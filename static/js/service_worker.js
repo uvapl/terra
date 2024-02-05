@@ -1,12 +1,26 @@
+/*
+ * Copyright 2020 WebAssembly Community Group participants
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 // Copied from:
 // https://developers.google.com/web/fundamentals/primers/service-workers/
 // https://developers.google.com/web/fundamentals/primers/service-workers/lifecycle
 // https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers
 
-const CACHE_NAME = 'v4';
+const CACHE_NAME = 'v1';
 const expectedCaches = [CACHE_NAME];
-
-const cdn = 'https://cdnjs.cloudflare.com/ajax/libs';
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -26,10 +40,11 @@ self.addEventListener('install', event => {
         '/index.html',
         '/static/css/main.css',
         '/static/wasm/memfs',
-        '/static/js/shared.js',
-        '/static/js/shared_web.js',
+        '/static/js/wasm/utils.js',
+        '/static/js/wasm/layout_components.js',
         '/static/js/worker.js',
-        '/static/main.js',
+        '/static/js/constants.js',
+        '/static/js/main.js',
       ]);
     })
   );
