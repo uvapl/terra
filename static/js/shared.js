@@ -1,19 +1,3 @@
-/*
- * Copyright 2020 WebAssembly Community Group participants
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 function sleep(ms) {
   return new Promise((resolve, _) => setTimeout(resolve, ms));
 }
@@ -285,56 +269,7 @@ const API = (function() {
       this.handles = new Map();
       this.nextHandle = 0;
 
-      const env = getImportObject(this, [
-        'canvas_arc',
-        'canvas_arcTo',
-        'canvas_beginPath',
-        'canvas_bezierCurveTo',
-        'canvas_clearRect',
-        'canvas_clip',
-        'canvas_closePath',
-        'canvas_createImageData',
-        'canvas_destroyHandle',
-        'canvas_ellipse',
-        'canvas_fill',
-        'canvas_fillRect',
-        'canvas_fillText',
-        'canvas_imageDataSetData',
-        'canvas_lineTo',
-        'canvas_measureText',
-        'canvas_moveTo',
-        'canvas_putImageData',
-        'canvas_quadraticCurveTo',
-        'canvas_rect',
-        'canvas_requestAnimationFrame',
-        'canvas_restore',
-        'canvas_rotate',
-        'canvas_save',
-        'canvas_scale',
-        'canvas_setFillStyle',
-        'canvas_setFont',
-        'canvas_setGlobalAlpha',
-        'canvas_setHeight',
-        'canvas_setLineCap',
-        'canvas_setLineDashOffset',
-        'canvas_setLineJoin',
-        'canvas_setLineWidth',
-        'canvas_setMiterLimit',
-        'canvas_setShadowBlur',
-        'canvas_setShadowColor',
-        'canvas_setShadowOffsetX',
-        'canvas_setShadowOffsetY',
-        'canvas_setStrokeStyle',
-        'canvas_setTextAlign',
-        'canvas_setTextBaseline',
-        'canvas_setTransform',
-        'canvas_setWidth',
-        'canvas_stroke',
-        'canvas_strokeRect',
-        'canvas_strokeText',
-        'canvas_transform',
-        'canvas_translate',
-      ]);
+      const env = getImportObject(this, []);
 
       const wasi_unstable = getImportObject(this, [
         'proc_exit', 'environ_sizes_get', 'environ_get', 'args_sizes_get',
@@ -451,129 +386,6 @@ const API = (function() {
 
     poll_oneoff(in_ptr, out_ptr, nsubscriptions, nevents_out) {
       throw new NotImplemented('wasi_unstable', 'poll_oneoff');
-    }
-
-    canvas_destroyHandle(handle) {
-      this.handles.delete(handle);
-    }
-
-    // Canvas API
-    canvas_setWidth(width) { if (canvas) canvas.width = width; }
-    canvas_setHeight(height) { if (canvas) canvas.height = height; }
-    canvas_requestAnimationFrame() {
-      if (this.allowRequestAnimationFrame) {
-        requestAnimationFrame(ms => {
-          if (this.allowRequestAnimationFrame) {
-            this.exports.canvas_loop(ms);
-          }
-        });
-      }
-    }
-
-    // ImageData stuff
-    canvas_createImageData(w, h) {
-      if (ctx2d) {
-        const imageData = ctx2d.createImageData(w, h);
-        const handle = this.nextHandle++;
-        this.handles.set(handle, imageData);
-        return handle;
-      }
-      return -1;
-    }
-    canvas_putImageData(handle, x, y) {
-      if (ctx2d) {
-        const imageData = this.handles.get(handle);
-        if (imageData) {
-          ctx2d.putImageData(imageData, x, y);
-        }
-      }
-    }
-    canvas_imageDataSetData(handle, buffer, offset, size) {
-      const imageData = this.handles.get(handle);
-      if (imageData) {
-        this.mem.check();
-        const src = new Uint8Array(this.mem.buffer, buffer, size);
-        imageData.data.set(src, offset);
-      }
-    }
-
-    // Other Canvas methods.
-    canvas_arc(...args) { if (ctx2d) ctx2d.arc(...args); }
-    canvas_arcTo(...args) { if (ctx2d) ctx2d.arcTo(...args); }
-    canvas_beginPath(...args) { if (ctx2d) ctx2d.beginPath(...args); }
-    canvas_bezierCurveTo(...args) { if (ctx2d) ctx2d.bezierCurveTo(...args); }
-    canvas_clearRect(...args) { if (ctx2d) ctx2d.clearRect(...args); }
-    canvas_clip(value) { if (ctx2d) ctx2d.clip(['nonzero', 'evenodd'][value]); }
-    canvas_closePath(...args) { if (ctx2d) ctx2d.closePath(...args); }
-    canvas_ellipse(...args) { if (ctx2d) ctx2d.ellipse(...args); }
-    canvas_fill(value) { if (ctx2d) ctx2d.fill(['nonzero', 'evenodd'][value]); }
-    canvas_fillRect(...args) { if (ctx2d) ctx2d.fillRect(...args); }
-    canvas_fillText(text, text_len, x, y) {  // TODO: maxwidth
-      this.mem.check();
-      if (ctx2d) ctx2d.fillText(this.mem.readStr(text, text_len), x, y);
-    }
-    canvas_lineTo(...args) { if (ctx2d) ctx2d.lineTo(...args); }
-    canvas_measureText(text, text_len) {
-      this.mem.check();
-      if (ctx2d) return ctx2d.measureText(this.mem.readStr(text, text_len)).width;
-      return 0;
-    }
-    canvas_moveTo(...args) { if (ctx2d) ctx2d.moveTo(...args); }
-    canvas_quadraticCurveTo(...args) { if (ctx2d) ctx2d.quadraticCurveTo(...args); }
-    canvas_rect(...args) { if (ctx2d) ctx2d.rect(...args); }
-    canvas_restore(...args) { if (ctx2d) ctx2d.restore(...args); }
-    canvas_rotate(...args) { if (ctx2d) ctx2d.rotate(...args); }
-    canvas_save(...args) { if (ctx2d) ctx2d.save(...args); }
-    canvas_scale(...args) { if (ctx2d) ctx2d.scale(...args); }
-    canvas_setTransform(...args) { if (ctx2d) ctx2d.setTransform(...args); }
-    canvas_stroke(...args) { if (ctx2d) ctx2d.stroke(...args); }
-    canvas_strokeRect(...args) { if (ctx2d) ctx2d.strokeRect(...args); }
-    canvas_strokeText(text, text_len, x, y) {  // TODO: maxwidth
-      this.mem.check();
-      if (ctx2d) ctx2d.strokeText(this.mem.readStr(text, text_len), x, y);
-    }
-    canvas_transform(...args) { if (ctx2d) ctx2d.transform(...args); }
-    canvas_translate(...args) { if (ctx2d) ctx2d.translate(...args); }
-
-    // Canvas properties.
-    canvas_setFillStyle(buf, len) {
-      this.mem.check();
-      if (ctx2d) ctx2d.fillStyle = this.mem.readStr(buf, len);
-    }
-    canvas_setFont(buf, len) {
-      this.mem.check();
-      if (ctx2d) ctx2d.font = this.mem.readStr(buf, len);
-    }
-    canvas_setGlobalAlpha(value) { if (ctx2d) ctx2d.globalAlpha = value; }
-    canvas_setLineCap(value) {
-      if (ctx2d) ctx2d.lineCap = ['butt', 'round', 'square'][value];
-    }
-    canvas_setLineDashOffset(value) { if (ctx2d) ctx2d.lineDashOffset = value; }
-    canvas_setLineJoin(value) {
-      if (ctx2d) ctx2d.lineJoin = ['bevel', 'round', 'miter'][value];
-    }
-    canvas_setLineWidth(value) { if (ctx2d) ctx2d.lineWidth = value; }
-    canvas_setMiterLimit(value) { if (ctx2d) ctx2d.miterLimit = value; }
-    canvas_setShadowBlur(value) { if (ctx2d) ctx2d.shadowBlur = value; }
-    canvas_setShadowColor(buf, len) {
-      this.mem.check();
-      if (ctx2d) ctx2d.shadowColor = this.mem.readStr(buf, len);
-    }
-    canvas_setShadowOffsetX(value) { if (ctx2d) ctx2d.setShadowOffsetX = value; }
-    canvas_setShadowOffsetY(value) { if (ctx2d) ctx2d.setShadowOffsetY = value; }
-    canvas_setStrokeStyle(buf, len) {
-      this.mem.check();
-      if (ctx2d) ctx2d.strokeStyle = this.mem.readStr(buf, len);
-    }
-    canvas_setTextAlign(value) {
-      if (ctx2d)
-        ctx2d.textAlign = ['left', 'right', 'center', 'start', 'end'][value];
-    }
-    canvas_setTextBaseline(value) {
-      if (ctx2d)
-        ctx2d.textBaseline = [
-          'top', 'hanging', 'middle', 'alphabetic', 'ideographic', 'bottom'
-        ][value];
     }
   }
 
@@ -775,7 +587,7 @@ const API = (function() {
         lld, 'wasm-ld', '--no-threads',
         '--export-dynamic',  // TODO required?
         '-z', `stack-size=${stackSize}`, `-L${libdir}`, crt1, obj, '-lc',
-        '-lc++', '-lc++abi', '-lcanvas', '-o', wasm)
+        '-lc++', '-lc++abi', '-o', wasm)
     }
 
     async run(module, ...args) {

@@ -1,35 +1,165 @@
+:root {
+  --font-size: 18px;
+  --navbar-padding: 10px;
+  --editor-tab-font-size: 12px;
+}
+
 * {
   box-sizing: border-box;
 }
 
-html, body {
+body {
+  margin: 0;
+  font-size: var(--font-size);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+html,
+body {
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
-.container {
+.app-container {
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-.layout-container {
+.layout-container,
+.layout-outer-container {
   width: 100%;
   height: 100%;
 }
 
-.font-size {
-  float: left;
-  padding: 0 1em;
-  font-size: small;
+.layout-outer-container {
+  position: relative;
 }
 
 .hidden {
   display: none !important;
 }
 
+.font-size {
+  font-size: 14px;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 3;
+}
+
+.font-size select {
+  -webkit-appearance: none;
+  border: 1px solid #999;
+  background: none;
+  border-radius: 4px;
+  padding: 3px 18px 3px 5px;
+}
+
+.font-size select:active {
+  background: #ccc;
+}
+
+.font-size:before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-left: 4px solid rgba(255, 255, 255, 0);
+  border-right: 4px solid rgba(255, 255, 255, 0);
+  border-top: 5px solid #000;
+  top: 50%;
+  right: 7px;
+  transform: translateY(-50%);
+}
+
+.run-code-btn {
+  -webkit-appearance: none;
+  background: #62c0ff;
+  border-radius: 4px;
+  border: 1px solid black;
+}
+
+.run-code-btn:active {
+  background: #5dabdf;
+}
+
+.terminal-component-container .lm_tabs {
+  display: none;
+}
+
+/* ========================================================================== */
+/* NAV                                                                        */
+/* ========================================================================== */
+.navbar {
+  position: relative;
+  padding: var(--navbar-padding);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-image: linear-gradient(180deg, rgba(132, 250, 176, 0.99) 95%, rgba(143, 211, 244, 0.99) 100%);
+  color: #006b4b;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.navbar-right ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.navbar-right li {
+  padding: var(--navbar-padding);
+  text-align: center;
+}
+
+.navbar-right span {
+  display: block;
+}
+
+.page-title {
+  margin: 0;
+  font-weight: normal;
+}
+
+/* ========================================================================== */
+/* GoldenLayout overrides                                                     */
+/* ========================================================================== */
+.lm_header .lm_tab {
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.lm_header {
+  display: flex;
+  align-items: center
+}
+
+.lm_header .lm_tabs {
+  height: 100%;
+}
+
+.lm_content,
+.lm_header .lm_tab {
+  border-color: #999;
+}
+
+
 .lm_header .lm_tab {
   padding: 0 10px 5px;
+  height: 100%;
+}
+
+.lm_header [class^="lm_"] {
+  box-sizing: inherit !important;
 }

@@ -1,31 +1,18 @@
-/*
- * Copyright 2020 WebAssembly Community Group participants
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-// Warn on close. It's easy to accidentally hit Ctrl+W.
-window.addEventListener('beforeunload', event => {
-  event.preventDefault();
-  event.returnValue = '';
-});
+const LOCAL_STORAGE_PREFIX = 'uva-tentamen-ide';
 
 window.addEventListener('resize', event => layout.updateSize(window.innerWidth, window.innerHeight));
 
+function setLocalStorageItem(key, value) {
+  localStorage.setItem(`${LOCAL_STORAGE_PREFIX}-${key}`, value);
+}
+
+function getLocalStorageItem(key, defaultValue) {
+  const value = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}-${key}`);
+  return typeof value === 'undefined' && typeof defaultValue !== 'undefined' ? defaultValue : value;
+}
+
 let editor;
 const run = debounceLazy(editor => {
-  // console.log('editor', editor.container);
-  // console.log('editor value', editor.container.getState());
   return api.compileLinkRun(editor.getValue());
 }, 100);
 
@@ -49,7 +36,11 @@ function EditorComponent(container, state) {
   }, 500));
 
   container.on('show', () => {
+    // Update the current editor.
     editor = this.editor;
+
+    // Add custom class for styling purposes.
+    container.parent.parent.element[0].classList.add('editor-component-container');
   });
 
   container.on('fontSizeChanged', setFontSize);
@@ -70,12 +61,18 @@ function TerminalComponent(container, state) {
     term.setOption('fontSize', fontSize);
     term.fit();
   };
+
   container.on('open', () => {
+    // Add custom class for styling purposes.
+    container.parent.parent.element[0].classList.add('terminal-component-container');
+
+    // Set font-size.
     const fontSize = state.fontSize || 18;
     term = new Terminal({ convertEol: true, disableStdin: true, fontSize });
     term.open(container.getElement()[0]);
     setFontSize(fontSize);
   });
+
   container.on('fontSizeChanged', setFontSize);
   container.on('resize', debounceLazy(() => term.fit(), 20));
   container.on('destroy', () => {
@@ -86,32 +83,9 @@ function TerminalComponent(container, state) {
   });
 }
 
-let canvas;
-function CanvasComponent(container, state) {
-  const canvasEl = document.createElement('canvas');
-  canvasEl.className = 'canvas';
-  container.getElement()[0].appendChild(canvasEl);
-  // TODO: Figure out how to proxy canvas calls. I started to work on this, but
-  // it's trickier than I thought to handle things like rAF. I also don't think
-  // it's possible to handle ctx2d.measureText.
-  if (canvasEl.transferControlToOffscreen) {
-    api.postCanvas(canvasEl.transferControlToOffscreen());
-  } else {
-    const w = 800;
-    const h = 600;
-    canvasEl.width = w;
-    canvasEl.height = h;
-    const ctx2d = canvasEl.getContext('2d');
-    const msg = 'offscreenCanvas is not supported :(';
-    ctx2d.font = 'bold 35px sans';
-    ctx2d.fillStyle = 'black';
-    const x = (w - ctx2d.measureText(msg).width) / 2;
-    const y = (h + 20) / 2;
-    ctx2d.fillText(msg, x, y);
-  }
-}
-
 class Layout extends GoldenLayout {
+  createdRunBtn = false;
+
   constructor(options) {
     // let layoutConfig = localStorage.getItem(options.configKey);
     // if (layoutConfig) {
@@ -130,55 +104,29 @@ class Layout extends GoldenLayout {
     }, 500));
 
     this.on('stackCreated', stack => {
-      // Set first editor component to be the active one
-      if (!editor) {
-        editor = stack.contentItems[0].instance.editor;
-        console.log(editor);
+      this.setActiveEditor(stack);
+
+      if (!this.createdRunBtn) {
+        this.createRunBtn();
+        this.createdRunBtn = true;
       }
-      this.createFontSizeElement(stack);
     });
 
     this.registerComponent('editor', EditorComponent);
     this.registerComponent('terminal', TerminalComponent);
   }
 
-  createFontSizeElement(stack) {
-    const fontSizeEl = document.createElement('div');
-
-    const labelEl = document.createElement('label');
-    labelEl.textContent = 'FontSize: ';
-    fontSizeEl.appendChild(labelEl);
-
-    const selectEl = document.createElement('select');
-    fontSizeEl.className = 'font-size';
-    fontSizeEl.appendChild(selectEl);
-
-    const sizes = [8, 9, 10, 11, 12, 14, 18, 24, 30, 36, 48, 60];
-    for (let size of sizes) {
-      const optionEl = document.createElement('option');
-      optionEl.value = size;
-      optionEl.textContent = size;
-      selectEl.appendChild(optionEl);
+  setActiveEditor(stack) {
+    // Set first editor component to be the active one.
+    if (!editor) {
+      editor = stack.contentItems[0].instance.editor;
     }
+  }
 
-    fontSizeEl.addEventListener('change', event => {
-      const contentItem = stack.getActiveContentItem();
-      const name = contentItem.config.componentName;
-      console.log('config', contentItem.config);
-      contentItem.container.emit('fontSizeChanged', event.target.value);
-    });
-
-    stack.header.controlsContainer.prepend(fontSizeEl);
-
-    stack.on('activeContentItemChanged', contentItem => {
-      const state = contentItem.container.getState();
-      if (state && state.fontSize) {
-        fontSizeEl.style.display = '';
-        selectEl.value = state.fontSize;
-      } else {
-        fontSizeEl.style.display = 'none';
-      }
-    });
+  createRunBtn() {
+    const runBtn = document.createElement('button');
+    $('.lm_header').first().append('<ul class="lm_controls"><button id="run" class="run-code-btn">Run</button></ul>');
+    $('#run').click(() => run(editor));
   }
 }
 
@@ -196,10 +144,6 @@ class WorkerAPI {
       [remotePort]);
   }
 
-  setShowTiming(value) {
-    this.port.postMessage({ id: 'setShowTiming', data: value });
-  }
-
   terminate() {
     this.worker.terminate();
   }
@@ -213,21 +157,8 @@ class WorkerAPI {
     return await responsePromise;
   }
 
-  async compileToAssembly(options) {
-    return this.runAsync('compileToAssembly', options);
-  }
-
-  async compileTo6502(options) {
-    return this.runAsync('compileTo6502', options);
-  }
-
   compileLinkRun(contents) {
     this.port.postMessage({ id: 'compileLinkRun', data: contents });
-  }
-
-  postCanvas(offscreenCanvas) {
-    this.port.postMessage({ id: 'postCanvas', data: offscreenCanvas },
-      [offscreenCanvas]);
   }
 
   onmessage(event) {
@@ -251,8 +182,6 @@ class WorkerAPI {
 
 const api = new WorkerAPI();
 
-
-// ServiceWorker stuff
 if (navigator.serviceWorker) {
   navigator.serviceWorker.register('/static/js/service_worker.js')
     .then(reg => {
