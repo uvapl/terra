@@ -185,7 +185,7 @@ class WorkerAPI {
   }
 }
 
-new WorkerAPI();
+const api = new WorkerAPI();
 
 if (navigator.serviceWorker) {
   navigator.serviceWorker.register('/static/js/service_worker.js')
