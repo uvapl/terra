@@ -1,26 +1,19 @@
 const initialProgram =
-  `#include <stdio.h>
+`#include <stdio.h>
 
 int main(void)
 {
-    int height = 8;
+    printf("snake.c");
+    return 0;
+}
+`;
 
-    printf("\\n");
-    for (int lijn = 0; lijn < height; lijn++)
-    {
-        for (int spatie = 1; spatie <= height-lijn - 1; spatie++)
-        {
-            printf(" ");
-        }
-        for(int breedte=0; breedte <= lijn; breedte++)
-        {
-          printf("#");
-        }
-        {
-          printf("\\n");
-        }
-    }
+const initialProgram2 =
+`#include <stdio.h>
 
+int main(void)
+{
+    printf("hello.c");
     return 0;
 }
 `;
@@ -61,14 +54,20 @@ const defaultLayoutConfig = {
             {
               type: 'component',
               componentName: 'editor',
-              componentState: { fontSize: fontSize, value: initialProgram },
+              componentState: {
+                fontSize: fontSize,
+                value: initialProgram
+              },
               title: 'snake.c',
               isClosable: false,
             },
             {
               type: 'component',
               componentName: 'editor',
-              componentState: { fontSize: fontSize, value: initialProgram },
+              componentState: {
+                fontSize: fontSize,
+                value: initialProgram2
+              },
               title: 'hello.c',
               isClosable: false,
             },

@@ -79,6 +79,7 @@ body {
 
 .run-code-btn {
   -webkit-appearance: none;
+  padding: 3px 5px;
   background: #62c0ff;
   border-radius: 4px;
   border: 1px solid black;
@@ -90,6 +91,10 @@ body {
 
 .terminal-component-container .lm_tabs {
   display: none;
+}
+
+.editor-component-container .lm_header {
+  padding-left: 5px;
 }
 
 /* ========================================================================== */
@@ -154,10 +159,20 @@ body {
   border-color: #999;
 }
 
-
 .lm_header .lm_tab {
   padding: 0 10px 5px;
-  height: 100%;
+  height: calc(100% - 1px);
+  margin-right: 5px;
+  margin-top: 2px;
+}
+
+.lm_tab:hover, .lm_tab.lm_active {
+  background: #cfcfcf;
+}
+
+.lm_header .lm_tab.lm_active {
+  box-shadow: none;
+  color: #000;
 }
 
 .lm_header [class^="lm_"] {
