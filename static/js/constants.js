@@ -1,1 +1,2 @@
-const LOCAL_STORAGE_PREFIX = 'uva-tentamen-ide';
+const LOCAL_STORAGE_PREFIX = 'examide';
+const LAYOUT_CONFIG_KEY = `${LOCAL_STORAGE_PREFIX}-layout`;
