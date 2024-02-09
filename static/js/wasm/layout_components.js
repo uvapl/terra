@@ -22,7 +22,7 @@ function getActiveEditor() {
 
 const runCode = debounceLazy(() => {
   const editor = getActiveEditor();
-  api.compileLinkRun(editor.config.title, editor.container.getState().value);
+  return api.compileLinkRun(editor.config.title, editor.container.getState().value);
 }, 100);
 
 function EditorComponent(container, state) {
@@ -137,12 +137,19 @@ class Layout extends GoldenLayout {
 
   createControls() {
     // Add the buttons to the header.
-    console.log('element', $('.editor-component-container .lm_header'));
     $('.editor-component-container .lm_header').append('<ul class="lm_controls"><button id="run" class="button run-code-btn">Run</button></ul>');
-    $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn">Clear output</button>');
+    $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn">Clear terminal</button>');
 
     // Add event listeners.
-    $('#run').click(() => runCode());
+    $('#run').click((event) => {
+      const $button = $(event.target);
+      if ($button.prop('disabled')) return;
+
+      $button.prop('disabled', true);
+      runCode().then(() => {
+        $button.prop('disabled', false);
+      });
+    });
     $('#clear-term').click(() => term.clear());
   }
 }

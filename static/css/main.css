@@ -94,8 +94,17 @@ body {
   background: #5dabdf;
 }
 
-.lm_controls .button {
+.run-code-btn[disabled] {
+  background: #cfcfcf;
+  color: #606060;
+}
 
+.clear-term-btn {
+  background: #f75a4a;
+}
+
+.clear-term-btn:active {
+  background: #e64a3a;
 }
 
 .lm_controls button + button {
