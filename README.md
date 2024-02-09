@@ -40,10 +40,10 @@ $ tar -tf static/wasm/sysroot.tar | tail                 # Optionally, you can c
 $ rm -rf include/                                        # Remove the include folder
 ```
 
-To see the changes, make sure to do a "hard refresh"" in your browser to see the
+To see the changes, make sure to do a "hard refresh" in your browser to see the
 changes, which can be done in most browsers through:
 
-- MacOS: <kbd>CMD</kbd> + <kbd>Shift</kbd> + <kbd>r</kbd>
+- MacOS: <kbd>&#8984;</kbd> + <kbd>Shift</kbd> + <kbd>r</kbd>
 - Windows: <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>r</kbd>
 
 Alternatively, remove the *Cache Storage* entries through the web inspector in your browser.
