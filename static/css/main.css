@@ -60,6 +60,7 @@ body {
   padding: 3px 18px 3px 5px;
 }
 
+.button:active,
 .font-size select:active {
   background: #ccc;
 }
@@ -77,16 +78,28 @@ body {
   transform: translateY(-50%);
 }
 
-.run-code-btn {
+.button {
   -webkit-appearance: none;
   padding: 3px 5px;
-  background: #62c0ff;
+  background: #fff;
   border-radius: 4px;
-  border: 1px solid black;
+  border: 1px solid #000;
+}
+
+.run-code-btn {
+  background: #62c0ff;
 }
 
 .run-code-btn:active {
   background: #5dabdf;
+}
+
+.lm_controls .button {
+
+}
+
+.lm_controls button + button {
+  margin-left: 5px;
 }
 
 .terminal-component-container .lm_tabs {

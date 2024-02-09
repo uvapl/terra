@@ -98,7 +98,7 @@ function TerminalComponent(container, state) {
 }
 
 class Layout extends GoldenLayout {
-  createdRunBtn = false;
+  createdControls = false;
 
   constructor(options) {
     // let layoutConfig = localStorage.getItem(options.configKey);
@@ -118,9 +118,12 @@ class Layout extends GoldenLayout {
     }, 500));
 
     this.on('stackCreated', stack => {
-      if (!this.createdRunBtn) {
-        this.createRunBtn();
-        this.createdRunBtn = true;
+      if (!this.createdControls) {
+        // Do a set-timeout trick to make sure the components are registered
+        // through the registerComponent() function, prior to calling this part.
+        setTimeout(this.createControls, 0);
+
+        this.createdControls = true;
       }
     });
 
@@ -128,12 +131,15 @@ class Layout extends GoldenLayout {
     this.registerComponent('terminal', TerminalComponent);
   }
 
-  createRunBtn() {
-    // Add the Run button to the header.
-    $('.lm_header').first().append('<ul class="lm_controls"><button id="run" class="run-code-btn">Run</button></ul>');
+  createControls() {
+    // Add the buttons to the header.
+    console.log('element', $('.editor-component-container .lm_header'));
+    $('.editor-component-container .lm_header').append('<ul class="lm_controls"><button id="run" class="button run-code-btn">Run</button></ul>');
+    $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn">Clear output</button>');
 
-    // Add the run button event listener.
+    // Add event listeners.
     $('#run').click(() => run());
+    $('#clear-term').click(() => term.clear());
   }
 }
 
