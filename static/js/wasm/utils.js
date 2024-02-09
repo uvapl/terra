@@ -102,10 +102,6 @@ const API = (function() {
     return result;
   }
 
-  function msToSec(start, end) {
-    return ((end - start) / 1000).toFixed(2);
-  }
-
   const ESUCCESS = 0;
 
   class Memory {
@@ -269,7 +265,6 @@ const API = (function() {
       const dst = new Uint8Array(this.hostMem_.buffer, clang_dst, size);
       this.mem.check();
       const src = new Uint8Array(this.mem.buffer, memfs_src, size);
-      // console.log(`copy_out(${clang_dst.toString(16)}, ${memfs_src.toString(16)}, ${size})`);
       dst.set(src);
     }
 
@@ -278,7 +273,6 @@ const API = (function() {
       const dst = new Uint8Array(this.mem.buffer, memfs_dst, size);
       this.hostMem_.check();
       const src = new Uint8Array(this.hostMem_.buffer, clang_src, size);
-      // console.log(`copy_in(${memfs_dst.toString(16)}, ${clang_src.toString(16)}, ${size})`);
       dst.set(src);
     }
   }
@@ -480,7 +474,7 @@ const API = (function() {
           case '0': // Regular file.
             memfs.addFile(entry.filename, entry.contents);
             break;
-          case '5':
+          case '5': // Directory.
             memfs.addDirectory(entry.filename);
             break;
         }
@@ -497,7 +491,6 @@ const API = (function() {
       this.clangFilename = options.clang || 'clang';
       this.lldFilename = options.lld || 'lld';
       this.sysrootFilename = options.sysroot || 'sysroot.tar';
-      this.showTiming = options.showTiming || false;
 
       this.clangCommonArgs = [
         '-disable-free',
@@ -515,90 +508,48 @@ const API = (function() {
         hostWrite: this.hostWrite,
         memfsFilename: options.memfs || 'memfs',
       });
-      this.ready = this.memfs.ready.then(
-        () => { return this.untar(this.memfs, this.sysrootFilename); });
+      this.ready = this.memfs.ready.then(() => {
+        return this.untar(this.sysrootFilename);
+      });
     }
 
     hostLog(message) {
-      const yellowArrow = '\x1b[1;93m>\x1b[0m ';
-      this.hostWrite(`${yellowArrow}${message}`);
+      this.hostWrite(`\$ ${message}`);
     }
 
     async hostLogAsync(message, promise) {
-      const start = +new Date();
       this.hostLog(`${message}...`);
       const result = await promise;
-      const end = +new Date();
-      this.hostWrite(' done.');
-      if (this.showTiming) {
-        const green = '\x1b[92m';
-        const normal = '\x1b[0m';
-        this.hostWrite(` ${green}(${msToSec(start, end)}s)${normal}\n`);
-      }
-      this.hostWrite('\n');
+      this.hostWrite(' done.\n');
       return result;
     }
 
     async getModule(name) {
       if (this.moduleCache[name]) return this.moduleCache[name];
-      const module = await this.hostLogAsync(`Fetching and compiling ${name}`,
-        this.compileStreaming(name));
+      const module = await this.compileStreaming(name);
       this.moduleCache[name] = module;
       return module;
     }
 
-    async untar(memfs, filename) {
+    async untar(filename) {
       await this.memfs.ready;
-      const promise = (async () => {
-        const tar = new Tar(await this.readBuffer(filename));
-        tar.untar(this.memfs);
-      })();
-      await this.hostLogAsync(`Untarring ${filename}`, promise);
+      const tar = new Tar(await this.readBuffer(filename));
+      tar.untar(this.memfs);
     }
 
     async compile(options) {
       const input = options.input;
       const contents = options.contents;
       const obj = options.obj;
-      const opt = options.opt || '2';
 
       await this.ready;
       this.memfs.addFile(input, contents);
       const clang = await this.getModule(this.clangFilename);
-      return await this.run(clang, 'clang', '-cc1', '-emit-obj',
+      return await this.run([
+        clang, 'clang', '-cc1', '-emit-obj',
         ...this.clangCommonArgs, '-O2', '-o', obj, '-x',
-        'c++', input);
-    }
-
-    async compileToAssembly(options) {
-      const input = options.input;
-      const output = options.output;
-      const contents = options.contents;
-      const obj = options.obj;
-      const triple = options.triple || 'x86_64';
-      const opt = options.opt || '2';
-
-      await this.ready;
-      this.memfs.addFile(input, contents);
-      const clang = await this.getModule(this.clangFilename);
-      await this.run(clang, 'clang', '-cc1', '-S', ...this.clangCommonArgs,
-        `-triple=${triple}`, '-mllvm',
-        '--x86-asm-syntax=intel', `-O${opt}`,
-        '-o', output, '-x', 'c++', input);
-      return this.memfs.getFileContents(output);
-    }
-
-    async compileTo6502(options) {
-      const input = options.input;
-      const output = options.output;
-      const contents = options.contents;
-      const flags = options.flags;
-
-      await this.ready;
-      this.memfs.addFile(input, contents);
-      const vasm = await this.getModule('vasm6502_oldstyle');
-      await this.run(vasm, 'vasm6502_oldstyle', ...flags, '-o', output, input);
-      return this.memfs.getFileContents(output);
+        'c++', input
+      ], { hostLog: false });
     }
 
     async link(obj, wasm) {
@@ -608,42 +559,39 @@ const API = (function() {
       const crt1 = `${libdir}/crt1.o`;
       await this.ready;
       const lld = await this.getModule(this.lldFilename);
-      return await this.run(
+      return await this.run([
         lld, 'wasm-ld', '--no-threads',
-        '--export-dynamic',  // TODO required?
+        '--export-dynamic',
         '-z', `stack-size=${stackSize}`, `-L${libdir}`, crt1, obj, '-lc',
-        '-lc++', '-lc++abi', '-o', wasm)
+        '-lc++', '-lc++abi', '-o', wasm
+        ]);
     }
 
-    async run(module, ...args) {
-      this.hostLog(`${args.join(' ')}\n`);
-      const start = +new Date();
+    async run(cmd) {
+      const [ module, ...args ] = cmd;
       const app = new App(module, this.memfs, ...args);
-      const instantiate = +new Date();
       const stillRunning = await app.run();
-      const end = +new Date();
-      this.hostWrite('\n');
-      if (this.showTiming) {
-        const green = '\x1b[92m';
-        const normal = '\x1b[0m';
-        let msg = `${green}(${msToSec(start, instantiate)}s`;
-        msg += `/${msToSec(instantiate, end)}s)${normal}\n`;
-        this.hostWrite(msg);
-      }
       return stillRunning ? app : null;
     }
 
-    async compileLinkRun(contents) {
+    async compileLinkRun(data) {
+      const { filename, contents } = data;
       const input = `test.cc`;
       const obj = `test.o`;
       const wasm = `test.wasm`;
-      await this.compile({ input, contents, obj });
-      await this.link(obj, wasm);
 
-      const buffer = this.memfs.getFileContents(wasm);
-      const testMod = await this.hostLogAsync(`Compiling ${wasm}`,
-        WebAssembly.compile(buffer));
-      return await this.run(testMod, wasm);
+      const promise = (async () => {
+        await this.compile({ input, contents, obj });
+        await this.link(obj, wasm);
+        const buffer = this.memfs.getFileContents(wasm);
+        return WebAssembly.compile(buffer)
+      })();
+      const testMod = await this.hostLogAsync(`Compiling ${filename}`, promise);
+
+      this.hostWrite(`\$ ./${filename.replace(/\.c/, '')}\n`);
+      const result = await this.run([testMod, wasm]);
+      this.hostWrite('\n');
+      return result;
     }
   }
 

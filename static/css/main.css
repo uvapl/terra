@@ -93,6 +93,10 @@ body {
   display: none;
 }
 
+.terminal {
+  padding: 10px;
+}
+
 .editor-component-container .lm_header {
   padding-left: 5px;
 }

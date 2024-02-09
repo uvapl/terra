@@ -16,9 +16,13 @@
 
 window.addEventListener('resize', event => layout.updateSize(window.innerWidth, window.innerHeight));
 
-let editor;
-const run = debounceLazy(editor => {
-  return api.compileLinkRun(editor.getValue());
+function getActiveEditor() {
+  return layout.root.contentItems[0].contentItems[0].getActiveContentItem();
+}
+
+const run = debounceLazy(() => {
+  const editor = getActiveEditor();
+  api.compileLinkRun(editor.config.title, editor.container.getState().value);
 }, 100);
 
 function EditorComponent(container, state) {
@@ -41,9 +45,6 @@ function EditorComponent(container, state) {
   }, 500));
 
   container.on('show', () => {
-    // Update the current editor.
-    editor = this.editor;
-
     // Add custom class for styling purposes.
     container.parent.parent.element[0].classList.add('editor-component-container');
   });
@@ -74,6 +75,14 @@ function TerminalComponent(container, state) {
     // Set font-size.
     const fontSize = state.fontSize || 18;
     term = new Terminal({ convertEol: true, disableStdin: true, fontSize });
+    startingMessage = [
+      'Click the "run" button to execute code',
+      'Click the "clear terminal" to clear this terminal screen',
+    ];
+    for (const line of startingMessage) {
+      term.write(line + '\n');
+    }
+    term.write('\n');
     term.open(container.getElement()[0]);
     setFontSize(fontSize);
   });
@@ -109,8 +118,6 @@ class Layout extends GoldenLayout {
     }, 500));
 
     this.on('stackCreated', stack => {
-      this.setActiveEditor(stack);
-
       if (!this.createdRunBtn) {
         this.createRunBtn();
         this.createdRunBtn = true;
@@ -121,17 +128,12 @@ class Layout extends GoldenLayout {
     this.registerComponent('terminal', TerminalComponent);
   }
 
-  setActiveEditor(stack) {
-    // Set first editor component to be the active one.
-    if (!editor) {
-      editor = stack.contentItems[0].instance.editor;
-    }
-  }
-
   createRunBtn() {
-    const runBtn = document.createElement('button');
+    // Add the Run button to the header.
     $('.lm_header').first().append('<ul class="lm_controls"><button id="run" class="run-code-btn">Run</button></ul>');
-    $('#run').click(() => run(editor));
+
+    // Add the run button event listener.
+    $('#run').click(() => run());
   }
 }
 
@@ -162,8 +164,11 @@ class WorkerAPI {
     return await responsePromise;
   }
 
-  compileLinkRun(contents) {
-    this.port.postMessage({ id: 'compileLinkRun', data: contents });
+  compileLinkRun(filename, contents) {
+    this.port.postMessage({
+      id: 'compileLinkRun',
+      data: { filename, contents },
+    });
   }
 
   onmessage(event) {

@@ -3,7 +3,7 @@ const initialProgram =
 
 int main(void)
 {
-    printf("snake.c");
+    printf("Hello from test1.c");
     return 0;
 }
 `;
@@ -13,7 +13,7 @@ const initialProgram2 =
 
 int main(void)
 {
-    printf("hello.c");
+    printf("Hello from test2.c");
     return 0;
 }
 `;
@@ -58,7 +58,7 @@ const defaultLayoutConfig = {
                 fontSize: fontSize,
                 value: initialProgram
               },
-              title: 'snake.c',
+              title: 'test1.c',
               isClosable: false,
             },
             {
@@ -68,7 +68,7 @@ const defaultLayoutConfig = {
                 fontSize: fontSize,
                 value: initialProgram2
               },
-              title: 'hello.c',
+              title: 'test2.c',
               isClosable: false,
             },
           ]
