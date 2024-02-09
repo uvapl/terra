@@ -74,7 +74,12 @@ function TerminalComponent(container, state) {
 
     const fontSize = state.fontSize || 18;
 
-    term = new Terminal({ convertEol: true, disableStdin: true, fontSize })
+    term = new Terminal({
+      convertEol: true,
+      disableStdin: true,
+      fontSize,
+      lineHeight: 1.2
+    })
     term.loadAddon(fitAddon);
     term.open(document.querySelector('.terminal-component-container .lm_content'));
     fitAddon.fit();
