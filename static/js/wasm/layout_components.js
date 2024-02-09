@@ -20,7 +20,7 @@ function getActiveEditor() {
   return layout.root.contentItems[0].contentItems[0].getActiveContentItem();
 }
 
-const run = debounceLazy(() => {
+const runCode = debounceLazy(() => {
   const editor = getActiveEditor();
   api.compileLinkRun(editor.config.title, editor.container.getState().value);
 }, 100);
@@ -142,7 +142,7 @@ class Layout extends GoldenLayout {
     $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn">Clear output</button>');
 
     // Add event listeners.
-    $('#run').click(() => run());
+    $('#run').click(() => runCode());
     $('#clear-term').click(() => term.clear());
   }
 }
