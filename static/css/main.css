@@ -205,6 +205,43 @@ body {
   box-sizing: inherit !important;
 }
 
+.lm_splitter {
+  opacity: 1;
+  background: #fff;
+  transition: background 200ms ease;
+}
+
+.lm_splitter:hover {
+  background: #999;
+}
+
+.lm_splitter.lm_horizontal:before,
+.lm_splitter.lm_horizontal:after {
+  content: '';
+  width: 2px;
+  height: 30px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #b1b1b1;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+  opacity: 1;
+}
+
+.lm_splitter:hover:before,
+.lm_splitter:hover:after {
+  opacity: 0;
+}
+
+.lm_splitter.lm_horizontal:before {
+  left: 2px;
+}
+
+.lm_splitter.lm_horizontal:after {
+  right: 2px;
+}
+
 /* ========================================================================== */
 /* xterm.js overrides                                                         */
 /* ========================================================================== */

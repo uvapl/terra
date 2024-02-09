@@ -520,7 +520,7 @@ const API = (function() {
     async hostLogAsync(message, promise) {
       this.hostLog(`${message}...`);
       const result = await promise;
-      this.hostWrite(' done.\n');
+      this.hostWrite('done.\n');
       return result;
     }
 

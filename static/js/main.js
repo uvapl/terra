@@ -40,7 +40,7 @@ const defaultLayoutConfig = {
   },
   dimensions: {
     headerHeight: 30,
-    borderWidth: 8,
+    borderWidth: 10,
   },
   content: [
     {
