@@ -195,3 +195,10 @@ body {
 .lm_header [class^="lm_"] {
   box-sizing: inherit !important;
 }
+
+/* ========================================================================== */
+/* xterm.js overrides                                                         */
+/* ========================================================================== */
+.xterm .xterm-helper-textarea {
+  visibility: hidden !important;
+}

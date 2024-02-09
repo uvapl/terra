@@ -60,21 +60,25 @@ function EditorComponent(container, state) {
 }
 
 let term;
-Terminal.applyAddon(fit);
+const fitAddon = new FitAddon.FitAddon();
 function TerminalComponent(container, state) {
   const setFontSize = fontSize => {
     container.extendState({ fontSize });
-    term.setOption('fontSize', fontSize);
-    term.fit();
+    term.options.fontSize = fontSize;
+    fitAddon.fit();
   };
 
   container.on('open', () => {
     // Add custom class for styling purposes.
     container.parent.parent.element[0].classList.add('terminal-component-container');
 
-    // Set font-size.
     const fontSize = state.fontSize || 18;
-    term = new Terminal({ convertEol: true, disableStdin: true, fontSize });
+
+    term = new Terminal({ convertEol: true, disableStdin: true, fontSize })
+    term.loadAddon(fitAddon);
+    term.open(document.querySelector('.terminal-component-container .lm_content'));
+    fitAddon.fit();
+
     startingMessage = [
       'Click the "run" button to execute code',
       'Click the "clear terminal" to clear this terminal screen',
@@ -88,7 +92,7 @@ function TerminalComponent(container, state) {
   });
 
   container.on('fontSizeChanged', setFontSize);
-  container.on('resize', debounceLazy(() => term.fit(), 20));
+  container.on('resize', debounceLazy(() => fitAddon.fit(), 20));
   container.on('destroy', () => {
     if (term) {
       term.destroy();
