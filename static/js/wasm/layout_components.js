@@ -187,11 +187,13 @@ class WorkerAPI {
 
 const api = new WorkerAPI();
 
-if (navigator.serviceWorker) {
-  navigator.serviceWorker.register('/static/js/service_worker.js')
-    .then(reg => {
-      console.log('Registration succeeded. Scope is ' + reg.scope);
-    }).catch(error => {
-      console.log('Registration failed with ' + error);
-    });
-}
+// TODO: uncomment this to enable caching
+// ======================================
+// if (navigator.serviceWorker) {
+//   navigator.serviceWorker.register('/static/js/service_worker.js')
+//     .then(reg => {
+//       console.log('Registration succeeded. Scope is ' + reg.scope);
+//     }).catch(error => {
+//       console.log('Registration failed with ' + error);
+//     });
+// }

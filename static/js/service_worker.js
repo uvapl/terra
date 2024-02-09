@@ -19,7 +19,7 @@
 // https://developers.google.com/web/fundamentals/primers/service-workers/lifecycle
 // https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers
 
-const CACHE_NAME = 'v1';
+const CACHE_NAME = 'v4';
 const expectedCaches = [CACHE_NAME];
 
 self.addEventListener('install', event => {
