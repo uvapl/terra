@@ -20,6 +20,25 @@ function getActiveEditor() {
   return layout.root.contentItems[0].contentItems[0].getActiveContentItem();
 }
 
+function waitForInput() {
+  return new Promise(resolve => {
+    let value = '';
+    const disposable = term.onKey(e => {
+      // Only append allowed characters.
+      if (/^[a-zA-Z0-9\s\r]+$/g.test(e.key)) {
+        term.write(e.key == '\r' ? '\n' : e.key)
+        value += e.key;
+      }
+
+      // If the user presses enter, resolve the promise.
+      if (e.key === '\r') {
+        disposable.dispose();
+        resolve(value);
+      }
+    });
+  });
+}
+
 const runCode = debounceLazy(() => {
   const editor = getActiveEditor();
   return api.compileLinkRun(editor.config.title, editor.container.getState().value);
@@ -77,6 +96,7 @@ function TerminalComponent(container, state) {
     term = new Terminal({
       convertEol: true,
       disableStdin: true,
+      cursorBlink: true,
       fontSize,
       lineHeight: 1.2
     })
@@ -110,7 +130,7 @@ class Layout extends GoldenLayout {
   createdControls = false;
 
   constructor(options) {
-    // let layoutConfig = localStorage.getItem(options.configKey);
+    // let layoutConfig = getLocalStorageItem('layout');
     // if (layoutConfig) {
     //   layoutConfig = JSON.parse(layoutConfig);
     // } else {
@@ -123,7 +143,7 @@ class Layout extends GoldenLayout {
     this.on('stateChanged', debounceLazy(() => {
       const config = this.toConfig();
       const state = JSON.stringify(config);
-      localStorage.setItem(options.configKey, state);
+      setLocalStorageItem('layout', state);
     }, 500));
 
     this.on('stackCreated', stack => {
@@ -159,7 +179,14 @@ class Layout extends GoldenLayout {
   }
 }
 
+
 class WorkerAPI {
+  sharedMem = new WebAssembly.Memory({
+    initial: 1,
+    maximum: 80,
+    shared: true,
+  });
+
   constructor() {
     this.nextResponseId = 0;
     this.responseCBs = new Map();
@@ -167,10 +194,12 @@ class WorkerAPI {
     const channel = new MessageChannel();
     this.port = channel.port1;
     this.port.onmessage = this.onmessage.bind(this);
-
     const remotePort = channel.port2;
-    this.worker.postMessage({ id: 'constructor', data: remotePort },
-      [remotePort]);
+    
+    this.worker.postMessage({
+      id: 'constructor',
+      data: { port: remotePort, sharedMem: this.sharedMem  },
+    }, [remotePort]);
   }
 
   terminate() {
@@ -198,6 +227,24 @@ class WorkerAPI {
       case 'write':
         term.write(event.data.data);
         break;
+
+      case 'readLine': {
+        console.log('readline in layout_components');
+        waitForInput().then((value) => {
+          console.log('callback value', value);
+          const view = new Uint8Array(this.sharedMem.buffer);
+          for (let i = 0; i < value.length; i++) {
+            console.log('value:', value[i], value.charCodeAt(i))
+            // to the shared memory
+            view[i] = value.charCodeAt(i);
+          }
+          // the last byte is the null terminator
+          view[value.length] = 0;
+
+          Atomics.notify(new Int32Array(this.sharedMem.buffer), 0);
+        });
+        break;
+      }
 
       case 'runAsync': {
         const responseId = event.data.responseId;

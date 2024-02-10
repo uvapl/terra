@@ -1,9 +1,11 @@
 const initialProgram =
 `#include <stdio.h>
 
-int main(void)
-{
-    printf("Hello from test1.c");
+int main() {
+    int num;
+    printf("Enter a number: ");
+    scanf("%d", &num);
+    printf("The number you entered is %d\\n", num);
     return 0;
 }
 `;
@@ -85,7 +87,6 @@ const defaultLayoutConfig = {
 };
 
 const layout = new Layout({
-  configKey: `${LOCAL_STORAGE_PREFIX}-layout`,
   defaultLayoutConfig,
 });
 

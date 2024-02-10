@@ -241,10 +241,3 @@ body {
 .lm_splitter.lm_horizontal:after {
   right: 2px;
 }
-
-/* ========================================================================== */
-/* xterm.js overrides                                                         */
-/* ========================================================================== */
-.xterm .xterm-helper-textarea {
-  visibility: hidden !important;
-}

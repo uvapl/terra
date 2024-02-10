@@ -11,11 +11,13 @@ Simply clone the project:
 git clone https://github.com/uvapl/examide && cd examide
 ```
 
-You need some kind of tool that serves static files in order for everything to
-work, as it can't be run in `file:///path/to/index.html`.
+and then run the project:
+```
+python3 run.py
+```
 
-One example is to use Python's http module: `python3 -m http.server`, then open
-`localhost:8000` in your browser and enjoy.
+open `localhost:5000` and enjoy.
+
 
 # Adding custom header files
 

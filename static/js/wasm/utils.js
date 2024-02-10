@@ -154,8 +154,10 @@ const API = (function() {
     constructor(options) {
       const compileStreaming = options.compileStreaming;
       this.hostWrite = options.hostWrite;
+      this.hostRead = options.hostRead;
       this.stdinStr = options.stdinStr || "";
       this.stdinStrPos = 0;
+      this.sharedMem = options.sharedMem;
       this.memfsFilename = options.memfsFilename;
 
       this.hostMem_ = null;  // Set later when wired up to application.
@@ -212,6 +214,7 @@ const API = (function() {
     abort() { throw new AbortError(); }
 
     host_write(fd, iovs, iovs_len, nwritten_out) {
+      console.log('host_write called');
       this.hostMem_.check();
       assert(fd <= 2);
       let size = 0;
@@ -230,27 +233,48 @@ const API = (function() {
     }
 
     host_read(fd, iovs, iovs_len, nread) {
+      console.log('host_read called');
+      let str = '';
+      let strPos = 0;
+
+      this.hostRead();
+      Atomics.wait(new Int32Array(this.sharedMem.buffer), 0, 0);
+
+      // Read the value stored in memory.
+      const sharedMem = new Uint8Array(this.sharedMem.buffer);
+      for (let i = 0; ; i++) {
+        if (sharedMem[i] === 0) {
+          break;
+        }
+
+        str += String.fromCharCode(sharedMem[i]);
+      }
+
+      // clean shared memory
+      for (let i = 0; i < sharedMem.length; i++) {
+        sharedMem[i] = 0;
+      }
+
       this.hostMem_.check();
       assert(fd === 0);
+
       let size = 0;
       for (let i = 0; i < iovs_len; ++i) {
         const buf = this.hostMem_.read32(iovs);
         iovs += 4;
         const len = this.hostMem_.read32(iovs);
         iovs += 4;
-        const lenToWrite = Math.min(len, (this.stdinStr.length - this.stdinStrPos));
+        const lenToWrite = Math.min(len, (str.length - strPos));
         if (lenToWrite === 0) {
           break;
         }
-        this.hostMem_.write(buf, this.stdinStr.substr(this.stdinStrPos, lenToWrite));
+        this.hostMem_.write(buf, str.substr(strPos, lenToWrite));
         size += lenToWrite;
-        this.stdinStrPos += lenToWrite;
+        strPos += lenToWrite;
         if (lenToWrite !== len) {
           break;
         }
       }
-      // For logging
-      // this.hostWrite("Read "+ size + "bytes, pos: "+ this.stdinStrPos + "\n");
       this.hostMem_.write32(nread, size);
       return ESUCCESS;
     }
@@ -488,8 +512,10 @@ const API = (function() {
       this.readBuffer = options.readBuffer;
       this.compileStreaming = options.compileStreaming;
       this.hostWrite = options.hostWrite;
+      this.hostRead = options.hostReadLine;
       this.clangFilename = options.clang || 'clang';
       this.lldFilename = options.lld || 'lld';
+      this.sharedMem = options.sharedMem;
       this.sysrootFilename = options.sysroot || 'sysroot.tar';
 
       this.clangCommonArgs = [
@@ -506,6 +532,8 @@ const API = (function() {
       this.memfs = new MemFS({
         compileStreaming: this.compileStreaming,
         hostWrite: this.hostWrite,
+        hostRead: this.hostRead,
+        sharedMem: this.sharedMem,
         memfsFilename: options.memfs || 'memfs',
       });
       this.ready = this.memfs.ready.then(() => {
@@ -527,6 +555,7 @@ const API = (function() {
     async getModule(name) {
       if (this.moduleCache[name]) return this.moduleCache[name];
       const module = await this.compileStreaming(name);
+      console.log(`Compiled ${name}`, module);
       this.moduleCache[name] = module;
       return module;
     }

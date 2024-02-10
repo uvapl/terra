@@ -39,6 +39,10 @@ const apiOptions = {
   },
 
   hostWrite(s) { port.postMessage({ id: 'write', data: s }); },
+  hostReadLine() {
+    console.log('hostReadLine called')
+    port.postMessage({ id: 'readLine' });
+  },
 
   clang: '/static/wasm/clang',
   lld: '/static/wasm/lld',
@@ -51,8 +55,10 @@ let currentApp = null;
 const onAnyMessage = async event => {
   switch (event.data.id) {
     case 'constructor':
-      port = event.data.data;
+      const sharedMem = event.data.data.sharedMem;
+      port = event.data.data.port;
       port.onmessage = onAnyMessage;
+      apiOptions.sharedMem = sharedMem;
       api = new API(apiOptions);
       break;
 
