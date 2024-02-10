@@ -25,14 +25,15 @@ function waitForInput() {
     let value = '';
     const disposable = term.onKey(e => {
       // Only append allowed characters.
-      if (/^[a-zA-Z0-9\s\r]+$/g.test(e.key)) {
-        term.write(e.key == '\r' ? '\n' : e.key)
+      if (/^[a-zA-Z0-9\s]+$/g.test(e.key)) {
+        term.write(e.key);
         value += e.key;
       }
 
       // If the user presses enter, resolve the promise.
       if (e.key === '\r') {
         disposable.dispose();
+        term.write('\n');
         resolve(value);
       }
     });

@@ -155,7 +155,7 @@ const API = (function() {
       const compileStreaming = options.compileStreaming;
       this.hostWrite = options.hostWrite;
       this.hostRead = options.hostRead;
-      this.stdinStr = options.stdinStr || "";
+      this.stdinStr = options.stdinStr || '';
       this.stdinStrPos = 0;
       this.sharedMem = options.sharedMem;
       this.memfsFilename = options.memfsFilename;
@@ -214,7 +214,6 @@ const API = (function() {
     abort() { throw new AbortError(); }
 
     host_write(fd, iovs, iovs_len, nwritten_out) {
-      console.log('host_write called');
       this.hostMem_.check();
       assert(fd <= 2);
       let size = 0;
@@ -233,9 +232,7 @@ const API = (function() {
     }
 
     host_read(fd, iovs, iovs_len, nread) {
-      console.log('host_read called');
       let str = '';
-      let strPos = 0;
 
       this.hostRead();
       Atomics.wait(new Int32Array(this.sharedMem.buffer), 0, 0);
@@ -244,16 +241,17 @@ const API = (function() {
       const sharedMem = new Uint8Array(this.sharedMem.buffer);
       for (let i = 0; ; i++) {
         if (sharedMem[i] === 0) {
+          // Null terminator found, terminate the loop.
           break;
         }
 
         str += String.fromCharCode(sharedMem[i]);
       }
 
-      // clean shared memory
-      for (let i = 0; i < sharedMem.length; i++) {
-        sharedMem[i] = 0;
-      }
+      this.setStdinStr(str);
+
+      // Clean shared memory
+      sharedMem.fill(0);
 
       this.hostMem_.check();
       assert(fd === 0);
@@ -264,17 +262,20 @@ const API = (function() {
         iovs += 4;
         const len = this.hostMem_.read32(iovs);
         iovs += 4;
-        const lenToWrite = Math.min(len, (str.length - strPos));
+        const lenToWrite = Math.min(len, (this.stdinStr.length - this.stdinStrPos));
         if (lenToWrite === 0) {
           break;
         }
-        this.hostMem_.write(buf, str.substr(strPos, lenToWrite));
+
+        this.hostMem_.write(buf, this.stdinStr.substr(this.stdinStrPos, lenToWrite));
         size += lenToWrite;
-        strPos += lenToWrite;
+        this.stdinStrPos += lenToWrite;
+
         if (lenToWrite !== len) {
           break;
         }
       }
+
       this.hostMem_.write32(nread, size);
       return ESUCCESS;
     }

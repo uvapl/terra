@@ -12,10 +12,13 @@ int main() {
 
 const initialProgram2 =
 `#include <stdio.h>
+#include <stdint.h>
 
-int main(void)
-{
-    printf("Hello from test2.c");
+int main() {
+    char str[50];
+    printf("Enter a string: ");
+    scanf("%s", str);
+    printf("The string you entered is %s\\n", str);
     return 0;
 }
 `;
