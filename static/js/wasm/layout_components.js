@@ -230,12 +230,9 @@ class WorkerAPI {
         break;
 
       case 'readLine': {
-        console.log('readline in layout_components');
         waitForInput().then((value) => {
-          console.log('callback value', value);
           const view = new Uint8Array(this.sharedMem.buffer);
           for (let i = 0; i < value.length; i++) {
-            console.log('value:', value[i], value.charCodeAt(i))
             // to the shared memory
             view[i] = value.charCodeAt(i);
           }

@@ -39,10 +39,7 @@ const apiOptions = {
   },
 
   hostWrite(s) { port.postMessage({ id: 'write', data: s }); },
-  hostReadLine() {
-    console.log('hostReadLine called')
-    port.postMessage({ id: 'readLine' });
-  },
+  hostReadLine() { port.postMessage({ id: 'readLine' }); },
 
   clang: '/static/wasm/clang',
   lld: '/static/wasm/lld',

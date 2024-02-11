@@ -250,7 +250,7 @@ const API = (function() {
 
       this.setStdinStr(str);
 
-      // Clean shared memory
+      // Clean shared memory.
       sharedMem.fill(0);
 
       this.hostMem_.check();
@@ -556,7 +556,6 @@ const API = (function() {
     async getModule(name) {
       if (this.moduleCache[name]) return this.moduleCache[name];
       const module = await this.compileStreaming(name);
-      console.log(`Compiled ${name}`, module);
       this.moduleCache[name] = module;
       return module;
     }
