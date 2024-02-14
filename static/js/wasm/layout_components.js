@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-window.addEventListener('resize', event => layout.updateSize(window.innerWidth, window.innerHeight));
+window.addEventListener('resize', event => window._layout.updateSize(window.innerWidth, window.innerHeight));
 
 function getActiveEditor() {
-  return layout.root.contentItems[0].contentItems[0].getActiveContentItem();
+  return window._layout.root.contentItems[0].contentItems[0].getActiveContentItem();
 }
 
 const runCode = debounceLazy(() => {
