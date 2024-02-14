@@ -142,22 +142,6 @@ body {
   height: 100%;
 }
 
-.navbar-right ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-}
-
-.navbar-right li {
-  padding: var(--navbar-padding);
-  text-align: center;
-}
-
-.navbar-right span {
-  display: block;
-}
-
 .page-title {
   margin: 0;
   font-weight: normal;
