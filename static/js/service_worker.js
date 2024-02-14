@@ -44,6 +44,7 @@ self.addEventListener('install', event => {
         '/static/js/wasm/layout_components.js',
         '/static/js/worker.js',
         '/static/js/constants.js',
+        '/static/js/helpers.js',
         '/static/js/main.js',
       ]);
     })

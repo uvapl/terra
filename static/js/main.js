@@ -55,18 +55,30 @@ function registerAutoSave(url) {
   setInterval(async () => {
     // Explicitly use a try-catch to make sure this auto-save never stops.
     try {
+      console.log('check')
       if (window._editorIsDirty) {
         // Explicitly set _editorIsDirty to false before calling the auto-save,
         // because if the auto-save post request takes too long, there might
         // have been made some changes that should make sure the next cycle
         // saves the changes again.
-        window._editorIAsDirty = false;
+        window._editorIsDirty = false;
         await doAutoSave(url);
+        updateLastSaved();
       }
     } catch (err) {
       console.error('Auto-save failed:', err);
     }
   }, AUTOSAVE_INTERVAL);
+}
+
+/**
+ * Update the last saved timestamp in the UI.
+ */
+function updateLastSaved() {
+  const d = new Date();
+  const hours = d.getHours();
+  const minutes = d.getMinutes();
+  $('.last-saved').html('Last saved: ' + hours + ':' + minutes);
 }
 
 /**

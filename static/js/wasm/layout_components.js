@@ -41,7 +41,7 @@ function EditorComponent(container, state) {
   setFontSize(state.fontSize || 18);
 
   this.editor.on('change', debounceLazy(event => {
-    window._editorIAsDirty = true;
+    window._editorIsDirty = true;
     container.extendState({ value: this.editor.getValue() });
   }, 500));
 

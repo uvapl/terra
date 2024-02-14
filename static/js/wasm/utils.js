@@ -14,15 +14,6 @@
  * limitations under the License.
  */
 
-function setLocalStorageItem(key, value) {
-  localStorage.setItem(`${LOCAL_STORAGE_PREFIX}-${key}`, value);
-}
-
-function getLocalStorageItem(key, defaultValue) {
-  const value = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}-${key}`);
-  return typeof value === 'undefined' && typeof defaultValue !== 'undefined' ? defaultValue : value;
-}
-
 function sleep(ms) {
   return new Promise((resolve, _) => setTimeout(resolve, ms));
 }
