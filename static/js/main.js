@@ -1,28 +1,94 @@
-main();
-registerEventListeners();
+// ===========================================================================
+// Here's the start of the application.
+// ===========================================================================
+
+// After the app has initialized (config loaded, components loaded) we want to
+// call additional functions.
+initApp().then(({ layout, config }) => {
+  window._layout = layout;
+  window._editorIsDirty = false;
+
+  registerEventListeners();
+  registerAutoSave(config.postback);
+}).catch((err) => {
+    console.error('Failed to bootstrap app', err);
+});
 
 // ===========================================================================
 // Functions
 // ===========================================================================
 
-async function main() {
-  loadConfig()
-    .then(async (config) => {
-      // Get the font-size stored in local storage or use fallback value.
-      const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
+/**
+ * Initialise the app by loading the config and create the layout.
+ *
+ * @returns {Promise<{ layout: Layout, config: object }>} Object containing the
+ * layout instance and the config object.
+ */
+function initApp() {
+  return new Promise((resolve, reject) => {
+    loadConfig()
+      .then(async (config) => {
+        // Get the font-size stored in local storage or use fallback value.
+        const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
 
-      // Create the content items.
-      const content = generateConfigContent(config.tabs, fontSize);
+        // Create the content objects that represent each tab in the editor.
+        const content = generateConfigContent(config.tabs, fontSize);
 
-      // Create the layout object.
-      const layout = createLayout(content, fontSize);
+        // Create the layout object.
+        const layout = createLayout(content, fontSize);
 
-      // Call the init function that creates all components.
-      layout.init();
-    })
-    .catch((err) => {
-      console.error('Error loading config:', err);
-    });
+        // Call the init function that creates all components.
+        layout.init();
+
+        resolve({ layout, config });
+      })
+      .catch((err) => reject(err));
+  });
+}
+
+/**
+ * Register auto-save by calling the auto-save function every X seconds.
+ *
+ * @param {string} url - The endpoint URL where the files will be submitted to.
+ */
+function registerAutoSave(url) {
+  setInterval(async () => {
+    // Explicitly use a try-catch to make sure this auto-save never stops.
+    try {
+      if (window._editorIsDirty) {
+        // Explicitly set _editorIsDirty to false before calling the auto-save,
+        // because if the auto-save post request takes too long, there might
+        // have been made some changes that should make sure the next cycle
+        // saves the changes again.
+        window._editorIAsDirty = false;
+        await doAutoSave(url);
+      }
+    } catch (err) {
+      console.error('Auto-save failed:', err);
+    }
+  }, AUTOSAVE_INTERVAL);
+}
+
+/**
+ * Gather all files from the editor and submit them to the given URL.
+ *
+ * @async
+ * @param {string} url - The endpoint URL where the files will be submitted to.
+ * @returns {Promise<Response>} The response from the submission endpoint.
+ */
+function doAutoSave(url) {
+  const formData = new FormData();
+  const editorComponent = window._layout.root.contentItems[0].contentItems[0];
+
+  // Go through each tab and create a Blob to be appended to the form data.
+  editorComponent.contentItems.forEach((contentItem) => {
+    const filename = contentItem.config.title;
+    const fileContent = contentItem.container.getState().value;
+    const blob = new Blob([fileContent], { type: 'text/plain' });
+    formData.append(`files[${filename}]`, blob, filename);
+  });
+
+  return fetch(url, { method: 'POST', body: formData, });
 }
 
 /**
@@ -79,7 +145,7 @@ function registerEventListeners() {
   // Update font-size for all components on change.
   $('.font-size').change((event) => {
     const newFontSize = parseInt(event.target.value);
-    layout.root.contentItems[0].contentItems.forEach((contentItem) => {
+    window._layout.root.contentItems[0].contentItems.forEach((contentItem) => {
       contentItem.contentItems.forEach((item) => {
         item.container.emit('fontSizeChanged', newFontSize);
       })
