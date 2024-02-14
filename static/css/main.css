@@ -169,6 +169,7 @@ body {
 .lm_header .lm_tab {
   font-size: inherit;
   font-family: inherit;
+  background-color: #e1e1e1;
 }
 
 .lm_header {
@@ -193,7 +194,7 @@ body {
 }
 
 .lm_tab:hover, .lm_tab.lm_active {
-  background: #cfcfcf;
+  background: #fff;
 }
 
 .lm_header .lm_tab.lm_active {
