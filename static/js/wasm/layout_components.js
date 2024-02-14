@@ -110,13 +110,12 @@ class Layout extends GoldenLayout {
   createdControls = false;
 
   constructor(options) {
-    // let layoutConfig = localStorage.getItem(options.configKey);
-    // if (layoutConfig) {
-    //   layoutConfig = JSON.parse(layoutConfig);
-    // } else {
-    //   layoutConfig = options.defaultLayoutConfig;
-    // }
-    const layoutConfig = options.defaultLayoutConfig;
+    let layoutConfig = getLocalStorageItem('layout');
+    if (layoutConfig) {
+      layoutConfig = JSON.parse(layoutConfig);
+    } else {
+      layoutConfig = options.defaultLayoutConfig;
+    }
 
     super(layoutConfig, $('#layout'));
 
