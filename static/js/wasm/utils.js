@@ -513,8 +513,8 @@ const API = (function() {
       });
     }
 
-    hostLog(message) {
-      this.hostWrite(`\$ ${message}`);
+    hostWriteCmd(message) {
+      this.hostWrite(`\$ ${message}\n`);
     }
 
     async hostLogAsync(message, promise) {
@@ -549,7 +549,7 @@ const API = (function() {
         clang, 'clang', '-cc1', '-emit-obj',
         ...this.clangCommonArgs, '-O2', '-o', obj, '-x',
         'c++', input
-      ], { hostLog: false });
+      ]);
     }
 
     async link(obj, wasm) {
@@ -576,22 +576,27 @@ const API = (function() {
 
     async compileLinkRun(data) {
       const { filename, contents } = data;
-      const input = `test.cc`;
-      const obj = `test.o`;
-      const wasm = `test.wasm`;
+      const basename = filename.replace(/\.c$/, '');
+      const input = `${basename}.cc`;
+      const obj = `${basename}.o`;
+      const wasm = `${basename}.wasm`;
 
-      const promise = (async () => {
-        await this.compile({ input, contents, obj });
-        await this.link(obj, wasm);
-        const buffer = this.memfs.getFileContents(wasm);
-        return WebAssembly.compile(buffer)
-      })();
-      const testMod = await this.hostLogAsync(`Compiling ${filename}`, promise);
+      this.hostWriteCmd(`make ${basename}`);
+      const fakeCmd = [
+        'clang', '-O0', '-std=c11', '-Wall', '-Werror', '-Wextra',
+        '-Wno-sign-compare', '-Wno-unused-parameter', '-Wno-unused-variable',
+        '-Wshadow', '-o', basename, `${basename}.c`, '-lcs50', '-lm'
+      ]
+      this.hostWrite(fakeCmd.join(' ') + '\n');
 
-      this.hostWrite(`\$ ./${filename.replace(/\.c/, '')}\n`);
-      const result = await this.run([testMod, wasm]);
-      this.hostWrite('\n');
-      return result;
+      await this.compile({ input, contents, obj });
+      await this.link(obj, wasm);
+      const buffer = this.memfs.getFileContents(wasm);
+      const testMod = await WebAssembly.compile(buffer)
+
+      this.hostWriteCmd(`./${basename}`);
+
+      return this.run([testMod, wasm]);
     }
   }
 

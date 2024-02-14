@@ -3,7 +3,7 @@ const initialProgram =
 
 int main(void)
 {
-    printf("Hello from test1.c");
+    printf("Hello from test1.c\\n");
     return 0;
 }
 `;
@@ -13,7 +13,7 @@ const initialProgram2 =
 
 int main(void)
 {
-    printf("Hello from test2.c");
+    printf("Hello from test2.c\\n");
     return 0;
 }
 `;
