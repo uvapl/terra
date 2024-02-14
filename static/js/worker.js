@@ -38,7 +38,13 @@ const apiOptions = {
     }
   },
 
-  hostWrite(s) { port.postMessage({ id: 'write', data: s }); },
+  hostWrite(s) {
+    port.postMessage({ id: 'write', data: s });
+  },
+
+  compileLinkRunCallback() {
+    port.postMessage({ id: 'compileLinkRunCallback' });
+  },
 
   clang: '../wasm/clang',
   lld: '../wasm/lld',

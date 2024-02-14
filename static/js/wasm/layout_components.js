@@ -151,9 +151,7 @@ class Layout extends GoldenLayout {
       if ($button.prop('disabled')) return;
 
       $button.prop('disabled', true);
-      runCode().then(() => {
-        $button.prop('disabled', false);
-      });
+      runCode();
     });
     $('#clear-term').click(() => term.clear());
   }
@@ -197,6 +195,10 @@ class WorkerAPI {
     switch (event.data.id) {
       case 'write':
         term.write(event.data.data);
+        break;
+
+      case 'compileLinkRunCallback':
+        $('#run').prop('disabled', false);
         break;
 
       case 'runAsync': {

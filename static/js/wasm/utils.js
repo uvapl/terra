@@ -478,6 +478,7 @@ const API = (function() {
       this.moduleCache = {};
       this.readBuffer = options.readBuffer;
       this.compileStreaming = options.compileStreaming;
+      this.compileLinkRunCallback = options.compileLinkRunCallback;
       this.hostWrite = options.hostWrite;
       this.clangFilename = options.clang || 'clang';
       this.lldFilename = options.lld || 'lld';
@@ -587,7 +588,13 @@ const API = (function() {
 
       this.hostWriteCmd(`./${basename}`);
 
-      return this.run([testMod, wasm]);
+      const currentApp = this.run([testMod, wasm]);
+
+      if (typeof this.compileLinkRunCallback === 'function') {
+        this.compileLinkRunCallback();
+      }
+
+      return currentApp;
     }
   }
 
