@@ -9,7 +9,7 @@ initApp().then(({ layout, config }) => {
   window._editorIsDirty = false;
 
   registerEventListeners();
-  registerAutoSave(config.postback);
+  registerAutoSave(config.postback, config.id);
 }).catch((err) => {
     console.error('Failed to bootstrap app', err);
 });
@@ -50,8 +50,10 @@ function initApp() {
  * Register auto-save by calling the auto-save function every X seconds.
  *
  * @param {string} url - The endpoint URL where the files will be submitted to.
+ * @param {string} id - Unique user ID that the POST request needs for
+ * verification purposes.
  */
-function registerAutoSave(url) {
+function registerAutoSave(url, id) {
   setInterval(async () => {
     // Explicitly use a try-catch to make sure this auto-save never stops.
     try {
@@ -62,7 +64,7 @@ function registerAutoSave(url) {
         // have been made some changes that should make sure the next cycle
         // saves the changes again.
         window._editorIsDirty = false;
-        await doAutoSave(url);
+        await doAutoSave(url, id);
         updateLastSaved();
       }
     } catch (err) {
@@ -86,11 +88,16 @@ function updateLastSaved() {
  *
  * @async
  * @param {string} url - The endpoint URL where the files will be submitted to.
+ * @param {string} id - Unique user ID that the POST request needs for
+ * verification purposes.
  * @returns {Promise<Response>} The response from the submission endpoint.
  */
-function doAutoSave(url) {
+function doAutoSave(url, id) {
   const formData = new FormData();
+  formData.append('id', id);
+
   const editorComponent = window._layout.root.contentItems[0].contentItems[0];
+
 
   // Go through each tab and create a Blob to be appended to the form data.
   editorComponent.contentItems.forEach((contentItem) => {
