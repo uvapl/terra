@@ -123,7 +123,7 @@ class Layout extends GoldenLayout {
     this.on('stateChanged', debounceLazy(() => {
       const config = this.toConfig();
       const state = JSON.stringify(config);
-      localStorage.setItem(options.configKey, state);
+      setLocalStorageItem('layout', state);
     }, 500));
 
     this.on('stackCreated', stack => {

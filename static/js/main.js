@@ -11,7 +11,7 @@ initApp().then(({ layout, config }) => {
   registerEventListeners();
   registerAutoSave(config.postback, config.id);
 }).catch((err) => {
-    console.error('Failed to bootstrap app', err);
+    console.error('Failed to bootstrap app:', err);
 });
 
 // ===========================================================================
@@ -59,12 +59,13 @@ function registerAutoSave(url, id) {
     try {
       console.log('check')
       if (window._editorIsDirty) {
-        // Explicitly set _editorIsDirty to false before calling the auto-save,
-        // because if the auto-save post request takes too long, there might
-        // have been made some changes that should make sure the next cycle
-        // saves the changes again.
-        window._editorIsDirty = false;
+        // Save the editor content.
         await doAutoSave(url, id);
+
+        // Reset the dirty flag as the response is successful at this point.
+        window._editorIsDirty = false;
+
+        // Update the last saved timestamp in the UI.
         updateLastSaved();
       }
     } catch (err) {
@@ -126,6 +127,7 @@ function loadConfig() {
     if (validateQueryParams(queryParams)) {
       try {
         config = await getConfig(queryParams.url);
+        config.id = queryParams.id;
         setLocalStorageItem('config', JSON.stringify(config));
 
         // Remove query params from the URL.
