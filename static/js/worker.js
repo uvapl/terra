@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-self.importScripts('/static/js/wasm/utils.js');
+self.importScripts('wasm/utils.js');
 
 let api;
 let port;
@@ -40,10 +40,10 @@ const apiOptions = {
 
   hostWrite(s) { port.postMessage({ id: 'write', data: s }); },
 
-  clang: '/static/wasm/clang',
-  lld: '/static/wasm/lld',
-  sysroot: '/static/wasm/sysroot.tar',
-  memfs: '/static/wasm/memfs',
+  clang: '../wasm/clang',
+  lld: '../wasm/lld',
+  sysroot: '../wasm/sysroot.tar',
+  memfs: '../wasm/memfs',
 };
 
 let currentApp = null;

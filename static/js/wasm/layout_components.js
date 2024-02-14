@@ -163,7 +163,7 @@ class WorkerAPI {
   constructor() {
     this.nextResponseId = 0;
     this.responseCBs = new Map();
-    this.worker = new Worker('/static/js/worker.js');
+    this.worker = new Worker('static/js/worker.js');
     const channel = new MessageChannel();
     this.port = channel.port1;
     this.port.onmessage = this.onmessage.bind(this);
