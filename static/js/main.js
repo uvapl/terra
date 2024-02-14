@@ -136,7 +136,7 @@ function loadConfig() {
       }
     } else {
       // Fallback on local storage.
-      config = JSON.parse(getLocalStorageItem('config') || {});
+      config = JSON.parse(getLocalStorageItem('config', {}));
     }
 
     if (!isValidConfig(config)) {
