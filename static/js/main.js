@@ -78,8 +78,10 @@ function registerAutoSave(url, uuid) {
  */
 function updateLastSaved() {
   const d = new Date();
-  const hours = d.getHours();
-  const minutes = d.getMinutes();
+  const hours = d.getHours() < 10 ? '0' + d.getHours() : d.getHours();
+  const minutes = d.getMinutes() < 10 ? '0' + d.getMinutes() : d.getMinutes();
+
+
   $('.last-saved').html('Last saved: ' + hours + ':' + minutes);
 }
 
