@@ -69,6 +69,7 @@ function registerAutoSave(url, uuid) {
       }
     } catch (err) {
       console.error('Auto-save failed:', err);
+      updateLastSaved(true);
     }
   }, AUTOSAVE_INTERVAL);
 }
@@ -85,13 +86,36 @@ function prefixZero(num) {
 }
 
 /**
+ * Format a given date object to a human-readable format.
+ *
+ * @param {Date} date - The date object to use.
+ * @returns {string} Formatted string in human-readable format.
+ */
+function formatDate(date) {
+  const hours = prefixZero(date.getHours());
+  const minutes = prefixZero(date.getMinutes());
+  return hours + ':' + minutes;
+}
+
+/**
  * Update the last saved timestamp in the UI.
  */
-function updateLastSaved() {
-  const d = new Date();
-  const hours = prefixZero(d.getHours());
-  const minutes = prefixZero(d.getMinutes());
-  $('.last-saved').html('Last saved: ' + hours + ':' + minutes);
+function updateLastSaved(showPrevAutoSaveTime) {
+  const currDate = new Date();
+  const autoSaveTime = formatDate(currDate);
+
+  let msg;
+  if (showPrevAutoSaveTime) {
+    msg = `Could not save at ${autoSaveTime}`;
+    if (window._prevAutoSaveTime instanceof Date) {
+      msg += ` (last save at ${formatDate(window._prevAutoSaveTime)})`
+    }
+  } else {
+    msg = `Last save at ${autoSaveTime}`;
+    window._prevAutoSaveTime = currDate;
+  }
+
+  $('.last-saved').html(msg);
 }
 
 /**
