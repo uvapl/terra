@@ -74,14 +74,23 @@ function registerAutoSave(url, uuid) {
 }
 
 /**
+ * Prefix the given number with a zero if below 10.
+ *
+ * @param {string|number} num - The number to be prefixed.
+ * @returns {string|number} Returns the original if above 10, otherwise it will
+ * return a string prefixed with a zero.
+ */
+function prefixZero(num) {
+  return num < 10 ? '0' + num : num;
+}
+
+/**
  * Update the last saved timestamp in the UI.
  */
 function updateLastSaved() {
   const d = new Date();
-  const hours = d.getHours() < 10 ? '0' + d.getHours() : d.getHours();
-  const minutes = d.getMinutes() < 10 ? '0' + d.getMinutes() : d.getMinutes();
-
-
+  const hours = prefixZero(d.getHours());
+  const minutes = prefixZero(d.getMinutes());
   $('.last-saved').html('Last saved: ' + hours + ':' + minutes);
 }
 
