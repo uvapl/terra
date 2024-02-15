@@ -9,7 +9,7 @@ initApp().then(({ layout, config }) => {
   window._editorIsDirty = false;
 
   registerEventListeners();
-  registerAutoSave(config.postback, config.id);
+  registerAutoSave(config.postback, config.code);
 }).catch((err) => {
     console.error('Failed to bootstrap app:', err);
 });
@@ -50,17 +50,16 @@ function initApp() {
  * Register auto-save by calling the auto-save function every X seconds.
  *
  * @param {string} url - The endpoint URL where the files will be submitted to.
- * @param {string} id - Unique user ID that the POST request needs for
- * verification purposes.
+ * @param {string} uuid - Unique user ID that the POST request needs for
+ *                        verification purposes.
  */
-function registerAutoSave(url, id) {
+function registerAutoSave(url, uuid) {
   setInterval(async () => {
     // Explicitly use a try-catch to make sure this auto-save never stops.
     try {
-      console.log('check')
       if (window._editorIsDirty) {
         // Save the editor content.
-        await doAutoSave(url, id);
+        await doAutoSave(url, uuid);
 
         // Reset the dirty flag as the response is successful at this point.
         window._editorIsDirty = false;
@@ -89,16 +88,15 @@ function updateLastSaved() {
  *
  * @async
  * @param {string} url - The endpoint URL where the files will be submitted to.
- * @param {string} id - Unique user ID that the POST request needs for
- * verification purposes.
+ * @param {string} uuid - Unique user ID that the POST request needs for
+ *                        verification purposes.
  * @returns {Promise<Response>} The response from the submission endpoint.
  */
-function doAutoSave(url, id) {
+function doAutoSave(url, uuid) {
   const formData = new FormData();
-  formData.append('id', id);
+  formData.append('code', uuid);
 
   const editorComponent = window._layout.root.contentItems[0].contentItems[0];
-
 
   // Go through each tab and create a Blob to be appended to the form data.
   editorComponent.contentItems.forEach((contentItem) => {
@@ -127,7 +125,7 @@ function loadConfig() {
     if (validateQueryParams(queryParams)) {
       try {
         config = await getConfig(queryParams.url);
-        config.id = queryParams.id;
+        config.code = queryParams.code;
         setLocalStorageItem('config', JSON.stringify(config));
 
         // Remove query params from the URL.
@@ -290,11 +288,11 @@ function objectHasKeys(obj, keys) {
  * @returns {boolean} True when the query params passes all validation checks.
  */
 function validateQueryParams(queryParams) {
-  if (!isObject(queryParams) || !objectHasKeys(queryParams, ['url', 'id'])) {
+  if (!isObject(queryParams) || !objectHasKeys(queryParams, ['url', 'code'])) {
     return false;
   }
 
-  // At this point, we know we have a 'url' and 'id' param.
+  // At this point, we know we have a 'url' and 'code' param.
   const configUrl = window.decodeURI(queryParams.url);
   if (!isValidUrl(configUrl)) {
     console.error('Invalid config URL');
