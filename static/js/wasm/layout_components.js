@@ -98,8 +98,8 @@ function TerminalComponent(container, state) {
     fitAddon.fit();
 
     startingMessage = [
-      'Click the "run" button to execute code',
-      'Click the "clear terminal" to clear this terminal screen',
+      'Click the "Run" button to execute code',
+      'Click the "Clear terminal" to clear this terminal screen',
     ];
     for (const line of startingMessage) {
       term.write(line + '\n');
