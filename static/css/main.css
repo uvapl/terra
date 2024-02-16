@@ -192,6 +192,11 @@ body {
   font-size: 14px;
 }
 
+.msg-container.error {
+  font-weight: bold;
+  color: #d93434;
+}
+
 .page-title {
   user-select: none;
   margin: 0;

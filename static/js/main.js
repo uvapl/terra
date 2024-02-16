@@ -147,27 +147,48 @@
     const currDate = new Date();
     const autoSaveTime = formatDate(currDate);
 
-    let msg;
     if (showPrevAutoSaveTime) {
-      msg = `Could not save at ${autoSaveTime}`;
+      const msg = `Could not save at ${autoSaveTime}`;
       if (window._prevAutoSaveTime instanceof Date) {
         msg += ` (last save at ${formatDate(window._prevAutoSaveTime)})`
       }
+      notifyError(msg);
     } else {
-      msg = `Last save at ${autoSaveTime}`;
+      notify(`Last save at ${autoSaveTime}`);
       window._prevAutoSaveTime = currDate;
     }
+  }
 
-    notify(msg);
+  /**
+   * Wrapper function to render a notification as an error type.
+   *
+   * @param {string} msg - The message to be displayed.
+   * @param {object} options - Additional options for the notification.
+   */
+  function notifyError(msg, options) {
+    notify(msg, { ...options, type: 'error' });
   }
 
   /**
    * Render a given message inside the notification container in the UI.
    *
    * @param {string} msg - The message to be displayed.
+   * @param {object} options - Additional options for the notification.
+   * @param {string} options.type - The type of notification (e.g. 'error').
+   * @param {number} options.fadeOutAfterMs - The time in milliseconds to fade.
    */
-  function notify(msg) {
-    $('.msg-container').html(msg);
+  function notify(msg, options = {}) {
+    const $msgContainer = $('.msg-container');
+
+    if (options.type === 'error') {
+      $msgContainer.addClass('error');
+    }
+
+    $msgContainer.html(`<span>${msg}</span>`);
+
+    if (options.fadeOutAfterMs) {
+      setTimeout(() => $('.msg-container span').fadeOut(), fadeOutAfterMs);
+    }
   }
 
   /**
@@ -241,10 +262,10 @@
           // Remove query params from the URL.
           history.replaceState({}, null, window.location.origin + window.location.pathname);
 
-          notify('Connected to server');
+          notify('Connected to server', { fadeOutAfterMs: 10 * 1000 });
         } catch (err) {
           console.error('Failed to fetch config:', err);
-          notify('Could not connect to server');
+          notifyError('Could not connect to server');
           return;
         }
       } else {
@@ -258,11 +279,11 @@
         try {
           await checkServerConnection(testUrl);
           config = tmpConfig;
-          notify('Connected to server');
+          notify('Connected to server', { fadeOutAfterMs: 10 * 1000 });
         } catch (err) {
           console.error('Failed to connect to', testUrl);
           console.error(err);
-          notify('Failed to connect to server');
+          notifyError('Failed to connect to server');
         }
       }
 
