@@ -142,7 +142,7 @@ function isValidUrl(url) {
  *
  * @param {number} lower - The lower bound.
  * @param {number} upper - The uppper bound.
- * @returns {number} Random integer between the specified bounds
+ * @returns {number} Random integer between the specified bounds.
  */
 function getRandNumBetween(lower, upper) {
   return Math.floor(Math.random() * (upper - lower + 1)) + lower;

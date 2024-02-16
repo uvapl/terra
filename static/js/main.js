@@ -340,7 +340,7 @@
    *
    * @async
    * @param {string} url - The URL that returns a JSON config.
-   * @returns {Promise<object>} JSON config
+   * @returns {Promise<object>} The JSON config object.
    */
   async function getConfig(url) {
     return new Promise((resolve, reject) => {
