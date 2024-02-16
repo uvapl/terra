@@ -18,8 +18,6 @@ self.importScripts('wasm/utils.js');
 
 let api;
 let port;
-let canvas;
-let ctx2d;
 
 const apiOptions = {
   async readBuffer(filename) {
