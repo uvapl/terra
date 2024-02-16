@@ -50,6 +50,8 @@ function initApp() {
  * Lock the entire app, which gets triggered once the exam is over.
  */
 function lockApp() {
+  notify('Your code is now locked and cannot be edited anymore.');
+
   // Lock all components, making them read-only.
   window._layout.root.contentItems[0].contentItems.forEach((contentItem) => {
     contentItem.contentItems.forEach((component) => {
@@ -86,7 +88,6 @@ function registerAutoSave(url, uuid) {
         // Check if the response returns a "423 Locked" status, indicating that
         // the user the submission has been closed.
         if (res.status === 423) {
-          notify('Your code is now locked and cannot be edited anymore.');
           clearInterval(autoSaveIntervalId);
           lockApp();
           return;
