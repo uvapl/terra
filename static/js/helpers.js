@@ -99,10 +99,10 @@ function notify(msg, options = {}) {
  * @returns {object} A key-value object with all the query params.
  */
 function parseQueryParams() {
-  if (!window.location.search.substring(1)) return {};
+  const queryString = window.location.search.substring(1);
+  if (!queryString) return {};
 
-  return window.location.search
-    .substring(1)
+  return queryString
     .split('&')
     .reduce((obj, param) => {
       const [key, value] = param.split('=');
