@@ -154,31 +154,30 @@ function doAutoSave(url, uuid) {
 }
 
 /**
- * Check whether a given server URL is reachable. If so, a notification will be
- * shown to the user.
+ * Check whether a given server URL is reachable.
  *
- * @param {string} url - The server URL to check for reachability.
+ * @param {string} url - The server URL to check for.
+ * @returns {Promise<boolean>} Resolves `true` when the server is reachable.
  */
 function checkServerConnection(url) {
-  fetch(url)
-    .then((response) => {
-      if (response.ok) {
-        notify('Connected to server');
-      } else {
-        console.error('Failed to connect to server', response);
-        notify('Could not connect to server');
-      }
-    })
-    .catch((err) => {
-      console.error('Failed to connect to server:', err);
-      notify('Could not connect to server');
-    });
+  return new Promise((resolve, reject) => {
+    fetch(url)
+      .then((response) => {
+        if (response.ok) {
+          resolve();
+        } else {
+          reject();
+        }
+      })
+      .catch((err) => reject(err));
+  });
 }
 
 /**
  * Load the config through query params with a fallback on the local storage.
  *
- * @returns {Promise<object>} The configuration for the app.
+ * @returns {Promise<object|string>} The configuration for the app once
+ * resolved, or an error when rejected.
  */
 function loadConfig() {
   return new Promise(async (resolve, reject) => {
@@ -206,10 +205,21 @@ function loadConfig() {
       }
     } else {
       // Fallback on local storage.
-      config = JSON.parse(getLocalStorageItem('config', {}));
+      const tmpConfig = JSON.parse(getLocalStorageItem('config', {}));
 
       // Check immediately if the server is reachable.
-      checkServerConnection(config.configUrl);
+      // If it is reachable, use the tmpConfig as the actual config,
+      // otherwise notify the user that we failed to connect.
+      let testUrl = tmpConfig.configUrl;
+      try {
+        await checkServerConnection(testUrl);
+        config = tmpConfig;
+        notify('Connected to server');
+      } catch (err) {
+        console.error('Failed to connect to', testUrl);
+        console.error(err);
+        notify('Failed to connect to server');
+      }
     }
 
     if (!isValidConfig(config)) {
