@@ -581,20 +581,18 @@ const API = (function() {
       ]
       this.hostWrite(fakeCmd.join(' ') + '\n');
 
-      await this.compile({ input, contents, obj });
-      await this.link(obj, wasm);
-      const buffer = this.memfs.getFileContents(wasm);
-      const testMod = await WebAssembly.compile(buffer)
-
-      this.hostWriteCmd(`./${basename}`);
-
-      const currentApp = this.run([testMod, wasm]);
-
-      if (typeof this.compileLinkRunCallback === 'function') {
-        this.compileLinkRunCallback();
+      try {
+        await this.compile({ input, contents, obj });
+        await this.link(obj, wasm);
+        const buffer = this.memfs.getFileContents(wasm);
+        const testMod = await WebAssembly.compile(buffer)
+        this.hostWriteCmd(`./${basename}`);
+        return this.run([testMod, wasm]);
+      } finally {
+        if (typeof this.compileLinkRunCallback === 'function') {
+          this.compileLinkRunCallback();
+        }
       }
-
-      return currentApp;
     }
   }
 
