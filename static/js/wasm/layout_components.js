@@ -185,6 +185,17 @@ class Layout extends GoldenLayout {
       runCode();
     });
     $('#clear-term').click(() => term.clear());
+
+    // Update font-size for all components on change.
+    $('.font-size-control select').change((event) => {
+      const newFontSize = parseInt(event.target.value);
+      window._layout.root.contentItems[0].contentItems.forEach((contentItem) => {
+        contentItem.contentItems.forEach((component) => {
+          component.container.emit('fontSizeChanged', newFontSize);
+        });
+      });
+      setLocalStorageItem('font-size', newFontSize);
+    });
   }
 }
 

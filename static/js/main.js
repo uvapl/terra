@@ -8,7 +8,6 @@ initApp().then(({ layout, config }) => {
   window._layout = layout;
   window._editorIsDirty = false;
 
-  registerEventListeners();
   registerAutoSave(config.postback, config.code);
 }).catch((err) => {
     console.error('Failed to bootstrap app:', err);
@@ -276,22 +275,6 @@ function loadConfig() {
  */
 function isValidConfig(config) {
   return isObject(config) && objectHasKeys(config, ['tabs', 'postback']);
-}
-
-/**
- * Register all event listeners for the application.
- */
-function registerEventListeners() {
-  // Update font-size for all components on change.
-  $('.font-size-control').change((event) => {
-    const newFontSize = parseInt(event.target.value);
-    window._layout.root.contentItems[0].contentItems.forEach((contentItem) => {
-      contentItem.contentItems.forEach((component) => {
-        component.container.emit('fontSizeChanged', newFontSize);
-      });
-    });
-    setLocalStorageItem('font-size', newFontSize);
-  });
 }
 
 /**
