@@ -8,7 +8,12 @@ initApp().then(({ layout, config }) => {
   window._layout = layout;
   window._editorIsDirty = false;
 
-  registerAutoSave(config.postback, config.code);
+  const startTimeout = getRandNumBetween(0, AUTOSAVE_START_OFFSET);
+  console.log(`Registering auto-save after ${startTimeout}ms...`);
+  setTimeout(() => {
+    console.log('Registering auto-save right now');
+    registerAutoSave(config.postback, config.code);
+  }, startTimeout);
 }).catch((err) => {
     console.error('Failed to bootstrap app:', err);
 });
@@ -436,4 +441,15 @@ async function getConfig(url) {
       })
       .catch((err) => reject(err));
   });
+}
+
+/**
+ * Generate a random integer between a lower and upper bound, both inclusive.
+ *
+ * @param {number} lower - The lower bound.
+ * @param {number} upper - The uppper bound.
+ * @returns {number} Random integer between the specified bounds
+ */
+function getRandNumBetween(lower, upper) {
+  return Math.floor(Math.random() * (upper - lower + 1)) + lower;
 }
