@@ -54,12 +54,19 @@ function initApp() {
  *                        verification purposes.
  */
 function registerAutoSave(url, uuid) {
-  setInterval(async () => {
+  const autoSaveIntervalId = setInterval(async () => {
     // Explicitly use a try-catch to make sure this auto-save never stops.
     try {
       if (window._editorIsDirty) {
         // Save the editor content.
-        await doAutoSave(url, uuid);
+        const res = await doAutoSave(url, uuid);
+
+        // Check if the response returns a "423 Locked" status, indicating that
+        // the user the submission has been closed.
+        if (res.status === 423) {
+          notify('Your code is now locked and cannot be edited anymore.');
+          clearInterval(autoSaveIntervalId);
+        }
 
         // Reset the dirty flag as the response is successful at this point.
         window._editorIsDirty = false;
@@ -142,7 +149,8 @@ function doAutoSave(url, uuid) {
 
   const editorComponent = window._layout.root.contentItems[0].contentItems[0];
 
-  // Go through each tab and create a Blob to be appended to the form data.
+  // Go through each tab and create a Blob with the file contents of that tab
+  // and append it to the form data.
   editorComponent.contentItems.forEach((contentItem) => {
     const filename = contentItem.config.title;
     const fileContent = contentItem.container.getState().value;
