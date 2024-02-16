@@ -143,6 +143,7 @@ body {
   background-repeat: no-repeat;
   background-position: center;
   background-size: 50px;
+  -webkit-backdrop-filter: blur(1px) grayscale(40%);
   backdrop-filter: blur(1px) grayscale(40%);
 }
 
