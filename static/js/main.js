@@ -47,6 +47,28 @@ function initApp() {
 }
 
 /**
+ * Lock the entire app, which gets triggered once the exam is over.
+ */
+function lockApp() {
+  // Lock all components, making them read-only.
+  window._layout.root.contentItems[0].contentItems.forEach((contentItem) => {
+    contentItem.contentItems.forEach((component) => {
+      component.container.emit('lock');
+    });
+  });
+
+  // Disable the controls and remove the 'click' event listeners.
+  $('#run').prop('disabled', true).off('click');
+  $('#clear-term').prop('disabled', true).off('click');
+
+  // Lock the drag handler between the editor and terminal.
+  $('.lm_splitter').addClass('locked');
+
+  // Show lock screen for both containers.
+  $('.component-container').addClass('locked');
+}
+
+/**
  * Register auto-save by calling the auto-save function every X seconds.
  *
  * @param {string} url - The endpoint URL where the files will be submitted to.
@@ -66,6 +88,7 @@ function registerAutoSave(url, uuid) {
         if (res.status === 423) {
           notify('Your code is now locked and cannot be edited anymore.');
           clearInterval(autoSaveIntervalId);
+          lockApp();
           return;
         }
 
@@ -259,12 +282,12 @@ function isValidConfig(config) {
  */
 function registerEventListeners() {
   // Update font-size for all components on change.
-  $('.font-size').change((event) => {
+  $('.font-size-control').change((event) => {
     const newFontSize = parseInt(event.target.value);
     window._layout.root.contentItems[0].contentItems.forEach((contentItem) => {
-      contentItem.contentItems.forEach((item) => {
-        item.container.emit('fontSizeChanged', newFontSize);
-      })
+      contentItem.contentItems.forEach((component) => {
+        component.container.emit('fontSizeChanged', newFontSize);
+      });
     });
     setLocalStorageItem('font-size', newFontSize);
   });

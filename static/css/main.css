@@ -44,7 +44,7 @@ body {
   display: none !important;
 }
 
-.font-size {
+.font-size-control {
   font-size: 14px;
   position: absolute;
   top: 4px;
@@ -52,7 +52,7 @@ body {
   z-index: 3;
 }
 
-.font-size select {
+.font-size-control select {
   -webkit-appearance: none;
   border: 1px solid #999;
   background: none;
@@ -61,11 +61,11 @@ body {
 }
 
 .button:active,
-.font-size select:active {
+.font-size-control select:active {
   background: #ccc;
 }
 
-.font-size:before {
+.font-size-control:before {
   content: '';
   position: absolute;
   width: 0;
@@ -76,6 +76,13 @@ body {
   top: 50%;
   right: 7px;
   transform: translateY(-50%);
+}
+
+.button[disabled] {
+  background: #cfcfcf;
+  color: #606060;
+  cursor: not-allowed;
+  border-color: #606060;
 }
 
 .button {
@@ -90,20 +97,15 @@ body {
   background: #62c0ff;
 }
 
-.run-code-btn:active {
+.run-code-btn:not([disabled]):active {
   background: #5dabdf;
-}
-
-.run-code-btn[disabled] {
-  background: #cfcfcf;
-  color: #606060;
 }
 
 .clear-term-btn {
   background: #f75a4a;
 }
 
-.clear-term-btn:active {
+.clear-term-btn:not([disabled]):active {
   background: #e64a3a;
 }
 
@@ -121,6 +123,26 @@ body {
 
 .editor-component-container .lm_header {
   padding-left: 5px;
+}
+
+.component-container.locked {
+  position: relative;
+  pointer-events: none;
+}
+
+.component-container.locked:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.7);
+  z-index: 10;
+  background-image: url('../img/icons/lock.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 50px;
 }
 
 /* ========================================================================== */
@@ -143,6 +165,7 @@ body {
 }
 
 .msg-container {
+  user-select: none;
   position: absolute;
   top: 50%;
   left: 50%;
@@ -151,6 +174,7 @@ body {
 }
 
 .page-title {
+  user-select: none;
   margin: 0;
   font-weight: normal;
 }
@@ -162,6 +186,7 @@ body {
   font-size: inherit;
   font-family: inherit;
   background-color: #e1e1e1;
+  user-select: none;
 }
 
 .lm_header {
@@ -208,8 +233,17 @@ body {
   background: #999;
 }
 
-.lm_splitter.lm_horizontal:before,
-.lm_splitter.lm_horizontal:after {
+.lm_splitter.locked {
+  pointer-events: none;
+}
+
+.lm_splitter.locked:hover {
+  background: #fff;
+}
+
+/* Create two vertical bars as a drag-handler icon */
+.lm_splitter.lm_horizontal:not(.locked):before,
+.lm_splitter.lm_horizontal:not(.locked):after {
   content: '';
   width: 2px;
   height: 30px;
@@ -222,17 +256,17 @@ body {
   opacity: 1;
 }
 
-.lm_splitter:hover:before,
-.lm_splitter:hover:after {
-  opacity: 0;
-}
-
 .lm_splitter.lm_horizontal:before {
   left: 2px;
 }
 
 .lm_splitter.lm_horizontal:after {
   right: 2px;
+}
+
+.lm_splitter:not(.locked):hover:before,
+.lm_splitter:not(.locked):hover:after {
+  opacity: 0;
 }
 
 /* ========================================================================== */

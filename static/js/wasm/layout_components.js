@@ -33,6 +33,8 @@ function EditorComponent(container, state) {
   this.editor.setValue(state.value || '');
   this.editor.clearSelection();
 
+  const getParentComponentElement = () => container.parent.parent.element[0];
+
   const setFontSize = fontSize => {
     container.extendState({ fontSize });
     this.editor.setFontSize(`${fontSize}px`);
@@ -47,9 +49,15 @@ function EditorComponent(container, state) {
 
   container.on('show', () => {
     // Add custom class for styling purposes.
-    container.parent.parent.element[0].classList.add('editor-component-container');
+    getParentComponentElement().classList.add('component-container', 'editor-component-container');
+  });
 
-    $('.font-size').removeClass('hidden');
+  container.on('lock', () => {
+    this.editor.setReadOnly(true);
+  });
+
+  container.on('unlock', () => {
+    this.editor.setReadOnly(false);
   });
 
   container.on('fontSizeChanged', setFontSize);
@@ -71,9 +79,11 @@ function TerminalComponent(container, state) {
     fitAddon.fit();
   };
 
+  const getParentComponentElement = () => container.parent.parent.element[0];
+
   container.on('open', () => {
     // Add custom class for styling purposes.
-    container.parent.parent.element[0].classList.add('terminal-component-container');
+    getParentComponentElement().classList.add('component-container', 'terminal-component-container');
 
     const fontSize = state.fontSize || 18;
 
@@ -146,6 +156,25 @@ class Layout extends GoldenLayout {
     // Add the buttons to the header.
     $('.editor-component-container .lm_header').append('<ul class="lm_controls"><button id="run" class="button run-code-btn">Run</button></ul>');
     $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn">Clear terminal</button>');
+
+    // Create font-size element.
+    $('.layout-outer-container').append([
+      '<div class="font-size-control">',
+      '  <label>font size: </label>',
+      '  <select>',
+      '    <option value="8">8</option>',
+      '    <option value="9">9</option>',
+      '    <option value="10">10</option>',
+      '    <option value="11">11</option>',
+      '    <option value="12">12</option>',
+      '    <option value="14">14</option>',
+      '    <option value="18" selected>18</option>',
+      '    <option value="24">24</option>',
+      '    <option value="30">30</option>',
+      '    <option value="36">36</option>',
+      '  </select>',
+      '</div>',
+    ].join(''));
 
     // Add event listeners.
     $('#run').click((event) => {
