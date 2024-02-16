@@ -115,7 +115,16 @@ function updateLastSaved(showPrevAutoSaveTime) {
     window._prevAutoSaveTime = currDate;
   }
 
-  $('.last-saved').html(msg);
+  notify(msg);
+}
+
+/**
+ * Render a given message inside the notification container in the UI.
+ *
+ * @param {string} msg - The message to be displayed.
+ */
+function notify(msg) {
+  $('.msg-container').html(msg);
 }
 
 /**
@@ -145,6 +154,28 @@ function doAutoSave(url, uuid) {
 }
 
 /**
+ * Check whether a given server URL is reachable. If so, a notification will be
+ * shown to the user.
+ *
+ * @param {string} url - The server URL to check for reachability.
+ */
+function checkServerConnection(url) {
+  fetch(url)
+    .then((response) => {
+      if (response.ok) {
+        notify('Connected to server');
+      } else {
+        console.error('Failed to connect to server', response);
+        notify('Could not connect to server');
+      }
+    })
+    .catch((err) => {
+      console.error('Failed to connect to server:', err);
+      notify('Could not connect to server');
+    });
+}
+
+/**
  * Load the config through query params with a fallback on the local storage.
  *
  * @returns {Promise<object>} The configuration for the app.
@@ -161,17 +192,24 @@ function loadConfig() {
       try {
         config = await getConfig(queryParams.url);
         config.code = queryParams.code;
+        config.configUrl = queryParams.url;
         setLocalStorageItem('config', JSON.stringify(config));
 
         // Remove query params from the URL.
         history.replaceState({}, null, window.location.origin + window.location.pathname);
+
+        notify('Connected to server');
       } catch (err) {
         console.error('Failed to fetch config:', err);
+        notify('Could not connect to server');
         return;
       }
     } else {
       // Fallback on local storage.
       config = JSON.parse(getLocalStorageItem('config', {}));
+
+      // Check immediately if the server is reachable.
+      checkServerConnection(config.configUrl);
     }
 
     if (!isValidConfig(config)) {
