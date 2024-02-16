@@ -48,6 +48,8 @@ function EditorComponent(container, state) {
   container.on('show', () => {
     // Add custom class for styling purposes.
     container.parent.parent.element[0].classList.add('editor-component-container');
+
+    $('.font-size').removeClass('hidden');
   });
 
   container.on('fontSizeChanged', setFontSize);
