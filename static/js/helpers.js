@@ -73,6 +73,11 @@ function notifyError(msg, options) {
  * @param {number} options.fadeOutAfterMs - The time in milliseconds to fade.
  */
 function notify(msg, options = {}) {
+  if (window.notifyTimeoutId !== null) {
+    clearTimeout(window.notifyTimeoutId);
+    window.notifyTimeoutId = null;
+  }
+
   const $msgContainer = $('.msg-container');
 
   if (options.type === 'error') {
@@ -82,7 +87,9 @@ function notify(msg, options = {}) {
   $msgContainer.html(`<span>${msg}</span>`);
 
   if (options.fadeOutAfterMs) {
-    setTimeout(() => $('.msg-container span').fadeOut(), options.fadeOutAfterMs);
+    window.notifyTimeoutId = setTimeout(() => {
+      $('.msg-container span').fadeOut();
+    }, options.fadeOutAfterMs);
   }
 }
 
