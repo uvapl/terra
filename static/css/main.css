@@ -103,6 +103,12 @@ body {
 
 .clear-term-btn {
   background: #f75a4a;
+
+  /*
+  This margin is solely added for when the app locks, fixing the issue that the
+  button isn't cut-off.
+  */
+  margin-left: 1px;
 }
 
 .clear-term-btn:not([disabled]):active {
@@ -110,6 +116,11 @@ body {
 }
 
 .lm_header .lm_controls {
+  /*
+  This margin is solely added for when the app locks, fixing the issue that the
+  button isn't cut-off.
+  */
+  margin-right: 1px;
   right: 0;
 }
 
