@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
-window.addEventListener('resize', event => window._layout.updateSize(window.innerWidth, window.innerHeight));
+window.addEventListener('resize', event => {
+  if (window._layout) {
+    window._layout.updateSize(window.innerWidth, window.innerHeight);
+  }
+});
 
 function getActiveEditor() {
   return window._layout.root.contentItems[0].contentItems[0].getActiveContentItem();
