@@ -118,29 +118,6 @@
   }
 
   /**
-   * Prefix the given number with a zero if below 10.
-   *
-   * @param {string|number} num - The number to be prefixed.
-   * @returns {string|number} Returns the original if above 10, otherwise it will
-   * return a string prefixed with a zero.
-   */
-  function prefixZero(num) {
-    return num < 10 ? '0' + num : num;
-  }
-
-  /**
-   * Format a given date object to a human-readable format.
-   *
-   * @param {Date} date - The date object to use.
-   * @returns {string} Formatted string in human-readable format.
-   */
-  function formatDate(date) {
-    const hours = prefixZero(date.getHours());
-    const minutes = prefixZero(date.getMinutes());
-    return hours + ':' + minutes;
-  }
-
-  /**
    * Update the last saved timestamp in the UI.
    */
   function updateLastSaved(showPrevAutoSaveTime) {
@@ -156,38 +133,6 @@
     } else {
       notify(`Last save at ${autoSaveTime}`);
       window._prevAutoSaveTime = currDate;
-    }
-  }
-
-  /**
-   * Wrapper function to render a notification as an error type.
-   *
-   * @param {string} msg - The message to be displayed.
-   * @param {object} options - Additional options for the notification.
-   */
-  function notifyError(msg, options) {
-    notify(msg, { ...options, type: 'error' });
-  }
-
-  /**
-   * Render a given message inside the notification container in the UI.
-   *
-   * @param {string} msg - The message to be displayed.
-   * @param {object} options - Additional options for the notification.
-   * @param {string} options.type - The type of notification (e.g. 'error').
-   * @param {number} options.fadeOutAfterMs - The time in milliseconds to fade.
-   */
-  function notify(msg, options = {}) {
-    const $msgContainer = $('.msg-container');
-
-    if (options.type === 'error') {
-      $msgContainer.addClass('error');
-    }
-
-    $msgContainer.html(`<span>${msg}</span>`);
-
-    if (options.fadeOutAfterMs) {
-      setTimeout(() => $('.msg-container span').fadeOut(), fadeOutAfterMs);
     }
   }
 
@@ -370,50 +315,6 @@
   }
 
   /**
-   * Parse the query parameters from the window.location.search.
-   *
-   * @returns {object} A key-value object with all the query params.
-   */
-  function parseQueryParams() {
-    return window.location.search
-      .substring(1)
-      .split('&')
-      .reduce((obj, param) => {
-        const [key, value] = param.split('=');
-        if (key !== '') {
-          obj[key] = value;
-        }
-        return obj;
-      }, {});
-  }
-
-  /**
-   * Check whether an object is a real object, because essentially, everything
-   * is an object in JavaScript.
-   *
-   * @param {object} obj - The object to validate.
-   * @returns {boolean} True if the given object is a real object.
-   */
-  function isObject(obj) {
-    return obj !== null && typeof obj === 'object' && !Array.isArray(obj);
-  }
-
-  /**
-   * Check whether a given object contains specific keys.
-   *
-   * @param {object} obj - The object to check.
-   * @param {array} keys - A list of keys the object is required to have.
-   * @returns {boolean} True when the object contains all keys specified.
-   */
-  function objectHasKeys(obj, keys) {
-    for (let key of keys) {
-      if (typeof obj[key] === 'undefined') return false;
-    }
-
-    return true;
-  }
-
-  /**
    * Validate the query parameters for this application.
    *
    * @param {object} queryParams - The query parameters object.
@@ -432,16 +333,6 @@
     }
 
     return true;
-  }
-
-  /**
-   * Check whether a given URL is valid by checking if it starts with `https://`
-   *
-   * @param {string} url - The URL to be checked.
-   * @returns {boolean} True when the url is valid.
-   */
-  function isValidUrl(url) {
-    return /^https:\/\//g.test(url);
   }
 
   /**
@@ -464,17 +355,6 @@
         })
         .catch((err) => reject(err));
     });
-  }
-
-  /**
-   * Generate a random integer between a lower and upper bound, both inclusive.
-   *
-   * @param {number} lower - The lower bound.
-   * @param {number} upper - The uppper bound.
-   * @returns {number} Random integer between the specified bounds
-   */
-  function getRandNumBetween(lower, upper) {
-    return Math.floor(Math.random() * (upper - lower + 1)) + lower;
   }
 
 })(window, document);
