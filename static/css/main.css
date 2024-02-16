@@ -109,6 +109,10 @@ body {
   background: #e64a3a;
 }
 
+.lm_header .lm_controls {
+  right: 0;
+}
+
 .lm_controls button + button {
   margin-left: 5px;
 }
