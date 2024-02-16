@@ -66,6 +66,12 @@ function registerAutoSave(url, uuid) {
         if (res.status === 423) {
           notify('Your code is now locked and cannot be edited anymore.');
           clearInterval(autoSaveIntervalId);
+          return;
+        }
+
+        // If the response was not OK, throw an error.
+        if (!res.ok) {
+          throw new Error(`[${res.status} ${res.statusText}] ${res.url}`);
         }
 
         // Reset the dirty flag as the response is successful at this point.
