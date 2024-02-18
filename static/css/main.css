@@ -321,6 +321,12 @@ body {
   background: #fff;
 }
 
+.dark-mode .ace_gutter-active-line,
+.dark-mode .ace_marker-layer .ace_active-line {
+  background-color: #383c44;
+  border: 0;
+}
+
 .lm_header .lm_tab.lm_active {
   box-shadow: none;
   color: #000;
