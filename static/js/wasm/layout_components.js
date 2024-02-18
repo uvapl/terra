@@ -30,7 +30,14 @@ const runCode = debounceLazy(() => {
 }, 100);
 
 function EditorComponent(container, state) {
-  this.editor = ace.edit(container.getElement()[0]);
+  // To make sure GoldenLayout doensn't override the editor styles, we create
+  // another child container for the editor instance.
+  const contentContainer = container.getElement()[0];
+  const editorContainer = document.createElement('div');
+  editorContainer.classList.add('editor');
+  contentContainer.appendChild(editorContainer);
+
+  this.editor = ace.edit(editorContainer);
   this.editor.session.setMode('ace/mode/c_cpp');
   this.editor.setKeyboardHandler('ace/keyboard/sublime');
   this.editor.setOption('fontSize');
@@ -39,10 +46,18 @@ function EditorComponent(container, state) {
 
   const getParentComponentElement = () => container.parent.parent.element[0];
 
-  const setFontSize = fontSize => {
+  const setFontSize = (fontSize) => {
     container.extendState({ fontSize });
     this.editor.setFontSize(`${fontSize}px`);
   };
+
+  const setTheme = (theme) => {
+    this.editor.setTheme(
+      theme === 'dark'
+        ? 'ace/theme/cloud_editor_dark'
+        : 'ace/theme/textmate'
+    );
+  }
 
   setFontSize(state.fontSize || 18);
 
@@ -64,6 +79,7 @@ function EditorComponent(container, state) {
     this.editor.setReadOnly(false);
   });
 
+  container.on('themeChanged', setTheme);
   container.on('fontSizeChanged', setFontSize);
   container.on('resize', debounceLazy(() => this.editor.resize(), 20));
   container.on('destroy', () => {
@@ -77,7 +93,7 @@ function EditorComponent(container, state) {
 let term;
 const fitAddon = new FitAddon.FitAddon();
 function TerminalComponent(container, state) {
-  const setFontSize = fontSize => {
+  const setFontSize = (fontSize) => {
     container.extendState({ fontSize });
     term.options.fontSize = fontSize;
     fitAddon.fit();
@@ -144,11 +160,13 @@ class Layout extends GoldenLayout {
 
     this.on('stackCreated', stack => {
       if (!this.createdControls) {
+        this.createdControls = true;
         // Do a set-timeout trick to make sure the components are registered
         // through the registerComponent() function, prior to calling this part.
-        setTimeout(this.createControls, 0);
-
-        this.createdControls = true;
+        setTimeout(() => {
+          this.createControls();
+          this.setTheme(getLocalStorageItem('theme') || 'light');
+        }, 0);
       }
     });
 
@@ -156,16 +174,41 @@ class Layout extends GoldenLayout {
     this.registerComponent('terminal', TerminalComponent);
   }
 
-  createControls() {
+  emitToAllComponents = (event, data) => {
+    window._layout.root.contentItems[0].contentItems.forEach((contentItem) => {
+      contentItem.contentItems.forEach((component) => {
+        component.container.emit(event, data);
+      });
+    });
+  }
+
+  setTheme = (theme) => {
+    const isDarkMode = (theme === 'dark');
+
+    if (isDarkMode) {
+      $('body').addClass('dark-mode');
+      $('#theme').val('dark');
+    } else {
+      $('body').removeClass('dark-mode');
+      $('#theme').val('light');
+    }
+
+    this.emitToAllComponents('themeChanged', theme);
+    setLocalStorageItem('theme', theme);
+  }
+
+  createControls = () => {
     // Add the buttons to the header.
-    $('.editor-component-container .lm_header').append('<ul class="lm_controls"><button id="run" class="button run-code-btn">Run</button></ul>');
+    $('.editor-component-container .lm_controls').append('<select id="theme" class="select"><option value="light">Light theme</option><option value="dark">Dark theme</option></select>');
+    $('.editor-component-container .lm_controls').append('<button id="run" class="button run-code-btn">Run</button>');
+
     $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn">Clear terminal</button>');
 
     // Create font-size element.
     $('.layout-outer-container').append([
       '<div class="font-size-control">',
       '  <label>font size: </label>',
-      '  <select>',
+      '  <select class="select">',
       '    <option value="8">8</option>',
       '    <option value="9">9</option>',
       '    <option value="10">10</option>',
@@ -188,16 +231,15 @@ class Layout extends GoldenLayout {
       $button.prop('disabled', true);
       runCode();
     });
+
     $('#clear-term').click(() => term.clear());
+
+    $('#theme').change((event) => this.setTheme(event.target.value));
 
     // Update font-size for all components on change.
     $('.font-size-control select').change((event) => {
       const newFontSize = parseInt(event.target.value);
-      window._layout.root.contentItems[0].contentItems.forEach((contentItem) => {
-        contentItem.contentItems.forEach((component) => {
-          component.container.emit('fontSizeChanged', newFontSize);
-        });
-      });
+      this.emitToAllComponents('fontSizeChanged', newFontSize);
       setLocalStorageItem('font-size', newFontSize);
     });
   }
