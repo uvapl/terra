@@ -216,6 +216,8 @@ body {
   font-family: inherit;
   background-color: #e1e1e1;
   user-select: none;
+  border-top-right-radius: 3px;
+  border-top-left-radius: 3px;
 }
 
 .lm_header {
