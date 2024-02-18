@@ -55,7 +55,8 @@ body {
 .select {
   -webkit-appearance: none;
   border: 1px solid #999;
-  background: url('../img/icons/caret-down.png');
+  background-color: #fff;
+  background-image: url('../img/icons/caret-down.png');
   background-size: 10px;
   background-position: calc(100% - 5px) center;
   background-repeat: no-repeat;
@@ -206,6 +207,10 @@ body {
 /* ========================================================================== */
 /* GoldenLayout overrides                                                     */
 /* ========================================================================== */
+.lm_goldenlayout {
+  background: #fff;
+}
+
 .lm_header .lm_tab {
   font-size: inherit;
   font-family: inherit;
