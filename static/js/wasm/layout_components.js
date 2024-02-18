@@ -59,7 +59,7 @@ function EditorComponent(container, state) {
     );
   }
 
-  setFontSize(state.fontSize || 18);
+  setFontSize(state.fontSize || BASE_FONT_SIZE);
 
   this.editor.on('change', debounceLazy(event => {
     window._editorIsDirty = true;
@@ -105,7 +105,7 @@ function TerminalComponent(container, state) {
     // Add custom class for styling purposes.
     getParentComponentElement().classList.add('component-container', 'terminal-component-container');
 
-    const fontSize = state.fontSize || 18;
+    const fontSize = state.fontSize || BASE_FONT_SIZE;
 
     term = new Terminal({
       convertEol: true,
@@ -242,6 +242,9 @@ class Layout extends GoldenLayout {
       this.emitToAllComponents('fontSizeChanged', newFontSize);
       setLocalStorageItem('font-size', newFontSize);
     });
+
+    // Set default font-size on select element.
+    $('.font-size-control select').val(getLocalStorageItem('font-size') || BASE_FONT_SIZE);
   }
 }
 
