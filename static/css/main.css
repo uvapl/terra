@@ -102,7 +102,7 @@ body {
 }
 
 .clear-term-btn {
-  background: #f75a4a;
+  background: #f9776a;
 
   /*
   This margin is solely added for when the app locks, fixing the issue that the
@@ -194,7 +194,7 @@ body {
 
 .msg-container.error {
   font-weight: bold;
-  color: #d93434;
+  color: #d34d4d;
 }
 
 .page-title {
