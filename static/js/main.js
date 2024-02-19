@@ -47,6 +47,13 @@
     return new Promise((resolve, reject) => {
       loadConfig()
         .then(async (config) => {
+          if (config.course_name && config.exam_name) {
+            $('.page-title').html(`
+              <span class="course-name">${config.course_name}</span>
+              <span class="exam-name">${config.exam_name}</span>
+            `);
+          }
+
           // Get the font-size stored in local storage or use fallback value.
           const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
 
