@@ -484,17 +484,6 @@ const API = (function() {
       this.lldFilename = options.lld || 'lld';
       this.sysrootFilename = options.sysroot || 'sysroot.tar';
 
-      this.clangCommonArgs = [
-        '-disable-free',
-        '-isysroot', '/',
-        '-internal-isystem', '/include/c++/v1',
-        '-internal-isystem', '/include',
-        '-internal-isystem', '/lib/clang/8.0.1/include',
-        '-ferror-limit', '19',
-        '-fmessage-length', '80',
-        '-fcolor-diagnostics',
-      ];
-
       this.memfs = new MemFS({
         compileStreaming: this.compileStreaming,
         hostWrite: this.hostWrite,
@@ -538,9 +527,17 @@ const API = (function() {
       this.memfs.addFile(input, contents);
       const clang = await this.getModule(this.clangFilename);
       return await this.run([
-        clang, 'clang', '-cc1', '-emit-obj',
-        ...this.clangCommonArgs, '-O2', '-o', obj, '-x',
-        'c++', input
+        clang, 'clang', '-cc1', '-emit-obj', '-disable-free',
+        '-isysroot', '/',
+        '-internal-isystem', '/include',
+        '-internal-isystem', '/lib/clang/8.0.1/include',
+        '-ferror-limit', '19',
+        '-fmessage-length', '80',
+        '-fcolor-diagnostics',
+        '-x', 'c',
+        '-std=c11', '-O0', '-Wall', '-Werror', '-Wextra',
+        '-Wno-unused-variable', '-Wno-sign-compare', '-Wno-unused-parameter',
+        '-Wshadow', '-o', obj, input
       ]);
     }
 
@@ -555,7 +552,7 @@ const API = (function() {
         lld, 'wasm-ld', '--no-threads',
         '--export-dynamic',
         '-z', `stack-size=${stackSize}`, `-L${libdir}`, crt1, obj, '-lc',
-        '-lc++', '-lc++abi', '-o', wasm
+        '-o', wasm
         ]);
     }
 
@@ -574,12 +571,15 @@ const API = (function() {
       const wasm = `${basename}.wasm`;
 
       this.hostWriteCmd(`make ${basename}`);
-      const fakeCmd = [
+
+      // Make a custom command placeholder without all the unnecessary
+      // additional flags needed for wasm.
+      const cmdPlaceholder = [
         'clang', '-O0', '-std=c11', '-Wall', '-Werror', '-Wextra',
         '-Wno-sign-compare', '-Wno-unused-parameter', '-Wno-unused-variable',
         '-Wshadow', '-o', basename, `${basename}.c`, '-lcs50', '-lm'
       ]
-      this.hostWrite(fakeCmd.join(' ') + '\n');
+      this.hostWrite(cmdPlaceholder.join(' ') + '\n');
 
       try {
         await this.compile({ input, contents, obj });
