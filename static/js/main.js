@@ -10,14 +10,27 @@
     window._layout = layout;
     window._editorIsDirty = false;
 
+    // Register the auto-save after a certain auto-save offset time to prevent
+    // the server receives many requests at once. This helps to spread them out
+    // over a minute of time.
     const startTimeout = getRandNumBetween(0, AUTOSAVE_START_OFFSET);
-    console.log(`Registering auto-save after ${startTimeout}ms...`);
     setTimeout(() => {
-      console.log('Registering auto-save right now');
       registerAutoSave(config.postback, config.code);
     }, startTimeout);
+
+    // Make the right navbar visible and add the click event listener to the
+    // submit button.
+    $('.navbar-right')
+      .removeClass('hidden')
+      .find('#submit-btn')
+      .click(showSubmitExamModal);
+
   }).catch((err) => {
     console.error('Failed to bootstrap app:', err);
+
+
+    // Remove the right navbar when the application failed to initialise.
+    $('.navbar-right').remove();
   });
 
   // ===========================================================================
@@ -82,19 +95,24 @@
    * @param {string} url - The endpoint where the files will be submitted to.
    * @param {string} uuid - Unique user ID that the POST request needs for
    *                        verification purposes.
+   * @param {boolean} [force] - Whether to trigger the auto-save immediately.
    */
-  function registerAutoSave(url, uuid) {
-    const autoSaveIntervalId = setInterval(async () => {
+  function registerAutoSave(url, uuid, force = false) {
+    if (window._autoSaveIntervalId) {
+      clearInterval(_autoSaveIntervalId);
+    }
+
+    const run = async () => {
       // Explicitly use a try-catch to make sure this auto-save never stops.
       try {
-        if (window._editorIsDirty) {
+        if (window._editorIsDirty || force) {
           // Save the editor content.
           const res = await doAutoSave(url, uuid);
 
           // Check if the response returns a "423 Locked" status, indicating
           // that the user the submission has been closed.
           if (res.status === 423) {
-            clearInterval(autoSaveIntervalId);
+            clearInterval(window._autoSaveIntervalId);
             lockApp();
             return;
           }
@@ -114,7 +132,11 @@
         console.error('Auto-save failed:', err);
         updateLastSaved(true);
       }
-    }, AUTOSAVE_INTERVAL);
+    };
+
+    window._autoSaveIntervalId = setInterval(run, AUTOSAVE_INTERVAL);
+
+    if (force) run();
   }
 
   /**
@@ -129,10 +151,19 @@
       if (window._prevAutoSaveTime instanceof Date) {
         msg += ` (last save at ${formatDate(window._prevAutoSaveTime)})`
       }
+
       notifyError(msg);
     } else {
       notify(`Last save at ${autoSaveTime}`);
       window._prevAutoSaveTime = currDate;
+
+      const $modal = $('#submit-exam-model');
+      if ($modal.length > 0) {
+        $modal.find('.status-text').html(`
+          ✅ Your files have been submitted successfully.<br/><br/>
+          🛂 Make sure that you sign off at the desk before leaving.
+        `);
+      }
     }
   }
 
@@ -355,6 +386,75 @@
         })
         .catch((err) => reject(err));
     });
+  }
+
+  /**
+   * Hide the submit exam modal by removing it completely out of the DOM, which
+   * simplifies our code a bit as we can handle a bit less.
+   */
+  function hideSubmitExamModal() {
+    let $modal = $('#submit-exam-model');
+
+    if ($modal.length === 0) return;
+
+    $modal.removeClass('show');
+
+    // Use a timeout to wait for the model animation to be completed before
+    // completely removing it from the DOM.
+    setTimeout(() => {
+      $modal.remove();
+    }, 300);
+  }
+
+  /**
+   * Show the modal that does one final submit of all the contents.
+   */
+  function showSubmitExamModal() {
+    let lastSaveText = '';
+    if (window._prevAutoSaveTime instanceof Date) {
+      lastSaveText += `<br/>🛅 Previous ssuccessfuluccessful submit was at <span class="last-save">${formatDate(window._prevAutoSaveTime)}</span>.<br/>`;
+    }
+
+    const modalHtml = `
+      <div id="submit-exam-model" class="modal" tabindex="-1">
+        <div class="modal-content">
+          <div class="modal-header">
+            <p class="modal-title">You're done!</p>
+          </div>
+          <div class="modal-body">
+            <div class="spinner"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="button dismiss-modal-btn">Return to exam</button>
+          </div>
+        </div>
+      </div>
+    `;
+    $('body').append(modalHtml);
+
+    $modal = $('#submit-exam-model');
+    $modal.find('.dismiss-modal-btn').click(hideSubmitExamModal);
+
+    // Use setTimeout trick to add the class after the modal HTML has been
+    // rendered to the DOM to show the fade-in animation.
+    setTimeout(() => $modal.addClass('show'), 10);
+
+    // Wait for the modal to be shown and then execute the code.
+    // interval = 300ms for the opening transition + 500ms for a visual
+    // indication that the submit is happening.
+    setTimeout(async () => {
+      $modal.find('.modal-body').html(`
+        <p class="status-text">
+          🈲 NOTE: DO NOT CLOSE THIS BROWSER WINDOW<br/><br/>
+          🛄 Trying to submit your final changes to the server.<br/>
+          ${lastSaveText}
+        </p>
+        <p>You can still return to the exam if you would like to make more changes to your code.</p>
+      `);
+
+      const config = await loadConfig();
+      registerAutoSave(config.postback, config.code, true);
+    }, 800);
   }
 
 })(window, document);

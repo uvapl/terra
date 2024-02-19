@@ -2,6 +2,7 @@
   --font-size: 18px;
   --navbar-padding: 10px;
   --editor-tab-font-size: 12px;
+  --modal-padding: 20px;
 }
 
 * {
@@ -67,6 +68,10 @@ body {
 .button:active,
 .select:active {
   background: #ccc;
+}
+
+.button:hover {
+  cursor: pointer;
 }
 
 .button[disabled] {
@@ -174,6 +179,21 @@ body {
   height: 100%;
 }
 
+.navbar-right ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-right li {
+  padding: 0 10px;
+  user-select: none;
+}
+
+.navbar-right li:hover {
+  cursor: pointer;
+}
+
 .msg-container {
   user-select: none;
   position: absolute;
@@ -183,7 +203,7 @@ body {
   font-size: 14px;
 }
 
-.msg-container.error {
+.error {
   font-weight: bold;
   color: #d34d4d;
 }
@@ -192,6 +212,7 @@ body {
   user-select: none;
   margin: 0;
   font-weight: normal;
+  font-size: 28px;
 }
 
 .editor {
@@ -339,4 +360,111 @@ body {
 /* ========================================================================== */
 .xterm .xterm-helper-textarea {
   visibility: hidden !important;
+}
+
+/* ========================================================================== */
+/* Custom spinner                                                             */
+/* ========================================================================== */
+.spinner {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #3498db;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* ========================================================================== */
+/* Custom modal (because bootstrap is too overkill)                           */
+/* ========================================================================== */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-20px);
+  transition-timing-function: ease;
+  transition-property: transform, opacity;
+  transition-duration: 0.3s;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.modal.show {
+  transform: translateY(0px);
+  opacity: 1;
+  pointer-events: all;
+}
+
+.modal-content {
+  max-width: 100%;
+  width: 750px;
+  min-width: 400px;
+  background-color: #fff;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.modal.show .modal-content {
+  opacity: 1;
+}
+
+.modal-header {
+  border-bottom: 1px solid #eee;
+  padding: var(--modal-padding);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-header p {
+  margin: 0;
+}
+
+.modal-body p:first-child {
+  margin-top: 0;
+}
+
+.modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+.modal-body {
+  padding: var(--modal-padding);
+}
+
+.modal-title {
+  font-weight: bold;
+}
+
+.modal-footer {
+  padding: var(--modal-padding);
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modal-footer .button {
+  padding: 10px 12px;
+}
+
+.modal-body .spinner {
+  margin: 0 auto;
 }
