@@ -25,9 +25,13 @@
       .find('#submit-btn')
       .click(showSubmitExamModal);
 
+    // Immediately lock everything if this exam is locked.
+    if (config.locked === true) {
+      lockApp();
+    }
+
   }).catch((err) => {
     console.error('Failed to bootstrap app:', err);
-
 
     // Remove the right navbar when the application failed to initialise.
     $('.navbar-right').remove();
@@ -105,6 +109,8 @@
 
       $submitModal.find('.modal-body').html(`❌ The submission was locked since the last submit. ${lastSubmissionText}`);
     }
+
+    $('#submit-btn').remove();
   }
 
   /**
