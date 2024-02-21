@@ -329,34 +329,30 @@ body {
   background: inherit;
 }
 
+.lm_header .lm_tab.lm_active {
+  box-shadow: none;
+  color: #000;
+}
+
 /* dark-mode enabled */
 .dark-mode .lm_content,
 .dark-mode .lm_header .lm_tab {
   border-color: #8e96a9;
 }
 
-.dark-mode .lm_header .lm_tab {
-  background-color: #282c34;
-  color: #8e96a9;
-}
-
 .dark-mode .lm_tab:hover {
-  background: #41454D;
+  color: #000;
 }
 
 .dark-mode .lm_tab.lm_active {
-  background: #fff;
+  background-color: #282c34;
+  color: #8e96a9;
 }
 
 .dark-mode .ace_gutter-active-line,
 .dark-mode .ace_marker-layer .ace_active-line {
   background-color: #383c44;
   border: 0;
-}
-
-.lm_header .lm_tab.lm_active {
-  box-shadow: none;
-  color: #000;
 }
 
 /* ========================================================================== */
