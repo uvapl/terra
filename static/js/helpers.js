@@ -147,3 +147,7 @@ function isValidUrl(url) {
 function getRandNumBetween(lower, upper) {
   return Math.floor(Math.random() * (upper - lower + 1)) + lower;
 }
+
+function isMacOS() {
+  return /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform);
+}

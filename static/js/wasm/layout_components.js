@@ -44,6 +44,18 @@ function EditorComponent(container, state) {
   this.editor.setValue(state.value || '');
   this.editor.clearSelection();
 
+  this.editor.commands.addCommand({
+    name: 'run',
+    bindKey: {win: 'Ctrl+Enter', mac: 'Command+Enter'},
+    exec: runCode
+  });
+
+  this.editor.commands.addCommand({
+    name: 'save',
+    bindKey: {win: 'Ctrl+S', mac: 'Command+S'},
+    exec: () => {}
+  });
+
   const getParentComponentElement = () => container.parent.parent.element[0];
 
   const setFontSize = (fontSize) => {
@@ -198,9 +210,11 @@ class Layout extends GoldenLayout {
   }
 
   createControls = () => {
+    const runCodeShortcut = isMacOS() ? '&#8984;+Enter' : 'Ctrl+Enter';
+
     // Add the buttons to the header.
     $('.editor-component-container .lm_controls').append('<select id="theme" class="select"><option value="light">Light theme</option><option value="dark">Dark theme</option></select>');
-    $('.editor-component-container .lm_controls').append('<button id="run" class="button run-code-btn">Run</button>');
+    $('.editor-component-container .lm_controls').append(`<button id="run" class="button run-code-btn">Run (${runCodeShortcut})</button>`);
 
     $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn">Clear terminal</button>');
 
