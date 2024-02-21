@@ -334,12 +334,6 @@ body {
   color: #000;
 }
 
-/* dark-mode enabled */
-.dark-mode .lm_content,
-.dark-mode .lm_header .lm_tab {
-  border-color: #8e96a9;
-}
-
 .dark-mode .lm_tab:hover {
   color: #000;
 }
