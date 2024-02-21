@@ -264,6 +264,7 @@
           config = await getConfig(queryParams.url);
           config.code = queryParams.code;
           config.configUrl = queryParams.url;
+          LOCAL_STORAGE_PREFIX += '-' + config.configUrl.replace(/[^0-9a-z]+/g, '-');
           setLocalStorageItem('config', JSON.stringify(config));
 
           // Remove query params from the URL.
