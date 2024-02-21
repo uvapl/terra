@@ -100,10 +100,10 @@
     if ($submitModal.length > 0) {
       let lastSubmissionText = '';
       if (window._prevAutoSaveTime instanceof Date) {
-        lastSubmissionText = `The last successful submit was at ${formatDate(window._prevAutoSaveTime)}.`;
+        lastSubmissionText = `<br/><br/>✅ The last successful submit was at ${formatDate(window._prevAutoSaveTime)}.`;
       }
 
-      $submitModal.find('.modal-body').html(`✅ The submission was locked since the last submit. ${lastSubmissionText}`);
+      $submitModal.find('.modal-body').html(`❌ The submission was locked since the last submit. ${lastSubmissionText}`);
     }
   }
 
