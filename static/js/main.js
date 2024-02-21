@@ -246,16 +246,6 @@
   }
 
   /**
-   * Update the local storage prefix with an additional key.
-   *
-   * @param {string} additionalKey - An additional prefix that will be appended
-   * to the current loccal storage prefix.
-   */
-  function updateLocalStoragePrefix(additionalKey) {
-    LOCAL_STORAGE_PREFIX += '-' + additionalKey.replace(/[^0-9a-z]+/g, '-');
-  }
-
-  /**
    * Load the config through query params with a fallback on the local storage.
    *
    * @returns {Promise<object|string>} The configuration for the app once
@@ -274,7 +264,6 @@
           config = await getConfig(queryParams.url);
           config.code = queryParams.code;
           config.configUrl = queryParams.url;
-          updateLocalStoragePrefix(config.configUrl);
           setLocalStorageItem('config', JSON.stringify(config));
 
           // Remove query params from the URL.
@@ -297,7 +286,6 @@
         try {
           await checkServerConnection(testUrl);
           config = tmpConfig;
-          updateLocalStoragePrefix(config.configUrl);
           notify('Connected to server', { fadeOutAfterMs: 10 * 1000 });
         } catch (err) {
           console.error('Failed to connect to', testUrl);
