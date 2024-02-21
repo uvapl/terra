@@ -94,6 +94,17 @@
 
     // Show lock screen for both containers.
     $('.component-container').addClass('locked');
+
+    // Check if the submit modal is open.
+    $submitModal = $('#submit-exam-model');
+    if ($submitModal.length > 0) {
+      let lastSubmissionText = '';
+      if (window._prevAutoSaveTime instanceof Date) {
+        lastSubmissionText = `The last successful submit was at ${formatDate(window._prevAutoSaveTime)}.`;
+      }
+
+      $submitModal.find('.modal-body').html(`✅ The submission was locked since the last submit. ${lastSubmissionText}`);
+    }
   }
 
   /**
@@ -103,8 +114,10 @@
    * @param {string} uuid - Unique user ID that the POST request needs for
    *                        verification purposes.
    * @param {boolean} [force] - Whether to trigger the auto-save immediately.
+   * @param {function} [saveCallback] - Callback function when the save has been
+   * done.
    */
-  function registerAutoSave(url, uuid, force = false) {
+  function registerAutoSave(url, uuid, force, saveCallback) {
     if (window._autoSaveIntervalId) {
       clearInterval(_autoSaveIntervalId);
     }
@@ -115,6 +128,10 @@
         if (window._editorIsDirty || force) {
           // Save the editor content.
           const res = await doAutoSave(url, uuid);
+
+          if (typeof saveCallback === 'function') {
+            saveCallback();
+          }
 
           // Check if the response returns a "423 Locked" status, indicating
           // that the user the submission has been closed.
@@ -134,6 +151,7 @@
 
           // Update the last saved timestamp in the UI.
           updateLastSaved();
+
         }
       } catch (err) {
         console.error('Auto-save failed:', err);
@@ -446,10 +464,13 @@
     // rendered to the DOM to show the fade-in animation.
     setTimeout(() => $modal.addClass('show'), 10);
 
-    // Wait for the modal to be shown and then execute the code.
-    // interval = 300ms for the opening transition + 500ms for a visual
-    // indication that the submit is happening.
-    setTimeout(async () => {
+    // If for some reason the auto-save POST request takes more than 1 second,
+    // we will show a message to the user.
+    //
+    // interval = 300ms for the opening transition to be completed + 1 second of
+    // time to wait for the POST request. If the submission was successful, then
+    // this timeout will be cleared automatically.
+    const infoMsgTimeoutId = setTimeout(() => {
       $modal.find('.modal-body').html(`
         <p class="status-text">
           🈲 NOTE: DO NOT CLOSE THIS BROWSER WINDOW<br/><br/>
@@ -458,10 +479,19 @@
         </p>
         <p>You can still return to the exam if you would like to make more changes to your code.</p>
       `);
+    }, 1300);
 
+    // Wait for the modal to be shown and then execute the code.
+    // interval = 300ms for the opening transition to be completed.
+    const submitTimeoutId = setTimeout(async () => {
       const config = await loadConfig();
-      registerAutoSave(config.postback, config.code, true);
-    }, 800);
+      registerAutoSave(config.postback, config.code, true, () => {
+        // Stop all timeouts after the first successful save.
+        clearTimeout(submitTimeoutId);
+        clearTimeout(infoMsgTimeoutId);
+      });
+
+    }, 300);
   }
 
 })(window, document);
