@@ -346,7 +346,7 @@ body {
 
 .dark-mode .lm_tab.lm_active {
   background-color: #282c34;
-  color: #8e96a9;
+  color: #dcdfe4;
 }
 
 .dark-mode .ace_gutter-active-line,
