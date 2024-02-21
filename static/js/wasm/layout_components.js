@@ -25,6 +25,11 @@ function getActiveEditor() {
 }
 
 const runCode = debounceLazy(() => {
+  const $button = $('#run');
+  if ($button.prop('disabled')) return;
+
+  $button.prop('disabled', true);
+
   const editor = getActiveEditor();
   return api.compileLinkRun(editor.config.title, editor.container.getState().value);
 }, 100);
@@ -238,16 +243,8 @@ class Layout extends GoldenLayout {
     ].join(''));
 
     // Add event listeners.
-    $('#run').click((event) => {
-      const $button = $(event.target);
-      if ($button.prop('disabled')) return;
-
-      $button.prop('disabled', true);
-      runCode();
-    });
-
+    $('#run').click((event) => runCode());
     $('#clear-term').click(() => term.clear());
-
     $('#theme').change((event) => this.setTheme(event.target.value));
 
     // Update font-size for all components on change.
