@@ -98,7 +98,10 @@ function EditorComponent(container, state) {
 
   container.on('themeChanged', setTheme);
   container.on('fontSizeChanged', setFontSize);
-  container.on('resize', debounceLazy(() => this.editor.resize(), 20));
+  container.on('resize', debounceLazy(() => {
+    this.editor.setAutoScrollEditorIntoView(true);
+    this.editor.resize();
+  }, 20));
   container.on('destroy', () => {
     if (this.editor) {
       this.editor.destroy();
