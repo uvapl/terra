@@ -244,7 +244,7 @@
       const queryParams = parseQueryParams();
       if (validateQueryParams(queryParams)) {
         try {
-          config = await getConfig(makeUrl(queryParams.url), { code: queryParams.code });
+          config = await getConfig(makeUrl(queryParams.url, { code: queryParams.code }));
           config.code = queryParams.code;
           config.configUrl = queryParams.url;
 
