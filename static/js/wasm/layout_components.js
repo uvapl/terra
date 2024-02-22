@@ -215,7 +215,7 @@ class Layout extends GoldenLayout {
   }
 
   createControls = () => {
-    const runCodeShortcut = isMacOS() ? '&#8984;+Enter' : 'Ctrl+Enter';
+    const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
 
     // Add the buttons to the header.
     $('.editor-component-container .lm_controls').append('<select id="theme" class="select"><option value="light">Light theme</option><option value="dark">Dark theme</option></select>');

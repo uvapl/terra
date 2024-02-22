@@ -229,26 +229,6 @@
   }
 
   /**
-   * Check whether a given server URL is reachable.
-   *
-   * @param {string} url - The server URL to check for.
-   * @returns {Promise<boolean>} Resolves `true` when the server is reachable.
-   */
-  function checkServerConnection(url) {
-    return new Promise((resolve, reject) => {
-      fetch(url)
-        .then((response) => {
-          if (response.ok) {
-            resolve();
-          } else {
-            reject();
-          }
-        })
-        .catch((err) => reject(err));
-    });
-  }
-
-  /**
    * Load the config through query params with a fallback on the local storage.
    *
    * @returns {Promise<object|string>} The configuration for the app once
@@ -264,7 +244,7 @@
       const queryParams = parseQueryParams();
       if (validateQueryParams(queryParams)) {
         try {
-          config = await getConfig(queryParams.url);
+          config = await getConfig(makeUrl(queryParams.url), { code: queryParams.code });
           config.code = queryParams.code;
           config.configUrl = queryParams.url;
 
@@ -281,18 +261,22 @@
         }
       } else {
         // Fallback on local storage.
-        const tmpConfig = JSON.parse(getLocalStorageItem('config', {}));
+        const localConfig = JSON.parse(getLocalStorageItem('config', {}));
 
-        // Check immediately if the server is reachable.
-        // If it is reachable, use the tmpConfig as the actual config,
-        // otherwise notify the user that we failed to connect.
-        let testUrl = tmpConfig.configUrl;
+        // Check immediately if the server is reachable by retrieving the
+        // config again. If it is reachable, use the localConfig as the actual
+        // config, otherwise notify the user that we failed to connect.
         try {
-          await checkServerConnection(testUrl);
-          config = tmpConfig;
+          const newConfig = await getConfig(makeUrl(localConfig.configUrl, { code: localConfig.code }))
+
+          // While we fallback on localstorage, we still need to check whether
+          // the exam is locked, so we have to update the `locked` property.
+          localConfig.locked = newConfig.locked;
+
+          config = localConfig;
           notify('Connected to server', { fadeOutAfterMs: 10 * 1000 });
         } catch (err) {
-          console.error('Failed to connect to', testUrl);
+          console.error('Failed to connect to server:');
           console.error(err);
           notifyError('Failed to connect to server');
         }

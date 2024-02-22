@@ -148,6 +148,26 @@ function getRandNumBetween(lower, upper) {
   return Math.floor(Math.random() * (upper - lower + 1)) + lower;
 }
 
-function isMacOS() {
+/**
+ * Check whether the current user OS is Mac.
+ *
+ * @returns {boolean} True when the system is detected as a Mac-like system.
+ */
+function isMac() {
   return /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform);
+}
+
+/**
+ * Make a url with a given query params object.
+ *
+ * @param {string} url - The URL where the query params will be appended to.
+ * @param {object} queryParams - The params that will be converted to the URL.
+ * @returns {string} A concatenation of the URL and query params.
+ */
+function makeUrl(url, queryParams) {
+  const query = Object.keys(queryParams)
+    .reduce((query, key) => query.concat(`${key}=${queryParams[key]}`), [])
+    .join('&');
+
+  return `${url}?${query}`;
 }
