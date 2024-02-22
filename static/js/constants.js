@@ -2,7 +2,8 @@
  * The prefix for all local storage keys. This will be adjusted once the config
  * is loaded.
  */
-let LOCAL_STORAGE_PREFIX = 'examide';
+const DEFAULT_LOCAL_STORAGE_PREFIX = 'examide';
+let LOCAL_STORAGE_PREFIX = DEFAULT_LOCAL_STORAGE_PREFIX;
 
 /**
  * Sets the default font-size for the upper-right select element.

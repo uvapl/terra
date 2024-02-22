@@ -264,13 +264,18 @@
         }
       } else {
         // Fallback on local storage.
-        const currentStorageKey = getLocalStorageItem('last-used');
 
-        if (!currentStorageKey) {
-          reject('No last-used config key found in local storage');
+        // This function should only update the local storage prefix if it's
+        // not the default prefix.
+        if (LOCAL_STORAGE_PREFIX === DEFAULT_LOCAL_STORAGE_PREFIX) {
+          const currentStorageKey = getLocalStorageItem('last-used');
+
+          if (!currentStorageKey) {
+            reject('No last-used config key found in local storage');
+          }
+          updateLocalStoragePrefix(currentStorageKey);
         }
 
-        updateLocalStoragePrefix(currentStorageKey);
         const localConfig = JSON.parse(getLocalStorageItem('config', {}));
 
         // Check immediately if the server is reachable by retrieving the
