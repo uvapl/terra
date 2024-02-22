@@ -190,9 +190,12 @@
 
       const $modal = $('#submit-exam-model');
       if ($modal.length > 0) {
-        $modal.find('.status-text').html(`
-          ✅ Your files have been submitted successfully.<br/><br/>
-          🛂 Make sure that you sign off at the desk before leaving.
+        $modal.find('.modal-body').html(`
+          <p class="status-text">
+            ✅ Your files have been submitted successfully.<br/><br/>
+            🛂 Make sure that you sign off at the desk before leaving.
+          </p>
+          <p>You can still return to the exam if you would like to make more changes to your code.</p>
         `);
       }
     }
@@ -494,8 +497,8 @@
       const config = await loadConfig();
       registerAutoSave(config.postback, config.code, true, () => {
         // Stop all timeouts after the first successful save.
-        clearTimeout(submitTimeoutId);
         clearTimeout(infoMsgTimeoutId);
+        clearTimeout(submitTimeoutId);
       });
 
     }, 300);
