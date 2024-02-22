@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-window.addEventListener('resize', event => {
+$(window).on('resize', () => {
   if (window._layout) {
     window._layout.updateSize(window.innerWidth, window.innerHeight);
   }
@@ -98,10 +98,12 @@ function EditorComponent(container, state) {
 
   container.on('themeChanged', setTheme);
   container.on('fontSizeChanged', setFontSize);
+
   container.on('resize', debounceLazy(() => {
     this.editor.setAutoScrollEditorIntoView(true);
     this.editor.resize();
   }, 20));
+
   container.on('destroy', () => {
     if (this.editor) {
       this.editor.destroy();
@@ -186,6 +188,12 @@ class Layout extends GoldenLayout {
         setTimeout(() => {
           this.createControls();
           this.setTheme(getLocalStorageItem('theme') || 'light');
+
+          // Focus the editor when clicking anywhere in the editor header.
+          $('.editor-component-container .lm_header').click(() => {
+            console.log('focusing editor');
+            getActiveEditor().instance.editor.focus();
+          });
         }, 0);
       }
     });
