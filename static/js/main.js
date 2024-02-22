@@ -265,7 +265,6 @@
           config.code = queryParams.code;
           config.configUrl = queryParams.url;
 
-          localStorage.clear();
           setLocalStorageItem('config', JSON.stringify(config));
 
           // Remove query params from the URL.
