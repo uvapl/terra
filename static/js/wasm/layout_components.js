@@ -51,14 +51,14 @@ function EditorComponent(container, state) {
 
   this.editor.commands.addCommand({
     name: 'run',
-    bindKey: {win: 'Ctrl+Enter', mac: 'Command+Enter'},
+    bindKey: { win: 'Ctrl+Enter', mac: 'Command+Enter' },
     exec: runCode
   });
 
   this.editor.commands.addCommand({
     name: 'save',
-    bindKey: {win: 'Ctrl+S', mac: 'Command+S'},
-    exec: () => {}
+    bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
+    exec: () => { }
   });
 
   const getParentComponentElement = () => container.parent.parent.element[0];
@@ -77,6 +77,10 @@ function EditorComponent(container, state) {
   }
 
   setFontSize(state.fontSize || BASE_FONT_SIZE);
+
+  this.editor.on('load', () => {
+    this.editor.session.getUndoMananger().reset();
+  });
 
   this.editor.on('change', debounceLazy(event => {
     window._editorIsDirty = true;
@@ -103,6 +107,12 @@ function EditorComponent(container, state) {
     this.editor.setAutoScrollEditorIntoView(true);
     this.editor.resize();
   }, 20));
+
+  container.on('afterFirstRender', () => {
+    // Reset the session after the first initial page render to prevent the
+    // initial content is removed when users hit ctrl+z or cmd+z.
+    this.editor.session.getUndoManager().reset();
+  });
 
   container.on('destroy', () => {
     if (this.editor) {
@@ -162,7 +172,7 @@ function TerminalComponent(container, state) {
 }
 
 class Layout extends GoldenLayout {
-  createdControls = false;
+  initialised = false;
 
   constructor(options) {
     let layoutConfig = getLocalStorageItem('layout');
@@ -180,18 +190,18 @@ class Layout extends GoldenLayout {
       setLocalStorageItem('layout', state);
     }, 500));
 
-    this.on('stackCreated', stack => {
-      if (!this.createdControls) {
-        this.createdControls = true;
+    this.on('stackCreated', (stack) => {
+      if (!this.initialised) {
+        this.initialised = true;
         // Do a set-timeout trick to make sure the components are registered
         // through the registerComponent() function, prior to calling this part.
         setTimeout(() => {
+          this.emitToAllComponents('afterFirstRender');
           this.createControls();
           this.setTheme(getLocalStorageItem('theme') || 'light');
 
           // Focus the editor when clicking anywhere in the editor header.
           $('.editor-component-container .lm_header').click(() => {
-            console.log('focusing editor');
             getActiveEditor().instance.editor.focus();
           });
         }, 0);
