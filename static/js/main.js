@@ -248,6 +248,9 @@
           config.code = queryParams.code;
           config.configUrl = queryParams.url;
 
+          const currentStorageKey = config.configUrl.replace(/[^0-9a-z]+/g, '-');
+          setLocalStorageItem('last-used', currentStorageKey);
+          updateLocalStoragePrefix(currentStorageKey);
           setLocalStorageItem('config', JSON.stringify(config));
 
           // Remove query params from the URL.
@@ -261,6 +264,13 @@
         }
       } else {
         // Fallback on local storage.
+        const currentStorageKey = getLocalStorageItem('last-used');
+
+        if (!currentStorageKey) {
+          reject('No last-used config key found in local storage');
+        }
+
+        updateLocalStoragePrefix(currentStorageKey);
         const localConfig = JSON.parse(getLocalStorageItem('config', {}));
 
         // Check immediately if the server is reachable by retrieving the
