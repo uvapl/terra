@@ -272,6 +272,7 @@
           // While we fallback on localstorage, we still need to check whether
           // the exam is locked, so we have to update the `locked` property.
           localConfig.locked = newConfig.locked;
+          setLocalStorageItem('config', JSON.stringify(localConfig));
 
           config = localConfig;
           notify('Connected to server', { fadeOutAfterMs: 10 * 1000 });
