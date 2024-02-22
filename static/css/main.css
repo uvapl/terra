@@ -9,19 +9,21 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  min-width: 1400px;
+}
+
 body {
   margin: 0;
   font-size: var(--font-size);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
     "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-}
-
-html,
-body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 .app-container {
@@ -234,6 +236,11 @@ body {
 /* ========================================================================== */
 .lm_goldenlayout {
   background: #fff;
+}
+
+.lm_goldenlayout,
+.lm_goldenlayout > div {
+  min-width: 100% !important;
 }
 
 .lm_header .lm_tab {
