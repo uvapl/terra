@@ -3,6 +3,13 @@
   --navbar-padding: 10px;
   --editor-tab-font-size: 12px;
   --modal-padding: 20px;
+  --tab-fg-color: #737373;
+  --tab-bg-color: #e1e1e1;
+  --active-tab-fg-color: #000;
+  --active-tab-bg-color: #fff;
+  --border-color: #999;
+  --dark-mode-active-tab-fg-color: #dcdfe4;
+  --dark-mode-active-tab-bg-color: #282c34;
 }
 
 * {
@@ -14,7 +21,9 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  min-width: 1500px;
+
+  /* Prevents the layout from breaking on small screens */
+  min-width: 768px;
 }
 
 body {
@@ -57,7 +66,7 @@ body {
 
 .select {
   -webkit-appearance: none;
-  border: 1px solid #999;
+  border: 1px solid var(--border-color);
   background-color: #fff;
   background-image: url('../img/icons/caret-down.png');
   background-size: 10px;
@@ -113,16 +122,7 @@ body {
   background: #e64a3a;
 }
 
-.lm_header .lm_controls {
-  /*
-  This margin is solely added for when the app locks, fixing the issue that the
-  button isn't cut-off.
-  */
-  margin-right: 1px;
-  right: 0;
-}
-
-.lm_controls * + * {
+.terminal-component-container .lm_header button + button {
   margin-left: 5px;
 }
 
@@ -232,6 +232,94 @@ body {
 }
 
 /* ========================================================================== */
+/* Setting dropdown                                                           */
+/* ========================================================================== */
+.settings-menu {
+  user-select: none;
+}
+
+.settings-btn {
+  width: 24px;
+  height: 24px;
+  background: url('../img/icons/cog.png') no-repeat center;
+  background-size: 14px;
+  position: relative;
+  border: 0;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.settings-menu.open > .settings-dropdown {
+  display: block;
+}
+
+.settings-menu:hover .settings-btn {
+  opacity: 1;
+}
+
+.settings-menu:hover {
+  cursor: pointer;
+}
+
+.settings-dropdown {
+  position: absolute;
+  background: #fff;
+  display: none;
+  right: 0;
+  border: 1px solid var(--border-color);
+}
+
+.settings-dropdown li.has-dropdown {
+  padding-left: 25px;
+  background-size: 10px;
+}
+
+.settings-dropdown li.has-dropdown:before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  width: 10px;
+  height: 10px;
+  background: url('../img/icons/arrow-head-left.png') no-repeat center center;
+  background-size: contain;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.6;
+}
+
+.settings-dropdown > li > .settings-dropdown {
+  top: 0;
+  right: 100%;
+}
+
+.settings-dropdown li {
+  position: relative;
+  padding: 6px 10px;
+  white-space: nowrap;
+  color: var(--tab-fg-color);
+}
+
+.settings-dropdown li:hover {
+  background-color: #ddd;
+  color: #000;
+  cursor: pointer;
+}
+
+.settings-dropdown li:hover:before {
+  opacity: 1;
+}
+
+.settings-dropdown li.active {
+  color: #000;
+  font-weight: bold;
+}
+
+.settings-dropdown > li:hover > .settings-dropdown {
+  display: block;
+}
+
+
+/* ========================================================================== */
 /* GoldenLayout overrides                                                     */
 /* ========================================================================== */
 .lm_goldenlayout {
@@ -246,10 +334,15 @@ body {
 .lm_header .lm_tab {
   font-size: inherit;
   font-family: inherit;
-  background-color: #e1e1e1;
   user-select: none;
   border-top-right-radius: 3px;
   border-top-left-radius: 3px;
+  padding: 2px 10px 5px;
+  height: calc(100% - 1px);
+  margin-right: 5px;
+  margin-top: 2px;
+  color: var(--tab-fg-color);
+  background-color: var(--tab-bg-color);
 }
 
 .lm_header {
@@ -263,23 +356,17 @@ body {
 
 .lm_content,
 .lm_header .lm_tab {
-  border-color: #999;
+  border-color: var(--border-color);
 }
 
-.lm_header .lm_tab {
-  padding: 2px 10px 5px;
-  height: calc(100% - 1px);
-  margin-right: 5px;
-  margin-top: 2px;
-}
-
-.lm_tab:hover, .lm_tab.lm_active {
-  background: #fff;
+.lm_tab:hover,
+.lm_tab.lm_active {
+  background: var(--active-tab-bg-color);
+  color: var(--active-tab-fg-color);
 }
 
 .lm_header .lm_tab.lm_active {
   box-shadow: none;
-  color: #000;
 }
 
 .lm_header [class^="lm_"] {
@@ -309,7 +396,7 @@ body {
 .lm_splitter.lm_horizontal:not(.locked):after {
   content: '';
   width: 2px;
-  height: 30px;
+  height: 31px;
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
@@ -336,20 +423,28 @@ body {
   background: inherit;
 }
 
-.lm_header .lm_tab.lm_active {
-  box-shadow: none;
-  color: #000;
+.lm_header .lm_tabdropdown_list {
+  top: 30px;
 }
 
-.dark-mode .lm_tab:hover {
-  color: #000;
+.lm_header .lm_tabdropdown_list .lm_tab {
+  border-radius: 0;
+  border: 1px solid var(--border-color);
+  background: #fff;
+  padding-bottom: 3px;
 }
 
+.lm_header .lm_tabdropdown_list .lm_tab + .lm_tab {
+  margin-top: -1px;
+}
+
+/* dark mode overrides */
 .dark-mode .lm_tab.lm_active {
-  background-color: #282c34;
-  color: #dcdfe4;
+  background-color: var(--dark-mode-active-tab-bg-color);
+  color: var(--dark-mode-active-tab-fg-color);
 }
 
+/* cursor line */
 .dark-mode .ace_gutter-active-line,
 .dark-mode .ace_marker-layer .ace_active-line {
   background-color: #383c44;
@@ -468,4 +563,17 @@ body {
 
 .modal-body .spinner {
   margin: 0 auto;
+}
+
+/* ========================================================================== */
+/* Media queries                                                              */
+/* ========================================================================== */
+@media (max-width: 1200px) {
+  .page-title {
+    font-size: 24px;
+  }
+
+  .exam-name {
+    font-size: 16px;
+  }
 }
