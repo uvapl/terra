@@ -239,44 +239,73 @@ class Layout extends GoldenLayout {
     const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
 
     // Add the buttons to the header.
-    $('.editor-component-container .lm_controls').append('<select id="theme" class="select"><option value="light">Light theme</option><option value="dark">Dark theme</option></select>');
-    $('.editor-component-container .lm_controls').append(`<button id="run" class="button run-code-btn">Run (${runCodeShortcut})</button>`);
-
     $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn">Clear terminal</button>');
+    $('.terminal-component-container .lm_header').prepend(`<button id="run" class="button run-code-btn">Run (${runCodeShortcut})</button>`);
 
-    // Create font-size element.
-    $('.layout-outer-container').append([
-      '<div class="font-size-control">',
-      '  <label>font size: </label>',
-      '  <select class="select">',
-      '    <option value="8">8</option>',
-      '    <option value="9">9</option>',
-      '    <option value="10">10</option>',
-      '    <option value="11">11</option>',
-      '    <option value="12">12</option>',
-      '    <option value="14">14</option>',
-      '    <option value="18" selected>18</option>',
-      '    <option value="24">24</option>',
-      '    <option value="30">30</option>',
-      '    <option value="36">36</option>',
-      '  </select>',
-      '</div>',
-    ].join(''));
+    // Create setting dropdown menu.
+    $('.terminal-component-container .lm_controls').append(`
+      <div class="settings-menu">
+        <button class="settings-btn"></button>
+        <ul class="settings-dropdown">
+          <li class="has-dropdown">
+            Editor theme
+            <ul class="settings-dropdown" id="editor-theme-menu">
+              <li data-val="light">Light</li>
+              <li data-val="dark">Dark</li>
+            </ul>
+          </li>
+          <li class="has-dropdown">
+            Font size
+            <ul class="settings-dropdown" id="font-size-menu">
+              <li data-val="10">10</li>
+              <li data-val="11">11</li>
+              <li data-val="12">12</li>
+              <li data-val="14">14</li>
+              <li data-val="16">16</li>
+              <li data-val="18">18</li>
+              <li data-val="24">24</li>
+              <li data-val="30">30</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    `);
+
+    // Add active state to font-size dropdown.
+    const $fontSizeMenu = $('#font-size-menu');
+    const currentFontSize = getLocalStorageItem('font-size') || BASE_FONT_SIZE;
+    $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
+
+    // Add active state to theme dropdown.
+    const currentTheme = getLocalStorageItem('theme') || 'light';
+    const $editorThemeMenu = $('#editor-theme-menu');
+    $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
 
     // Add event listeners.
-    $('#run').click((event) => runCode());
+    $('.settings-menu').click((event) => $(event.target).toggleClass('open'));
+    $('#run').click(() => runCode());
     $('#clear-term').click(() => term.clear());
-    $('#theme').change((event) => this.setTheme(event.target.value));
-
-    // Update font-size for all components on change.
-    $('.font-size-control select').change((event) => {
-      const newFontSize = parseInt(event.target.value);
-      this.emitToAllComponents('fontSizeChanged', newFontSize);
-      setLocalStorageItem('font-size', newFontSize);
+    $(document).click((event) => {
+      if (!$(event.target).is($('.settings-menu.open'))) {
+        $('.settings-menu').removeClass('open');
+      }
     });
 
-    // Set default font-size on select element.
-    $('.font-size-control select').val(getLocalStorageItem('font-size') || BASE_FONT_SIZE);
+    // Update font-size for all components on change.
+    $fontSizeMenu.find('li').click((event) => {
+      const $element = $(event.target);
+      const newFontSize = parseInt($element.data('val'));
+      this.emitToAllComponents('fontSizeChanged', newFontSize);
+      setLocalStorageItem('font-size', newFontSize);
+      $element.addClass('active').siblings().removeClass('active');
+    });
+
+    // Update theme on change.
+    $editorThemeMenu.find('li').click((event) => {
+      const $element = $(event.target);
+      this.setTheme($element.data('val'));
+      $element.addClass('active').siblings().removeClass('active');
+    });
   }
 }
 
