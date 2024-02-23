@@ -499,16 +499,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transform: translateY(-20px);
   transition-timing-function: ease;
-  transition-property: transform, opacity;
+  transition-property: opacity;
   transition-duration: 0.3s;
   opacity: 0;
   pointer-events: none;
 }
 
 .modal.show {
-  transform: translateY(0px);
   opacity: 1;
   pointer-events: all;
 }
@@ -520,11 +518,15 @@ body {
   background-color: #fff;
   border-radius: 3px;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition-timing-function: ease;
+  transition-property: transform, opacity;
+  transition-duration: 0.3s;
+  transform: translateY(-20px);
 }
 
 .modal.show .modal-content {
   opacity: 1;
+  transform: translateY(0px);
 }
 
 .modal-header {
