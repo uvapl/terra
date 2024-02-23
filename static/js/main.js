@@ -191,7 +191,7 @@
       const $modal = $('#submit-exam-model');
       if ($modal.length > 0) {
         $modal.find('.modal-body').html(`
-          <p class="status-text">
+          <p>
             ✅ Your files have been submitted successfully.<br/><br/>
             🛂 Make sure that you sign off at the desk before leaving.
           </p>
@@ -482,7 +482,7 @@
     // this timeout will be cleared automatically.
     const infoMsgTimeoutId = setTimeout(() => {
       $modal.find('.modal-body').html(`
-        <p class="status-text">
+        <p>
           🈲 NOTE: DO NOT CLOSE THIS BROWSER WINDOW<br/><br/>
           🛄 Trying to submit your final changes to the server.<br/>
           ${lastSaveText}
