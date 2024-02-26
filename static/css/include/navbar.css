@@ -38,11 +38,6 @@
   font-size: 14px;
 }
 
-.error {
-  font-weight: bold;
-  color: #d34d4d;
-}
-
 .page-title {
   user-select: none;
   margin: 0;
@@ -52,11 +47,6 @@
 
 .exam-name {
   font-size: 20px;
-}
-
-.editor {
-  width: 100%;
-  height: 100%;
 }
 
 /* hide 80-th column indicator */
@@ -76,4 +66,3 @@
     font-size: 16px;
   }
 }
-
