@@ -492,6 +492,9 @@ const API = (function() {
       this.ready = this.memfs.ready.then(() => {
         return this.untar(this.sysrootFilename);
       });
+
+      this.getModule(this.clangFilename);
+      this.getModule(this.lldFilename);
     }
 
     hostWriteCmd(message) {
