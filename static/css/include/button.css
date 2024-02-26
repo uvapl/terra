@@ -1,0 +1,39 @@
+.button:active {
+  background: #ccc;
+}
+
+.button:hover {
+  cursor: pointer;
+}
+
+.button[disabled] {
+  background: #cfcfcf;
+  color: #606060;
+  cursor: not-allowed;
+  border-color: #606060;
+}
+
+.button {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 3px 5px;
+  background: #fff;
+  border-radius: 4px;
+  border: 1px solid #000;
+}
+
+.run-code-btn {
+  background: #62c0ff;
+}
+
+.run-code-btn:not([disabled]):active {
+  background: #5dabdf;
+}
+
+.clear-term-btn {
+  background: #f9776a;
+}
+
+.clear-term-btn:not([disabled]):active {
+  background: #e64a3a;
+}

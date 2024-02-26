@@ -1,0 +1,87 @@
+/* ========================================================================== */
+/* Custom modal (because bootstrap is too overkill)                           */
+/* ========================================================================== */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition-timing-function: ease;
+  transition-property: opacity;
+  transition-duration: 0.3s;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.modal.show {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.modal-content {
+  max-width: 100%;
+  width: 750px;
+  min-width: 400px;
+  background-color: #fff;
+  border-radius: 3px;
+  opacity: 0;
+  transition-timing-function: ease;
+  transition-property: transform, opacity;
+  transition-duration: 0.3s;
+  transform: translateY(-20px);
+}
+
+.modal.show .modal-content {
+  opacity: 1;
+  transform: translateY(0px);
+}
+
+.modal-header {
+  border-bottom: 1px solid #eee;
+  padding: var(--modal-padding);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-header p {
+  margin: 0;
+}
+
+.modal-body p:first-child {
+  margin-top: 0;
+}
+
+.modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+.modal-body {
+  padding: var(--modal-padding);
+}
+
+.modal-title {
+  font-weight: bold;
+}
+
+.modal-footer {
+  padding: var(--modal-padding);
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modal-footer .button {
+  padding: 10px 12px;
+}
+
+.modal-body .spinner {
+  margin: 0 auto;
+}
