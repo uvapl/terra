@@ -27,13 +27,17 @@ body {
   min-width: 768px;
 }
 
+html {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 body {
   margin: 0;
   font-size: var(--font-size);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
     "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  overflow-x: auto;
 }
 
 .app-container {
