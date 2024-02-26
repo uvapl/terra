@@ -590,7 +590,7 @@ const API = (function() {
         const buffer = this.memfs.getFileContents(wasm);
         const testMod = await WebAssembly.compile(buffer)
         this.hostWriteCmd(`./${basename}`);
-        return this.run([testMod, wasm]);
+        return await this.run([testMod, wasm]);
       } finally {
         if (typeof this.compileLinkRunCallback === 'function') {
           this.compileLinkRunCallback();
