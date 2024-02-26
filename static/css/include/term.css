@@ -1,0 +1,17 @@
+.xterm .xterm-helper-textarea {
+  visibility: hidden !important;
+}
+
+.terminal-component-container .lm_header button + button {
+  margin-left: 5px;
+}
+
+.terminal-component-container .lm_tabs {
+  display: none;
+}
+
+.terminal {
+  padding: 10px;
+  height: 100%;
+  width: 100%;
+}

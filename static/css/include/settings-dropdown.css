@@ -1,0 +1,83 @@
+.settings-menu {
+  user-select: none;
+}
+
+.settings-btn {
+  width: 24px;
+  height: 24px;
+  background: url('../../img/icons/cog.png') no-repeat center;
+  background-size: 14px;
+  position: relative;
+  border: 0;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.settings-menu.open > .settings-dropdown {
+  display: block;
+}
+
+.settings-menu:hover .settings-btn {
+  opacity: 1;
+}
+
+.settings-menu:hover {
+  cursor: pointer;
+}
+
+.settings-dropdown {
+  position: absolute;
+  background: #fff;
+  display: none;
+  right: 0;
+  border: 1px solid var(--border-color);
+}
+
+.settings-dropdown li.has-dropdown {
+  padding-left: 25px;
+  background-size: 10px;
+}
+
+.settings-dropdown li.has-dropdown:before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  width: 10px;
+  height: 10px;
+  background: url('../../img/icons/arrow-head-left.png') no-repeat center center;
+  background-size: contain;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.6;
+}
+
+.settings-dropdown > li > .settings-dropdown {
+  top: 0;
+  right: 100%;
+}
+
+.settings-dropdown li {
+  position: relative;
+  padding: 6px 10px;
+  white-space: nowrap;
+  color: var(--tab-fg-color);
+}
+
+.settings-dropdown li:hover {
+  background-color: var(--tab-menu--tab-bg-color);
+  color: #000;
+  cursor: pointer;
+}
+
+.settings-dropdown li:hover:before {
+  opacity: 1;
+}
+
+.settings-dropdown li.active {
+  color: #000;
+  font-weight: bold;
+}
+
+.settings-dropdown > li:hover > .settings-dropdown {
+  display: block;
+}

@@ -1,0 +1,132 @@
+.lm_goldenlayout {
+  background: #fff;
+}
+
+.lm_goldenlayout,
+.lm_goldenlayout > div {
+  min-width: 100% !important;
+}
+
+.lm_header .lm_tab {
+  font-size: inherit;
+  font-family: inherit;
+  user-select: none;
+  border-top-right-radius: 3px;
+  border-top-left-radius: 3px;
+  padding: 2px 10px 5px;
+  height: calc(100% - 1px);
+  margin-right: 5px;
+  margin-top: 2px;
+  color: var(--tab-fg-color);
+  background-color: var(--tab-bg-color);
+}
+
+.lm_header {
+  display: flex;
+  align-items: center
+}
+
+.lm_header .lm_tabs {
+  height: 100%;
+}
+
+.lm_content,
+.lm_header .lm_tab {
+  border-color: var(--border-color);
+}
+
+.lm_tab:hover,
+.lm_tab.lm_active {
+  background: var(--active-tab-bg-color);
+  color: var(--active-tab-fg-color);
+}
+
+.lm_header .lm_tab.lm_active {
+  box-shadow: none;
+}
+
+.lm_header [class^="lm_"] {
+  box-sizing: inherit !important;
+}
+
+.lm_splitter {
+  opacity: 1;
+  background: #fff;
+  transition: background 200ms ease;
+}
+
+.lm_splitter:hover {
+  background: #999;
+}
+
+.lm_splitter.locked {
+  pointer-events: none;
+}
+
+.lm_splitter.locked:hover {
+  background: #fff;
+}
+
+/* Create two vertical bars as a drag-handler icon */
+.lm_splitter.lm_horizontal:not(.locked):before,
+.lm_splitter.lm_horizontal:not(.locked):after {
+  content: '';
+  width: 2px;
+  height: 31px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #b1b1b1;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+  opacity: 1;
+}
+
+.lm_splitter.lm_horizontal:before {
+  left: 2px;
+}
+
+.lm_splitter.lm_horizontal:after {
+  right: 2px;
+}
+
+.lm_splitter:not(.locked):hover:before,
+.lm_splitter:not(.locked):hover:after {
+  opacity: 0;
+}
+
+.lm_content {
+  background: inherit;
+}
+
+.lm_header .lm_tabdropdown_list {
+  top: 30px;
+}
+
+.lm_header .lm_tabdropdown_list .lm_tab {
+  border-radius: 0;
+  border: 1px solid var(--border-color);
+  background: #fff;
+  padding-bottom: 3px;
+}
+
+.lm_header .lm_tabdropdown_list .lm_tab:hover {
+  background: var(--tab-menu--tab-bg-color);
+}
+
+.lm_header .lm_tabdropdown_list .lm_tab + .lm_tab {
+  margin-top: -1px;
+}
+
+/* dark mode overrides */
+.dark-mode .lm_tab.lm_active {
+  background-color: var(--dark-mode-active-tab-bg-color);
+  color: var(--dark-mode-active-tab-fg-color);
+}
+
+/* cursor line */
+.dark-mode .ace_gutter-active-line,
+.dark-mode .ace_marker-layer .ace_active-line {
+  background-color: #383c44;
+  border: 0;
+}
