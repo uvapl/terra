@@ -185,10 +185,10 @@ function makeUrl(url, queryParams) {
  * Update the local storage prefix with an additional key.
  *
  * @param {string} additionalKey - An additional prefix that will be appended to
- * the current loccal storage prefix.
+ * the current local storage prefix.
  */
 function updateLocalStoragePrefix(additionalKey) {
-  LOCAL_STORAGE_PREFIX += `-${additionalKey}`;
+  LOCAL_STORAGE_PREFIX = `${DEFAULT_LOCAL_STORAGE_PREFIX}-${additionalKey}`;
 }
 
 /**
