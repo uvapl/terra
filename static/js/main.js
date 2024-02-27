@@ -229,6 +229,35 @@
   }
 
   /**
+   * Do another fallback by checking whether the examide-* local storage keys
+   * exist from the previous app version. If so, migrate them to the new names.
+   *
+   * @returns {boolean} True when the migration was successful.
+   */
+  function migrateOldLocalStorageKeys() {
+    const config = JSON.parse(getLocalStorageItem('config', false));
+    if (!config) return false;
+
+    const newKeyPrefix = makeLocalStorageKey(config.configUrl);
+
+    for (const oldKey of ['config', 'font-size', 'theme', 'layout']) {
+      const value = getLocalStorageItem(oldKey, false);
+      const newKey = `${newKeyPrefix}-${oldKey}`;
+
+      // Ignore this key if it has no value or the new key already exists.
+      if (!value || getLocalStorageItem(newKey)) continue;
+
+      setLocalStorageItem(newKey, value);
+      removeLocalStorageItem(oldKey);
+    }
+
+    setLocalStorageItem('last-used', newKeyPrefix);
+    updateLocalStoragePrefix(newKeyPrefix);
+
+    return true;
+  }
+
+  /**
    * Load the config through query params with a fallback on the local storage.
    *
    * @returns {Promise<object|string>} The configuration for the app once
@@ -248,7 +277,7 @@
           config.code = queryParams.code;
           config.configUrl = queryParams.url;
 
-          const currentStorageKey = config.configUrl.replace(/[^0-9a-z]+/g, '-');
+          const currentStorageKey = makeLocalStorageKey(config.configUrl);
           setLocalStorageItem('last-used', currentStorageKey);
           updateLocalStoragePrefix(currentStorageKey);
           setLocalStorageItem('config', JSON.stringify(config));
@@ -270,10 +299,11 @@
         if (LOCAL_STORAGE_PREFIX === DEFAULT_LOCAL_STORAGE_PREFIX) {
           const currentStorageKey = getLocalStorageItem('last-used');
 
-          if (!currentStorageKey) {
-            reject('No last-used config key found in local storage');
+          if (currentStorageKey) {
+            updateLocalStoragePrefix(currentStorageKey);
+          } else if (!migrateOldLocalStorageKeys()) {
+            reject('Last-used local storage key not available and failed to migrate old keys.');
           }
-          updateLocalStoragePrefix(currentStorageKey);
         }
 
         const localConfig = JSON.parse(getLocalStorageItem('config', {}));

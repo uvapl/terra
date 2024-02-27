@@ -21,6 +21,15 @@ function getLocalStorageItem(key, defaultValue) {
 }
 
 /**
+ * Remove a given key from the local storage.
+ *
+ * @param {string} key - The key to remove.
+ */
+function removeLocalStorageItem(key) {
+  localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}-${key}`);
+}
+
+/**
  * Check whether an object is a real object, because essentially, everything
  * is an object in JavaScript.
  *
@@ -180,4 +189,15 @@ function makeUrl(url, queryParams) {
  */
 function updateLocalStoragePrefix(additionalKey) {
   LOCAL_STORAGE_PREFIX += `-${additionalKey}`;
+}
+
+/**
+ * Converts a string to be a local storage suitable key by replacing
+ * non-suitable characters with a hyphen.
+ *
+ * @param {string} key - The key to convert.
+ * @returns {string} A local storage suitable key.
+ */
+function makeLocalStorageKey(key) {
+  return key.replace(/[^0-9a-z]+/g, '-');
 }
