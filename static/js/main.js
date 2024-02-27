@@ -235,8 +235,8 @@
    * @returns {boolean} True when the migration was successful.
    */
   function migrateOldLocalStorageKeys() {
-    const config = JSON.parse(getLocalStorageItem('config', false));
-    if (!config) return false;
+    const config = JSON.parse(getLocalStorageItem('config', {}));
+    if (!config.configUrl) return false;
 
     const newKeyPrefix = makeLocalStorageKey(config.configUrl);
 
