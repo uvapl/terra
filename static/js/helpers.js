@@ -17,7 +17,7 @@ function setLocalStorageItem(key, value) {
  */
 function getLocalStorageItem(key, defaultValue) {
   const value = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}-${key}`);
-  return typeof value === 'undefined' && typeof defaultValue !== 'undefined' ? defaultValue : value;
+  return value === null && typeof defaultValue !== 'undefined' ? defaultValue : value;
 }
 
 /**
