@@ -17,7 +17,16 @@ function setLocalStorageItem(key, value) {
  */
 function getLocalStorageItem(key, defaultValue) {
   const value = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}-${key}`);
-  return typeof value === 'undefined' && typeof defaultValue !== 'undefined' ? defaultValue : value;
+  return value === null && typeof defaultValue !== 'undefined' ? defaultValue : value;
+}
+
+/**
+ * Remove a given key from the local storage.
+ *
+ * @param {string} key - The key to remove.
+ */
+function removeLocalStorageItem(key) {
+  localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}-${key}`);
 }
 
 /**

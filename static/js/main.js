@@ -235,8 +235,10 @@
    * @returns {boolean} True when the migration was successful.
    */
   function migrateOldLocalStorageKeys() {
-    const config = JSON.parse(getLocalStorageItem('config', {}));
-    if (!config.configUrl) return false;
+    const configRaw = getLocalStorageItem('config', false);
+    if (!configRaw) return false;
+
+    const config = JSON.parse(configRaw);
 
     const newKeyPrefix = makeLocalStorageKey(config.configUrl);
 
@@ -306,7 +308,7 @@
           }
         }
 
-        const localConfig = JSON.parse(getLocalStorageItem('config', {}));
+        const localConfig = JSON.parse(getLocalStorageItem('config'));
 
         // Check immediately if the server is reachable by retrieving the
         // config again. If it is reachable, use the localConfig as the actual
@@ -477,7 +479,7 @@
   function showSubmitExamModal() {
     let lastSaveText = '';
     if (window._prevAutoSaveTime instanceof Date) {
-      lastSaveText += `<br/>🛅 Previous ssuccessfuluccessful submit was at <span class="last-save">${formatDate(window._prevAutoSaveTime)}</span>.<br/>`;
+      lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${formatDate(window._prevAutoSaveTime)}</span>.<br/>`;
     }
 
     const modalHtml = `
