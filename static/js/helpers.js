@@ -30,6 +30,15 @@ function removeLocalStorageItem(key) {
 }
 
 /**
+ * Remove a given key from the local storage.
+ *
+ * @param {string} key - The key to remove.
+ */
+function removeLocalStorageItem(key) {
+  localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}-${key}`);
+}
+
+/**
  * Check whether an object is a real object, because essentially, everything
  * is an object in JavaScript.
  *
