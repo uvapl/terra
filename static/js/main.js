@@ -479,7 +479,7 @@
   function showSubmitExamModal() {
     let lastSaveText = '';
     if (window._prevAutoSaveTime instanceof Date) {
-      lastSaveText += `<br/>🛅 Previous ssuccessfuluccessful submit was at <span class="last-save">${formatDate(window._prevAutoSaveTime)}</span>.<br/>`;
+      lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${formatDate(window._prevAutoSaveTime)}</span>.<br/>`;
     }
 
     const modalHtml = `
