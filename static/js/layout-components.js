@@ -201,7 +201,6 @@ class Layout extends GoldenLayout {
         // through the registerComponent() function, prior to calling this part.
         setTimeout(() => {
           this.emitToAllComponents('afterFirstRender');
-          console.log('this.proglang', this.proglang);
           this.emitToAllComponents('setProgLang', this.proglang);
           this.createControls();
           this.setTheme(getLocalStorageItem('theme') || 'light');

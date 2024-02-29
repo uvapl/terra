@@ -1,18 +1,4 @@
-/*
- * Copyright 2020 WebAssembly Community Group participants
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+self.importScripts('base-api.js')
 
 function readStr(u8, o, len = -1) {
   let str = '';
@@ -33,12 +19,6 @@ class ProcExit extends Error {
 
 class AbortError extends Error {
   constructor(msg = 'abort') { super(msg); }
-}
-
-class NotImplemented extends Error {
-  constructor(modname, fieldname) {
-    super(`${modname}.${fieldname} not implemented.`);
-  }
 }
 
 class AssertError extends Error {
@@ -443,13 +423,12 @@ class Tar {
   }
 }
 
-class API {
+class API extends BaseAPI {
   constructor(options) {
+    super(options);
     this.moduleCache = {};
     this.readBuffer = options.readBuffer;
     this.compileStreaming = options.compileStreaming;
-    this.compileLinkRunCallback = options.compileLinkRunCallback;
-    this.hostWrite = options.hostWrite;
     this.clangFilename = options.clang || 'clang';
     this.lldFilename = options.lld || 'lld';
     this.sysrootFilename = options.sysroot || 'sysroot.tar';
@@ -526,11 +505,11 @@ class API {
       '--export-dynamic',
       '-z', `stack-size=${stackSize}`, `-L${libdir}`, crt1, obj, '-lc',
       '-o', wasm
-      ]);
+    ]);
   }
 
   async run(cmd) {
-    const [ module, ...args ] = cmd;
+    const [module, ...args] = cmd;
     const app = new App(module, this.memfs, ...args);
     const stillRunning = await app.run();
     return stillRunning ? app : null;
@@ -571,36 +550,9 @@ class API {
   }
 }
 
-const apiOptions = {
-  async readBuffer(filename) {
-    const response = await fetch(filename);
-    return response.arrayBuffer();
-  },
-
-  async compileStreaming(filename) {
-    // TODO: make compileStreaming work. It needs the server to use the
-    // application/wasm mimetype.
-    if (false && WebAssembly.compileStreaming) {
-      return WebAssembly.compileStreaming(fetch(filename));
-    } else {
-      const response = await fetch(filename);
-      return WebAssembly.compile(await response.arrayBuffer());
-    }
-  },
-
-  hostWrite(s) {
-    port.postMessage({ id: 'write', data: s });
-  },
-
-  compileLinkRunCallback() {
-    port.postMessage({ id: 'compileLinkRunCallback' });
-  },
-
-  clang: '../../wasm/c_cpp/clang',
-  lld: '../../wasm/c_cpp/lld',
-  sysroot: '../../wasm/c_cpp/sysroot.tar',
-  memfs: '../../wasm/c_cpp/memfs',
-};
+// =============================================================================
+// Worker message handling.
+// =============================================================================
 
 let api;
 let port;
@@ -611,7 +563,30 @@ const onAnyMessage = async event => {
     case 'constructor':
       port = event.data.data;
       port.onmessage = onAnyMessage;
-      api = new API(apiOptions);
+      api = new API({
+        async readBuffer(filename) {
+          const response = await fetch(filename);
+          return response.arrayBuffer();
+        },
+
+        async compileStreaming(filename) {
+          const response = await fetch(filename);
+          return WebAssembly.compile(await response.arrayBuffer());
+        },
+
+        hostWrite(s) {
+          port.postMessage({ id: 'write', data: s });
+        },
+
+        compileLinkRunCallback() {
+          port.postMessage({ id: 'compileLinkRunCallback' });
+        },
+
+        clang: '../../wasm/c_cpp/clang',
+        lld: '../../wasm/c_cpp/lld',
+        sysroot: '../../wasm/c_cpp/sysroot.tar',
+        memfs: '../../wasm/c_cpp/memfs',
+      });
       break;
 
     case 'compileLinkRun':
