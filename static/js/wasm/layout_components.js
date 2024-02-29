@@ -24,15 +24,17 @@ function getActiveEditor() {
   return window._layout.root.contentItems[0].contentItems[0].getActiveContentItem();
 }
 
-const runCode = debounceLazy(() => {
+const runCode = async () => {
   const $button = $('#run');
   if ($button.prop('disabled')) return;
 
   $button.prop('disabled', true);
 
   const editor = getActiveEditor();
-  return api.compileLinkRun(editor.config.title, editor.container.getState().value);
-}, 100);
+  const title = editor.config.title;
+  const contents = editor.container.getState().value;
+  return api.compileLinkRun(title, contents);
+};
 
 function EditorComponent(container, state) {
   // To make sure GoldenLayout doensn't override the editor styles, we create
@@ -82,10 +84,10 @@ function EditorComponent(container, state) {
     this.editor.session.getUndoMananger().reset();
   });
 
-  this.editor.on('change', debounceLazy(event => {
+  this.editor.on('change', () => {
     window._editorIsDirty = true;
     container.extendState({ value: this.editor.getValue() });
-  }, 500));
+  });
 
   container.on('show', () => {
     // Add custom class for styling purposes.
@@ -103,10 +105,10 @@ function EditorComponent(container, state) {
   container.on('themeChanged', setTheme);
   container.on('fontSizeChanged', setFontSize);
 
-  container.on('resize', debounceLazy(() => {
+  container.on('resize', () => {
     this.editor.setAutoScrollEditorIntoView(true);
     this.editor.resize();
-  }, 20));
+  });
 
   container.on('afterFirstRender', () => {
     // Reset the session after the first initial page render to prevent the
@@ -162,7 +164,7 @@ function TerminalComponent(container, state) {
   });
 
   container.on('fontSizeChanged', setFontSize);
-  container.on('resize', debounceLazy(() => fitAddon.fit(), 20));
+  container.on('resize', () => fitAddon.fit());
   container.on('destroy', () => {
     if (term) {
       term.destroy();
@@ -184,11 +186,11 @@ class Layout extends GoldenLayout {
 
     super(layoutConfig, $('#layout'));
 
-    this.on('stateChanged', debounceLazy(() => {
+    this.on('stateChanged', () => {
       const config = this.toConfig();
       const state = JSON.stringify(config);
       setLocalStorageItem('layout', state);
-    }, 500));
+    });
 
     this.on('stackCreated', (stack) => {
       if (!this.initialised) {
