@@ -3,6 +3,15 @@
 Exam website that ships with an editor and a terminal that can run C or Python
 code completely offline using WebAssembly.
 
+# Table of Contents
+
+- [Examide](#examide)
+- [Table of Contents](#table-of-contents)
+- [Getting Started](#getting-started)
+- [Structure](#structure)
+- [Adding custom header files](#adding-custom-header-files)
+- [Acknowledgements](#acknowledgements)
+
 # Getting Started
 
 Simply clone the project:
@@ -16,6 +25,28 @@ work, as it can't be run in `file:///path/to/index.html`.
 
 One example is to use Python's http module: `python3 -m http.server`, then open
 `localhost:8000` in your browser and enjoy.
+
+# Structure
+
+```
+.
+├── index.html
+└── static/
+    ├── css/
+    │   ├── main.css                # Includes custom css from include/
+    │   ├── include/                # Custom app CSS
+    │   └── vendor/                 # Third party CSS
+    ├── img/                        # App images, i.e. icons
+    ├── js/
+    │   ├── constants.js            # Global app constants
+    │   ├── helpers.js              # Global app helper functions
+    │   ├── layout-components.js    # Main layout and component classes
+    │   ├── main.js                 # Bootstraps the app, contains most logic
+    │   ├── vendor/                 # Third party javascript files
+    │   ├── worker-api.js           # Bridge between app and other workers
+    │   └── workers/                # Language specific workers that compiles and runs the code
+    └── wasm                        # WASM files grouped per lang, loaded by corresponding worker
+```
 
 # Adding custom header files
 
