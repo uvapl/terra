@@ -1,30 +1,27 @@
 self.importScripts('../vendor/pyodide.min.js');
+self.importScripts('base-api.js')
 
-class API {
+class API extends BaseAPI {
   pyodide = null;
 
   constructor(options) {
-    this.hostWrite = options.hostWrite;
-    this.compileLinkRunCallback = options.compileLinkRunCallback;
+    super(options);
 
     loadPyodide({ indexURL: '../../wasm/py/' }).then((pyodide) => {
       this.pyodide = pyodide;
 
       // Initialise stdout with some other modules.
-      this.pyodide.runPython(`
+      const pyVersion = this.pyodide.runPython(`
         import io, sys
         sys.stdout = io.StringIO()
         sys.version.split(' ')[0]
       `);
+
+      console.log(`Started Python v${pyVersion}`);
     });
   }
 
-  hostWriteCmd(message) {
-    this.hostWrite(`\$ ${message}\n`);
-  }
-
   async compileLinkRun(data) {
-    console.log('data', data);
     const { filename, contents } = data;
 
     // Reset stdout value.
@@ -42,6 +39,10 @@ class API {
     }
   }
 }
+
+// =============================================================================
+// Worker message handling.
+// =============================================================================
 
 let api;
 let port;
