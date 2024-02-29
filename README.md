@@ -27,26 +27,16 @@ Inspecting which header files are included can be done through
 tar -tf static/wasm/sysroot.tar
 ```
 
-Including another header `.h` file can be done by making a custom `include/`
-folder with the header files you want and simply append them to the `sysroot.tar`.
+Including another header `.h` file can be done by extracting the tar, adding the
+header and making a new tar. For example:
 
-Example (assuming cwd is the root of this repository):
+- `cd ./static/wasm/c_cpp/` make sure you're in this folder
+- `tar -xvf sysroot.tar` extract tar
+- `cp my-header-file.h ./include/` add custom `my-header-file.h` to the
+`include/` folder
+- `tar --format ustar -cvf sysroot.tar include lib share` make a new tar
+- `rm -rf include lib share` remove previously extracted folders
 
-```sh
-$ mkdir include/                                         # Create a new include folder
-$ cp /usr/local/include/cs50.h include/                  # Copy system local cs50.h to the include folder
-$ tar --append --file=static/wasm/sysroot.tar include/*  # Append cs50.h to the sysroot.tar
-$ tar -tf static/wasm/sysroot.tar | tail                 # Optionally, you can confirm your file has been added
-$ rm -rf include/                                        # Remove the include folder
-```
-
-To see the changes, make sure to do a "hard refresh" in your browser to see the
-changes, which can be done in most browsers through:
-
-- MacOS: <kbd>&#8984;</kbd> + <kbd>Shift</kbd> + <kbd>r</kbd>
-- Windows: <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>r</kbd>
-
-Alternatively, remove the *Cache Storage* entries through the web inspector in your browser.
 
 # Acknowledgements
 
