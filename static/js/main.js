@@ -58,6 +58,12 @@
             `);
           }
 
+          // Get the programming language based on tabs filename.
+          const proglang = Object.keys(config.tabs)[0].split('.').pop();
+
+          // Initialise the programming language specific worker API.
+          window._workerApi = new WorkerAPI(proglang);
+
           // Get the font-size stored in local storage or use fallback value.
           const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
 
@@ -65,7 +71,7 @@
           const content = generateConfigContent(config.tabs, fontSize);
 
           // Create the layout object.
-          const layout = createLayout(content, fontSize);
+          const layout = createLayout(content, proglang, fontSize);
 
           // Call the init function that creates all components.
           layout.init();
@@ -352,10 +358,11 @@
    * Create the layout object with the given content objects and font-size.
    *
    * @param {array} content - List of content objects.
+   * @param {string} proglang - The programming language to be used
    * @param {number} fontSize - The default font-size to be used.
    * @returns {Layout} The layout instance.
    */
-  function createLayout(content, fontSize) {
+  function createLayout(content, proglang, fontSize) {
     const defaultLayoutConfig = {
       settings: {
         showCloseIcon: false,
@@ -388,7 +395,7 @@
       ]
     };
 
-    return new Layout({ defaultLayoutConfig });
+    return new Layout({ proglang, defaultLayoutConfig });
   }
 
   /**
