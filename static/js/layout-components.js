@@ -8,7 +8,7 @@ function getActiveEditor() {
   return window._layout.root.contentItems[0].contentItems[0].getActiveContentItem();
 }
 
-const runCode = async () => {
+const runCode = () => {
   const $button = $('#run');
   if ($button.prop('disabled')) return;
 
