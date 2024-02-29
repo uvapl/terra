@@ -28,30 +28,6 @@ function readStr(u8, o, len = -1) {
   return str;
 }
 
-function debounceLazy(f, ms) {
-  let waiting = 0;
-  let running = false;
-
-  const wait = async () => {
-    ++waiting;
-    await sleep(ms);
-    return --waiting === 0;
-  };
-
-  const wrapped = async (...args) => {
-    if (await wait()) {
-      while (running) await wait();
-      running = true;
-      try {
-        await f(...args);
-      } finally {
-        running = false;
-      }
-    }
-  };
-  return wrapped;
-}
-
 const API = (function() {
 
   class ProcExit extends Error {
