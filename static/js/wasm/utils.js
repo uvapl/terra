@@ -14,10 +14,6 @@
  * limitations under the License.
  */
 
-function sleep(ms) {
-  return new Promise((resolve, _) => setTimeout(resolve, ms));
-}
-
 function readStr(u8, o, len = -1) {
   let str = '';
   let end = u8.length;
