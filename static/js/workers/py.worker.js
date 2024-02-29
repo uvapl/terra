@@ -22,21 +22,23 @@ class API extends BaseAPI {
   }
 
   async compileLinkRun(data) {
-    const { filename, contents } = data;
+    try {
+      const { filename, contents } = data;
 
-    // Reset stdout value.
-    this.pyodide.runPython("sys.stdout = io.StringIO()");
+      // Reset stdout value.
+      this.pyodide.runPython("sys.stdout = io.StringIO()");
 
-    // Run user code.
-    this.hostWriteCmd(`python3 ${filename}`);
-    this.pyodide.runPython(contents);
+      // Run user code.
+      this.hostWriteCmd(`python3 ${filename}`);
+      this.pyodide.runPython(contents);
 
-    // Get the output.
-    const stdout = this.pyodide.runPython("sys.stdout.getvalue()");
-    this.hostWrite(stdout);
-
-    if (typeof this.compileLinkRunCallback === 'function') {
-      this.compileLinkRunCallback();
+      // Get the output.
+      const stdout = this.pyodide.runPython("sys.stdout.getvalue()");
+      this.hostWrite(stdout);
+    } finally {
+      if (typeof this.compileLinkRunCallback === 'function') {
+        this.compileLinkRunCallback();
+      }
     }
   }
 }
