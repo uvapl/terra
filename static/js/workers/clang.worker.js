@@ -386,7 +386,8 @@ class Tar {
       linkname: this.readStr(100),
     };
 
-    if (this.readStr(8) !== 'ustar  ') {
+    const format = this.readStr(8);
+    if (!/ustar/.test(format)) {
       return null;
     }
 
