@@ -58,13 +58,8 @@
             `);
           }
 
-          config.tabs = {
-            "test.py": "print('Hello from test.py')\n",
-            "foo.py": "print('Hello from foo.py')\n",
-          }
-
           // Get the programming language based on tabs filename.
-          const proglang = 'py';//Object.keys(config.tabs)[0].split('.').pop();
+          const proglang = Object.keys(config.tabs)[0].split('.').pop();
 
           // Initialise the programming language specific worker API.
           window._workerApi = new WorkerAPI(proglang);
