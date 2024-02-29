@@ -35,14 +35,14 @@ One example is to use Python's http module: `python3 -m http.server`, then open
     ├── css/
     │   ├── main.css                # Includes custom css from include/
     │   ├── include/                # Custom app CSS
-    │   └── vendor/                 # Third party CSS
+    │   └── vendor/                 # Third-party CSS
     ├── img/                        # App images, i.e. icons
     ├── js/
     │   ├── constants.js            # Global app constants
     │   ├── helpers.js              # Global app helper functions
     │   ├── layout-components.js    # Main layout and component classes
     │   ├── main.js                 # Bootstraps the app, contains most logic
-    │   ├── vendor/                 # Third party javascript files
+    │   ├── vendor/                 # Third-party javascript files
     │   ├── worker-api.js           # Bridge between app and other workers
     │   └── workers/                # Language specific workers that compiles and runs the code
     └── wasm                        # WASM files grouped per lang, loaded by corresponding worker
