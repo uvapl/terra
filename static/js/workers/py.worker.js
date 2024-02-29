@@ -28,6 +28,7 @@ class API extends BaseAPI {
     this.pyodide.runPython("sys.stdout = io.StringIO()");
 
     // Run user code.
+    this.hostWriteCmd(`python3 ${filename}`);
     this.pyodide.runPython(contents);
 
     // Get the output.
