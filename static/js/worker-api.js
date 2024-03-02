@@ -1,3 +1,6 @@
+/**
+ * Bridge class between the main app and the currently loaded worker.
+ */
 class WorkerAPI {
   constructor(proglang) {
     this.worker = new Worker(this.getWorkerPath(proglang));
