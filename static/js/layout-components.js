@@ -154,7 +154,7 @@ function TerminalComponent(container, state) {
 
     startingMessage = [
       'Click the "Run" button to execute code',
-      'Click the "Clear terminal" to clear this terminal screen',
+      'Click the "Clear terminal" button to clear this screen',
     ];
     for (const line of startingMessage) {
       term.write(line + '\n');
