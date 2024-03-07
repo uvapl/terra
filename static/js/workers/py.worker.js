@@ -21,7 +21,7 @@ class API extends BaseAPI {
     });
   }
 
-  async compileLinkRun(data) {
+  compileLinkRun(data) {
     try {
       const { filename, contents } = data;
 
@@ -67,7 +67,7 @@ const onAnyMessage = async event => {
       break;
 
     case 'compileLinkRun':
-      await api.compileLinkRun(event.data.data);
+      api.compileLinkRun(event.data.data);
       break;
   }
 };
