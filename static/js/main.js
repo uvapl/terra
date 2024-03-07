@@ -452,7 +452,7 @@
       fetch(url)
         .then((response) => response.json())
         .then((configData) => {
-          if (!objectHasKeys(configData, ['tabs', 'postback'])) {
+          if (!isValidConfig(configData)) {
             reject();
           } else {
             resolve(configData)
