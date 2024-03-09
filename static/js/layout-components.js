@@ -8,17 +8,31 @@ function getActiveEditor() {
   return window._layout.root.contentItems[0].contentItems[0].getActiveContentItem();
 }
 
-const runCode = () => {
-  const $button = $('#run');
+function runCode() {
+  const $button = $('#run-code');
   if ($button.prop('disabled')) return;
-
   $button.prop('disabled', true);
 
   const editor = getActiveEditor();
   const title = editor.config.title;
   const contents = editor.container.getState().value;
-  return window._workerApi.compileLinkRun(title, contents);
-};
+  window._workerApi.compileLinkRun(title, contents);
+}
+
+function runTests() {
+  const $button = $('#run-tests');
+  if ($button.prop('disabled')) return;
+  $button.prop('disabled', true);
+
+  // Gather all contents of all test_* files and send them to the python worker.
+  const files = window._layout.root.contentItems[0].contentItems[0].contentItems
+    .filter((item) => item.config.title.startsWith('test_'))
+    .map((item) => ({
+      filename: item.config.title,
+      contents: item.container.getState().value,
+    }));
+  window._workerApi.runTests(files);
+}
 
 function EditorComponent(container, state) {
   // To make sure GoldenLayout doensn't override the editor styles, we create
@@ -176,6 +190,7 @@ function TerminalComponent(container, state) {
 
 class Layout extends GoldenLayout {
   initialised = false;
+  proglag = null;
 
   constructor(options) {
     let layoutConfig = getLocalStorageItem('layout');
@@ -244,8 +259,13 @@ class Layout extends GoldenLayout {
     const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
 
     // Add the buttons to the header.
+    // if (this.proglang === 'py') {
+      $('.terminal-component-container .lm_header').prepend('<button id="run-tests" class="button run-tests-btn">Run tests</button>');
+      $('#run-tests').click(() => runTests());
+    // }
+
     $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn">Clear terminal</button>');
-    $('.terminal-component-container .lm_header').prepend(`<button id="run" class="button run-code-btn">Run (${runCodeShortcut})</button>`);
+    $('.terminal-component-container .lm_header').prepend(`<button id="run-code" class="button run-code-btn">Run (${runCodeShortcut})</button>`);
 
     // Create setting dropdown menu.
     $('.terminal-component-container .lm_controls').append(`
@@ -288,7 +308,7 @@ class Layout extends GoldenLayout {
 
     // Add event listeners.
     $('.settings-menu').click((event) => $(event.target).toggleClass('open'));
-    $('#run').click(() => runCode());
+    $('#run-code').click(() => runCode());
     $('#clear-term').click(() => term.clear());
     $(document).click((event) => {
       if (!$(event.target).is($('.settings-menu.open'))) {
