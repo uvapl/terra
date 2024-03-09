@@ -516,7 +516,7 @@ class API extends BaseAPI {
     return stillRunning ? app : null;
   }
 
-  async compileLinkRun(data) {
+  async runUserCode(data) {
     const { filename, contents } = data;
     const basename = filename.replace(/\.c$/, '');
     const input = `${basename}.cc`;
@@ -542,8 +542,8 @@ class API extends BaseAPI {
       this.hostWriteCmd(`./${basename}`);
       return await this.run([testMod, wasm]);
     } finally {
-      if (typeof this.compileLinkRunCallback === 'function') {
-        this.compileLinkRunCallback();
+      if (typeof this.runUserCodeCallback === 'function') {
+        this.runUserCodeCallback();
       }
     }
   }
@@ -577,8 +577,8 @@ const onAnyMessage = async event => {
           port.postMessage({ id: 'write', data: s });
         },
 
-        compileLinkRunCallback() {
-          port.postMessage({ id: 'compileLinkRunCallback' });
+        runUserCodeCallback() {
+          port.postMessage({ id: 'runUserCodeCallback' });
         },
 
         clang: '../../wasm/c_cpp/clang',
@@ -588,12 +588,12 @@ const onAnyMessage = async event => {
       });
       break;
 
-    case 'compileLinkRun':
+    case 'runUserCode':
       if (currentApp) {
         // Stop running rAF on the previous app, if any.
         currentApp.allowRequestAnimationFrame = false;
       }
-      currentApp = await api.compileLinkRun(event.data.data);
+      currentApp = await api.runUserCode(event.data.data);
       break;
   }
 };

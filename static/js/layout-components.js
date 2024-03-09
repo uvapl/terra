@@ -16,7 +16,7 @@ function runCode() {
   const editor = getActiveEditor();
   const title = editor.config.title;
   const contents = editor.container.getState().value;
-  window._workerApi.compileLinkRun(title, contents);
+  window._workerApi.runUserCode(title, contents);
 }
 
 function runTests() {

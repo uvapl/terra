@@ -21,14 +21,14 @@ class API extends BaseAPI {
     });
   }
 
-  compileLinkRun(data) {
+  runUserCode(data) {
     try {
       const { filename, contents } = data;
       this.hostWriteCmd(`python3 ${filename}`);
       this.hostWrite(this.run(contents));
     } finally {
-      if (typeof this.compileLinkRunCallback === 'function') {
-        this.compileLinkRunCallback();
+      if (typeof this.runUserCodeCallback === 'function') {
+        this.runUserCodeCallback();
       }
     }
   }
@@ -98,8 +98,8 @@ const onAnyMessage = async event => {
           port.postMessage({ id: 'write', data: s });
         },
 
-        compileLinkRunCallback() {
-          port.postMessage({ id: 'compileLinkRunCallback' });
+        runUserCodeCallback() {
+          port.postMessage({ id: 'runUserCodeCallback' });
         },
 
         runTestsCallback() {
@@ -112,8 +112,8 @@ const onAnyMessage = async event => {
       api.runTests(event.data.data);
       break;
 
-    case 'compileLinkRun':
-      api.compileLinkRun(event.data.data);
+    case 'runUserCode':
+      api.runUserCode(event.data.data);
       break;
   }
 };

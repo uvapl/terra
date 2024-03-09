@@ -15,9 +15,9 @@ class WorkerAPI {
     }, [remotePort]);
   }
 
-  compileLinkRun(filename, contents) {
+  runUserCode(filename, contents) {
     this.port.postMessage({
-      id: 'compileLinkRun',
+      id: 'runUserCode',
       data: { filename, contents },
     });
   }
@@ -50,7 +50,7 @@ class WorkerAPI {
         $('#run-tests').prop('disabled', false);
         break;
 
-      case 'compileLinkRunCallback':
+      case 'runUserCodeCallback':
         $('#run-code').prop('disabled', false);
         break;
     }
