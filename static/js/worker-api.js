@@ -41,12 +41,16 @@ class WorkerAPI {
 
   onmessage(event) {
     switch (event.data.id) {
+      case 'ready':
+        $('#run-tests').prop('disabled', false);
+        $('#run-code').prop('disabled', false);
+        break;
+
       case 'write':
         term.write(event.data.data);
         break;
 
       case 'runTestsCallback':
-        console.log('runTestsCallback')
         $('#run-tests').prop('disabled', false);
         break;
 

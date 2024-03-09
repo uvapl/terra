@@ -445,6 +445,8 @@ class API extends BaseAPI {
 
     this.getModule(this.clangFilename);
     this.getModule(this.lldFilename);
+
+    options.readyCallback();
   }
 
   hostWriteCmd(message) {
@@ -542,9 +544,7 @@ class API extends BaseAPI {
       this.hostWriteCmd(`./${basename}`);
       return await this.run([testMod, wasm]);
     } finally {
-      if (typeof this.runUserCodeCallback === 'function') {
-        this.runUserCodeCallback();
-      }
+      this.runUserCodeCallback();
     }
   }
 }
@@ -575,6 +575,10 @@ const onAnyMessage = async event => {
 
         hostWrite(s) {
           port.postMessage({ id: 'write', data: s });
+        },
+
+        readyCallback() {
+          port.postMessage({ id: 'ready' });
         },
 
         runUserCodeCallback() {
