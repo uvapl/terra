@@ -71,7 +71,6 @@ class API extends BaseAPI {
         }
       }
 
-      // Reset stdout value, run pytest and gather stdout value.
       const results = this.run("import pytest; pytest.main()");
 
       this.hostWrite(results);
