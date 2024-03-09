@@ -9,14 +9,14 @@ class NotImplemented extends Error {
  */
 class BaseAPI {
   constructor(options) {
-    for (const fn of ['hostWrite', 'compileLinkRunCallback']) {
+    for (const fn of ['hostWrite', 'runUserCodeCallback']) {
       if (!(options[fn] instanceof Function)) {
         throw new Error(`Missing required option: ${fn}`);
       }
     }
 
     this.hostWrite = options.hostWrite;
-    this.compileLinkRunCallback = options.compileLinkRunCallback;
+    this.runUserCodeCallback = options.runUserCodeCallback;
   }
 
   /**
@@ -34,7 +34,7 @@ class BaseAPI {
    * @async
    * @throws {NotImplemented} - This method must be implemented by the subclass.
    */
-  async compileLinkRun() {
-    throw NotImplemented('BaseAPI', 'compileLinkRun');
+  async runUserCode() {
+    throw NotImplemented('BaseAPI', 'runUserCode');
   }
 }
