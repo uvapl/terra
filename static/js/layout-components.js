@@ -259,10 +259,10 @@ class Layout extends GoldenLayout {
     const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
 
     // Add the buttons to the header.
-    // if (this.proglang === 'py') {
+    if (this.proglang === 'py') {
       $('.terminal-component-container .lm_header').prepend('<button id="run-tests" class="button run-tests-btn">Run tests</button>');
       $('#run-tests').click(() => runTests());
-    // }
+    }
 
     $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn">Clear terminal</button>');
     $('.terminal-component-container .lm_header').prepend(`<button id="run-code" class="button run-code-btn">Run (${runCodeShortcut})</button>`);
