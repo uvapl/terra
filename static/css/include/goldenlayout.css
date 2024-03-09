@@ -72,7 +72,7 @@
 .lm_splitter.lm_horizontal:not(.locked):after {
   content: '';
   width: 2px;
-  height: 31px;
+  height: 40px;
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
