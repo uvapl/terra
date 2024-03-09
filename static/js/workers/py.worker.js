@@ -18,6 +18,8 @@ class API extends BaseAPI {
       // Print python version to console.
       const pyVersion = this.pyodide.runPython("sys.version.split(' ')[0]");
       console.log(`Started Python v${pyVersion}`);
+
+      options.readyCallback();
     });
   }
 
@@ -74,9 +76,7 @@ class API extends BaseAPI {
 
       this.hostWrite(results);
     } finally {
-      if (typeof this.runTestsCallback === 'function') {
-        this.runTestsCallback();
-      }
+      this.runTestsCallback();
     }
   }
 }
@@ -96,6 +96,10 @@ const onAnyMessage = async event => {
       api = new API({
         hostWrite(s) {
           port.postMessage({ id: 'write', data: s });
+        },
+
+        readyCallback() {
+          port.postMessage({ id: 'ready' });
         },
 
         runUserCodeCallback() {
