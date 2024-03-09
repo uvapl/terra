@@ -1,4 +1,4 @@
-self.importScripts('../vendor/pyodide.min.js');
+self.importScripts('https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js');
 self.importScripts('base-api.js')
 
 class API extends BaseAPI {
@@ -6,17 +6,17 @@ class API extends BaseAPI {
 
   constructor(options) {
     super(options);
+    this.runTestsCallback = options.runTestsCallback;
+    const packages = ['pytest'];
 
-    loadPyodide({ indexURL: '../../wasm/py/' }).then((pyodide) => {
+    loadPyodide({ packages }).then((pyodide) => {
       this.pyodide = pyodide;
 
-      // Initialise stdout with some other modules.
-      const pyVersion = this.pyodide.runPython(`
-        import io, sys
-        sys.stdout = io.StringIO()
-        sys.version.split(' ')[0]
-      `);
+      // Import some basic modules.
+      this.pyodide.runPython('import io, sys, importlib');
 
+      // Print python version to console.
+      const pyVersion = this.pyodide.runPython("sys.version.split(' ')[0]");
       console.log(`Started Python v${pyVersion}`);
     });
   }
@@ -24,20 +24,58 @@ class API extends BaseAPI {
   compileLinkRun(data) {
     try {
       const { filename, contents } = data;
-
-      // Reset stdout value.
-      this.pyodide.runPython("sys.stdout = io.StringIO()");
-
-      // Run user code.
       this.hostWriteCmd(`python3 ${filename}`);
-      this.pyodide.runPython(contents);
-
-      // Get the output.
-      const stdout = this.pyodide.runPython("sys.stdout.getvalue()");
-      this.hostWrite(stdout);
+      this.hostWrite(this.run(contents));
     } finally {
       if (typeof this.compileLinkRunCallback === 'function') {
         this.compileLinkRunCallback();
+      }
+    }
+  }
+
+  /**
+   * Run a string or an array of python code.
+   *
+   * @example run("print('Hello World!')"
+   * @example run(["print('Hello World!')", "print('Hello World 2!')"]
+   *
+   * @param {string} code - The python code to run.
+   * @returns {string} The output of the python code.
+   */
+  run(code) {
+    if (!Array.isArray(code)) {
+      code = code.split('\n')
+    }
+
+    return this.pyodide.runPython([
+      'sys.stdout = io.StringIO()',
+      ...code,
+      'sys.stdout.getvalue()',
+    ].join('\n'));
+  }
+
+  runTests(files) {
+    try {
+      // Put each test_* file in the virtual file system.
+      for (const file of files) {
+        if (file.filename.startsWith('test_')) {
+          this.pyodide.FS.writeFile(file.filename, file.contents, { encoding: 'utf8' })
+
+          // Because pyodide always runs the same session, we have to remove the
+          // test_* as a module from sys.modules to make sure pytest always uses
+          // the latest version.
+          const module = file.filename.replace('.py', '');
+          this.run(`sys.modules.pop('${module}', None)`);
+        }
+      }
+
+      // Reset stdout value, run pytest and gather stdout value.
+      const results = this.run("import pytest; pytest.main()");
+
+      this.hostWrite(results);
+    } finally {
+      if (typeof this.runTestsCallback === 'function') {
+        this.runTestsCallback();
       }
     }
   }
@@ -63,7 +101,15 @@ const onAnyMessage = async event => {
         compileLinkRunCallback() {
           port.postMessage({ id: 'compileLinkRunCallback' });
         },
+
+        runTestsCallback() {
+          port.postMessage({ id: 'runTestsCallback' });
+        }
       });
+      break;
+
+    case 'runTests':
+      api.runTests(event.data.data);
       break;
 
     case 'compileLinkRun':

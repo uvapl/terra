@@ -22,6 +22,13 @@ class WorkerAPI {
     });
   }
 
+  runTests(files) {
+    this.port.postMessage({
+      id: 'runTests',
+      data: files,
+    });
+  }
+
   getWorkerPath(proglang) {
     let name = proglang;
 
@@ -38,8 +45,13 @@ class WorkerAPI {
         term.write(event.data.data);
         break;
 
+      case 'runTestsCallback':
+        console.log('runTestsCallback')
+        $('#run-tests').prop('disabled', false);
+        break;
+
       case 'compileLinkRunCallback':
-        $('#run').prop('disabled', false);
+        $('#run-code').prop('disabled', false);
         break;
     }
   }
