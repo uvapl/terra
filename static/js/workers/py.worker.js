@@ -1,4 +1,4 @@
-self.importScripts('https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js');
+self.importScripts('../vendor/pyodide.min.js');
 self.importScripts('base-api.js')
 
 class API extends BaseAPI {
@@ -7,13 +7,12 @@ class API extends BaseAPI {
   constructor(options) {
     super(options);
     this.runTestsCallback = options.runTestsCallback;
-    const packages = ['pytest'];
 
-    loadPyodide({ packages }).then((pyodide) => {
+    loadPyodide({ indexURL: '../../wasm/py/' }).then((pyodide) => {
       this.pyodide = pyodide;
 
       // Import some basic modules.
-      this.pyodide.runPython('import io, sys, importlib');
+      this.pyodide.runPython('import io, sys, importlib, pytest');
 
       // Print python version to console.
       const pyVersion = this.pyodide.runPython("sys.version.split(' ')[0]");
@@ -71,7 +70,7 @@ class API extends BaseAPI {
         }
       }
 
-      const results = this.run("import pytest; pytest.main()");
+      const results = this.run("import pytest; pytest.main(['--color=yes'])");
 
       this.hostWrite(results);
     } finally {
