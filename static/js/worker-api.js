@@ -22,10 +22,10 @@ class WorkerAPI {
     });
   }
 
-  runTests(files) {
+  runButtonCommand(selector, cmd, files) {
     this.port.postMessage({
-      id: 'runTests',
-      data: files,
+      id: 'runButtonCommand',
+      data: { selector, cmd, files },
     });
   }
 
@@ -42,16 +42,15 @@ class WorkerAPI {
   onmessage(event) {
     switch (event.data.id) {
       case 'ready':
-        $('#run-tests').prop('disabled', false);
-        $('#run-code').prop('disabled', false);
+        $('.terminal-component-container .lm_header .button').prop('disabled', false);
         break;
 
       case 'write':
         term.write(event.data.data);
         break;
 
-      case 'runTestsCallback':
-        $('#run-tests').prop('disabled', false);
+      case 'runButtonCommandCallback':
+        $(event.data.selector).prop('disabled', false);
         break;
 
       case 'runUserCodeCallback':

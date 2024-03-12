@@ -71,7 +71,7 @@
           const content = generateConfigContent(config.tabs, fontSize);
 
           // Create the layout object.
-          const layout = createLayout(content, proglang, fontSize);
+          const layout = createLayout(content, proglang, fontSize, config.buttons);
 
           // Call the init function that creates all components.
           layout.init();
@@ -360,9 +360,11 @@
    * @param {array} content - List of content objects.
    * @param {string} proglang - The programming language to be used
    * @param {number} fontSize - The default font-size to be used.
+   * @param {object} buttonConfig - Object containing buttons with their
+   * commands that will be rendered by the layout.
    * @returns {Layout} The layout instance.
    */
-  function createLayout(content, proglang, fontSize) {
+  function createLayout(content, proglang, fontSize, buttonConfig) {
     const defaultLayoutConfig = {
       settings: {
         showCloseIcon: false,
@@ -395,7 +397,7 @@
       ]
     };
 
-    return new Layout({ proglang, defaultLayoutConfig });
+    return new Layout(proglang, defaultLayoutConfig, buttonConfig);
   }
 
   /**

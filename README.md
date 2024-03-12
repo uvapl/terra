@@ -9,7 +9,8 @@ code completely offline using WebAssembly.
 - [Table of Contents](#table-of-contents)
 - [Getting Started](#getting-started)
 - [Structure](#structure)
-- [Adding custom header files](#adding-custom-header-files)
+- [Adding custom header files to C](#adding-custom-header-files-to-c)
+- [Packaging Python files in stdlib](#packaging-python-files-in-stdlib)
 - [Acknowledgements](#acknowledgements)
 
 # Getting Started
@@ -48,7 +49,7 @@ One example is to use Python's http module: `python3 -m http.server`, then open
     └── wasm                        # WASM files grouped per lang, loaded by corresponding worker
 ```
 
-# Adding custom header files
+# Adding custom header files to C
 
 The `static/wasm/sysroot.tar` contains C++ standard headers and libraries.
 
@@ -67,6 +68,49 @@ header and making a new tar. For example:
 `include/` folder
 - `tar --format ustar -cvf sysroot.tar include lib share` make a new tar
 - `rm -rf include lib share` remove previously extracted folders
+
+# Packaging Python files in stdlib
+
+The `./static/wasm/py/python_stdlib.zip` contains all the python modules you
+can import through `pyiodide.runPython('import <module>')`. Let's say you want
+to import `mypy`, then you should do the following:
+
+- Go to [PyPi](https://pypi.org) and search for the `mypy` package
+- Go to the _Download files_ on the `mypy` page.
+- Under _Built Distributions_, copy the link of a downloadable `.whl` file
+- Locally `cd` into `./static/wasm/py/`
+- Run `unzip python_stdlib.zip -d stdlib` to extract the files into `stdlib` directory
+- Run `cd stdlib` to go into the directory
+- Run `wget https://files.pythonhosted.org/packages/60/db/0ba2eaedca52bf5276275e8489951c26206030b3d31bf06f00875ae75d5d/mypy-1.9.0-py3-none-any.whl` to download the `.whl` into the stdlib folder
+- Run `unzip mypy-1.9.0-py3-none-any.whl` to unzip the `.whl` contents
+- Run `rm *.whl` to remove the `.whl` file
+- Run `zip -vr ../python_stdlib.zip .` to create a new zip
+- Run `rm -rf stdlib`
+
+It might be that the contents are cached. In that case, clear your browser cache
+through the settings.
+
+When refreshing the page, you should be able to import the module. However,
+there might be dependencies. If you have this error:
+
+```
+PythonError: Traceback (most recent call last):
+  File "/lib/python311.zip/_pyodide/_base.py", line 499, in eval_code
+    .run(globals, locals)
+     ^^^^^^^^^^^^^^^^^^^^
+  File "/lib/python311.zip/_pyodide/_base.py", line 340, in run
+    coroutine = eval(self.code, globals, locals)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<exec>", line 2, in <module>
+ModuleNotFoundError: The module '<MODULE_NAME_HERE>' is included in the Pyodide distribution, but it is not installed.
+You can install it by calling:
+  await micropip.install("<MODULE_NAME_HERE>") in Python, or
+  await pyodide.loadPackage("<MODULE_NAME_HERE>") in JavaScript
+See https://pyodide.org/en/stable/usage/loading-packages.html for more details.
+```
+
+Then check what `<MODULE_NAME_HERE>` is and repeat the packaging steps described
+above for that package as well, until all dependencies are resolved.
 
 
 # Acknowledgements
