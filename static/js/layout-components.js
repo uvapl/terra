@@ -19,19 +19,32 @@ function runCode() {
   window._workerApi.runUserCode(title, contents);
 }
 
-function runTests() {
-  const $button = $('#run-tests');
+function runButtonCommand(selector, cmd) {
+  const $button = $(selector);
   if ($button.prop('disabled')) return;
   $button.prop('disabled', true);
 
-  // Gather all contents of all test_* files and send them to the python worker.
-  const files = window._layout.root.contentItems[0].contentItems[0].contentItems
-    .filter((item) => item.config.title.startsWith('test_'))
-    .map((item) => ({
-      filename: item.config.title,
-      contents: item.container.getState().value,
-    }));
-  window._workerApi.runTests(files);
+  let files;
+
+  // If <filename> exists in the commands, then we execute the commands solely
+  // for the current file the user has open in the UI.
+  const hasFilenameToken = cmd.filter((line) => line.includes('<filename>')).length > 0;
+  if (hasFilenameToken) {
+    const editor = getActiveEditor();
+    files = [{
+      filename: editor.config.title,
+      contents: editor.container.getState().value
+    }];
+  } else {
+    // Otherwise, gather all files from the editor.
+    files = window._layout.root.contentItems[0].contentItems[0].contentItems
+      .map((item) => ({
+        filename: item.config.title,
+        contents: item.container.getState().value,
+      }));
+  }
+
+  window._workerApi.runButtonCommand(selector, cmd, files);
 }
 
 function EditorComponent(container, state) {
@@ -191,17 +204,23 @@ function TerminalComponent(container, state) {
 class Layout extends GoldenLayout {
   initialised = false;
   proglag = null;
+  buttonConfig = null;
 
-  constructor(options) {
+  constructor(proglang, defaultLayoutConfig, buttonConfig) {
     let layoutConfig = getLocalStorageItem('layout');
     if (layoutConfig) {
       layoutConfig = JSON.parse(layoutConfig);
     } else {
-      layoutConfig = options.defaultLayoutConfig;
+      layoutConfig = defaultLayoutConfig;
     }
 
     super(layoutConfig, $('#layout'));
-    this.proglang = options.proglang;
+
+    this.proglang = proglang;
+
+    if (isObject(buttonConfig)) {
+      this.buttonConfig = buttonConfig;
+    }
 
     this.on('stateChanged', () => {
       const config = this.toConfig();
@@ -258,13 +277,21 @@ class Layout extends GoldenLayout {
   createControls = () => {
     const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
 
-    // Add the buttons to the header.
-    if (this.proglang === 'py') {
-      $('.terminal-component-container .lm_header').prepend('<button id="run-tests" class="button run-tests-btn" disabled>Run tests</button>');
-      $('#run-tests').click(() => runTests());
+    // Add custom buttons to the header.
+    if (this.proglang === 'py' && isObject(this.buttonConfig)) {
+      Object.keys(this.buttonConfig).forEach((name) => {
+        const id = name.replace(/\s/g, '-').toLowerCase();
+        const selector = `#${id}`;
+        const cmd = this.buttonConfig[name];
+
+        $('.terminal-component-container .lm_header')
+          .prepend(`<button id="${id}" class="button ${id}-btn" disabled>${name}</button>`);
+
+        $(selector).click(() => runButtonCommand(selector, cmd));
+      });
     }
 
-    $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn">Clear terminal</button>');
+    $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>');
     $('.terminal-component-container .lm_header').prepend(`<button id="run-code" class="button run-code-btn" disabled>Run (${runCodeShortcut})</button>`);
 
     // Create setting dropdown menu.

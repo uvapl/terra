@@ -1,4 +1,5 @@
 self.importScripts('../vendor/pyodide.min.js');
+self.importScripts('../helpers.js')
 self.importScripts('base-api.js')
 
 class API extends BaseAPI {
@@ -7,6 +8,7 @@ class API extends BaseAPI {
   constructor(options) {
     super(options);
     this.runTestsCallback = options.runTestsCallback;
+    this.runButtonCommandCallback = options.runButtonCommandCallback;
 
     loadPyodide({ indexURL: '../../wasm/py/' }).then((pyodide) => {
       this.pyodide = pyodide;
@@ -22,9 +24,8 @@ class API extends BaseAPI {
     });
   }
 
-  runUserCode(data) {
+  runUserCode({ filename, contents }) {
     try {
-      const { filename, contents } = data;
       this.hostWriteCmd(`python3 ${filename}`);
       this.hostWrite(this.run(contents));
     } finally {
@@ -55,26 +56,47 @@ class API extends BaseAPI {
     ].join('\n'));
   }
 
-  runTests(files) {
+  /**
+   * Run a given command with the given files.
+   *
+   * @param {object} data - The data object retrieved.
+   * @param {string} data.selector - Contains the button selector, which is
+   * solely needed for the callback to enable the button after the code ran.
+   * @param {array} data.cmd - A list of python commands to execute.
+   * @param {array} data.files - A list of objects, each containing the filename
+   * and the file contents coming from the front-end editor. If '<filename>'
+   * exists in the data.cmd, then this will be a list containing solely the file
+   * the user is currently looking at.
+   */
+  runButtonCommand({ selector, cmd, files }) {
     try {
-      // Put each test_* file in the virtual file system.
       for (const file of files) {
-        if (file.filename.startsWith('test_')) {
-          this.pyodide.FS.writeFile(file.filename, file.contents, { encoding: 'utf8' })
+        // Put each file in the virtual file system.
+        this.pyodide.FS.writeFile(file.filename, file.contents, { encoding: 'utf8' });
 
-          // Because pyodide always runs the same session, we have to remove the
-          // test_* as a module from sys.modules to make sure pytest always uses
-          // the latest version.
-          const module = file.filename.replace('.py', '');
-          this.run(`sys.modules.pop('${module}', None)`);
-        }
+        // Because pyodide always runs the same session, we have to remove the
+        // file as a module from sys.modules to make sure the command runs on
+        // a clean state.
+        const module = file.filename.replace('.py', '');
+        this.run(`sys.modules.pop('${module}', None)`);
       }
 
-      const results = this.run("import pytest; pytest.main(['--color=yes'])");
+      // If '<filename>' exists in the commands, then we execute the commands
+      // solely on the current file the user has open in the UI.
+      const hasFilenameToken = cmd.filter((line) => line.includes('<filename>')).length > 0;
+      if (hasFilenameToken) {
+        // Replace <filename> with the actual filename.
+        const filename = files[0].filename.replace('.py', '');
+        cmd = cmd.map((line) => line.replace('<filename>', filename));
+      }
 
+      // Run the command.
+      const results = this.run(cmd);
+
+      // Print the reults to the terminal in the UI.
       this.hostWrite(results);
     } finally {
-      this.runTestsCallback();
+      this.runButtonCommandCallback(selector);
     }
   }
 }
@@ -104,14 +126,14 @@ const onAnyMessage = async event => {
           port.postMessage({ id: 'runUserCodeCallback' });
         },
 
-        runTestsCallback() {
-          port.postMessage({ id: 'runTestsCallback' });
+        runButtonCommandCallback(selector) {
+          port.postMessage({ id: 'runButtonCommandCallback', selector });
         }
       });
       break;
 
-    case 'runTests':
-      api.runTests(event.data.data);
+    case 'runButtonCommand':
+      api.runButtonCommand(event.data.data);
       break;
 
     case 'runUserCode':
