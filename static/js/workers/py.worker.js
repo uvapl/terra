@@ -63,15 +63,19 @@ class API extends BaseAPI {
     // Clear the standard output.
     this.pyodide.runPython('sys.stdout = io.StringIO()')
 
-    // Run the code and get the standard output.
-    const cmdOutput = this.pyodide.runPython(code.join('\n'))
-    const stdout = this.pyodide.runPython('sys.stdout.getvalue()')
+    try {
+      // Run the code and get the standard output.
+      const cmdOutput = this.pyodide.runPython(code.join('\n'))
+      const stdout = this.pyodide.runPython('sys.stdout.getvalue()')
 
-    // In most cases, the commands will write to the stdout, but some packages,
-    // such as mypy, will use io.StringIO() as well and return the value rather
-    // than writing to the stdout, which leads to an empty stdout string. In
-    // that case, we return the cmdOutput.
-    return stdout || cmdOutput;
+      // In most cases, the commands will write to the stdout, but some packages,
+      // such as mypy, will use io.StringIO() as well and return the value rather
+      // than writing to the stdout, which leads to an empty stdout string. In
+      // that case, we return the cmdOutput.
+      return stdout || cmdOutput;
+    } catch (err) {
+      return err.message;
+    }
   }
 
   /**
