@@ -84,13 +84,14 @@ class API extends BaseAPI {
    * @param {object} data - The data object retrieved.
    * @param {string} data.selector - Contains the button selector, which is
    * solely needed for the callback to enable the button after the code ran.
+   * @param {string} activeTabName - The name of the active editor tab.
    * @param {array} data.cmd - A list of python commands to execute.
    * @param {array} data.files - A list of objects, each containing the filename
    * and the file contents coming from the front-end editor. If '<filename>'
    * exists in the data.cmd, then this will be a list containing solely the file
    * the user is currently looking at.
    */
-  runButtonCommand({ selector, cmd, files }) {
+  runButtonCommand({ selector, activeTabName, cmd, files }) {
     try {
       for (const file of files) {
         // Put each file in the virtual file system.
@@ -103,17 +104,13 @@ class API extends BaseAPI {
         this.run(`sys.modules.pop('${module}', None)`);
       }
 
-      // If '<filename>' exists in the commands, then we execute the commands
-      // solely on the current file the user has open in the UI.
-      const hasFilenameToken = cmd.filter((line) => line.includes('<filename>')).length > 0;
-      if (hasFilenameToken) {
-        // Replace <filename> with the actual filename.
-        const filename = files[0].filename.replace('.py', '');
-        cmd = cmd.map((line) => line.replace('<filename>', filename));
-      }
+      // Replace <filename> placeholder with the active editor tab name.
+      const moduleName = activeTabName.replace('.py', '');
+      cmd = cmd.map((line) => line.replace('<filename>', moduleName));
 
       // Run the command and gather its results.
       const results = this.run(cmd);
+      console.log('results', typeof results, results);
 
       // Print the reults to the terminal in the UI.
       this.hostWrite(results);

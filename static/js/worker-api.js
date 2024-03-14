@@ -22,10 +22,10 @@ class WorkerAPI {
     });
   }
 
-  runButtonCommand(selector, cmd, files) {
+  runButtonCommand(selector, activeTabName, cmd, files) {
     this.port.postMessage({
       id: 'runButtonCommand',
-      data: { selector, cmd, files },
+      data: { selector, activeTabName, cmd, files },
     });
   }
 
