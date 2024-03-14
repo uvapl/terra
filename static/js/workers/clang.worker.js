@@ -518,8 +518,7 @@ class API extends BaseAPI {
     return stillRunning ? app : null;
   }
 
-  async runUserCode(data) {
-    const { filename, contents } = data;
+  async runUserCode({ filename, contents }) {
     const basename = filename.replace(/\.c$/, '');
     const input = `${basename}.cc`;
     const obj = `${basename}.o`;
