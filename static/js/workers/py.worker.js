@@ -7,20 +7,31 @@ class API extends BaseAPI {
 
   constructor(options) {
     super(options);
-    this.runTestsCallback = options.runTestsCallback;
     this.runButtonCommandCallback = options.runButtonCommandCallback;
 
-    loadPyodide({ indexURL: '../../wasm/py/' }).then((pyodide) => {
+    this.initPyodide();
+  }
+
+  initPyodide() {
+    loadPyodide({ indexURL: '../../wasm/py/' }).then(async (pyodide) => {
       this.pyodide = pyodide;
 
       // Import some basic modules.
-      this.pyodide.runPython('import io, sys, importlib, pytest');
+      this.pyodide.runPython('import io, sys');
 
-      // Print python version to console.
+      // Get pyodide's Python version.
       const pyVersion = this.pyodide.runPython("sys.version.split(' ')[0]");
+      const [pyMajorVersion, pyMinorVersion, _] = pyVersion.split('.');
       console.log(`Started Python v${pyVersion}`);
 
-      options.readyCallback();
+      // Load custom libraries and extract them in the virtual filesystem.
+      let zipResponse = await fetch('../../wasm/py/custom_stdlib.zip');
+      let zipBinary = await zipResponse.arrayBuffer();
+      this.pyodide.unpackArchive(zipBinary, 'zip', {
+        extractDir: `/lib/python${pyMajorVersion}.${pyMinorVersion}/site-packages/`
+      });
+
+      this.readyCallback();
     });
   }
 
@@ -49,11 +60,18 @@ class API extends BaseAPI {
       code = code.split('\n')
     }
 
-    return this.pyodide.runPython([
-      'sys.stdout = io.StringIO()',
-      ...code,
-      'sys.stdout.getvalue()',
-    ].join('\n'));
+    // Clear the standard output.
+    this.pyodide.runPython('sys.stdout = io.StringIO()')
+
+    // Run the code and get the standard output.
+    const cmdOutput = this.pyodide.runPython(code.join('\n'))
+    const stdout = this.pyodide.runPython('sys.stdout.getvalue()')
+
+    // In most cases, the commands will write to the stdout, but some packages,
+    // such as mypy, will use io.StringIO() as well and return the value rather
+    // than writing to the stdout, which leads to an empty stdout string. In
+    // that case, we return the cmdOutput.
+    return stdout || cmdOutput;
   }
 
   /**
@@ -90,7 +108,7 @@ class API extends BaseAPI {
         cmd = cmd.map((line) => line.replace('<filename>', filename));
       }
 
-      // Run the command.
+      // Run the command and gather its results.
       const results = this.run(cmd);
 
       // Print the reults to the terminal in the UI.
