@@ -100,7 +100,6 @@ class API extends BaseAPI {
 
       // Run the command and gather its results.
       const results = this.run(cmd);
-      console.log('results', typeof results, results);
 
       // Print the reults to the terminal in the UI.
       this.hostWrite(results);
@@ -138,10 +137,8 @@ class API extends BaseAPI {
 
       if (stdout) return stdout;
 
-      cmdOutput = [1,2,3];
-
       // If the cmdOutput is an object, we log an error to the console.
-      if (isObject(cmdOutput) || isArray(cmdOutput)) {
+      if (isObject(cmdOutput) || Array.isArray(cmdOutput)) {
         console.error([
           `Command output is an object instead of a string`,
           ...code,
