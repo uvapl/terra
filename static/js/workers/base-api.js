@@ -9,14 +9,13 @@ class NotImplemented extends Error {
  */
 class BaseAPI {
   constructor(options) {
-    for (const fn of ['hostWrite', 'runUserCodeCallback']) {
+    for (const fn of ['hostWrite', 'runUserCodeCallback', 'readyCallback']) {
       if (!(options[fn] instanceof Function)) {
         throw new Error(`Missing required option: ${fn}`);
       }
-    }
 
-    this.hostWrite = options.hostWrite;
-    this.runUserCodeCallback = options.runUserCodeCallback;
+      this[fn] = options[fn];
+    }
   }
 
   /**
