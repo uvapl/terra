@@ -15,13 +15,30 @@ class WorkerAPI {
     }, [remotePort]);
   }
 
-  runUserCode(filename, contents) {
+  /**
+   * Triggers the `runUserCode` event in the currently active worker.
+   *
+   * @param {string} activeTabName - The name of the currently active tab.
+   * @param {array} files - List of objects, each containing the filename
+   * and contents of the corresponding editor tab.
+   */
+  runUserCode(activeTabName, files) {
     this.port.postMessage({
       id: 'runUserCode',
-      data: { filename, contents },
+      data: { activeTabName, files },
     });
   }
 
+  /**
+   * Triggers the `runButtonCommand` event in the currently active worker.
+   *
+   * @param {string} selector - Unique selector for the button, used to disable
+   * it when running and disable it when it's done running.
+   * @param {string} activeTabName - The name of the currently active tab.
+   * @param {array} cmd - List of commands to execute.
+   * @param {array} files - List of objects, each containing the filename and
+   * contents of the corresponding editor tab.
+   */
   runButtonCommand(selector, activeTabName, cmd, files) {
     this.port.postMessage({
       id: 'runButtonCommand',
@@ -29,6 +46,12 @@ class WorkerAPI {
     });
   }
 
+  /**
+   * Get the path to the worker file given a programming language.
+   *
+   * @param {string} proglang - The programming language to get the worker path for.
+   * @returns {string} Path to the worker file.
+   */
   getWorkerPath(proglang) {
     let name = proglang;
 
@@ -39,6 +62,11 @@ class WorkerAPI {
     return `static/js/workers/${name}.worker.js`;
   }
 
+  /**
+   * Message event handler for the worker.
+   *
+   * @param {object} event - Event object coming from the UI.
+   */
   onmessage(event) {
     switch (event.data.id) {
       case 'ready':

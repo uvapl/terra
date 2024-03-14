@@ -4,34 +4,57 @@ $(window).on('resize', () => {
   }
 });
 
+/**
+ * Get the active tab its editor instance.
+ *
+ * @returns {object} The active editor instance.
+ */
 function getActiveEditor() {
   return window._layout.root.contentItems[0].contentItems[0].getActiveContentItem();
 }
 
+/**
+ * Gathers all files from the editor and returns them as an array of objects.
+ *
+* @returns {array} List of objects, each containing the filename and contents of
+* the corresponding editor tab.
+ */
+function getAllEditorFiles() {
+  return window._layout.root.contentItems[0].contentItems[0].contentItems
+    .map((item) => ({
+      filename: item.config.title,
+      contents: item.container.getState().value,
+    }));
+}
+
+/**
+* Runs the code inside the worker by sending all files to the worker along with
+* the current active tab name.
+ */
 function runCode() {
   const $button = $('#run-code');
   if ($button.prop('disabled')) return;
   $button.prop('disabled', true);
 
-  const editor = getActiveEditor();
-  const title = editor.config.title;
-  const contents = editor.container.getState().value;
-  window._workerApi.runUserCode(title, contents);
+  const activeTabName = getActiveEditor().config.title;
+  const files = getAllEditorFiles();
+  window._workerApi.runUserCode(activeTabName, files);
 }
 
+/**
+ * Run the command of a custom config button.
+ *
+ * @param {string} selector - Unique selector for the button, used to
+ * disable it when running and disable it when it's done running.
+ * @param {array} cmd - List of commands to execute.
+ */
 function runButtonCommand(selector, cmd) {
   const $button = $(selector);
   if ($button.prop('disabled')) return;
   $button.prop('disabled', true);
 
   const activeTabName = getActiveEditor().config.title;
-
-  // Gather all files from the editor.
-  const files = window._layout.root.contentItems[0].contentItems[0].contentItems
-    .map((item) => ({
-      filename: item.config.title,
-      contents: item.container.getState().value,
-    }));
+  const files = getAllEditorFiles();
 
   window._workerApi.runButtonCommand(selector, activeTabName, cmd, files);
 }
