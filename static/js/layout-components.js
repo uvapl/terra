@@ -24,27 +24,16 @@ function runButtonCommand(selector, cmd) {
   if ($button.prop('disabled')) return;
   $button.prop('disabled', true);
 
-  let files;
+  const activeTabName = getActiveEditor().config.title;
 
-  // If <filename> exists in the commands, then we execute the commands solely
-  // for the current file the user has open in the UI.
-  const hasFilenameToken = cmd.filter((line) => line.includes('<filename>')).length > 0;
-  if (hasFilenameToken) {
-    const editor = getActiveEditor();
-    files = [{
-      filename: editor.config.title,
-      contents: editor.container.getState().value
-    }];
-  } else {
-    // Otherwise, gather all files from the editor.
-    files = window._layout.root.contentItems[0].contentItems[0].contentItems
-      .map((item) => ({
-        filename: item.config.title,
-        contents: item.container.getState().value,
-      }));
-  }
+  // Gather all files from the editor.
+  const files = window._layout.root.contentItems[0].contentItems[0].contentItems
+    .map((item) => ({
+      filename: item.config.title,
+      contents: item.container.getState().value,
+    }));
 
-  window._workerApi.runButtonCommand(selector, cmd, files);
+  window._workerApi.runButtonCommand(selector, activeTabName, cmd, files);
 }
 
 function EditorComponent(container, state) {
