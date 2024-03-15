@@ -520,6 +520,7 @@ class API extends BaseAPI {
 
   async runUserCode({ activeTabName, files }) {
     const { filename, contents } = files.find(file => file.filename === activeTabName);
+    const basename = filename.replace(/\.c$/, '');
     const input = `${basename}.cc`;
     const obj = `${basename}.o`;
     const wasm = `${basename}.wasm`;
