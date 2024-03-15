@@ -518,8 +518,8 @@ class API extends BaseAPI {
     return stillRunning ? app : null;
   }
 
-  async runUserCode({ filename, contents }) {
-    const basename = filename.replace(/\.c$/, '');
+  async runUserCode({ activeTabName, files }) {
+    const { filename, contents } = files.find(file => file.filename === activeTabName);
     const input = `${basename}.cc`;
     const obj = `${basename}.o`;
     const wasm = `${basename}.wasm`;
