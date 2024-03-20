@@ -71,7 +71,10 @@ class API extends BaseAPI {
       const activeTab = files.find(file => file.filename === activeTabName);
 
       this.hostWriteCmd(`python3 ${activeTab.filename}`);
-      this.hostWrite(this.run(activeTab.contents));
+      const stdout = this.run(activeTab.contents);
+      if (stdout) {
+        this.hostWrite(stdout);
+      }
     } finally {
       if (typeof this.runUserCodeCallback === 'function') {
         this.runUserCodeCallback();
