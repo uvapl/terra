@@ -188,7 +188,7 @@ function TerminalComponent(container, state) {
       lineHeight: 1.2
     })
     term.loadAddon(fitAddon);
-    term.open(document.querySelector('.terminal-component-container .lm_content'));
+    term.open(container.getElement()[0]);
     fitAddon.fit();
 
     startingMessage = [
@@ -199,7 +199,6 @@ function TerminalComponent(container, state) {
       term.write(line + '\n');
     }
     term.write('\n');
-    term.open(container.getElement()[0]);
     setFontSize(fontSize);
   });
 
