@@ -81,14 +81,14 @@ Let's say you want to import `mypy`, then you should do the following:
 - Go to the _Download files_ on the `mypy` page.
 - Under _Built Distributions_, copy the link of a downloadable `.whl` file (preferably of the format `*-none-any.whl`)
 - Locally `cd` into `./static/wasm/py/`
-- If `custom_stdlib.zip` exists, run `rm -rf custom_stdlib.zip`, because otherwise `zip` will append to the existing zip and not remove old files.
+- If `custom_stdlib.zip` exists, run `rm custom_stdlib.zip`, because otherwise `zip` will append to the existing zip and not remove old files.
 - Run `unzip custom_stdlib.zip -d stdlib` to extract the files into `stdlib` directory
 - Run `cd stdlib` to go into the directory
 - Run `wget https://files.pythonhosted.org/packages/60/db/0ba2eaedca52bf5276275e8489951c26206030b3d31bf06f00875ae75d5d/mypy-1.9.0-py3-none-any.whl` to download the `.whl` into the stdlib folder
 - Run `unzip mypy-1.9.0-py3-none-any.whl` to unzip the `.whl` contents
-- Run `rm *.whl` to remove the `.whl` file
-- Run `zip -vr ../python_stdlib.zip .` to create a new zip
-- Run `rm -rf stdlib` to remove the folder we just created
+- Run `rm -rf *.whl *.dist-info` remove files we don't need
+- Run `zip -vr ../custom_stdlib.zip .` to create a new zip
+- Run `cd .. && rm -rf stdlib` to remove the folder we just created
 
 It might be that the contents are cached. In that case, clear your browser cache
 through the settings.
