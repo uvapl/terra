@@ -1,4 +1,6 @@
 :root {
+  --color-white: #fff;
+  --color-black: #000;
   --font-size: 16px;
   --navbar-padding: 10px;
   --editor-tab-font-size: 12px;

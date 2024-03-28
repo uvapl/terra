@@ -27,7 +27,7 @@
 
 .settings-dropdown {
   position: absolute;
-  background: #fff;
+  background: var(--color-white);
   display: none;
   right: 0;
   border: 1px solid var(--border-color);
@@ -65,7 +65,7 @@
 
 .settings-dropdown li:hover {
   background-color: var(--tab-menu--tab-bg-color);
-  color: #000;
+  color: var(--color-black);
   cursor: pointer;
 }
 
@@ -74,7 +74,7 @@
 }
 
 .settings-dropdown li.active {
-  color: #000;
+  color: var(--color-black);
   font-weight: bold;
 }
 
