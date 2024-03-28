@@ -16,8 +16,8 @@ function getActiveEditor() {
 /**
  * Gathers all files from the editor and returns them as an array of objects.
  *
-* @returns {array} List of objects, each containing the filename and contents of
-* the corresponding editor tab.
+ * @returns {array} List of objects, each containing the filename and contents of
+ * the corresponding editor tab.
  */
 function getAllEditorFiles() {
   return window._layout.root.contentItems[0].contentItems[0].contentItems
@@ -28,17 +28,32 @@ function getAllEditorFiles() {
 }
 
 /**
-* Runs the code inside the worker by sending all files to the worker along with
-* the current active tab name.
+ * Runs the code inside the worker by sending all files to the worker along with
+ * the current active tab name.
  */
 function runCode() {
-  const $button = $('#run-code');
-  if ($button.prop('disabled')) return;
-  $button.prop('disabled', true);
+  if ($('#run-code').prop('disabled')) {
+    return;
+  } else if (window._workerApi.isRunningCode) {
+    return window._workerApi.terminate();
+  }
 
   const activeTabName = getActiveEditor().config.title;
   const files = getAllEditorFiles();
   window._workerApi.runUserCode(activeTabName, files);
+
+  $('#run-code').prop('disabled', true);
+
+  // Change the run-code button to a stop-code button if after 1 second the code
+  // has not finished running (potentially infinite loop scenario).
+  window._showStopCodeButtonTimeoutId = setTimeout(() => {
+    const $button = $('#run-code');
+    const newText = $button.text().replace('Run', 'Stop');
+    $button.text(newText)
+      .prop('disabled', false)
+      .removeClass('run-code-btn')
+      .addClass('stop-code-btn');
+  }, 1000);
 }
 
 /**
@@ -363,7 +378,7 @@ class Layout extends GoldenLayout {
     // Add event listeners.
     $('.settings-menu').click((event) => $(event.target).toggleClass('open'));
     $('#run-code').click(() => runCode());
-    $('#clear-term').click(() => term.clear());
+    $('#clear-term').click(() => term.reset());
     $(document).click((event) => {
       if (!$(event.target).is($('.settings-menu.open'))) {
         $('.settings-menu').removeClass('open');

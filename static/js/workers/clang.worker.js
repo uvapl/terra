@@ -443,10 +443,16 @@ class API extends BaseAPI {
       return this.untar(this.sysrootFilename);
     });
 
+    this.ready.then(() => {
+      this.loadModules().then(() => {
+        options.readyCallback();
+      });
+    });
+  }
+
+  async loadModules() {
     this.getModule(this.clangFilename);
     this.getModule(this.lldFilename);
-
-    options.readyCallback();
   }
 
   hostWriteCmd(message) {

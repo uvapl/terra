@@ -2,8 +2,26 @@
  * Bridge class between the main app and the currently loaded worker.
  */
 class WorkerAPI {
+  proglang = null;
+  isRunningCode = false;
+
   constructor(proglang) {
-    this.worker = new Worker(this.getWorkerPath(proglang));
+    this.proglang = proglang;
+    this._createWorker();
+  }
+
+  _createWorker() {
+    if (this.worker) {
+      this.isRunningCode = false;
+      this.worker.terminate();
+      this.runUserCodeCallback();
+
+      // Disable the button and wait for the worker to remove the disabled prop
+      // once it has been loaded.
+      $('#run-code').prop('disabled', true);
+    }
+
+    this.worker = new Worker(this.getWorkerPath(this.proglang));
     const channel = new MessageChannel();
     this.port = channel.port1;
     this.port.onmessage = this.onmessage.bind(this);
@@ -23,6 +41,8 @@ class WorkerAPI {
    * and contents of the corresponding editor tab.
    */
   runUserCode(activeTabName, files) {
+    this.isRunningCode = true;
+
     this.port.postMessage({
       id: 'runUserCode',
       data: { activeTabName, files },
@@ -63,6 +83,36 @@ class WorkerAPI {
   }
 
   /**
+   * Terminate the code that is being run by the user. Useful when e.g. an
+   * infinite loop is detected. This process terminates the existing worker and
+   * create a complete new instance.
+   */
+  terminate() {
+    this._createWorker();
+  }
+
+  /**
+   * Callback function for when the user code has finished running or has been
+   * terminated by the user.
+   */
+  runUserCodeCallback() {
+    this.isRunningCode = false;
+
+    // Change the stop-code button back to a run-code button.
+    const $button = $('#run-code');
+    const newText = $button.text().replace('Stop', 'Run');
+    $button.text(newText)
+      .prop('disabled', false)
+      .addClass('run-code-btn')
+      .removeClass('stop-code-btn');
+
+    if (window._showStopCodeButtonTimeoutId) {
+      clearTimeout(window._showStopCodeButtonTimeoutId);
+      window._showStopCodeButtonTimeoutId = null;
+    }
+  }
+
+  /**
    * Message event handler for the worker.
    *
    * @param {object} event - Event object coming from the UI.
@@ -82,7 +132,7 @@ class WorkerAPI {
         break;
 
       case 'runUserCodeCallback':
-        $('#run-code').prop('disabled', false);
+        this.runUserCodeCallback();
         break;
     }
   }
