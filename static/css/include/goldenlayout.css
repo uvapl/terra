@@ -1,5 +1,5 @@
 .lm_goldenlayout {
-  background: #fff;
+  background: var(--color-white);
 }
 
 .lm_goldenlayout,
@@ -51,7 +51,7 @@
 
 .lm_splitter {
   opacity: 1;
-  background: #fff;
+  background: var(--color-white);
   transition: background 200ms ease;
 }
 
@@ -64,7 +64,7 @@
 }
 
 .lm_splitter.locked:hover {
-  background: #fff;
+  background: var(--color-white);
 }
 
 /* Create two vertical bars as a drag-handler icon */
