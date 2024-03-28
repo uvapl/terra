@@ -101,13 +101,17 @@
 
 .lm_header .lm_tabdropdown_list {
   top: 30px;
+  background-color: var(--color-white);
+  border: 1px solid var(--border-color);
 }
 
 .lm_header .lm_tabdropdown_list .lm_tab {
   border-radius: 0;
-  border: 1px solid var(--border-color);
-  background: #fff;
   padding-bottom: 3px;
+  background-color: transparent;
+  border: 0;
+  width: 100%;
+  text-align: right;
 }
 
 .lm_header .lm_tabdropdown_list .lm_tab:hover {
@@ -116,6 +120,11 @@
 
 .lm_header .lm_tabdropdown_list .lm_tab + .lm_tab {
   margin-top: -1px;
+  border-top: 1px solid var(--border-color);
+}
+
+.lm_header .lm_tabdropdown_list .lm_tab .lm_title {
+  width: auto;
 }
 
 /* dark mode overrides */
