@@ -26,14 +26,14 @@
   background: #62c0ff;
 }
 
-.run-code-btn:not([disabled]):active {
+.run-code-btn:active {
   background: #5dabdf;
 }
 
-.clear-term-btn {
+.stop-code-btn {
   background: #f9776a;
 }
 
-.clear-term-btn:not([disabled]):active {
+.stop-code-btn:active {
   background: #e64a3a;
 }
