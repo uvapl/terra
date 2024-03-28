@@ -164,6 +164,20 @@ function EditorComponent(container, state) {
   });
 }
 
+/**
+ * Hide the cursor inside the terminal component.
+ */
+function hideTermCursor() {
+  term.write('\x1b[?25l');
+}
+
+/**
+ * Show the cursor inside the terminal component.
+ */
+function showTermCursor() {
+  term.write('\x1b[?25h');
+}
+
 let term;
 const fitAddon = new FitAddon.FitAddon();
 function TerminalComponent(container, state) {
@@ -199,7 +213,9 @@ function TerminalComponent(container, state) {
       term.write(line + '\n');
     }
     term.write('\n');
+
     setFontSize(fontSize);
+    hideTermCursor();
   });
 
   container.on('fontSizeChanged', setFontSize);
