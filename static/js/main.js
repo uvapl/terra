@@ -418,6 +418,7 @@
       },
       title: filename,
       isClosable: false,
+      reorderEnabled: false,
     }));
   }
 
