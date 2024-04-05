@@ -35,6 +35,10 @@ function initApp() {
       return reject('No filename provided in query params');
     }
 
+    // Update local storage key.
+    const currentStorageKey = makeLocalStorageKey(window.location.href);
+    updateLocalStoragePrefix(currentStorageKey);
+
     // Create tabs with the filename as key and empty string as the contents.
     const tabs = {}
     tabs[queryParams.filename] = '';
