@@ -31,7 +31,7 @@ initApp().then(({ layout }) => {
 function initApp() {
   return new Promise((resolve, reject) => {
     const queryParams = parseQueryParams();
-    if (isValidQueryParams(queryParams)) {
+    if (!isValidQueryParams(queryParams)) {
       return reject('No filename provided in query params');
     }
 
@@ -75,5 +75,5 @@ function initApp() {
  * @returns {boolean} True if valid, false otherwise.
  */
 function isValidQueryParams(params) {
-  return typeof params.filename !== 'string';
+  return typeof params.filename === 'string';
 }
