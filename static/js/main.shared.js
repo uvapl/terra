@@ -69,6 +69,5 @@ function createLayout(content, proglang, fontSize, options = {}) {
     ]
   };
 
-  console.log('defaultLayoutConfig', defaultLayoutConfig);
   return new Layout(proglang, defaultLayoutConfig, options);
 }

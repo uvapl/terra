@@ -39,7 +39,7 @@ initApp().then(({ layout, config }) => {
   }
 
 }).catch((err) => {
-  console.error('Failed to bootstrap app:', err);
+  console.error('Failed to bootstrap exam app:', err);
 
   // Remove the right navbar when the application failed to initialise.
   $('.navbar-right').remove();
