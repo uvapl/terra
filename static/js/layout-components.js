@@ -324,7 +324,11 @@ class Layout extends GoldenLayout {
       Object.keys(this.buttonConfig).forEach((name) => {
         const id = name.replace(/\s/g, '-').toLowerCase();
         const selector = `#${id}`;
-        const cmd = this.buttonConfig[name];
+
+        let cmd = this.buttonConfig[name];
+        if (!Array.isArray(cmd)) {
+          cmd = cmd.split('\n');
+        }
 
         $('.terminal-component-container .lm_header')
           .prepend(`<button id="${id}" class="button ${id}-btn" disabled>${name}</button>`);
