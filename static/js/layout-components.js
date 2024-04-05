@@ -248,7 +248,7 @@ class Layout extends GoldenLayout {
   proglag = null;
   buttonConfig = null;
 
-  constructor(proglang, defaultLayoutConfig, buttonConfig) {
+  constructor(proglang, defaultLayoutConfig, options = {}) {
     let layoutConfig = getLocalStorageItem('layout');
     if (layoutConfig) {
       layoutConfig = JSON.parse(layoutConfig);
@@ -260,7 +260,7 @@ class Layout extends GoldenLayout {
 
     this.proglang = proglang;
 
-    if (isObject(buttonConfig)) {
+    if (isObject(options.buttonConfig)) {
       this.buttonConfig = buttonConfig;
     }
 

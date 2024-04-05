@@ -95,6 +95,29 @@
   opacity: 0;
 }
 
+/* Create two horizontal bars as a drag-handler icon */
+.lm_splitter.lm_vertical:before,
+.lm_splitter.lm_vertical:after {
+  content: '';
+  height: 2px;
+  width: 40px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #b1b1b1;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+  opacity: 1;
+}
+
+.lm_splitter.lm_vertical:before {
+  top: 2px;
+}
+
+.lm_splitter.lm_vertical:after {
+  bottom: 2px;
+}
+
 .lm_content {
   background: inherit;
 }
