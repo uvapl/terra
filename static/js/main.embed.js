@@ -6,12 +6,17 @@
 // Here's the start of the application.
 // ===========================================================================
 
-// After the app has initialized (config loaded, components loaded) we want to
-// call additional functions.
-initApp().then(({ layout, config }) => {
-  console.log('Successfully bootstrapped app');
+initApp().then(({ layout }) => {
+
+  // Listen for the contents of the file to be received.
+  window.addEventListener('message', function(event) {
+    const editor = getActiveEditor().instance.editor;
+    editor.setValue(event.data);
+    editor.clearSelection();
+  });
+
 }).catch((err) => {
-  console.error('Failed to bootstrap app:', err);
+  console.error('Failed to bootstrap examide iframe:', err);
 });
 
 // ===========================================================================
@@ -26,7 +31,7 @@ initApp().then(({ layout, config }) => {
 function initApp() {
   return new Promise((resolve, reject) => {
     const queryParams = parseQueryParams();
-    if (typeof queryParams.filename !== 'string') {
+    if (isValidQueryParams(queryParams)) {
       return reject('No filename provided in query params');
     }
 
@@ -57,4 +62,14 @@ function initApp() {
 
     resolve({ layout });
   });
+}
+
+/**
+ * Validate whether the given query params are valid.
+ *
+ * @param {object} params - The query params object.
+ * @returns {boolean} True if valid, false otherwise.
+ */
+function isValidQueryParams(params) {
+  return typeof params.filename !== 'string';
 }
