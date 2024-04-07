@@ -89,8 +89,8 @@ In order to compile to `wasm32-wasi`, we need to use
 file.
 
 Start off with `cd ./static/wasm/c_cpp/` and extract the `sysroot.tar` through
-`tar -xvf sysroot.tar`. The tar will extract 3 folder, namely `include`, `lib`
-and `share`.
+`tar -xvf sysroot.tar`. This will extract 3 folder, namely `include`, `lib` and
+`share`.
 
 Inside `./static/wasm/c_cpp/`, create a temporary folder for your library. For
 the sake of this example, we'll call our library `libfoo` which we can later
@@ -143,10 +143,6 @@ foo.o: foo.c foo.h
 
 clean:
 	rm -f libfoo.a foo.o
-
-check:
-	wasm-objdump -h foo.o
-	wasm-ld -v libfoo.a
 ```
 </details>
 
@@ -159,7 +155,7 @@ wasi-sdk.
 When running `make`, you should have the `libfoo.a`.
 
 Next, we go one folder up through `cd ..` and then copy the `libfoo.a` and
-`foo.h` inside the corresponding folder of the sysroot.tar we extracted earlier:
+`foo.h` to the corresponding folder of the `sysroot.tar` we extracted earlier:
 
 ```
 $ cp ./libfoo/foo.h ./include
