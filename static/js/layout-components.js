@@ -239,6 +239,59 @@ function showTermCursor() {
   term.write('\x1b[?25h');
 }
 
+/**
+ * Enable stdin in the terminal and record the user's keystrokes. Once the user
+ * presses ENTER, the promise is resolved with the user's input.
+ *
+ * @returns {Promise<string>} The user's input.
+ */
+function waitForInput() {
+  return new Promise(resolve => {
+    // Immediately focus the terminal when user input is requested.
+    showTermCursor();
+    term.focus();
+
+    // Disable some special characters.
+    // For all input sequences, see http://xtermjs.org/docs/api/vtfeatures/#c0
+    const blacklistedKeys = [
+      '\u007f', // Backspace
+      '\t',     // Tab
+      '\r',     // Enter
+    ]
+
+    // Keep track of the value that is typed by the user.
+    let value = '';
+    const disposable = term.onKey(e => {
+      // Only append allowed characters.
+      if (!blacklistedKeys.includes(e.key)) {
+        term.write(e.key);
+        value += e.key;
+      }
+
+      // Remove the last character when pressing backspace. This is done by
+      // triggering a backspace '\b' character and then insert a space at that
+      // position to clear the character.
+      if (e.key === '\u007f' && value.length > 0) {
+        term.write('\b \b');
+        value = value.slice(0, -1);
+      }
+
+      // If the user presses enter, resolve the promise.
+      if (e.key === '\r') {
+        // Remove the onKey event listener.
+        disposable.dispose();
+
+        // Trigger a real enter in the terminal.
+        term.write('\n');
+        value += '\n';
+
+        hideTermCursor();
+        resolve(value);
+      }
+    });
+  });
+}
+
 let term;
 const fitAddon = new FitAddon.FitAddon();
 function TerminalComponent(container, state) {
@@ -259,6 +312,7 @@ function TerminalComponent(container, state) {
     term = new Terminal({
       convertEol: true,
       disableStdin: true,
+      cursorBlink: true,
       fontSize,
       lineHeight: 1.2
     })

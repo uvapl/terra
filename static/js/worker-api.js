@@ -4,6 +4,7 @@
 class WorkerAPI {
   proglang = null;
   isRunningCode = false;
+  sharedMem = null;
 
   constructor(proglang) {
     this.proglang = proglang;
@@ -26,10 +27,18 @@ class WorkerAPI {
     this.port = channel.port1;
     this.port.onmessage = this.onmessage.bind(this);
 
+    // this.sharedMem = new WebAssembly.Memory({
+    //   initial: 1,
+    //   maximum: 80,
+    //   shared: true,
+    // });
+
+    this.sharedMem = new SharedArrayBuffer(80); // Specify your desired buffer size here
+
     const remotePort = channel.port2;
     this.worker.postMessage({
       id: 'constructor',
-      data: remotePort
+      data: { remotePort, sharedMem: this.sharedMem },
     }, [remotePort]);
   }
 
@@ -125,6 +134,20 @@ class WorkerAPI {
 
       case 'write':
         term.write(event.data.data);
+        break;
+
+      case 'readStdin':
+        waitForInput().then((value) => {
+          const view = new Uint8Array(this.sharedMem.buffer);
+          for (let i = 0; i < value.length; i++) {
+            // To the shared memory.
+            view[i] = value.charCodeAt(i);
+          }
+          // Set the last byte to the null terminator.
+          view[value.length] = 0;
+
+          Atomics.notify(new Int32Array(this.sharedMem.buffer), 0);
+        });
         break;
 
       case 'runButtonCommandCallback':
