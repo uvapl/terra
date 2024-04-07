@@ -434,6 +434,14 @@ class API extends BaseAPI {
     this.lldFilename = options.lld || 'lld';
     this.sysrootFilename = options.sysroot || 'sysroot.tar';
 
+    this.cflags = [
+      '-O0', '-std=c11', '-O0', '-Wall', '-Werror', '-Wextra',
+      '-Wno-unused-variable', '-Wno-sign-compare', '-Wno-unused-parameter',
+      '-Wshadow'
+    ];
+
+    this.ldflags = ['-lc', '-lcs50'];
+
     this.memfs = new MemFS({
       compileStreaming: this.compileStreaming,
       hostWrite: this.hostWrite,
@@ -495,10 +503,7 @@ class API extends BaseAPI {
       '-ferror-limit', '19',
       '-fmessage-length', '80',
       '-fcolor-diagnostics',
-      '-x', 'c',
-      '-std=c11', '-O0', '-Wall', '-Werror', '-Wextra',
-      '-Wno-unused-variable', '-Wno-sign-compare', '-Wno-unused-parameter',
-      '-Wshadow', '-o', obj, input
+      '-x', 'c', ...this.cflags, '-o', obj, input
     ]);
   }
 
@@ -512,7 +517,7 @@ class API extends BaseAPI {
     return await this.run([
       lld, 'wasm-ld', '--no-threads',
       '--export-dynamic',
-      '-z', `stack-size=${stackSize}`, `-L${libdir}`, crt1, obj, '-lc',
+      '-z', `stack-size=${stackSize}`, `-L${libdir}`, crt1, obj, ...this.ldflags,
       '-o', wasm
     ]);
   }
@@ -536,10 +541,10 @@ class API extends BaseAPI {
     // Make a custom command placeholder without all the unnecessary
     // additional flags needed for wasm.
     const cmdPlaceholder = [
-      'clang', '-O0', '-std=c11', '-Wall', '-Werror', '-Wextra',
-      '-Wno-sign-compare', '-Wno-unused-parameter', '-Wno-unused-variable',
-      '-Wshadow', '-o', basename, `${basename}.c`, '-lcs50', '-lm'
-    ]
+      'clang', ...this.cflags,
+      '-o', basename, `${basename}.c`,
+      ...this.ldflags,
+    ];
     this.hostWrite(cmdPlaceholder.join(' ') + '\n');
 
     try {
