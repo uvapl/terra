@@ -61,30 +61,30 @@ class Memory {
     }
   }
 
-  read8(o) { return this.u8[o]; }
-  read32(o) { return this.u32[o >> 2]; }
-  write8(o, v) { this.u8[o] = v; }
-  write32(o, v) { this.u32[o >> 2] = v; }
-  write64(o, vlo, vhi = 0) { this.write32(o, vlo); this.write32(o + 4, vhi); }
+  read8(offset) { return this.u8[offset]; }
+  read32(offset) { return this.u32[offset >> 2]; }
+  write8(offset, val) { this.u8[offset] = val; }
+  write32(offset, val) { this.u32[offset >> 2] = val; }
+  write64(offset, vlo, vhi = 0) { this.write32(offset, vlo); this.write32(offset + 4, vhi); }
 
-  readStr(o, len) {
-    return readStr(this.u8, o, len);
+  readStr(offset, len) {
+    return readStr(this.u8, offset, len);
   }
 
   // Null-terminated string.
-  writeStr(o, str) {
-    o += this.write(o, str);
-    this.write8(o, 0);
+  writeStr(offset, str) {
+    offset += this.write(offset, str);
+    this.write8(offset, 0);
     return str.length + 1;
   }
 
-  write(o, buf) {
+  write(offset, buf) {
     if (buf instanceof ArrayBuffer) {
-      return this.write(o, new Uint8Array(buf));
+      return this.write(offset, new Uint8Array(buf));
     } else if (typeof buf === 'string') {
-      return this.write(o, buf.split('').map(x => x.charCodeAt(0)));
+      return this.write(offset, buf.split('').map(x => x.charCodeAt(0)));
     } else {
-      const dst = new Uint8Array(this.buffer, o, buf.length);
+      const dst = new Uint8Array(this.buffer, offset, buf.length);
       dst.set(buf);
       return buf.length;
     }
@@ -95,6 +95,8 @@ class MemFS {
   constructor(options) {
     const compileStreaming = options.compileStreaming;
     this.hostWrite = options.hostWrite;
+    this.hostRead = options.hostRead;
+    this.sharedMem = options.sharedMem;
     this.stdinStr = options.stdinStr || "";
     this.stdinStrPos = 0;
     this.memfsFilename = options.memfsFilename;
@@ -171,28 +173,44 @@ class MemFS {
   }
 
   host_read(fd, iovs, iovs_len, nread) {
+    let str = '';
+
+    this.hostRead();
+    Atomics.wait(new Int32Array(this.sharedMem.buffer), 0, 0);
+
+    // Read the value stored in memory.
+    const sharedMem = new Uint8Array(this.sharedMem.buffer);
+    for (let i = 0; i < sharedMem.length; i++) {
+      if (sharedMem[i] === 0) {
+        // Null terminator found, terminate the loop.
+        break;
+      }
+
+      str += String.fromCharCode(sharedMem[i]);
+    }
+
+    // Clean shared memory.
+    sharedMem.fill(0);
+
     this.hostMem_.check();
     assert(fd === 0);
-    let size = 0;
+
+    const strLen = str.length;
+    let bytesWritten = 0;
     for (let i = 0; i < iovs_len; ++i) {
       const buf = this.hostMem_.read32(iovs);
       iovs += 4;
       const len = this.hostMem_.read32(iovs);
       iovs += 4;
-      const lenToWrite = Math.min(len, (this.stdinStr.length - this.stdinStrPos));
-      if (lenToWrite === 0) {
-        break;
-      }
-      this.hostMem_.write(buf, this.stdinStr.substr(this.stdinStrPos, lenToWrite));
-      size += lenToWrite;
-      this.stdinStrPos += lenToWrite;
-      if (lenToWrite !== len) {
-        break;
-      }
+
+      const remainingBytes = strLen - bytesWritten;
+      const bytesToWrite = Math.min(len, remainingBytes);
+      const slice = str.slice(bytesWritten, bytesWritten + bytesToWrite);
+      this.hostMem_.write(buf, slice);
+      bytesWritten += bytesToWrite;
     }
-    // For logging
-    // this.hostWrite("Read "+ size + "bytes, pos: "+ this.stdinStrPos + "\n");
-    this.hostMem_.write32(nread, size);
+
+    this.hostMem_.write32(nread, bytesWritten);
     return ESUCCESS;
   }
 
@@ -429,6 +447,8 @@ class API extends BaseAPI {
     super(options);
     this.moduleCache = {};
     this.readBuffer = options.readBuffer;
+    this.sharedMem = options.sharedMem;
+    this.hostRead = options.hostRead;
     this.compileStreaming = options.compileStreaming;
     this.clangFilename = options.clang || 'clang';
     this.lldFilename = options.lld || 'lld';
@@ -445,6 +465,8 @@ class API extends BaseAPI {
     this.memfs = new MemFS({
       compileStreaming: this.compileStreaming,
       hostWrite: this.hostWrite,
+      hostRead: this.hostRead,
+      sharedMem: this.sharedMem,
       memfsFilename: options.memfs || 'memfs',
     });
     this.ready = this.memfs.ready.then(() => {
@@ -571,9 +593,11 @@ let currentApp = null;
 const onAnyMessage = async event => {
   switch (event.data.id) {
     case 'constructor':
-      port = event.data.data;
+      port = event.data.data.remotePort;
       port.onmessage = onAnyMessage;
       api = new API({
+        sharedMem: event.data.data.sharedMem,
+
         async readBuffer(filename) {
           const response = await fetch(filename);
           return response.arrayBuffer();
@@ -586,6 +610,10 @@ const onAnyMessage = async event => {
 
         hostWrite(s) {
           port.postMessage({ id: 'write', data: s });
+        },
+
+        hostRead() {
+          port.postMessage({ id: 'readStdin' });
         },
 
         readyCallback() {
