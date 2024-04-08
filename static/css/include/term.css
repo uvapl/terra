@@ -1,7 +1,3 @@
-.terminal-component-container .lm_header button + button {
-  margin-left: 5px;
-}
-
 .terminal-component-container .lm_tabs {
   display: none;
 }

@@ -11,7 +11,7 @@ initApp().then(({ layout }) => {
   // Listen for the contents of the file to be received.
   window.addEventListener('message', function(event) {
     const editor = getActiveEditor().instance.editor;
-    editor.setValue(event.data);
+    editor.setValue(removeIndent(event.data));
     editor.clearSelection();
   });
 
@@ -35,6 +35,9 @@ function initApp() {
       return reject('No filename provided in query params');
     }
 
+    const isHorizontal = queryParams.layout === 'horizontal';
+    const isVertical = !isHorizontal;
+
     // Update local storage key.
     const currentStorageKey = makeLocalStorageKey(window.location.href);
     updateLocalStoragePrefix(currentStorageKey);
@@ -57,9 +60,10 @@ function initApp() {
 
     // Create the layout object.
     const layout = createLayout(content, proglang, fontSize, {
-      buttonConfig: config.buttons,
-      vertical: true,
+      vertical: isVertical,
     });
+
+    $('body').addClass(isVertical ? 'vertical' : 'horizontal');
 
     // Call the init function that creates all components.
     layout.init();

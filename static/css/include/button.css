@@ -1,3 +1,16 @@
+.button {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 3px 5px;
+  background: var(--color-white);
+  border-radius: 4px;
+  border: 1px solid var(--color-black);
+}
+
+.button + .button {
+  margin-left: 5px;
+}
+
 .button:active {
   background: #ccc;
 }
@@ -11,15 +24,6 @@
   color: #606060;
   cursor: not-allowed;
   border-color: #606060;
-}
-
-.button {
-  -webkit-appearance: none;
-  appearance: none;
-  padding: 3px 5px;
-  background: var(--color-white);
-  border-radius: 4px;
-  border: 1px solid var(--color-black);
 }
 
 .run-code-btn {

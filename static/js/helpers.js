@@ -201,3 +201,28 @@ function updateLocalStoragePrefix(additionalKey) {
 function makeLocalStorageKey(key) {
   return key.replace(/[^0-9a-z]+/g, '-');
 }
+
+/**
+ * Remove the minimum indent at a given string.
+ *
+ * @param {string} text - The input string.
+ * @returns {str} Modified string with minimum indent removed.
+ */
+function removeIndent(text) {
+  // Remove leading newlines.
+  while (text.startsWith('\n')) {
+    text = text.slice(1);
+  }
+
+  // Remove trailing newlines.
+  text = text.replace(/([\n\s])*$/, '');
+
+  // Get the minimum indentation.
+  const indent = text.match(/^[\s\t]*/)[0];
+
+  // Remove minimum indent from each line.
+  return text
+    .split('\n')
+    .map(line => line.replace(new RegExp(`^${indent}`), ''))
+    .join('\n');
+}

@@ -120,7 +120,7 @@ class WorkerAPI {
   onmessage(event) {
     switch (event.data.id) {
       case 'ready':
-        $('.terminal-component-container .lm_header .button').prop('disabled', false);
+        $('.lm_header .button').prop('disabled', false);
         break;
 
       case 'write':

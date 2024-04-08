@@ -30,6 +30,11 @@
   height: 100%;
 }
 
+.lm_header .lm_controls {
+  display: flex;
+  align-items: center;
+}
+
 .lm_content,
 .lm_header .lm_tab {
   border-color: var(--border-color);
