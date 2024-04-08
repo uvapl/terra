@@ -261,7 +261,7 @@ class Layout extends GoldenLayout {
     this.proglang = proglang;
 
     if (isObject(options.buttonConfig)) {
-      this.buttonConfig = buttonConfig;
+      this.buttonConfig = options.buttonConfig;
     }
 
     this.on('stateChanged', () => {

@@ -72,7 +72,9 @@ function initApp() {
         const content = generateConfigContent(config.tabs, fontSize);
 
         // Create the layout object.
-        const layout = createLayout(content, proglang, fontSize, config.buttons);
+        const layout = createLayout(content, proglang, fontSize, {
+          buttonConfig: config.buttons,
+        });
 
         // Call the init function that creates all components.
         layout.init();
