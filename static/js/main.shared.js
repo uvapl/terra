@@ -36,6 +36,7 @@ function generateConfigContent(tabs, fontSize) {
  * @returns {Layout} The layout instance.
  */
 function createLayout(content, proglang, fontSize, options = {}) {
+  const isIframe = $('body').hasClass('examide-embed');
   const defaultLayoutConfig = {
     settings: {
       showCloseIcon: false,
@@ -46,7 +47,7 @@ function createLayout(content, proglang, fontSize, options = {}) {
     },
     dimensions: {
       headerHeight: 30,
-      borderWidth: options.vertical ? 0 : 10,
+      borderWidth: isIframe ? 0 : 10,
     },
     content: [
       {
