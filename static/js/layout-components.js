@@ -373,21 +373,23 @@ class Layout extends GoldenLayout {
       </div>
     `;
 
+    const $editorContainer = $('.editor-component-container');
+    const $terminalContainer = $('.terminal-component-container');
+
     if (this.iframe && this.vertical) {
-      $('.editor-component-container')
+      $editorContainer
         .find('.lm_controls')
         .append(runCodeButtonHtml)
         .append(settingsMenuHtml);
+    } else if (this.iframe) {
+      // Horizontal layout.
+      $terminalContainer.find('.lm_controls')
+        .append(runCodeButtonHtml)
+        .append(settingsMenuHtml);
     } else {
-      // horizontal layout (exam and iframe)
-      const $componentContainer = $('.terminal-component-container');
-      $componentContainer.find('.lm_header').append(runCodeButtonHtml);
-      $componentContainer.find('.lm_controls').append(settingsMenuHtml);
-
-      // Only add the clear-terminal button in the exam version.
-      if (!this.iframe) {
-        $componentContainer.find('.lm_header').append(clearTermButtonHtml);
-      }
+      // Exam layout.
+      $terminalContainer.find('.lm_header').append(runCodeButtonHtml).append(clearTermButtonHtml)
+      $terminalContainer.find('.lm_controls').append(settingsMenuHtml);
     }
 
     // Add custom buttons to the header.
