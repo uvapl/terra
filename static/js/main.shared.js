@@ -20,7 +20,6 @@ function generateConfigContent(tabs, fontSize) {
     },
     title: filename,
     isClosable: false,
-    reorderEnabled: false,
   }));
 }
 
@@ -43,10 +42,11 @@ function createLayout(content, proglang, fontSize, options = {}) {
       showPopoutIcon: false,
       showMaximiseIcon: false,
       showCloseIcon: false,
+      reorderEnabled: false,
     },
     dimensions: {
       headerHeight: 30,
-      borderWidth: 10,
+      borderWidth: options.vertical ? 0 : 10,
     },
     content: [
       {

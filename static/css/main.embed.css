@@ -4,3 +4,31 @@
 @import 'include/goldenlayout.css';
 @import 'include/term.css';
 @import 'include/editor.css';
+
+/* iframe-specific overwrites */
+
+.examide-embed .lm_splitter.lm_vertical {
+  display: none;
+}
+
+.examide-embed .terminal-component-container .lm_content {
+  border: 0;
+}
+
+.examide-embed.vertical .editor-component-container .lm_content {
+  border-width: 1px 0 0;
+}
+
+.examide-embed.horizontal .editor-component-container .lm_content {
+  border-width: 1px 1px 0 0;
+}
+
+.examide-embed .editor-component-container .lm_controls {
+  margin-top: -2px;
+}
+
+.examide-embed {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  padding: 2px 0 0;
+}

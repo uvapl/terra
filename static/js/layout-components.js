@@ -30,8 +30,13 @@ function getAllEditorFiles() {
 /**
  * Runs the code inside the worker by sending all files to the worker along with
  * the current active tab name.
+ *
+ * @param {boolean} [clearTerm=false] Whether to clear the terminal before
+ * printing the output.
  */
-function runCode() {
+function runCode(clearTerm = false) {
+  if (clearTerm) term.reset();
+
   if ($('#run-code').prop('disabled')) {
     return;
   } else if (window._workerApi.isRunningCode) {
@@ -220,17 +225,12 @@ function TerminalComponent(container, state) {
     term.open(container.getElement()[0]);
     fitAddon.fit();
 
-    startingMessage = [
-      'Click the "Run" button to execute code',
-      'Click the "Clear terminal" button to clear this screen',
-    ];
-    for (const line of startingMessage) {
-      term.write(line + '\n');
-    }
-    term.write('\n');
-
     setFontSize(fontSize);
     hideTermCursor();
+  });
+
+  container.on('vertical', () => {
+    container.tab.header.position(false);
   });
 
   container.on('fontSizeChanged', setFontSize);
@@ -247,6 +247,7 @@ class Layout extends GoldenLayout {
   initialised = false;
   proglag = null;
   buttonConfig = null;
+  vertical = false;
 
   constructor(proglang, defaultLayoutConfig, options = {}) {
     let layoutConfig = getLocalStorageItem('layout');
@@ -259,6 +260,7 @@ class Layout extends GoldenLayout {
     super(layoutConfig, $('#layout'));
 
     this.proglang = proglang;
+    this.vertical = options.vertical;
 
     if (isObject(options.buttonConfig)) {
       this.buttonConfig = options.buttonConfig;
@@ -280,6 +282,11 @@ class Layout extends GoldenLayout {
           this.emitToAllComponents('setProgLang', this.proglang);
           this.createControls();
           this.setTheme(getLocalStorageItem('theme') || 'light');
+          this.showTermStartupMessage();
+
+          if (this.vertical) {
+            this.emitToAllComponents('vertical');
+          }
 
           // Focus the editor when clicking anywhere in the editor header.
           $('.editor-component-container .lm_header').click(() => {
@@ -291,6 +298,20 @@ class Layout extends GoldenLayout {
 
     this.registerComponent('editor', EditorComponent);
     this.registerComponent('terminal', TerminalComponent);
+  }
+
+  showTermStartupMessage = () => {
+    const msg = ['Click the "Run" button to execute code'];
+
+    if (!this.vertical) {
+      msg.push('Click the "Clear terminal" button to clear this screen');
+    }
+
+    for (const line of msg) {
+      term.write(line + '\n');
+    }
+
+    term.write('\n');
   }
 
   emitToAllComponents = (event, data) => {
@@ -319,29 +340,10 @@ class Layout extends GoldenLayout {
   createControls = () => {
     const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
 
-    // Add custom buttons to the header.
-    if (this.proglang === 'py' && isObject(this.buttonConfig)) {
-      Object.keys(this.buttonConfig).forEach((name) => {
-        const id = name.replace(/\s/g, '-').toLowerCase();
-        const selector = `#${id}`;
+    const runCodeButtonHtml = `<button id="run-code" class="button run-code-btn" disabled>Run (${runCodeShortcut})</button>`;
+    const clearTermButtonHtml = '<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>';
 
-        let cmd = this.buttonConfig[name];
-        if (!Array.isArray(cmd)) {
-          cmd = cmd.split('\n');
-        }
-
-        $('.terminal-component-container .lm_header')
-          .prepend(`<button id="${id}" class="button ${id}-btn" disabled>${name}</button>`);
-
-        $(selector).click(() => runButtonCommand(selector, cmd));
-      });
-    }
-
-    $('.terminal-component-container .lm_header').prepend('<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>');
-    $('.terminal-component-container .lm_header').prepend(`<button id="run-code" class="button run-code-btn" disabled>Run (${runCodeShortcut})</button>`);
-
-    // Create setting dropdown menu.
-    $('.terminal-component-container .lm_controls').append(`
+    const settingsMenuHtml = `
       <div class="settings-menu">
         <button class="settings-btn"></button>
         <ul class="settings-dropdown">
@@ -367,7 +369,36 @@ class Layout extends GoldenLayout {
           </li>
         </ul>
       </div>
-    `);
+    `;
+
+    if (this.vertical) {
+      $('.editor-component-container')
+        .find('.lm_controls')
+        .append(runCodeButtonHtml)
+        .append(settingsMenuHtml);
+    } else {
+      const $componentContainer = $('.terminal-component-container');
+      $componentContainer.find('.lm_header').append(runCodeButtonHtml).append(clearTermButtonHtml);
+      $componentContainer.find('.lm_controls').append(settingsMenuHtml);
+    }
+
+    // Add custom buttons to the header.
+    if (this.proglang === 'py' && isObject(this.buttonConfig)) {
+      Object.keys(this.buttonConfig).forEach((name) => {
+        const id = name.replace(/\s/g, '-').toLowerCase();
+        const selector = `#${id}`;
+
+        let cmd = this.buttonConfig[name];
+        if (!Array.isArray(cmd)) {
+          cmd = cmd.split('\n');
+        }
+
+        $('.terminal-component-container .lm_header')
+          .append(`<button id="${id}" class="button ${id}-btn" disabled>${name}</button>`);
+
+        $(selector).click(() => runButtonCommand(selector, cmd));
+      });
+    }
 
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');
@@ -381,7 +412,7 @@ class Layout extends GoldenLayout {
 
     // Add event listeners.
     $('.settings-menu').click((event) => $(event.target).toggleClass('open'));
-    $('#run-code').click(() => runCode());
+    $('#run-code').click(() => runCode(this.vertical));
     $('#clear-term').click(() => term.reset());
     $(document).click((event) => {
       if (!$(event.target).is($('.settings-menu.open'))) {
