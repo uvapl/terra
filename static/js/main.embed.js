@@ -56,7 +56,10 @@ function initApp() {
     const content = generateConfigContent(tabs, fontSize);
 
     // Create the layout object.
-    const layout = createLayout(content, proglang, fontSize, { vertical: true });
+    const layout = createLayout(content, proglang, fontSize, {
+      buttonConfig: config.buttons,
+      vertical: true,
+    });
 
     // Call the init function that creates all components.
     layout.init();
