@@ -229,7 +229,7 @@ function TerminalComponent(container, state) {
     hideTermCursor();
   });
 
-  container.on('vertical', () => {
+  container.on('verticalLayout', () => {
     container.tab.header.position(false);
   });
 
@@ -248,6 +248,7 @@ class Layout extends GoldenLayout {
   proglag = null;
   buttonConfig = null;
   vertical = false;
+  iframe = false;
 
   constructor(proglang, defaultLayoutConfig, options = {}) {
     let layoutConfig = getLocalStorageItem('layout');
@@ -260,6 +261,7 @@ class Layout extends GoldenLayout {
     super(layoutConfig, $('#layout'));
 
     this.proglang = proglang;
+    this.iframe = $('body').hasClass('examide-embed');
     this.vertical = options.vertical;
 
     if (isObject(options.buttonConfig)) {
@@ -285,7 +287,7 @@ class Layout extends GoldenLayout {
           this.showTermStartupMessage();
 
           if (this.vertical) {
-            this.emitToAllComponents('vertical');
+            this.emitToAllComponents('verticalLayout');
           }
 
           // Focus the editor when clicking anywhere in the editor header.
@@ -303,7 +305,7 @@ class Layout extends GoldenLayout {
   showTermStartupMessage = () => {
     const msg = ['Click the "Run" button to execute code'];
 
-    if (!this.vertical) {
+    if (!this.iframe) {
       msg.push('Click the "Clear terminal" button to clear this screen');
     }
 
@@ -371,15 +373,21 @@ class Layout extends GoldenLayout {
       </div>
     `;
 
-    if (this.vertical) {
+    if (this.iframe && this.vertical) {
       $('.editor-component-container')
         .find('.lm_controls')
         .append(runCodeButtonHtml)
         .append(settingsMenuHtml);
     } else {
+      // horizontal layout (exam and iframe)
       const $componentContainer = $('.terminal-component-container');
-      $componentContainer.find('.lm_header').append(runCodeButtonHtml).append(clearTermButtonHtml);
+      $componentContainer.find('.lm_header').append(runCodeButtonHtml);
       $componentContainer.find('.lm_controls').append(settingsMenuHtml);
+
+      // Only add the clear-terminal button in the exam version.
+      if (!this.iframe) {
+        $componentContainer.find('.lm_header').append(clearTermButtonHtml);
+      }
     }
 
     // Add custom buttons to the header.
@@ -412,7 +420,7 @@ class Layout extends GoldenLayout {
 
     // Add event listeners.
     $('.settings-menu').click((event) => $(event.target).toggleClass('open'));
-    $('#run-code').click(() => runCode(this.vertical));
+    $('#run-code').click(() => runCode(this.iframe));
     $('#clear-term').click(() => term.reset());
     $(document).click((event) => {
       if (!$(event.target).is($('.settings-menu.open'))) {
