@@ -27,13 +27,11 @@ class WorkerAPI {
     this.port = channel.port1;
     this.port.onmessage = this.onmessage.bind(this);
 
-    // this.sharedMem = new WebAssembly.Memory({
-    //   initial: 1,
-    //   maximum: 80,
-    //   shared: true,
-    // });
-
-    this.sharedMem = new SharedArrayBuffer(80); // Specify your desired buffer size here
+    this.sharedMem = new WebAssembly.Memory({
+      initial: 1,
+      maximum: 80,
+      shared: true,
+    });
 
     const remotePort = channel.port2;
     this.worker.postMessage({
