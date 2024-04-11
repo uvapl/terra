@@ -76,11 +76,6 @@
   background: var(--color-white);
 }
 
-.lm_splitter.lm_horizontal .lm_drag_handle {
-  width: calc(100% - 2px);
-  left: 0;
-}
-
 /* Create two vertical bars as a drag-handler icon */
 .lm_splitter.lm_horizontal:not(.locked):before,
 .lm_splitter.lm_horizontal:not(.locked):after {
