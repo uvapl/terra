@@ -90,8 +90,15 @@ function EditorComponent(container, state) {
   this.editor = ace.edit(editorContainer);
   this.editor.setKeyboardHandler('ace/keyboard/sublime');
   this.editor.setOption('fontSize');
+  this.editor.setOption('enableSnippets', false);
+  this.editor.setOption('enableBasicAutocompletion', true);
+  this.editor.setOption('enableLiveAutocompletion', true);
   this.editor.setValue(state.value || '');
   this.editor.clearSelection();
+
+  // Only use textCompleter that completes text inside the file.
+  const langTools = ace.require('ace/ext/language_tools');
+  this.editor.completers = [langTools.textCompleter];
 
   this.editor.commands.addCommand({
     name: 'run',
@@ -155,6 +162,16 @@ function EditorComponent(container, state) {
 
   container.on('lock', () => {
     this.editor.setReadOnly(true);
+  });
+
+  container.on('setCustomAutocompleter', (completions) => {
+    this.editor.completers.push({
+      getCompletions: (editor, session, pos, prefix, callback) => {
+        if (prefix.length === 0) { callback(null, []); return }
+
+        callback(null, completions);
+      }
+    });
   });
 
   container.on('unlock', () => {
@@ -286,6 +303,10 @@ class Layout extends GoldenLayout {
           this.setTheme(getLocalStorageItem('theme') || 'light');
           this.showTermStartupMessage();
 
+          if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
+            this.emitToEditorComponents('setCustomAutocompleter', options.autocomplete);
+          }
+
           if (this.vertical) {
             this.emitToAllComponents('verticalLayout');
           }
@@ -322,6 +343,12 @@ class Layout extends GoldenLayout {
         component.container.emit(event, data);
       });
     });
+  }
+
+  emitToEditorComponents = (event, data) => {
+    window._layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
+      contentItem.container.emit(event, data);
+    })
   }
 
   setTheme = (theme) => {

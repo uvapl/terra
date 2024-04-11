@@ -6,3 +6,29 @@
 .editor-component-container .lm_header {
   padding-left: 5px;
 }
+
+/* The docText popup menu when selecting a suggestion */
+.ace_doc-tooltip {
+  background: #fff;
+  border: 1px solid var(--border-color);
+}
+
+/* The autocomplete suggestion menu */
+.ace_editor.ace_autocomplete {
+  border: 1px solid var(--border-color);
+}
+
+.dark-mode .ace_doc-tooltip,
+.ace-cloud_editor_dark.ace_dark.ace_editor.ace_autocomplete {
+  color: var(--color-white);
+  background: #111;
+  border: 1px solid #464a4f;
+}
+
+.ace-cloud_editor_dark.ace_dark.ace_editor.ace_autocomplete {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+}
+
+.ace-cloud_editor_dark.ace_dark.ace_editor.ace_autocomplete .ace_marker-layer .ace_active-line {
+  border: 0;
+}
