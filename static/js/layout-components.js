@@ -242,6 +242,13 @@ function TerminalComponent(container, state) {
     term.open(container.getElement()[0]);
     fitAddon.fit();
 
+    // Trigger a single resize after the terminal has rendered to make sure it
+    // fits the whole parent width and doesn't leave any gaps near the edges.
+    setTimeout(() =>{
+      $(window).trigger('resize');
+    }, 0);
+
+
     setFontSize(fontSize);
     hideTermCursor();
   });
