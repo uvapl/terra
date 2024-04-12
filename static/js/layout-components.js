@@ -127,7 +127,7 @@ function EditorComponent(container, state) {
   this.editor.commands.addCommand({
     name: 'run',
     bindKey: { win: 'Ctrl+Enter', mac: 'Command+Enter' },
-    exec: runCode
+    exec: () => runCode()
   });
 
   this.editor.commands.addCommand({
