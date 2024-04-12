@@ -71,7 +71,7 @@ class API extends BaseAPI {
       const activeTab = files.find(file => file.filename === activeTabName);
 
       this.hostWriteCmd(`python3 ${activeTab.filename}`);
-      const stdout = this.run(activeTab.contents);
+      const stdout = this.run(activeTab.contents, activeTabName);
       if (stdout) {
         this.hostWrite(stdout);
       }
@@ -102,7 +102,7 @@ class API extends BaseAPI {
       cmd = cmd.map((line) => line.replace('<filename>', moduleName));
 
       // Run the command and gather its results.
-      const results = this.run(cmd);
+      const results = this.run(cmd, activeTabName);
 
       // Print the reults to the terminal in the UI.
       this.hostWrite(results);
@@ -112,15 +112,60 @@ class API extends BaseAPI {
   }
 
   /**
+   * Format the pyodide error message.
+   *
+   * When running e.g. "print(x)" where x is undefined, the following Pyodide
+   * error message will be shown to the user:
+   *
+   *     Traceback (most recent call last):
+   *       File "/lib/python311.zip/_pyodide/_base.py", line 499, in eval_code
+   *         .run(globals, locals)
+   *          ^^^^^^^^^^^^^^^^^^^^
+   *       File "/lib/python311.zip/_pyodide/_base.py", line 340, in run
+   *         coroutine = eval(self.code, globals, locals)
+   *                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   *       File "<exec>", line 1, in <module>
+   *       NameError: name 'x' is not defined
+   *
+   * while regular Python shows the following:
+   *
+   *     Traceback (most recent call last):
+   *       File "/Users/koomen/tech/uva/examide/src/example.py", line 1, in <module>
+   *         print(x)
+   *               ^
+   *     NameError: name 'x' is not defined
+   *
+   * This function will therefore do two things:
+   * (1) remove lines 2-7, which is after 'Traceback' and before 'File "<exec>"'
+   * (2) replace <exec> with the active tab's filename
+   *
+   * @param {string} msg - The error message.
+   * @param {string} activeTabName - The filename of the active editor tab.
+   * @returns {str} Filtered error message.
+   */
+  formatErrorMsg(msg, activeTabName) {
+    msg = msg.split('\n');
+
+    // Remove lines 2-7.
+    msg = [msg[0]].concat(msg.slice(7));
+
+    // Replace "<exec>" with the active tab's filename.
+    msg = msg.map((line) => line.replace('<exec>', activeTabName));
+
+    return msg.join('\n');
+  }
+
+  /**
    * Run a string or an array of python code.
    *
    * @example run("print('Hello World!')"
    * @example run(["print('Hello World!')", "print('Hello World 2!')"]
    *
    * @param {string} code - The python code to run.
+   * @param {string} activeTabName - The filename of the active editor tab.
    * @returns {string} The output of the python code.
    */
-  run(code) {
+  run(code, activeTabName) {
     if (!Array.isArray(code)) {
       code = code.split('\n')
     }
@@ -154,7 +199,7 @@ class API extends BaseAPI {
 
       return cmdOutput;
     } catch (err) {
-      return err.message;
+      return this.formatErrorMsg(err.message, activeTabName)
     } finally {
       // Clear the globals after the code has run such that the next execution
       // will be called with a clean state.
