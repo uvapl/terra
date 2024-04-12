@@ -79,6 +79,33 @@ function runButtonCommand(selector, cmd) {
   window._workerApi.runButtonCommand(selector, activeTabName, cmd, files);
 }
 
+/**
+ * Get default Ace editor completers.
+ *
+ * @returns {array} List of completers.
+ */
+function getAceCompleters() {
+  const langTools = ace.require('ace/ext/language_tools');
+
+  const completers = [];
+
+  // Only use textCompleter that completes text inside the file.
+  // Alter the results of the textCompleter by removing the 'meta', as it is
+  // always 'local' which isn't useful for the user.
+  completers.push({
+    getCompletions(editor, session, pos, prefix, callback) {
+      langTools.textCompleter.getCompletions(editor, session, pos, prefix, (_, completions) => {
+        callback(null, completions.map((completion) => ({
+          ...completion,
+          meta: ''
+        })));
+      });
+    }
+  });
+
+  return completers;
+}
+
 function EditorComponent(container, state) {
   // To make sure GoldenLayout doensn't override the editor styles, we create
   // another child container for the editor instance.
@@ -95,10 +122,7 @@ function EditorComponent(container, state) {
   this.editor.setOption('enableLiveAutocompletion', true);
   this.editor.setValue(state.value || '');
   this.editor.clearSelection();
-
-  // Only use textCompleter that completes text inside the file.
-  const langTools = ace.require('ace/ext/language_tools');
-  this.editor.completers = [langTools.textCompleter];
+  this.editor.completers = getAceCompleters();
 
   this.editor.commands.addCommand({
     name: 'run',
