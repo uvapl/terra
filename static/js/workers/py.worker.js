@@ -149,8 +149,17 @@ class API extends BaseAPI {
     // Remove lines 2-7.
     msg = [msg[0]].concat(msg.slice(7));
 
-    // Replace "<exec>" with the active tab's filename.
-    msg = msg.map((line) => line.replace('<exec>', activeTabName));
+    // Replace "<exec>" with the active tab's filename, except for the last
+    // line, because otherwise the user is able to do something like:
+    //
+    //    `raise Exception('<exec>')`
+    //
+    // which would be replaced with the active tab's filename.
+    msg = msg.map((line, index) => {
+      return index === msg.length - 2
+        ? line
+        : line.replace('<exec>', activeTabName)
+    });
 
     return msg.join('\n');
   }
