@@ -114,51 +114,56 @@ class API extends BaseAPI {
   /**
    * Format the pyodide error message.
    *
-   * When running e.g. "print(x)" where x is undefined, the following Pyodide
-   * error message will be shown to the user:
-   *
-   *     Traceback (most recent call last):
-   *       File "/lib/python311.zip/_pyodide/_base.py", line 499, in eval_code
-   *         .run(globals, locals)
-   *          ^^^^^^^^^^^^^^^^^^^^
-   *       File "/lib/python311.zip/_pyodide/_base.py", line 340, in run
-   *         coroutine = eval(self.code, globals, locals)
-   *                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   *       File "<exec>", line 1, in <module>
-   *       NameError: name 'x' is not defined
-   *
-   * while regular Python shows the following:
-   *
-   *     Traceback (most recent call last):
-   *       File "/Users/koomen/tech/uva/examide/src/example.py", line 1, in <module>
-   *         print(x)
-   *               ^
-   *     NameError: name 'x' is not defined
-   *
-   * This function will therefore do two things:
-   * (1) remove lines 2-7, which is after 'Traceback' and before 'File "<exec>"'
-   * (2) replace <exec> with the active tab's filename
-   *
    * @param {string} msg - The error message.
    * @param {string} activeTabName - The filename of the active editor tab.
    * @returns {str} Filtered error message.
    */
   formatErrorMsg(msg, activeTabName) {
+    // When running e.g. "print(x)" where x is undefined, the following
+    // Pyodide error message will be shown to the user:
+    //
+    //     Traceback (most recent call last):
+    //       File "/lib/python311.zip/_pyodide/_base.py", line 499, in eval_code
+    //         .run(globals, locals)
+    //          ^^^^^^^^^^^^^^^^^^^^
+    //       File "/lib/python311.zip/_pyodide/_base.py", line 340, in run
+    //         coroutine = eval(self.code, globals, locals)
+    //                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    //       File "<exec>", line 1, in <module>
+    //       NameError: name 'x' is not defined
+    //
+    // while regular Python shows the following:
+    //
+    //     Traceback (most recent call last):
+    //       File "/Users/koomen/tech/uva/examide/src/example.py", line 1, in <module>
+    //         print(x)
+    //               ^
+    //     NameError: name 'x' is not defined
+    //
+    // Therefore, we'll remove line 2-7.
     msg = msg.split('\n');
-
-    // Remove lines 2-7.
     msg = [msg[0]].concat(msg.slice(7));
 
-    // Replace "<exec>" with the active tab's filename, except for the last
-    // line, because otherwise the user is able to do something like:
-    //
-    //    `raise Exception('<exec>')`
-    //
-    // which would be replaced with the active tab's filename.
+    // Furthermore, apply line postprocessing.
     msg = msg.map((line, index) => {
-      return index === msg.length - 2
-        ? line
-        : line.replace('<exec>', activeTabName)
+      // Do not alter the last line, as the user can control this output.
+      if (index === msg.length - 2) return line;
+
+      // Replace "<exec>" with the active tab's filename.
+      line = line.replace('<exec>', activeTabName);
+
+      // Remove `/home/pyodide` prefix when an error occurs in an imported file.
+      // Unfiltered output will look like this:
+      //
+      //     Traceback (most recent call last):
+      //       File "main.py", line 3, in <module>
+      //       File "/home/pyodide/helpers.py", line 2, in say_hello
+      //         print(x)
+      //               ^
+      //     NameError: name 'x' is not defined
+      line = line.replace(/File "\/home\/pyodide\/(.+?\.py)"/, 'File "$1"');
+
+      return line;
     });
 
     return msg.join('\n');
