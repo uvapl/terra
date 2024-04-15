@@ -74,11 +74,7 @@ function initApp() {
         // Create the layout object.
         const layout = createLayout(content, proglang, fontSize, {
           buttonConfig: config.buttons,
-          autocomplete: [5, {
-            value: 'main value2',
-            meta: 'some type here',
-            docText: 'some documentation text here',
-          }],
+          autocomplete: config.autocomplete,
         });
 
         // Call the init function that creates all components.
