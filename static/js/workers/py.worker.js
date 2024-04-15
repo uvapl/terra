@@ -213,7 +213,7 @@ class API extends BaseAPI {
 
       return cmdOutput;
     } catch (err) {
-      return this.formatErrorMsg(err.message, activeTabName)
+      return this.formatErrorMsg(err.message, activeTabName);
     } finally {
       // Clear the globals after the code has run such that the next execution
       // will be called with a clean state.
