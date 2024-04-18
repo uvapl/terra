@@ -11,6 +11,23 @@ class WorkerAPI {
     this._createWorker();
   }
 
+  /**
+   * Checks whether the browser enabled support for WebAssembly.Memory object
+   * usage by trying to create a new SharedArrayBuffer object. This object can
+   * only be created whenever both the Cross-Origin-Opener-Policy and
+   * Cross-Origin-Embedder-Policy headers are set.
+   *
+   * @returns {boolean} True if browser supports shared memory, false otherwise.
+   */
+  hasSharedMemEnabled() {
+    try {
+      new SharedArrayBuffer(1024);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   _createWorker() {
     if (this.worker) {
       this.isRunningCode = false;
@@ -27,11 +44,13 @@ class WorkerAPI {
     this.port = channel.port1;
     this.port.onmessage = this.onmessage.bind(this);
 
-    this.sharedMem = new WebAssembly.Memory({
-      initial: 1,
-      maximum: 80,
-      shared: true,
-    });
+    if (this.hasSharedMemEnabled()) {
+      this.sharedMem = new WebAssembly.Memory({
+        initial: 1,
+        maximum: 80,
+        shared: true,
+      });
+    }
 
     const remotePort = channel.port2;
     this.worker.postMessage({
