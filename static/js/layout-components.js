@@ -40,6 +40,8 @@ function runCode(clearTerm = false) {
   if ($('#run-code').prop('disabled')) {
     return;
   } else if (window._workerApi.isRunningCode) {
+    hideTermCursor();
+    term.write('\nProcess terminated\n');
     return window._workerApi.terminate();
   }
 
