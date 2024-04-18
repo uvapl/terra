@@ -28,6 +28,17 @@ function getAllEditorFiles() {
 }
 
 /**
+ * Disposes the user input when active. This is actived once user input is
+ * requested through the `waitForInput` function.
+ */
+function disposeUserInput() {
+  if (isObject(window._userInputDisposable) && typeof window._userInputDisposable.dispose === 'function') {
+    window._userInputDisposable.dispose();
+    window._userInputDisposable = null;
+  }
+}
+
+/**
  * Runs the code inside the worker by sending all files to the worker along with
  * the current active tab name.
  *
@@ -42,6 +53,7 @@ function runCode(clearTerm = false) {
   } else if (window._workerApi.isRunningCode) {
     hideTermCursor();
     term.write('\nProcess terminated\n');
+    disposeUserInput();
     return window._workerApi.terminate();
   }
 
@@ -263,7 +275,7 @@ function waitForInput() {
 
     // Keep track of the value that is typed by the user.
     let value = '';
-    const disposable = term.onKey(e => {
+    window._userInputDisposable = term.onKey(e => {
       // Only append allowed characters.
       if (!blacklistedKeys.includes(e.key)) {
         term.write(e.key);
@@ -280,8 +292,7 @@ function waitForInput() {
 
       // If the user presses enter, resolve the promise.
       if (e.key === '\r') {
-        // Remove the onKey event listener.
-        disposable.dispose();
+        disposeUserInput();
 
         // Trigger a real enter in the terminal.
         term.write('\n');
