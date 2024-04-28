@@ -232,7 +232,7 @@ let port;
 const onAnyMessage = async event => {
   switch (event.data.id) {
     case 'constructor':
-      port = event.data.data;
+      port = event.data.data.remotePort;
       port.onmessage = onAnyMessage;
       api = new API({
         hostWrite(s) {

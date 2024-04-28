@@ -43,6 +43,8 @@ class WorkerAPI {
     const channel = new MessageChannel();
     this.port = channel.port1;
     this.port.onmessage = this.onmessage.bind(this);
+    const remotePort = channel.port2;
+    const constructorData = { remotePort };
 
     if (this.hasSharedMemEnabled()) {
       this.sharedMem = new WebAssembly.Memory({
@@ -50,12 +52,12 @@ class WorkerAPI {
         maximum: 80,
         shared: true,
       });
+      constructorData.sharedMem = this.sharedMem;
     }
 
-    const remotePort = channel.port2;
     this.worker.postMessage({
       id: 'constructor',
-      data: { remotePort, sharedMem: this.sharedMem },
+      data: constructorData,
     }, [remotePort]);
   }
 
