@@ -1,0 +1,16 @@
+@import 'include/base.css';
+@import 'include/button.css';
+@import 'include/ide/navbar.css';
+@import 'include/settings-dropdown.css';
+@import 'include/goldenlayout.css';
+@import 'include/term.css';
+@import 'include/editor.css';
+
+/* Overrides */
+.lm_header .lm_tab {
+  padding-right: 20px;
+}
+
+.lm_header .lm_tab.lm_active .lm_close_tab {
+  top: 7px;
+}

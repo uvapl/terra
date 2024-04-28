@@ -1,0 +1,104 @@
+<!DOCTYPE>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+  <link rel="stylesheet" href="static/css/vendor/goldenlayout/1.5.9/goldenlayout-base.css" />
+  <link rel="stylesheet" href="static/css/vendor/goldenlayout/1.5.9/goldenlayout-light-theme.css" />
+  <link rel="stylesheet" href="static/css/vendor/xterm-5.4.0.min.css" />
+  <link rel="stylesheet" href="static/css/main.ide.css" />
+  <title>Proglab IDE</title>
+</head>
+
+<body>
+
+  <div class="app-container">
+    <nav class="navbar">
+      <div class="navbar-left">
+        <h1 class="page-title">IDE</h1>
+          <ul class="menubar">
+            <li>
+              File
+              <ul>
+                <li>New</li>
+                <li>Close</li>
+              </ul>
+            </li>
+            <li>
+              Edit
+              <ul>
+                <li>Undo</li>
+                <li>Redo</li>
+                <div class="separator"></div>
+                <li>Copy</li>
+                <li>Cut</li>
+                <li>Paste</li>
+                <div class="separator"></div>
+                <li>Indent</li>
+                <li>Unindent</li>
+              </ul>
+            </li>
+            <li>
+              Find
+              <ul>
+                <li>Search</li>
+                <li>Replace</li>
+              </ul>
+            </li>
+            <li>
+              View
+              <ul>
+                <li>Switch to </li>
+                <li>
+                  Theme
+                  <ul>
+                    <li>Light</li>
+                    <li>Dark</li>
+                  </ul>
+                </li>
+                <li>Font size</li>
+              </ul>
+            </li>
+            <li>
+              Run
+              <ul>
+                <li>Current tab</li>
+                <li>Pytest</li>
+                <li>Mypy</li>
+              </ul>
+            </li>
+          </ul>
+      </div>
+      <div class="msg-container"></div>
+      <div class="navbar-right hidden">
+        <ul>
+            <li>RUN</li>
+        </ul>
+      </div>
+    </nav>
+    <div class="layout-outer-container">
+      <div id="layout" class="layout-container"></div>
+    </div>
+  </div>
+
+
+  <!-- Load third party libraries -->
+  <script src="static/js/vendor/jquery-3.4.1.min.js"></script>
+  <script src="static/js/vendor/ace/1.4.5/ace.js"></script>
+  <script src="static/js/vendor/ace/1.4.5/ext-language_tools.js"></script>
+  <script src="static/js/vendor/goldenlayout-1.5.9.min.js"></script>
+  <script src="static/js/vendor/xterm/5.4.0/xterm.min.js"></script>
+  <script src="static/js/vendor/xterm/5.4.0/xterm.fit.min.js"></script>
+
+  <!-- Load custom scripts -->
+  <script src="static/js/constants.js"></script>
+  <script src="static/js/helpers.js"></script>
+  <script src="static/js/layout-components.js"></script>
+  <script src="static/js/worker-api.js"></script>
+  <script src="static/js/main.shared.js"></script>
+  <script src="static/js/main.ide.js"></script>
+</body>
+
+</html>
