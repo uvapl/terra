@@ -1,0 +1,95 @@
+/* ========================================================================== */
+/* Custom modal (because bootstrap is too overkill)                           */
+/* ========================================================================== */
+.navbar {
+  position: relative;
+  padding: 0 var(--navbar-padding);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--color-black);
+  user-select: none;
+}
+
+.navbar-right ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-right li {
+  padding: 0 10px;
+}
+
+.navbar-right li:hover {
+  cursor: pointer;
+}
+
+.page-title {
+  user-select: none;
+  margin: 0;
+  font-weight: normal;
+  font-size: 18px;
+}
+
+/* ========================================================================== */
+/* Menubar                                                                    */
+/* ========================================================================== */
+.navbar-left {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.menubar {
+  list-style: none;
+  margin: 0 0 0 20px;
+  padding: 0;
+  display: flex;
+}
+
+.menubar > li {
+  padding: 8px;
+}
+
+.menubar > li:hover,
+.menubar > li:focus {
+  background: #ccc;
+  cursor: pointer;
+}
+
+.menubar li:hover > ul {
+  display: block;
+}
+
+.menubar li {
+  position: relative;
+  white-space: nowrap;
+}
+
+.menubar ul {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  border: 1px solid #ccc;
+  background: var(--color-white);
+  z-index: 10;
+  margin: 0;
+  padding: 0;
+  display: none;
+  list-style: none;
+}
+
+.menubar > li:hover > ul {
+  left: 0;
+  top: 100%;
+}
+
+.menubar ul li {
+  padding: 8px 10px;
+}
+
+.menubar ul li:hover,
+.menubar ul li:focus {
+  background-color: #ccc;
+}
