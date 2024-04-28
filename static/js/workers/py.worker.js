@@ -7,6 +7,8 @@ class API extends BaseAPI {
 
   constructor(options) {
     super(options);
+    this.hostRead = options.hostRead;
+    this.sharedMem = options.sharedMem;
     this.runButtonCommandCallback = options.runButtonCommandCallback;
 
     this.initPyodide();
@@ -16,7 +18,12 @@ class API extends BaseAPI {
    * Initialise pyodide and load custom python modules.
    */
   initPyodide() {
-    loadPyodide({ indexURL: '../../wasm/py/' }).then(async (pyodide) => {
+    loadPyodide({
+      indexURL: '../../wasm/py/',
+      stderr: this.hostWrite,
+      stdout: this.hostWrite,
+      stdin: this.stdinHandler,
+    }).then(async (pyodide) => {
       this.pyodide = pyodide;
 
       // Import some basic modules.
@@ -36,6 +43,29 @@ class API extends BaseAPI {
 
       this.readyCallback();
     });
+  }
+
+  stdinHandler = () => {
+    this.hostRead();
+    Atomics.wait(new Int32Array(this.sharedMem.buffer), 0, 0);
+
+    let str = '';
+
+    // Read the value stored in memory.
+    const sharedMem = new Uint8Array(this.sharedMem.buffer);
+    for (let i = 0; i < sharedMem.length; i++) {
+      if (sharedMem[i] === 0) {
+        // Null terminator found, terminate the loop.
+        break;
+      }
+
+      str += String.fromCharCode(sharedMem[i]);
+    }
+
+    // Clean shared memory.
+    sharedMem.fill(0);
+
+    return str;
   }
 
   /**
@@ -184,34 +214,11 @@ class API extends BaseAPI {
       code = code.split('\n')
     }
 
-    // Clear the standard output.
-    this.pyodide.runPython('sys.stdout = io.StringIO()')
-
     // Gather the current globals (i.e. vars, funcs, classes).
     const globals = this.pyodide.globals.get('dict')();
 
     try {
-      // Run the code and get the standard output.
-      let cmdOutput = this.pyodide.runPython(code.join('\n'), { globals, locals: globals });
-      const stdout = this.pyodide.runPython('sys.stdout.getvalue()')
-
-      // In most cases, the commands will write to the stdout, but some packages,
-      // such as mypy, will use io.StringIO() as well and return the value rather
-      // than writing to the stdout, which leads to an empty stdout string. In
-      // that case, we return the cmdOutput.
-
-      if (stdout) return stdout;
-
-      // If the cmdOutput is an object, we log an error to the console.
-      if (isObject(cmdOutput) || Array.isArray(cmdOutput)) {
-        console.error([
-          `Command output is an object instead of a string`,
-          ...code,
-          `Output: ${cmdOutput}`,
-        ].join('\n'))
-      }
-
-      return cmdOutput;
+      this.pyodide.runPython(code.join('\n'), { globals, locals: globals });
     } catch (err) {
       return this.formatErrorMsg(err.message, activeTabName);
     } finally {
@@ -235,8 +242,14 @@ const onAnyMessage = async event => {
       port = event.data.data.remotePort;
       port.onmessage = onAnyMessage;
       api = new API({
+        sharedMem: event.data.data.sharedMem,
+
         hostWrite(s) {
           port.postMessage({ id: 'write', data: s });
+        },
+
+        hostRead() {
+          port.postMessage({ id: 'readStdin' });
         },
 
         readyCallback() {
