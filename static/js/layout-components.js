@@ -435,17 +435,25 @@ class Layout extends GoldenLayout {
     term.write('\n');
   }
 
+  _emit = (contentItem, event, data) => {
+    if (contentItem.isComponent) {
+      contentItem.container.emit(event, data);
+    } else {
+      contentItem.contentItems.forEach((childContentItem) => {
+        this._emit(childContentItem, event, data);
+      });
+    }
+  }
+
   emitToAllComponents = (event, data) => {
     window._layout.root.contentItems[0].contentItems.forEach((contentItem) => {
-      contentItem.contentItems.forEach((component) => {
-        component.container.emit(event, data);
-      });
+      this._emit(contentItem, event, data);
     });
   }
 
   emitToEditorComponents = (event, data) => {
     window._layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
-      contentItem.container.emit(event, data);
+      this._emit(contentItem, event, data);
     })
   }
 
