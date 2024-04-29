@@ -120,11 +120,11 @@
 }
 
 .lm_splitter.lm_vertical:before {
-  top: 2px;
+  top: 4px;
 }
 
 .lm_splitter.lm_vertical:after {
-  bottom: 2px;
+  bottom: 0;
 }
 
 .lm_content {

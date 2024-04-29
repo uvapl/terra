@@ -2,7 +2,6 @@
   min-width: 200px;
   max-width: 200px;
   overflow: auto;
-  border-right: 1px solid var(--border-color);
 }
 
 .file-tree-container ul {

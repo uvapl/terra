@@ -13,8 +13,9 @@
   padding-right: 20px;
 }
 
-.lm_header .lm_tab.lm_active .lm_close_tab {
-  top: 7px;
+.lm_header .lm_tab .lm_close_tab {
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .lm_goldenlayout,
@@ -24,17 +25,4 @@
 
 .layout-outer-container {
   max-width: calc(100% - 200px);
-}
-
-.lm_content {
-  border-width: 1px 0;
-}
-
-.terminal-component-container .lm_header {
-  padding-top: 3px;
-  padding-left: 4px;
-}
-
-.examide-ide .lm_splitter {
-  display: none;
 }

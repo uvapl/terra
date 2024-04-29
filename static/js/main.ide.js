@@ -7,6 +7,7 @@
 // ===========================================================================
 
 initApp().then(({ layout }) => {
+  registerFileTreeEventListeners();
 }).catch((err) => {
   console.error('Failed to bootstrap IDE app:', err);
 });
@@ -77,7 +78,15 @@ function createLayout(proglang, options) {
                 componentState: {
                   fontSize: BASE_FONT_SIZE,
                 },
-                title: 'Untitled',
+                title: 'main.c',
+              },
+              {
+                type: 'component',
+                componentName: 'editor',
+                componentState: {
+                  fontSize: BASE_FONT_SIZE,
+                },
+                title: 'README.md',
               },
             ],
           },
@@ -94,3 +103,42 @@ function createLayout(proglang, options) {
 
   return new Layout(proglang, defaultLayoutConfig, options);
 }
+
+/**
+ * Open a file in the editor. When the file is already open, switch to the tab.
+ *
+ * @param {string} filename - The name of the file to open.
+ */
+function openFile(filename) {
+  const components = window._layout.root.contentItems[0].contentItems;
+  const editorComponent = components.filter((component) => {
+    return component.getActiveContentItem().config.componentName !== 'terminal';
+  })[0];
+  const tab = editorComponent.contentItems.filter((contentItem) => contentItem.config.title === filename);
+  if (tab.length > 0) {
+    // Switch to the active tab.
+    tab[0].parent.setActiveContentItem(tab[0]);
+  } else {
+    // Add a new tab.
+    editorComponent.addChild({
+      type: 'component',
+      componentName: 'editor',
+      componentState: {
+        fontSize: BASE_FONT_SIZE,
+      },
+      title: filename,
+    })
+  }
+}
+
+/**
+ * Registers all file tree event listeners
+ */
+function registerFileTreeEventListeners() {
+  $('#file-tree .file').click((event) => {
+    const filename = $(event.target).text();
+    openFile(filename);
+  });
+}
+
+
