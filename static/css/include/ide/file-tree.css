@@ -1,0 +1,34 @@
+.file-tree-container {
+  min-width: 200px;
+  max-width: 200px;
+  overflow: auto;
+  border-right: 1px solid var(--border-color);
+}
+
+.file-tree-container ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.file-tree-container li {
+  padding: 4px 8px 4px 25px;
+}
+
+.file-tree-container li:hover {
+  background-color: var(--tab-menu--tab-bg-color);
+  cursor: pointer;
+}
+
+.file-tree-container .file {
+  background-image: url('../../../img/icons/file.png');
+  background-repeat: no-repeat;
+  background-position: 5px 50%;
+  background-size: 16px;
+}
+
+.file-tree-container .title {
+  text-transform: uppercase;
+  padding: 10px 8px;
+  font-size: 14px;
+}

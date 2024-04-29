@@ -39,7 +39,6 @@ function createLayout(content, proglang, fontSize, options = {}) {
   const isIframe = $('body').hasClass('examide-embed');
   const defaultLayoutConfig = {
     settings: {
-      showCloseIcon: false,
       showPopoutIcon: false,
       showMaximiseIcon: false,
       showCloseIcon: false,

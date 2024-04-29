@@ -9,11 +9,10 @@
   --tab-bg-color: #e1e1e1;
   --active-tab-fg-color: #000;
   --active-tab-bg-color: #fff;
-  --border-color: #999;
+  --border-color: #c6c6c6;
   --tab-menu--tab-bg-color: #ddd;
   --dark-mode-active-tab-fg-color: #dcdfe4;
   --dark-mode-active-tab-bg-color: #282c34;
-}
 
 * {
   box-sizing: border-box;
@@ -56,6 +55,7 @@ body {
 }
 
 .layout-outer-container {
+  display: flex;
   position: relative;
 }
 

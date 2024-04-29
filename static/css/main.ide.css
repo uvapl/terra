@@ -1,16 +1,40 @@
 @import 'include/base.css';
 @import 'include/button.css';
 @import 'include/ide/navbar.css';
+@import 'include/ide/file-tree.css';
 @import 'include/settings-dropdown.css';
 @import 'include/goldenlayout.css';
 @import 'include/term.css';
 @import 'include/editor.css';
 
-/* Overrides */
+/* IDE Overrides */
+
 .lm_header .lm_tab {
   padding-right: 20px;
 }
 
 .lm_header .lm_tab.lm_active .lm_close_tab {
   top: 7px;
+}
+
+.lm_goldenlayout,
+.lm_goldenlayout > div {
+  max-width: 100%;
+}
+
+.layout-outer-container {
+  max-width: calc(100% - 200px);
+}
+
+.lm_content {
+  border-width: 1px 0;
+}
+
+.terminal-component-container .lm_header {
+  padding-top: 3px;
+  padding-left: 4px;
+}
+
+.examide-ide .lm_splitter {
+  display: none;
 }
