@@ -55,10 +55,9 @@ function initApp() {
 function createLayout(proglang, options) {
   const defaultLayoutConfig = {
     settings: {
-      showCloseIcon: true,
+      showCloseIcon: false,
       showPopoutIcon: false,
       showMaximiseIcon: true,
-      showCloseIcon: true,
       reorderEnabled: true,
     },
     dimensions: {
