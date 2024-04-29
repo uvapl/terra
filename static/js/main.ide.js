@@ -118,6 +118,7 @@ function openFile(filename) {
   if (tab.length > 0) {
     // Switch to the active tab.
     tab[0].parent.setActiveContentItem(tab[0]);
+    tab[0].instance.editor.focus();
   } else {
     // Add a new tab.
     editorComponent.addChild({
