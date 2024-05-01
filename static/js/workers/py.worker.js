@@ -245,7 +245,7 @@ let port;
 const onAnyMessage = async event => {
   switch (event.data.id) {
     case 'constructor':
-      const { port, sharedMem } = event.data.data.remotePort;
+      const { port, sharedMem } = event.data.data;
       port.onmessage = onAnyMessage;
       api = new API({
         sharedMem,
