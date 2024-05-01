@@ -44,7 +44,7 @@ class WorkerAPI {
     this.port = channel.port1;
     this.port.onmessage = this.onmessage.bind(this);
     const remotePort = channel.port2;
-    const constructorData = { remotePort };
+    const constructorData = { port: remotePort };
 
     if (this.hasSharedMemoryEnabled()) {
       this.sharedMem = new WebAssembly.Memory({
