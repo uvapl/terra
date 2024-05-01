@@ -19,7 +19,7 @@ class WorkerAPI {
    *
    * @returns {boolean} True if browser supports shared memory, false otherwise.
    */
-  hasSharedMemEnabled() {
+  hasSharedMemoryEnabled() {
     try {
       new SharedArrayBuffer(1024);
       return true;
@@ -46,7 +46,7 @@ class WorkerAPI {
     const remotePort = channel.port2;
     const constructorData = { remotePort };
 
-    if (this.hasSharedMemEnabled()) {
+    if (this.hasSharedMemoryEnabled()) {
       this.sharedMem = new WebAssembly.Memory({
         initial: 1,
         maximum: 80,
