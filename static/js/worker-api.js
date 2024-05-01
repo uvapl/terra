@@ -162,6 +162,7 @@ class WorkerAPI {
             // To the shared memory.
             view[i] = value.charCodeAt(i);
           }
+
           // Set the last byte to the null terminator.
           view[value.length] = 0;
 
