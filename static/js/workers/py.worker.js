@@ -20,11 +20,17 @@ class API extends BaseAPI {
   initPyodide() {
     loadPyodide({
       indexURL: '../../wasm/py/',
-      stderr: this.hostWrite,
       stdout: this.hostWrite,
       stdin: this.stdinHandler,
     }).then(async (pyodide) => {
       this.pyodide = pyodide;
+
+      // By default, pyodide uses batch mode, which only flushes data when a
+      // newline character is received. We override the options by using raw
+      // mode, which gets triggered on every character the stdout receives.
+      this.pyodide.setStdout({
+        raw: (charCode) => this.hostWrite(String.fromCharCode(charCode))
+      })
 
       // Import some basic modules.
       this.pyodide.runPython('import io, sys');
