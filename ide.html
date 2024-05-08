@@ -22,35 +22,35 @@
             <li>
               File
               <ul>
-                <li>New</li>
-                <li>Close</li>
+                <li id="menu-item--new-file" data-keystroke="CTRL_META N">New</li>
+                <li id="menu-item--close-file" data-keystroke="CTRL_META W">Close</li>
               </ul>
             </li>
             <li>
               Edit
               <ul>
-                <li>Undo</li>
-                <li>Redo</li>
+                <li id="menu-item--undo" data-keystroke="CTRL_META Z">Undo</li>
+                <li id="menu-item--redo" data-keystroke="CTRL_META SHIFT Z">Redo</li>
                 <div class="separator"></div>
-                <li>Copy</li>
-                <li>Cut</li>
-                <li>Paste</li>
+                <li id="menu-item--copy" data-keystroke="CTRL_META C">Copy</li>
+                <li id="menu-item--cut" data-keystroke="CTRL_META X">Cut</li>
+                <li id="menu-item--paste" data-keystroke="CTRL_META V">Paste</li>
                 <div class="separator"></div>
-                <li>Indent</li>
-                <li>Unindent</li>
+                <li id="menu-item--indent" data-keystroke="TAB">Indent</li>
+                <li id="menu-item--unindent" data-keystroke="SHIFT TAB">Unindent</li>
               </ul>
             </li>
             <li>
               Find
               <ul>
-                <li>Search</li>
-                <li>Replace</li>
+                <li id="menu-item--search" data-keystroke="CTRL_META F">Search</li>
+                <li id="menu-item--replace" data-keystroke="CTRL_META R">Replace</li>
               </ul>
             </li>
             <li>
               View
               <ul>
-                <li>Switch to </li>
+                <li id="menu-item--switch-editor-term" data-keystroke="ALT_OPTION UP/DOWN">Switch to</li>
                 <li>
                   Theme
                   <ul>
@@ -64,7 +64,7 @@
             <li>
               Run
               <ul>
-                <li>Current tab</li>
+                <li id="menu-item--run-tab" data-keystroke="CTRL_META ENTER">Current tab</li>
                 <li>Pytest</li>
                 <li>Mypy</li>
               </ul>
@@ -101,6 +101,7 @@
   <script src="static/js/vendor/goldenlayout-1.5.9.min.js"></script>
   <script src="static/js/vendor/xterm/5.4.0/xterm.min.js"></script>
   <script src="static/js/vendor/xterm/5.4.0/xterm.fit.min.js"></script>
+  <script src="static/js/vendor/mousetrap-1.6.5.min.js"></script>
 
   <!-- Load custom scripts -->
   <script src="static/js/constants.js"></script>

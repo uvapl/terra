@@ -55,8 +55,8 @@
   padding: 8px;
 }
 
-.menubar > li:hover,
-.menubar > li:focus {
+.menubar li:hover,
+.menubar li:focus {
   background: var(--tab-menu--tab-bg-color);;
   color: var(--color-black);
   cursor: pointer;
@@ -74,6 +74,17 @@
 .menubar li {
   position: relative;
   white-space: nowrap;
+  display: flex;
+  color: var(--tab-fg-color);
+}
+
+.menubar .text {
+  flex-grow: 1;
+}
+
+.menubar .keystroke {
+  padding-left: 30px;
+  color: var(--tab-fg-color);
 }
 
 .menubar ul {
