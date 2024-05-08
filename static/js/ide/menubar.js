@@ -30,7 +30,10 @@ function setMenubarKeystrokeIcons(element) {
     .replace('RIGHT', '\u2192');
 
   const currentText = $(element).text();
-  $(element).html(`<span class="text">${currentText}</span><span class="keystroke">${keystroke}</span>`);
+  $(element).html(`
+    <span class="text">${currentText}</span>
+    <span class="keystroke">${keystroke}</span>
+  `);
 }
 
 /**
