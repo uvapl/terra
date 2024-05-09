@@ -94,7 +94,6 @@ function registerMenubarEventListeners() {
   $('#menu-item--search').click(search);
   $('#menu-item--replace').click(replace);
 
-  $('#menu-item--switch-editor-term').click(switchEditorTerminal);
   $('#menu-item--run-tab').click(runTab);
 }
 
@@ -120,7 +119,7 @@ function copy() {
 function cut() {
   copy();
 
-  // clear selection
+  // Cut the selected text.
   getActiveEditor().instance.editor.insert('');
 }
 
@@ -138,8 +137,12 @@ function unindent() {
   getActiveEditor().instance.editor.blockOutdent();
 }
 
-function search() { console.log('TODO: search in file') }
-function replace() { console.log('TODO: replace in file') }
+function search() {
+  getActiveEditor().instance.editor.execCommand('find');
+}
 
-function switchEditorTerminal() { console.log('TODO: switch between editor and terminal') }
+function replace() {
+  getActiveEditor().instance.editor.execCommand('replace');
+}
+
 function runTab() { console.log('TODO: run tab') }
