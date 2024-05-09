@@ -110,18 +110,14 @@ function createLayout(proglang, options) {
  * @param {string} filename - The name of the file to open.
  */
 function openFile(filename) {
-  const components = window._layout.root.contentItems[0].contentItems;
-  const editorComponent = components.filter((component) => {
-    return component.getActiveContentItem().config.componentName !== 'terminal';
-  })[0];
-  const tab = editorComponent.contentItems.filter((contentItem) => contentItem.config.title === filename);
+  const tab = getAllEditorTabs().filter((tab) => tab.config.title === filename);
   if (tab.length > 0) {
     // Switch to the active tab.
     tab[0].parent.setActiveContentItem(tab[0]);
     tab[0].instance.editor.focus();
   } else {
-    // Add a new tab.
-    editorComponent.addChild({
+    // Add a new tab next to the current active tab.
+    getActiveEditor().parent.addChild({
       type: 'component',
       componentName: 'editor',
       componentState: {

@@ -20,11 +20,32 @@ function getActiveEditor() {
  * the corresponding editor tab.
  */
 function getAllEditorFiles() {
-  return window._layout.root.contentItems[0].contentItems[0].contentItems
-    .map((item) => ({
-      filename: item.config.title,
-      contents: item.container.getState().value,
+  return getAllEditorTabs().map((tab) => ({
+      filename: tab.config.title,
+      contents: tab.container.getState().value,
     }));
+}
+
+/**
+ * Gather all editor tab components recursively from the layout.
+ *
+ * @param {GoldenLayout.ContentItem} [contentItem] - Starting contentItem where
+ * the recursive search will start.
+ * @returns {array} List of all the editor tabs.
+ */
+function getAllEditorTabs(contentItem = window._layout.root) {
+  if (contentItem.isComponent) {
+    return contentItem;
+  }
+
+  let files = [];
+  contentItem.contentItems.forEach((childContentItem) => {
+    if (!childContentItem.isTerminal) {
+      files = files.concat(getAllEditorTabs(childContentItem));
+    }
+  });
+
+  return files;
 }
 
 /**
@@ -319,6 +340,8 @@ function waitForInput() {
 let term;
 const fitAddon = new FitAddon.FitAddon();
 function TerminalComponent(container, state) {
+  container.parent.isTerminal = true;
+
   const setFontSize = (fontSize) => {
     container.extendState({ fontSize });
     term.options.fontSize = fontSize;
