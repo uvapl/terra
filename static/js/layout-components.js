@@ -181,13 +181,13 @@ function EditorComponent(container, state) {
     }
 
     this.proglang = proglang;
-    this.editor.session.setMode(`ace/mode/${mode}`);
+    this.editor.getSession().setMode(`ace/mode/${mode}`);
   };
 
   setFontSize(state.fontSize || BASE_FONT_SIZE);
 
   this.editor.on('load', () => {
-    this.editor.session.getUndoMananger().reset();
+    this.editor.getSession().getUndoMananger().reset();
   });
 
   this.editor.on('change', () => {
@@ -239,7 +239,7 @@ function EditorComponent(container, state) {
   container.on('afterFirstRender', () => {
     // Reset the session after the first initial page render to prevent the
     // initial content is removed when users hit ctrl+z or cmd+z.
-    this.editor.session.getUndoManager().reset();
+    this.editor.getSession().getUndoManager().reset();
   });
 
   container.on('destroy', () => {

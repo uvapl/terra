@@ -187,3 +187,21 @@ function removeIndent(text) {
     .map(line => line.replace(new RegExp(`^${indent}`), ''))
     .join('\n');
 }
+
+/**
+ * Check whether the clipboard writing is allowed.
+ *
+ * @returns {Promise<boolean>} True when allowed, false otherwise.
+ */
+function isClipboardWritingAllowed() {
+  return new Promise((resolve, reject) => {
+    try {
+      navigator.permissions.query({ name: 'clipboard-write' }).then(function(status) {
+        resolve((status.state == 'granted'));
+      });
+    } catch (error) {
+      // This feature works only through HTTPS
+      reject(error);
+    }
+  });
+}

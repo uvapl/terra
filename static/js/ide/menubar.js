@@ -41,6 +41,36 @@ function setMenubarKeystrokeIcons(element) {
  * keyboard shortcuts in the document.
  */
 function registerMenubarEventListeners() {
+  // Main menu items.
+  // ================
+  const closeActiveMenu = () => $('.menubar > li.open').removeClass('open');
+
+  // Open the first menu level when clicking the main menubar items.
+  $('.menubar > li').click((event) => {
+    $(event.target).toggleClass('open').siblings().removeClass('open');
+  });
+
+  // Close menu when clicking outside of it.
+  $(document).click((event) => {
+    if (!$(event.target).closest('.menubar').length) {
+      closeActiveMenu();
+    }
+  });
+
+  // Close menu when pressing ESC.
+  $(document).keydown((event) => {
+    if (event.key === 'Escape') {
+      closeActiveMenu();
+    }
+  });
+
+  // Close menu when clicking on a menu item.
+  $('.menubar > li li').click(() => {
+    closeActiveMenu();
+  });
+
+  // All submenu item event listeners.
+  // =================================
   $('#menu-item--new-file').click(openNewFile);
   Mousetrap.bind(['ctrl+n', 'meta+n'], openNewFile);
 
@@ -67,12 +97,34 @@ function registerMenubarEventListeners() {
 function openNewFile() { console.log('TODO: open new file') }
 function closeFile() { console.log('TODO: close file') }
 
-function undo() { console.log('TODO: undo') }
-function redo() { console.log('TODO: redo') }
+function undo() {
+  getActiveEditor().instance.editor.undo();
+}
 
-function copy() { console.log('TODO: copy') }
-function cut() { console.log('TODO: cut') }
-function paste() { console.log('TODO: paste') }
+function redo() {
+  getActiveEditor().instance.editor.redo();
+}
+
+function copy() {
+  const editor = getActiveEditor().instance.editor;
+  if (!editor.selection.isEmpty()) {
+    const text = editor.getSelectedText();
+    navigator.clipboard.writeText(text);
+  }
+}
+
+function cut() {
+  copy();
+
+  // clear selection
+  getActiveEditor().instance.editor.insert('');
+}
+
+function paste() {
+  navigator.clipboard.readText().then((text) => {
+    getActiveEditor().instance.editor.insert(text);
+  });
+}
 
 function indent() { console.log('TODO: indent') }
 function unindent() { console.log('TODO: unindent') }
