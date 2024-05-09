@@ -109,8 +109,7 @@ function createLayout(proglang, options) {
  */
 function closeFile() {
   const editor = getActiveEditor();
-
-  if (editor.config.title !== 'Untitled') {
+  if (editor) {
     editor.parent.removeChild(editor);
   }
 }
@@ -138,11 +137,10 @@ function openFile(filename) {
         fontSize: BASE_FONT_SIZE,
       },
       title: filename,
-      isClosable: filename === 'Untitled' ? false : true,
     });
 
+    // Check if the current tab is an untitled tab with no content.
     if (currentTab.config.title === 'Untitled' && currentTab.instance.editor.getValue() === '') {
-      // Check if the current tab is an untitled tab with no content.
       currentTab.parent.removeChild(currentTab);
     }
 

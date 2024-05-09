@@ -277,13 +277,22 @@ function EditorComponent(container, state) {
     // If it's the last tab being closed, then we insert another 'Untitled' tab,
     // because we always need at least one tab open.
     if (getAllEditorTabs().length === 1) {
-      openFile('Untitled');
+      getActiveEditor().parent.addChild({
+        type: 'component',
+        componentName: 'editor',
+        componentState: {
+          fontSize: BASE_FONT_SIZE,
+        },
+        title: 'Untitled',
+      });
     } else {
       setActiveEditor(null);
     }
 
-    this.editor.destroy();
-    this.editor = null;
+    if (this.editor) {
+      this.editor.destroy();
+      this.editor = null;
+    }
   });
 }
 
