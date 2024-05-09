@@ -64,7 +64,6 @@ function registerMenubarEventListeners() {
   $('#menu-item--run-tab').click(runTab);
 }
 
-
 function openNewFile() { console.log('TODO: open new file') }
 function closeFile() { console.log('TODO: close file') }
 

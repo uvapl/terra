@@ -10,7 +10,7 @@ $(window).on('resize', () => {
  * @returns {object} The active editor instance.
  */
 function getActiveEditor() {
-  return window._layout.root.contentItems[0].contentItems[0].getActiveContentItem();
+  return window._layout._lastActiveEditor;
 }
 
 /**
@@ -152,6 +152,8 @@ function EditorComponent(container, state) {
 
   const getParentComponentElement = () => container.parent.parent.element[0];
 
+  const setActiveEditor = () => window._layout._lastActiveEditor = container.parent;
+
   const setFontSize = (fontSize) => {
     container.extendState({ fontSize });
     this.editor.setFontSize(`${fontSize}px`);
@@ -193,9 +195,18 @@ function EditorComponent(container, state) {
     container.extendState({ value: this.editor.getValue() });
   });
 
+  this.editor.on('focus', () => {
+    setActiveEditor();
+  });
+
   container.on('show', () => {
     // Add custom class for styling purposes.
     getParentComponentElement().classList.add('component-container', 'editor-component-container');
+
+    // Focus the editor when it's shown.
+    if (!getActiveEditor()) {
+      setActiveEditor();
+    }
   });
 
   container.on('lock', () => {
