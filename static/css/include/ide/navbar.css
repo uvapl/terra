@@ -72,6 +72,15 @@
   color: var(--color-black);
 }
 
+.menubar li.active {
+  color: var(--color-black);
+  font-weight: bold;
+}
+
+.menubar li.disabled {
+  color: #cecece;
+}
+
 .menubar > li.open > ul {
   display: block;
   filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.3));
@@ -93,7 +102,6 @@
 
 .menubar .keystroke {
   padding-left: 30px;
-  color: var(--tab-fg-color);
   pointer-events: none;
 }
 
@@ -108,6 +116,19 @@
   padding: 0;
   display: none;
   list-style: none;
+}
+
+.menubar li.has-dropdown:before {
+  content: '';
+  position: absolute;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  background: url('../../../img/icons/arrow-head-left.png') no-repeat center center;
+  background-size: contain;
+  top: 50%;
+  transform: translateY(-50%) rotate(180deg);
+  opacity: 0.6;
 }
 
 .menubar ul li {

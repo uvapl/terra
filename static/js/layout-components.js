@@ -446,6 +446,7 @@ class Layout extends GoldenLayout {
     term.write('\n');
   }
 
+  // Emit an event recursively to all components.
   _emit = (contentItem, event, data) => {
     if (contentItem.isComponent) {
       contentItem.container.emit(event, data);
@@ -483,11 +484,16 @@ class Layout extends GoldenLayout {
     setLocalStorageItem('theme', theme);
   }
 
-  createControls = () => {
+  getRunCodeButtonHtml = () => {
     const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
+    return `<button id="run-code" class="button run-code-btn" disabled>Run (${runCodeShortcut})</button>`;
+  };
 
-    const runCodeButtonHtml = `<button id="run-code" class="button run-code-btn" disabled>Run (${runCodeShortcut})</button>`;
-    const clearTermButtonHtml = '<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>';
+  getClearTermButtonHtml = () => '<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>';
+
+  createControls = () => {
+    const runCodeButtonHtml = this.getRunCodeButtonHtml();
+    const clearTermButtonHtml = this.getClearTermButtonHtml();
 
     const settingsMenuHtml = `
       <div class="settings-menu">
@@ -564,18 +570,23 @@ class Layout extends GoldenLayout {
     const $editorThemeMenu = $('#editor-theme-menu');
     $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
 
-    // Add event listeners.
+    // Add event listeners for setttings menu.
     $('.settings-menu').click((event) => $(event.target).toggleClass('open'));
-    $('#run-code').click(() => runCode(this.iframe));
-    $('#clear-term').click(() => term.reset());
     $(document).click((event) => {
       if (!$(event.target).is($('.settings-menu.open'))) {
         $('.settings-menu').removeClass('open');
       }
     });
 
+    this.addControlsEventListeners();
+  }
+
+  addControlsEventListeners = () => {
+    $('#run-code').click(() => runCode(this.iframe));
+    $('#clear-term').click(() => term.reset());
+
     // Update font-size for all components on change.
-    $fontSizeMenu.find('li').click((event) => {
+    $('#font-size-menu').find('li').click((event) => {
       const $element = $(event.target);
       const newFontSize = parseInt($element.data('val'));
       this.emitToAllComponents('fontSizeChanged', newFontSize);
@@ -584,10 +595,45 @@ class Layout extends GoldenLayout {
     });
 
     // Update theme on change.
-    $editorThemeMenu.find('li').click((event) => {
+    $('#editor-theme-menu').find('li').click((event) => {
       const $element = $(event.target);
       this.setTheme($element.data('val'));
       $element.addClass('active').siblings().removeClass('active');
     });
+  };
+}
+
+class LayoutIDE extends Layout {
+  constructor(proglang, defaultLayoutConfig, options = {}) {
+    super(proglang, defaultLayoutConfig, options);
+  }
+
+  createControls = () => {
+    const runCodeButtonHtml = this.getRunCodeButtonHtml();
+    const clearTermButtonHtml = this.getClearTermButtonHtml();
+
+    const $terminalContainer = $('.terminal-component-container');
+
+    $terminalContainer.find('.lm_header').append(runCodeButtonHtml).append(clearTermButtonHtml)
+
+    // Add active state to font-size dropdown.
+    const $fontSizeMenu = $('#font-size-menu');
+    const currentFontSize = getLocalStorageItem('font-size') || BASE_FONT_SIZE;
+    $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
+
+    // Add active state to theme dropdown.
+    const currentTheme = getLocalStorageItem('theme') || 'light';
+    const $editorThemeMenu = $('#editor-theme-menu');
+    $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
+
+    // Add event listeners for setttings menu.
+    $('.settings-menu').click((event) => $(event.target).toggleClass('open'));
+    $(document).click((event) => {
+      if (!$(event.target).is($('.settings-menu.open'))) {
+        $('.settings-menu').removeClass('open');
+      }
+    });
+
+    this.addControlsEventListeners();
   }
 }

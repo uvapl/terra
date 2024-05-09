@@ -47,7 +47,11 @@ function registerMenubarEventListeners() {
 
   // Open the first menu level when clicking the main menubar items.
   $('.menubar > li').click((event) => {
-    $(event.target).toggleClass('open').siblings().removeClass('open');
+    // Check if the clicked item is one of the menubar children.
+    const $listItem = $(event.target);
+    if ($listItem.parent().hasClass('menubar')) {
+      $listItem.toggleClass('open').siblings().removeClass('open');
+    }
   });
 
   // Close menu when clicking outside of it.
@@ -65,7 +69,7 @@ function registerMenubarEventListeners() {
   });
 
   // Close menu when clicking on a menu item.
-  $('.menubar > li li').click(() => {
+  $('.menubar > li li:not(.disabled)').click(() => {
     closeActiveMenu();
   });
 

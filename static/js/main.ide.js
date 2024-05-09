@@ -101,7 +101,7 @@ function createLayout(proglang, options) {
     ]
   };
 
-  return new Layout(proglang, defaultLayoutConfig, options);
+  return new LayoutIDE(proglang, defaultLayoutConfig, options);
 }
 
 /**
