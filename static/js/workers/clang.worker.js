@@ -114,7 +114,7 @@ class MemFS {
         this.exports = instance.exports;
         this.mem = new Memory(this.exports.memory);
         this.exports.init();
-      })
+      });
   }
 
   set hostMem(mem) {
@@ -469,6 +469,7 @@ class API extends BaseAPI {
       sharedMem: this.sharedMem,
       memfsFilename: options.memfs || 'memfs',
     });
+
     this.ready = this.memfs.ready.then(() => {
       return this.untar(this.sysrootFilename);
     });
@@ -477,12 +478,14 @@ class API extends BaseAPI {
       this.loadModules().then(() => {
         options.readyCallback();
       });
-    });
+    })
   }
 
-  async loadModules() {
-    this.getModule(this.clangFilename);
-    this.getModule(this.lldFilename);
+  loadModules() {
+    return Promise.all([
+      this.getModule(this.clangFilename),
+      this.getModule(this.lldFilename),
+    ]);
   }
 
   hostWriteCmd(message) {

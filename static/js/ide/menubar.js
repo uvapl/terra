@@ -130,8 +130,13 @@ function paste() {
   });
 }
 
-function indent() { console.log('TODO: indent') }
-function unindent() { console.log('TODO: unindent') }
+function indent() {
+  getActiveEditor().instance.editor.blockIndent();
+}
+
+function unindent() {
+  getActiveEditor().instance.editor.blockOutdent();
+}
 
 function search() { console.log('TODO: search in file') }
 function replace() { console.log('TODO: replace in file') }
