@@ -118,6 +118,10 @@
   list-style: none;
 }
 
+.menubar li.has-dropdown {
+  padding-right: 25px;
+}
+
 .menubar li.has-dropdown:before {
   content: '';
   position: absolute;

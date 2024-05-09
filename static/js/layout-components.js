@@ -21,9 +21,9 @@ function getActiveEditor() {
  */
 function getAllEditorFiles() {
   return getAllEditorTabs().map((tab) => ({
-      filename: tab.config.title,
-      contents: tab.container.getState().value,
-    }));
+    filename: tab.config.title,
+    contents: tab.container.getState().value,
+  }));
 }
 
 /**
@@ -162,7 +162,7 @@ function EditorComponent(container, state) {
   this.editor.commands.addCommand({
     name: 'run',
     bindKey: { win: 'Ctrl+Enter', mac: 'Command+Enter' },
-    exec: () => runCode()
+    exec: () => runCode(),
   });
 
   this.editor.commands.addCommand({
@@ -171,9 +171,18 @@ function EditorComponent(container, state) {
     exec: () => { }
   });
 
+  this.editor.commands.addCommand({
+    name: 'closeFile',
+    bindKey: 'Ctrl+W',
+    exec: closeFile
+  });
+
   const getParentComponentElement = () => container.parent.parent.element[0];
 
-  const setActiveEditor = () => window._layout._lastActiveEditor = container.parent;
+  const setActiveEditor = (value) =>
+    window._layout._lastActiveEditor = typeof value !== 'undefined'
+      ? value
+      : container.parent;
 
   const setFontSize = (fontSize) => {
     container.extendState({ fontSize });
@@ -221,10 +230,11 @@ function EditorComponent(container, state) {
   });
 
   container.on('show', () => {
+    this.editor.focus();
+
     // Add custom class for styling purposes.
     getParentComponentElement().classList.add('component-container', 'editor-component-container');
 
-    // Focus the editor when it's shown.
     if (!getActiveEditor()) {
       setActiveEditor();
     }
@@ -264,10 +274,16 @@ function EditorComponent(container, state) {
   });
 
   container.on('destroy', () => {
-    if (this.editor) {
-      this.editor.destroy();
-      this.editor = null;
+    // If it's the last tab being closed, then we insert another 'Untitled' tab,
+    // because we always need at least one tab open.
+    if (getAllEditorTabs().length === 1) {
+      openFile('Untitled');
+    } else {
+      setActiveEditor(null);
     }
+
+    this.editor.destroy();
+    this.editor = null;
   });
 }
 
@@ -369,7 +385,7 @@ function TerminalComponent(container, state) {
 
     // Trigger a single resize after the terminal has rendered to make sure it
     // fits the whole parent width and doesn't leave any gaps near the edges.
-    setTimeout(() =>{
+    setTimeout(() => {
       $(window).trigger('resize');
     }, 0);
 
@@ -442,11 +458,6 @@ class Layout extends GoldenLayout {
           if (this.vertical) {
             this.emitToAllComponents('verticalLayout');
           }
-
-          // Focus the editor when clicking anywhere in the editor header.
-          $('.editor-component-container .lm_header').click(() => {
-            getActiveEditor().instance.editor.focus();
-          });
         }, 0);
       }
     });
