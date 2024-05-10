@@ -98,6 +98,11 @@ function createLayout(proglang, options) {
   return new LayoutIDE(proglang, defaultLayoutConfig, options);
 }
 
+/**
+ * Create a new file element in the file tree and trigger edit mode.
+ *
+ * @param {jQuery.Object} [parentNode] - The parent node of the new file.
+ */
 function createNewFileTreeFile(parentNode = null) {
   const nodeId = $('#file-tree').jstree('create_node', parentNode, {
     text: 'Untitled',
@@ -106,6 +111,11 @@ function createNewFileTreeFile(parentNode = null) {
   $('#file-tree').jstree(true).edit(nodeId);
 }
 
+/**
+ * Create a new folder element in the file tree and trigger edit mode.
+ *
+ * @param {jQuery.Object} [parentNode] - The parent node of the new folder.
+ */
 function createNewFileTreeFolder(parentNode = null) {
   const nodeId = $('#file-tree').jstree('create_node', parentNode, {
     text: 'Untitled',

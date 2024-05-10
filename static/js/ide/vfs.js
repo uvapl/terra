@@ -2,6 +2,7 @@
 // This file contains the virtual filesystem logic for the IDE app.
 ////////////////////////////////////////////////////////////////////////////////
 
+/* Main virtual filesystem object */
 const VFS = {
   folders: [],
   files: [],
