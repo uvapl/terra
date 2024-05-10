@@ -224,7 +224,7 @@ function registerFileTreeEventListeners($tree) {
   $tree.on('delete_node.jstree', (event, data) => {
     const id = data.node.original.id;
     const fn = data.node.type === 'folder'
-      ? VFS.deleteFolderhttp
+      ? VFS.deleteFolder
       : VFS.deleteFile;
 
     fn(id);
