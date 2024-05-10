@@ -171,11 +171,13 @@ function EditorComponent(container, state) {
     exec: () => { }
   });
 
-  this.editor.commands.addCommand({
-    name: 'closeFile',
-    bindKey: 'Ctrl+W',
-    exec: closeFile
-  });
+  if (isIDE) {
+    this.editor.commands.addCommand({
+      name: 'closeFile',
+      bindKey: 'Ctrl+W',
+      exec: VFS.closeFile
+    });
+  }
 
   const getParentComponentElement = () => container.parent.parent.element[0];
 

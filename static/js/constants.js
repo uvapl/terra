@@ -22,3 +22,6 @@ const AUTOSAVE_INTERVAL = 60 * 1000;
  * The offset is defined in milliseconds.
  */
 const AUTOSAVE_START_OFFSET = 60 * 1000;
+
+const isIDE = $('body').hasClass('examide-ide');
+const isIframe = $('body').hasClass('examide-embed');

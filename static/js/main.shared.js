@@ -36,7 +36,6 @@ function generateConfigContent(tabs, fontSize) {
  * @returns {Layout} The layout instance.
  */
 function createLayout(content, proglang, fontSize, options = {}) {
-  const isIframe = $('body').hasClass('examide-embed');
   const defaultLayoutConfig = {
     settings: {
       showPopoutIcon: false,
