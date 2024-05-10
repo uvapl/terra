@@ -21,6 +21,7 @@ function setMenubarKeystrokeIcons(element) {
   const keystroke = $(element).data('keystroke')
     .replace('CTRL_META', isMac() ? '\u2318' : 'Ctrl')
     .replace('ALT_OPTION', isMac() ? '\u2325' : 'Alt')
+    .replace('CTRL', isMac() ? '\u2303' : 'Ctrl')
     .replace('SHIFT', '\u21E7')
     .replace('ENTER', '\u23CE')
     .replace('UP', '\u2191')

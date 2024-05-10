@@ -22,8 +22,9 @@
             <li>
               File
               <ul>
-                <li id="menu-item--new-file" data-keystroke="CTRL_META N">New</li>
-                <li id="menu-item--close-file" data-keystroke="CTRL_META W">Close</li>
+                <li id="menu-item--new-file" data-keystroke="CTRL T">New File</li>
+                <li id="menu-item--new-folder" data-keystroke="CTRL SHIFT T">New Folder</li>
+                <li id="menu-item--close-file" data-keystroke="CTRL W">Close</li>
               </ul>
             </li>
             <li>
@@ -90,15 +91,9 @@
       </div>
     </nav>
     <div class="layout-outer-container">
-      <div id="file-tree" class="file-tree-container">
+      <div class="file-tree-container">
           <div class="title">Explorer</div>
-          <ul>
-            <li class="file">main.c</li>
-            <li class="file">snake.c</li>
-            <li class="file">mario.c</li>
-            <li class="file">README.md</li>
-            <li class="file">.gitignore</li>
-          <ul>
+          <div id="file-tree"></div>
       </div>
       <div id="layout" class="layout-container"></div>
     </div>
@@ -113,6 +108,7 @@
   <script src="static/js/vendor/xterm/5.4.0/xterm.min.js"></script>
   <script src="static/js/vendor/xterm/5.4.0/xterm.fit.min.js"></script>
   <script src="static/js/vendor/mousetrap-1.6.5.min.js"></script>
+  <script src="static/js/vendor/jstree-3.3.16.min.js"></script>
 
   <!-- Load custom scripts -->
   <script src="static/js/constants.js"></script>

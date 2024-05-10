@@ -7,7 +7,7 @@
 // ===========================================================================
 
 initApp().then(({ layout }) => {
-  registerFileTreeEventListeners();
+  createFileTree();
 }).catch((err) => {
   console.error('Failed to bootstrap IDE app:', err);
 });
@@ -78,15 +78,7 @@ function createLayout(proglang, options) {
                 componentState: {
                   fontSize: BASE_FONT_SIZE,
                 },
-                title: 'main.c',
-              },
-              {
-                type: 'component',
-                componentName: 'editor',
-                componentState: {
-                  fontSize: BASE_FONT_SIZE,
-                },
-                title: 'README.md',
+                title: 'Untitled',
               },
             ],
           },
@@ -105,11 +97,56 @@ function createLayout(proglang, options) {
 }
 
 /**
- * Registers all file tree event listeners
+ * Instantiates the file tree with the files in the VFS using TreeJS.
  */
-function registerFileTreeEventListeners() {
-  $('#file-tree .file').click((event) => {
-    const filename = $(event.target).text();
-    VFS.openFile(filename);
+function createFileTree() {
+  const rootFiles = VFS.files.filter((file) => !file.parentId).map((file) => ({
+    id: file.id,
+    text: file.filename,
+    type: 'file',
+    icon: 'file-tree-icon file-tree-file-icon',
+  }));
+
+  const rootDirs = VFS.folders.filter((folder) => !folder.parentId).map((folder) => ({
+    id: folder.id,
+    text: folder.name,
+    type: 'directory',
+    icon: 'file-tree-icon file-tree-folder-icon',
+    children: [
+      ...VFS.folders.filter((childFolder) => childFolder.parentId === folder.id).map((childFolder) => ({
+        id: childFolder.id,
+        text: childFolder.name,
+        type: 'directory',
+        icon: 'file-tree-icon file-tree-folder-icon',
+        children: rootFiles,
+      })),
+      ...rootFiles,
+    ]
+  }));
+
+  const $tree = $('#file-tree').jstree({
+    core: {
+      animation: 0,
+      data: [
+        ...rootDirs,
+        ...rootFiles,
+      ]
+    },
+
+    conditionalselect: () => {
+      // Returning true makes a single click open a file/directory.
+      // Returning false will require double click.
+      return true;
+    },
+
+    plugins: ['wholerow', 'conditionalselect'],
   });
+
+  $tree.on('select_node.jstree', (event, data) => {
+    if (data.node.original.type === 'directory') {
+      $('#file-tree').jstree('toggle_node', data.node);
+    } else {
+      VFS.openFile(data.node.text);
+    }
+  })
 }

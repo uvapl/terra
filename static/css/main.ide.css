@@ -9,6 +9,10 @@
 
 /* IDE Overrides */
 
+:root {
+  --file-tree-padding: 10px;
+}
+
 .lm_header .lm_tab {
   padding-right: 20px;
 }

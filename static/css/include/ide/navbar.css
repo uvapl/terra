@@ -128,10 +128,10 @@
   right: 8px;
   width: 10px;
   height: 10px;
-  background: url('../../../img/icons/arrow-head-left.png') no-repeat center center;
+  background: url('../../../img/icons/arrow-head-right.png') no-repeat center center;
   background-size: contain;
   top: 50%;
-  transform: translateY(-50%) rotate(180deg);
+  transform: translateY(-50%);
   opacity: 0.6;
 }
 

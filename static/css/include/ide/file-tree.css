@@ -5,30 +5,100 @@
   user-select: none;
 }
 
-.file-tree-container ul {
+.file-tree-container .title {
+  text-transform: uppercase;
+  padding: var(--file-tree-padding);
+  font-size: 14px;
+}
+
+.jstree ul {
   list-style: none;
+  padding-left: 25px;
   margin: 0;
+}
+
+.jstree > .jstree-container-ul {
   padding: 0;
 }
 
-.file-tree-container li {
-  padding: 4px 8px 4px 25px;
+.jstree-node {
+  position: relative;
 }
 
-.file-tree-container li:hover {
+.jstree-node > .jstree-anchor {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.jstree-anchor,
+.jstree-anchor:visited,
+.jstree-anchor:active,
+.jstree-anchor:focus {
+  color: inherit;
+  text-decoration: none;
+  outline: 0;
+}
+
+.jstree-wholerow,
+.jstree-anchor {
+  width: 100%;
+  padding: 4px var(--file-tree-padding);
+}
+
+.jstree-anchor {
+  display: flex;
+  align-items: center;
+}
+
+.jstree-anchor:hover {
   background-color: var(--tab-menu--tab-bg-color);
-  cursor: pointer;
 }
 
-.file-tree-container .file {
-  background-image: url('../../../img/icons/file.png');
+.file-tree-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
   background-repeat: no-repeat;
-  background-position: 5px 50%;
   background-size: 16px;
+  background-position: center 50%;
+  margin-right: 5px;
 }
 
-.file-tree-container .title {
-  text-transform: uppercase;
-  padding: 10px 8px;
-  font-size: 14px;
+.file-tree-file-icon {
+  background-image: url('../../../img/icons/file.png');
+}
+
+.file-tree-folder-icon {
+  background-image: url('../../../img/icons/folder.png');
+}
+
+.jstree-node:not(.jstree-leaf) {
+  position: relative;
+}
+
+.jstree-node:not(.jstree-leaf) > .jstree-anchor {
+  padding-left: 30px;
+}
+
+.jstree-node:not(.jstree-leaf) > .jstree-icon {
+  display: block;
+  width: 12px;
+  height: 12px;
+  background-repeat: no-repeat;
+  background-size: 12px;
+  background-position: center 50%;
+  margin-right: 5px;
+  position: absolute;
+  left: var(--file-tree-padding);
+  top: 7px;
+  z-index: 3;
+}
+
+.jstree-node.jstree-closed > .jstree-icon {
+  background-image: url('../../../img/icons/arrow-head-right.png');
+}
+
+.jstree-node.jstree-open > .jstree-icon {
+  background-image: url('../../../img/icons/arrow-head-down.png');
 }
