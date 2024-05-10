@@ -199,6 +199,11 @@ function createFileTree() {
   registerFileTreeEventListeners($tree);
 }
 
+/**
+ * Registers event listeners for the file tree.
+ *
+ * @param {jQuery.Object} $tree - File-tree reference object.
+ */
 function registerFileTreeEventListeners($tree) {
   $tree.on('create_node.jstree', (event, data) => {
     // Create the new file or folder in the filesystem.
