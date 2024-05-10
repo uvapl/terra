@@ -56,7 +56,7 @@ VFS.openFile = (filename) => {
  * @param {string} [parentId] - The parent folder id.
  * @returns {object} The new file object.
  */
-VFS.createFile = (filename, parentId) => {
+VFS.createFile = (filename, parentId = null) => {
   const newFile = {
     id: uuidv4(),
     filename,
@@ -80,6 +80,7 @@ VFS.createFolder = (name) => {
   const newFolder = {
     id: uuidv4(),
     name,
+    parentId: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

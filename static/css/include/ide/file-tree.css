@@ -173,7 +173,7 @@
   margin: 0 0 0 20px;
   padding: 0;
   position: absolute;
-  background: var(--color-white);
+  background-color: var(--color-white);
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
   z-index: 10;
   border: 1px solid var(--border-color);
@@ -197,9 +197,25 @@
   padding: 5px 10px;
 }
 
-
 .vakata-context a:hover {
-  background: var(--tab-menu--tab-bg-color);
+  background-color: var(--tab-menu--tab-bg-color);
   cursor: pointer;
   outline: 0;
+}
+
+.jstree-dnd-parent {
+  position: relative;
+}
+
+.jstree-dnd-parent:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 3px;
+  height: 100%;
+  border-left: 3px solid var(--color-black);
+}
+
+#jstree-marker {
+  display: none !important;
 }

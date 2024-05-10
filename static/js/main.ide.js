@@ -6,6 +6,8 @@
 // Here's the start of the application.
 // ===========================================================================
 
+LOCAL_STORAGE_PREFIX = 'examide-ide';
+
 initApp().then(({ layout }) => {
   createFileTree();
 }).catch((err) => {
@@ -98,7 +100,7 @@ function createLayout(proglang, options) {
 
 function createNewFileTreeFile(parentNode = null) {
   const nodeId = $('#file-tree').jstree('create_node', parentNode, {
-    filename: 'Untitled',
+    text: 'Untitled',
     type: 'file',
   });
   $('#file-tree').jstree(true).edit(nodeId);
@@ -106,7 +108,7 @@ function createNewFileTreeFile(parentNode = null) {
 
 function createNewFileTreeFolder(parentNode = null) {
   const nodeId = $('#file-tree').jstree('create_node', parentNode, {
-    name: 'Untitled',
+    text: 'Untitled',
     type: 'folder',
   });
   $('#file-tree').jstree(true).edit(nodeId);
@@ -134,7 +136,7 @@ function createFileTree() {
         const defaultItems = $.jstree.defaults.contextmenu.items();
         const newItems = {};
 
-        if (node.original.type === 'folder') {
+        if (node.type === 'folder') {
           newItems.createFile = {
             separator_before: false,
             separator_after: false,
@@ -161,22 +163,29 @@ function createFileTree() {
       // Sort folders before files and then alphabetically.
       const nodeA = this.get_node(a);
       const nodeB = this.get_node(b);
-      if (nodeA.original.type === nodeB.original.type) {
+      if (nodeA.type === nodeB.type) {
         return nodeA.text.localeCompare(nodeB.text);
       }
-      return nodeA.original.type === 'folder' ? -1 : 1;
+      return nodeA.type === 'folder' ? -1 : 1;
     },
 
     types: {
       folder: {
-        icon: 'file-tree-icon file-tree-folder-icon'
+        icon: 'file-tree-icon file-tree-folder-icon',
+        valid_children: ['folder', 'file'],
       },
       file: {
-        icon: 'file-tree-icon file-tree-file-icon'
+        icon: 'file-tree-icon file-tree-file-icon',
+        valid_children: [],
       }
     },
 
-    plugins: ['wholerow', 'conditionalselect', 'contextmenu', 'sort', 'types'],
+    dnd: {
+      copy: false,
+      use_html5: true,
+    },
+
+    plugins: ['wholerow', 'conditionalselect', 'contextmenu', 'sort', 'types', 'dnd'],
   });
 
   $('#file-tree--add-folder-btn').click(() => {
@@ -193,7 +202,7 @@ function createFileTree() {
 function registerFileTreeEventListeners($tree) {
   $tree.on('create_node.jstree', (event, data) => {
     // Create the new file or folder in the filesystem.
-    const fn = data.node.original.type === 'folder'
+    const fn = data.node.type === 'folder'
       ? VFS.createFolder
       : VFS.createFile;
 
@@ -205,7 +214,7 @@ function registerFileTreeEventListeners($tree) {
     const id = data.node.original.id;
     const newName = data.text;
 
-    if (data.node.original.type === 'folder') {
+    if (data.node.type === 'folder') {
       VFS.updateFolder(id, { name: newName });
     } else {
       VFS.updateFile(id, { filename: newName });
@@ -214,18 +223,41 @@ function registerFileTreeEventListeners($tree) {
 
   $tree.on('delete_node.jstree', (event, data) => {
     const id = data.node.original.id;
-    const fn = data.node.original.type === 'folder'
-      ? VFS.deleteFolder
+    const fn = data.node.type === 'folder'
+      ? VFS.deleteFolderhttp
       : VFS.deleteFile;
 
     fn(id);
   });
 
   $tree.on('select_node.jstree', (event, data) => {
-    if (data.node.original.type === 'folder') {
+    if (data.node.type === 'folder') {
       $('#file-tree').jstree('toggle_node', data.node);
     } else {
       VFS.openFile(data.node.text);
     }
+  });
+
+  $(document).on('dnd_stop.vakata', function(event, data) {
+    // Use setTimeout-trick to check after the drop process is finished.
+    setTimeout(() => {
+      const $treeRef = $('#file-tree').jstree(true);
+      const targetNode = $treeRef.get_node(data.event.target);
+
+      if (targetNode) {
+        const sourceNode = $treeRef.get_node(data.data.nodes[0]);
+
+        // If the dropped node became a root node, unset parentId.
+        const atRootLevel = $('#' + sourceNode.id).parent().parent().attr('id') === 'file-tree';
+        const parentId = atRootLevel ? null : targetNode.original.id;
+
+        const id = sourceNode.original.id;
+        const fn = sourceNode.type === 'folder'
+          ? VFS.updateFolder
+          : VFS.updateFile;
+
+        fn(id, { parentId });
+      }
+    }, 0);
   });
 }
