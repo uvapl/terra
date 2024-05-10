@@ -96,30 +96,19 @@ function createLayout(proglang, options) {
   return new LayoutIDE(proglang, defaultLayoutConfig, options);
 }
 
-function makeFileTreeFileObject(filename) {
-  return {
-    text: filename,
-    type: 'file',
-    icon: 'file-tree-icon file-tree-file-icon'
-  }
-}
-
-
-function makeFileTreeFolderObject(foldername) {
-  return {
-    name: foldername,
-    type: 'folder',
-    icon: 'file-tree-icon file-tree-folder-icon'
-  }
-}
-
 function createNewFileTreeFile(parentNode = null) {
-  const nodeId = $('#file-tree').jstree('create_node', parentNode, makeFileTreeFileObject('Untitled'));
+  const nodeId = $('#file-tree').jstree('create_node', parentNode, {
+    filename: 'Untitled',
+    type: 'file',
+  });
   $('#file-tree').jstree(true).edit(nodeId);
 }
 
 function createNewFileTreeFolder(parentNode = null) {
-  const nodeId = $('#file-tree').jstree('create_node', parentNode, makeFileTreeFolderObject('Untitled'));
+  const nodeId = $('#file-tree').jstree('create_node', parentNode, {
+    name: 'Untitled',
+    type: 'folder',
+  });
   $('#file-tree').jstree(true).edit(nodeId);
 }
 
@@ -178,7 +167,16 @@ function createFileTree() {
       return nodeA.original.type === 'folder' ? -1 : 1;
     },
 
-    plugins: ['wholerow', 'conditionalselect', 'contextmenu', 'sort'],
+    types: {
+      folder: {
+        icon: 'file-tree-icon file-tree-folder-icon'
+      },
+      file: {
+        icon: 'file-tree-icon file-tree-file-icon'
+      }
+    },
+
+    plugins: ['wholerow', 'conditionalselect', 'contextmenu', 'sort', 'types'],
   });
 
   $('#file-tree--add-folder-btn').click(() => {
