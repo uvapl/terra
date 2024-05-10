@@ -5,10 +5,69 @@
   user-select: none;
 }
 
-.file-tree-container .title {
-  text-transform: uppercase;
+.file-tree-container .title-container {
   padding: var(--file-tree-padding);
+  display: flex;
+  align-items: center;
+}
+
+.file-tree-container .title {
   font-size: 14px;
+  flex-grow: 1;
+  text-transform: uppercase;
+}
+
+.file-tree-container button {
+  background: none;
+  border: 0;
+  display: block;
+  width: 20px;
+  height: 20px;
+  background-repeat: no-repeat;
+  background-size: 20px;
+  background-position: center 50%;
+  margin: 0 5px 0 10px;
+  position: relative;
+  opacity: 0.4;
+}
+
+.file-tree-container button:hover {
+  opacity: 1;
+  cursor: pointer;
+}
+
+.file-tree-container button:before {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: -5px;
+  border: 1px solid var(--color-black);
+  background: var(--color-white);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.file-tree-container button:after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  display: block;
+  width: 8px;
+  height: 8px;
+  background-repeat: no-repeat;
+  background-size: 10px;
+  background-position: center 50%;
+  background-image: url('../../../img/icons/plus.png');
+}
+
+.file-tree-container .add-file-btn {
+  background-image: url('../../../img/icons/file.png');
+}
+
+.file-tree-container .add-folder-btn {
+  background-image: url('../../../img/icons/folder.png');
 }
 
 .jstree ul {
@@ -55,6 +114,12 @@
   background-color: var(--tab-menu--tab-bg-color);
 }
 
+.jstree-anchor input {
+  outline: 0;
+  height: 20px !important;
+  max-width: calc(100% - 30px);
+}
+
 .file-tree-icon {
   display: block;
   width: 16px;
@@ -92,7 +157,7 @@
   position: absolute;
   left: var(--file-tree-padding);
   top: 7px;
-  z-index: 3;
+  z-index: 2;
 }
 
 .jstree-node.jstree-closed > .jstree-icon {
@@ -101,4 +166,40 @@
 
 .jstree-node.jstree-open > .jstree-icon {
   background-image: url('../../../img/icons/arrow-head-down.png');
+}
+
+.vakata-context {
+  list-style: none;
+  margin: 0 0 0 20px;
+  padding: 0;
+  position: absolute;
+  background: var(--color-white);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  border: 1px solid var(--border-color);
+}
+
+.vakata-context-separator {
+  display: none;
+}
+
+.vakata-context a,
+.vakata-context a:visited,
+.vakata-context a:active,
+.vakata-context a:focus {
+  color: inherit;
+  text-decoration: none;
+  outline: 0;
+}
+
+.vakata-context a {
+  display: block;
+  padding: 5px 10px;
+}
+
+
+.vakata-context a:hover {
+  background: var(--tab-menu--tab-bg-color);
+  cursor: pointer;
+  outline: 0;
 }

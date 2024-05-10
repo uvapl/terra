@@ -96,57 +96,138 @@ function createLayout(proglang, options) {
   return new LayoutIDE(proglang, defaultLayoutConfig, options);
 }
 
+function makeFileTreeFileObject(filename) {
+  return {
+    text: filename,
+    type: 'file',
+    icon: 'file-tree-icon file-tree-file-icon'
+  }
+}
+
+
+function makeFileTreeFolderObject(foldername) {
+  return {
+    name: foldername,
+    type: 'folder',
+    icon: 'file-tree-icon file-tree-folder-icon'
+  }
+}
+
+function createNewFileTreeFile(parentNode = null) {
+  const nodeId = $('#file-tree').jstree('create_node', parentNode, makeFileTreeFileObject('Untitled'));
+  $('#file-tree').jstree(true).edit(nodeId);
+}
+
+function createNewFileTreeFolder(parentNode = null) {
+  const nodeId = $('#file-tree').jstree('create_node', parentNode, makeFileTreeFolderObject('Untitled'));
+  $('#file-tree').jstree(true).edit(nodeId);
+}
+
 /**
  * Instantiates the file tree with the files in the VFS using TreeJS.
  */
 function createFileTree() {
-  const rootFiles = VFS.files.filter((file) => !file.parentId).map((file) => ({
-    id: file.id,
-    text: file.filename,
-    type: 'file',
-    icon: 'file-tree-icon file-tree-file-icon',
-  }));
-
-  const rootDirs = VFS.folders.filter((folder) => !folder.parentId).map((folder) => ({
-    id: folder.id,
-    text: folder.name,
-    type: 'directory',
-    icon: 'file-tree-icon file-tree-folder-icon',
-    children: [
-      ...VFS.folders.filter((childFolder) => childFolder.parentId === folder.id).map((childFolder) => ({
-        id: childFolder.id,
-        text: childFolder.name,
-        type: 'directory',
-        icon: 'file-tree-icon file-tree-folder-icon',
-        children: rootFiles,
-      })),
-      ...rootFiles,
-    ]
-  }));
-
   const $tree = $('#file-tree').jstree({
     core: {
       animation: 0,
-      data: [
-        ...rootDirs,
-        ...rootFiles,
-      ]
+      check_callback: true,
+      data: [/* TODO: get files from vfs via localStorage */]
     },
 
-    conditionalselect: () => {
-      // Returning true makes a single click open a file/directory.
-      // Returning false will require double click.
-      return true;
+    conditionalselect: (node, event) => {
+      // Only trigger the select_node event when it's not triggered by the
+      // contextmenu event.
+      return event.type !== 'contextmenu';
     },
 
-    plugins: ['wholerow', 'conditionalselect'],
+    contextmenu: {
+      items: (node) => {
+        const defaultItems = $.jstree.defaults.contextmenu.items();
+        const newItems = {};
+
+        if (node.original.type === 'folder') {
+          newItems.createFile = {
+            separator_before: false,
+            separator_after: false,
+            label: 'New File',
+            action: () => createNewFileTreeFile(node),
+          };
+
+          newItems.createFolder = {
+            separator_before: false,
+            separator_after: false,
+            label: 'New Folder',
+            action: () => createNewFileTreeFolder(node),
+          };
+        }
+
+        newItems.rename = defaultItems.rename;
+        newItems.remove = defaultItems.remove;
+
+        return newItems;
+      }
+    },
+
+    sort: function(a, b) {
+      // Sort folders before files and then alphabetically.
+      const nodeA = this.get_node(a);
+      const nodeB = this.get_node(b);
+      if (nodeA.original.type === nodeB.original.type) {
+        return nodeA.text.localeCompare(nodeB.text);
+      }
+      return nodeA.original.type === 'folder' ? -1 : 1;
+    },
+
+    plugins: ['wholerow', 'conditionalselect', 'contextmenu', 'sort'],
+  });
+
+  $('#file-tree--add-folder-btn').click(() => {
+    createNewFileTreeFolder();
+  });
+
+  $('#file-tree--add-file-btn').click(() => {
+    createNewFileTreeFile();
+  });
+
+  registerFileTreeEventListeners($tree);
+}
+
+function registerFileTreeEventListeners($tree) {
+  $tree.on('create_node.jstree', (event, data) => {
+    // Create the new file or folder in the filesystem.
+    const fn = data.node.original.type === 'folder'
+      ? VFS.createFolder
+      : VFS.createFile;
+
+    const { id } = fn(data.node.original.text);
+    data.node.original.id = id;
+  });
+
+  $tree.on('rename_node.jstree', (event, data) => {
+    const id = data.node.original.id;
+    const newName = data.text;
+
+    if (data.node.original.type === 'folder') {
+      VFS.updateFolder(id, { name: newName });
+    } else {
+      VFS.updateFile(id, { filename: newName });
+    }
+  });
+
+  $tree.on('delete_node.jstree', (event, data) => {
+    const id = data.node.original.id;
+    const fn = data.node.original.type === 'folder'
+      ? VFS.deleteFolder
+      : VFS.deleteFile;
+
+    fn(id);
   });
 
   $tree.on('select_node.jstree', (event, data) => {
-    if (data.node.original.type === 'directory') {
+    if (data.node.original.type === 'folder') {
       $('#file-tree').jstree('toggle_node', data.node);
     } else {
       VFS.openFile(data.node.text);
     }
-  })
+  });
 }

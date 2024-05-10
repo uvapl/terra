@@ -3,64 +3,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 const VFS = {
-  totalFolders: 0,
-  totalFiles: 0,
-  folders: [
-    {
-      id: 1,
-      name: 'prog1',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    },
-    {
-      id: 2,
-      name: 'prog2',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    },
-    {
-      id: 3,
-      parentId: 2,
-      name: 'prog3',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }
-  ],
-  files: [
-    {
-      parentId: 1,
-      filename: 'main.c',
-      content: `#include <stdio.h>'\n\nint main() {\n    printf("Hello, World!\\n");\n    return 0;\n}`,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    },
-    {
-      filename: 'README.md',
-      content: `# Welcome to the ExamIDE!\n\nThis is a simple IDE for the Exam project.\n\n## Features\n\n- Syntax highlighting\n- File tree\n- Terminal\n- Menubar\n- Virtual filesystem\n\n## Usage\n\n1. Click on a file in the file tree to open it in the editor.\n2. Edit the file content.\n3. Click on the save button to save the file.\n4. Click on the close button to close the file.\n5. Click on the terminal tab to open the terminal.\n6. Click on the menubar items to open the dropdown menus.\n7. Click on the close icon in the menubar to close the dropdown menu.\n8. Click on the file tree icon to open the file tree.\n9. Click on the file tree items to open the files in the editor.\n10. Click on the file tree icon again to close the file tree.\n\n## License\n\nThis project is licensed under the MIT License.`,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    },
-    {
-      parentId: 1,
-      filename: 'Makefile',
-      content: `all:\n    gcc main.c -o main\n\nrun:\n    ./main\n\nclean:\n    rm -f main\n`,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    },
-    {
-      parentId: 2,
-      filename: 'snake.c',
-      content: '#include <stdio.h>\n\nint main() {\n    printf("Hello, Snake!\\n");\n    return 0;\n}',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    },
-    {
-      filename: '.gitignore',
-      content: 'node_modules/\n.vscode/\n*.log\n',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    },
-  ],
+  folders: [],
+  files: [],
 };
 
 /**
@@ -110,27 +54,116 @@ VFS.openFile = (filename) => {
  *
  * @param {string} filename - The basename of the file including extension.
  * @param {string} [parentId] - The parent folder id.
+ * @returns {object} The new file object.
  */
 VFS.createFile = (filename, parentId) => {
-  VFS.files.push({
+  const newFile = {
+    id: uuidv4(),
     filename,
     parentId,
     content: '',
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  });
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  VFS.files.push(newFile);
+  return newFile;
 }
 
 /**
  * Create a new folder in the virtual filesystem.
  *
  * @param {string} name - The name of the folder.
+ * @returns {object} The new folder object.
  */
 VFS.createFolder = (name) => {
-  VFS.folders.push({
+  const newFolder = {
     id: uuidv4(),
     name,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  });
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  VFS.folders.push(newFolder);
+  return newFolder;
+}
+
+/**
+ * Update a file in the virtual filesystem.
+ *
+ * @param {string} id - The file id.
+ * @param {object} obj - Key-value pairs to update in the file object.
+ * @returns {object} The updated file object.
+ */
+VFS.updateFile = (id, obj) => {
+  const file = VFS.files.find((file) => file.id === id);
+
+  if (file) {
+    for (const [key, value] of Object.entries(obj)) {
+      if (file.hasOwnProperty(key) && key !== 'id') {
+        file[key] = value;
+      }
+    }
+
+    file.updatedAt = new Date().toISOString();
+  }
+
+  return file;
+}
+
+/**
+ * Update a folder in the virtual filesystem.
+ *
+ * @param {string} id - The folder id.
+ * @param {object} obj - Key-value pairs to update in the folder object.
+ * @returns {object} The updated folder object.
+ */
+VFS.updateFolder = (id, obj) => {
+  const folder = VFS.folders.find((folder) => folder.id === id);
+
+  if (folder) {
+    for (const [key, value] of Object.entries(obj)) {
+      if (folder.hasOwnProperty(key) && key !== 'id') {
+        folder[key] = value;
+      }
+    }
+
+    folder.updatedAt = new Date().toISOString();
+  }
+
+  return folder;
+}
+
+/**
+ * Delete a file from the virtual filesystem.
+ *
+ * @param {string} id - The file id.
+ * @returns {boolean} True if deleted successfully, false otherwise.
+ */
+VFS.deleteFile = (id) => {
+  const file = VFS.files.find((file) => file.id === id);
+
+  if (file) {
+    VFS.files = VFS.files.filter((file) => file.id !== id);
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Delete a folder from the virtual filesystem.
+ *
+ * @param {string} id - The folder id.
+ * @returns {boolean} True if deleted successfully, false otherwise.
+ */
+VFS.deleteFolder = (id) => {
+  const folder = VFS.folders.find((folder) => folder.id === id);
+
+  if (folder) {
+    VFS.folders = VFS.folders.filter((folder) => folder.id !== id);
+    return true;
+  }
+
+  return false;
 }

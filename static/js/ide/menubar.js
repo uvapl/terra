@@ -75,7 +75,11 @@ function registerMenubarEventListeners() {
 
   // All submenu item event listeners.
   // =================================
-  $('#menu-item--new-file').click(Menubar.openNewFile);
+  $('#menu-item--new-file').click(() => createNewFileTreeFile());
+  Mousetrap.bind(['ctrl+t'], () => createNewFileTreeFile());
+
+  $('#menu-item--new-folder').click(() => createNewFileTreeFolder());
+  Mousetrap.bind(['ctrl+shift+t'], () => createNewFileTreeFolder());
 
   $('#menu-item--close-file').click(VFS.closeFile);
   Mousetrap.bind(['ctrl+w'], VFS.closeFile);
@@ -99,7 +103,7 @@ function registerMenubarEventListeners() {
 const Menubar = {};
 
 Menubar.openNewFile = () => {
-  console.log('TODO: open new file')
+  createNewFileTreeFile();
 }
 
 Menubar.undo = () => {

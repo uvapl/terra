@@ -175,7 +175,19 @@ function EditorComponent(container, state) {
     this.editor.commands.addCommand({
       name: 'closeFile',
       bindKey: 'Ctrl+W',
-      exec: VFS.closeFile
+      exec: VFS.closeFile,
+    });
+
+    this.editor.commands.addCommand({
+      name: 'createNewFileTreeFile',
+      bindKey: 'Ctrl+T',
+      exec: () => createNewFileTreeFile(),
+    });
+
+    this.editor.commands.addCommand({
+      name: 'creteNewFileTreeFolder',
+      bindKey: 'Ctrl+Shift+T',
+      exec: () => createNewFileTreeFolder(),
     });
   }
 
