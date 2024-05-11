@@ -21,10 +21,15 @@ VFS.closeFile = () => {
 /**
  * Open a file in the editor. When the file is already open, switch to the tab.
  *
+ * @param {string} id - The file id. Leave empty to create new file.
  * @param {string} filename - The name of the file to open.
  */
-VFS.openFile = (filename) => {
-  const tab = getAllEditorTabs().filter((tab) => tab.config.title === filename);
+VFS.openFile = (id, filename) => {
+  const tab = getAllEditorTabs().filter((tab) =>
+    id === null
+      ? tab.config.title === filename
+      : tab.container.getState().fileId === id
+  );
 
   if (tab.length > 0) {
     // Switch to the active tab.
@@ -39,6 +44,7 @@ VFS.openFile = (filename) => {
       componentName: 'editor',
       componentState: {
         fontSize: BASE_FONT_SIZE,
+        fileId: id,
       },
       title: filename,
     });

@@ -237,6 +237,12 @@ function EditorComponent(container, state) {
   this.editor.on('change', () => {
     window._editorIsDirty = true;
     container.extendState({ value: this.editor.getValue() });
+
+    if (isIDE) {
+      VFS.updateFile(container.getState().fileId, {
+        content: this.editor.getValue(),
+      });
+    }
   });
 
   this.editor.on('focus', () => {

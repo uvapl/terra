@@ -249,7 +249,7 @@ function registerFileTreeEventListeners($tree) {
     if (data.node.type === 'folder') {
       $('#file-tree').jstree('toggle_node', data.node);
     } else {
-      VFS.openFile(data.node.text);
+      VFS.openFile(data.node.original.id, data.node.text);
     }
   });
 
