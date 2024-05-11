@@ -95,6 +95,8 @@ function registerMenubarEventListeners() {
   $('#menu-item--outdent').click(Menubar.outdent);
 
   $('#menu-item--search').click(Menubar.search);
+  Mousetrap.bind(['ctrl+f', 'meta+f'], Menubar.search);
+
   $('#menu-item--replace').click(Menubar.replace);
 
   $('#menu-item--run-tab').click(Menubar.runTab);

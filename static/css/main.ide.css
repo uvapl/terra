@@ -18,6 +18,10 @@
   overflow: hidden;
 }
 
+.layout-container {
+  width: calc(100% - var(--file-tree-width)) !important;
+}
+
 .lm_header .lm_tab {
   padding-right: 20px;
 }
