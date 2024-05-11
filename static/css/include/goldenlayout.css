@@ -11,8 +11,8 @@
   font-size: inherit;
   font-family: inherit;
   user-select: none;
-  border-top-right-radius: 3px;
-  border-top-left-radius: 3px;
+  border-top-right-radius: var(--border-radius);
+  border-top-left-radius: var(--border-radius);
   padding: 2px 10px 5px;
   height: calc(100% - 1px);
   margin-right: 5px;

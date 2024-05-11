@@ -108,7 +108,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  border-radius: 3px;
+  border-radius: var(--border-radius);
   margin-left: 5px;
 }
 
