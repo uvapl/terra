@@ -214,16 +214,41 @@ function EditorComponent(container, state) {
   const setProgLang = (proglang) => {
     let mode;
 
-    switch (proglang) {
+    switch (proglang.toLowerCase()) {
       case 'py':
         mode = 'python';
         break;
 
+      case 'cpp':
       case 'c':
         mode = 'c_cpp';
         break;
+
+      case 'rs':
+        mode = 'rust';
+        break;
+
+      case 'bash':
+        mode = 'sh';
+        break;
+
+      case 'jsx':
+      case 'js':
+      case 'ts':
+      case 'typescript':
+        mode = 'tsx';
+        break;
+
+      case 'md':
+        mode = 'markdown';
+        break;
+
+      default:
+        mode = proglang.toLowerCase();
+        break;
     }
 
+    console.log('Seting mode', mode);
     this.proglang = proglang;
     this.editor.getSession().setMode(`ace/mode/${mode}`);
   };
@@ -250,6 +275,7 @@ function EditorComponent(container, state) {
   });
 
   container.on('show', () => {
+    setProgLang(container.parent.config.title.split('.').pop());
     this.editor.focus();
 
     // Add custom class for styling purposes.
@@ -280,7 +306,6 @@ function EditorComponent(container, state) {
 
   container.on('themeChanged', setTheme);
   container.on('fontSizeChanged', setFontSize);
-  container.on('setProgLang', setProgLang);
 
   container.on('resize', () => {
     this.editor.setAutoScrollEditorIntoView(true);
@@ -475,7 +500,6 @@ class Layout extends GoldenLayout {
         // through the registerComponent() function, prior to calling this part.
         setTimeout(() => {
           this.emitToAllComponents('afterFirstRender');
-          this.emitToAllComponents('setProgLang', this.proglang);
           this.createControls();
           this.setTheme(getLocalStorageItem('theme') || 'light');
           this.showTermStartupMessage();
