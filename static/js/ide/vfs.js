@@ -3,10 +3,68 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 /* Main virtual filesystem object */
-const VFS = {
+const VFS = initVFS({
   folders: [],
   files: [],
-};
+});
+
+// ===========================================================================
+// Functions
+// ===========================================================================
+
+/**
+ * Load the saved state from local storage and update the main VFS object.
+ * If no saved state is found, return the default state.
+ *
+ * @param {object} defaultState - The default state to return.
+ */
+function initVFS(defaultState) {
+  const savedState = getLocalStorageItem('vfs');
+  if (typeof savedState === 'string') {
+    return JSON.parse(savedState);
+  } else {
+    return defaultState;
+  }
+}
+
+/**
+ * Save the virtual filesystem state to localstorage.
+ */
+VFS.saveState = () => setLocalStorageItem('vfs', JSON.stringify({
+  files: VFS.files,
+  folders: VFS.folders,
+}));
+
+/**
+ * Get the root-level folders in the virtual filesystem.
+ */
+VFS.getRootFolders = () => VFS.folders.filter((f) => !f.parentId);
+
+/**
+ * Get the root-level files in the virtual filesystem.
+ */
+VFS.getRootFiles = () => VFS.files.filter((f) => !f.parentId);
+
+/**
+ * Internal helper function to filter a list of object based on conditions.
+ *
+ * @param {object} conditions - VThe conditions to filter on.
+ */
+VFS._where = (conditions) => (f) => Object.entries(conditions).every(([k, v]) => f[k] === v);
+
+/**
+ * Find all files that match the given conditions.
+ *
+ * @param {object} conditions - VThe conditions to filter on.
+ */
+VFS.findFilesWhere = (conditions) => VFS.files.filter(VFS._where(conditions));
+
+/**
+ * Find all folders that match the given conditions.
+ *
+ * @param {object} conditions - VThe conditions to filter on.
+ */
+VFS.findFoldersWhere = (conditions) => VFS.folders.filter(VFS._where(conditions));
 
 /**
  * Close the active tab in the editor, except when it is an untitled tab.
@@ -74,6 +132,7 @@ VFS.createFile = (filename, parentId = null) => {
   };
 
   VFS.files.push(newFile);
+  VFS.saveState();
   return newFile;
 }
 
@@ -81,18 +140,20 @@ VFS.createFile = (filename, parentId = null) => {
  * Create a new folder in the virtual filesystem.
  *
  * @param {string} name - The name of the folder.
+ * @param {string} [parentId] - The parent folder id.
  * @returns {object} The new folder object.
  */
-VFS.createFolder = (name) => {
+VFS.createFolder = (name, parentId = null) => {
   const newFolder = {
     id: uuidv4(),
     name,
-    parentId: null,
+    parentId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
   VFS.folders.push(newFolder);
+  VFS.saveState();
   return newFolder;
 }
 
@@ -116,6 +177,7 @@ VFS.updateFile = (id, obj) => {
     file.updatedAt = new Date().toISOString();
   }
 
+  VFS.saveState();
   return file;
 }
 
@@ -139,6 +201,7 @@ VFS.updateFolder = (id, obj) => {
     folder.updatedAt = new Date().toISOString();
   }
 
+  VFS.saveState();
   return folder;
 }
 
@@ -153,6 +216,7 @@ VFS.deleteFile = (id) => {
 
   if (file) {
     VFS.files = VFS.files.filter((file) => file.id !== id);
+    VFS.saveState();
     return true;
   }
 
@@ -170,6 +234,7 @@ VFS.deleteFolder = (id) => {
 
   if (folder) {
     VFS.folders = VFS.folders.filter((folder) => folder.id !== id);
+    VFS.saveState();
     return true;
   }
 

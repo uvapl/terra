@@ -6,8 +6,6 @@
 // Here's the start of the application.
 // ===========================================================================
 
-LOCAL_STORAGE_PREFIX = 'examide-ide';
-
 initApp().then(({ layout }) => {
   createFileTree();
 }).catch((err) => {
@@ -104,6 +102,7 @@ function createLayout(proglang, options) {
  * @param {jQuery.Object} [parentNode] - The parent node of the new file.
  */
 function createNewFileTreeFile(parentNode = null) {
+  console.log('parentNode', parentNode);
   const nodeId = $('#file-tree').jstree('create_node', parentNode, {
     text: 'Untitled',
     type: 'file',
@@ -125,6 +124,29 @@ function createNewFileTreeFolder(parentNode = null) {
 }
 
 /**
+ * Create a file tree list from the VFS compatible with jsTree.
+ *
+ * @param {string} [parentId] - The parent folder id.
+ * @returns {array} jsTree list with file tree objects.
+ */
+function createFileTreeFromVFS(parentId = null) {
+  const folders = VFS.findFoldersWhere({ parentId }).map((folder) => ({
+    id: folder.id,
+    text: folder.name,
+    type: 'folder',
+    children: createFileTreeFromVFS(folder.id),
+  }));
+
+  const files = VFS.findFilesWhere({ parentId }).map((file) => ({
+    id: file.id,
+    text: file.filename,
+    type: 'file',
+  }));
+
+  return folders.concat(files);
+}
+
+/**
  * Instantiates the file tree with the files in the VFS using TreeJS.
  */
 function createFileTree() {
@@ -132,7 +154,7 @@ function createFileTree() {
     core: {
       animation: 0,
       check_callback: true,
-      data: [/* TODO: get files from vfs via localStorage */]
+      data: createFileTreeFromVFS(),
     },
 
     conditionalselect: (node, event) => {
@@ -221,12 +243,13 @@ function registerFileTreeEventListeners($tree) {
       ? VFS.createFolder
       : VFS.createFile;
 
-    const { id } = fn(data.node.original.text);
-    data.node.original.id = id;
+    const parentId = data.node.parent !== '#' ? data.node.parent : null;
+    const { id } = fn(data.node.original.text, parentId);
+    $tree.jstree('set_id', data.node, id);
   });
 
   $tree.on('rename_node.jstree', (event, data) => {
-    const id = data.node.original.id;
+    const id = data.node.id;
     const newName = data.text;
 
     if (data.node.type === 'folder') {
@@ -237,7 +260,7 @@ function registerFileTreeEventListeners($tree) {
   });
 
   $tree.on('delete_node.jstree', (event, data) => {
-    const id = data.node.original.id;
+    const id = data.node.id;
     const fn = data.node.type === 'folder'
       ? VFS.deleteFolder
       : VFS.deleteFile;
@@ -249,7 +272,7 @@ function registerFileTreeEventListeners($tree) {
     if (data.node.type === 'folder') {
       $('#file-tree').jstree('toggle_node', data.node);
     } else {
-      VFS.openFile(data.node.original.id, data.node.text);
+      VFS.openFile(data.node.id, data.node.text);
     }
   });
 
@@ -264,9 +287,9 @@ function registerFileTreeEventListeners($tree) {
 
         // If the dropped node became a root node, unset parentId.
         const atRootLevel = $('#' + sourceNode.id).parent().parent().attr('id') === 'file-tree';
-        const parentId = atRootLevel ? null : targetNode.original.id;
+        const parentId = atRootLevel ? null : targetNode.id;
 
-        const id = sourceNode.original.id;
+        const id = sourceNode.id;
         const fn = sourceNode.type === 'folder'
           ? VFS.updateFolder
           : VFS.updateFile;
