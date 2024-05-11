@@ -243,6 +243,10 @@ function EditorComponent(container, state) {
         mode = 'markdown';
         break;
 
+      case 'untitled':
+        mode = 'text';
+        break;
+
       default:
         mode = proglang.toLowerCase();
         break;
