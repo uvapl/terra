@@ -1,8 +1,10 @@
 .file-tree-container {
-  min-width: 200px;
-  max-width: 200px;
+  min-width: var(--file-tree-width);
+  max-width: var(--file-tree-width);
   overflow: auto;
   user-select: none;
+  display: flex;
+  flex-direction: column;
 }
 
 .file-tree-container .title-container {
@@ -70,6 +72,11 @@
   background-image: url('../../../img/icons/folder.png');
 }
 
+.jstree {
+  height: 100%;
+  overflow: auto;
+}
+
 .jstree ul {
   list-style: none;
   padding-left: 25px;
@@ -84,12 +91,6 @@
   position: relative;
 }
 
-.jstree-node > .jstree-anchor {
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
 .jstree-anchor,
 .jstree-anchor:visited,
 .jstree-anchor:active,
@@ -99,17 +100,20 @@
   outline: 0;
 }
 
-.jstree-wholerow,
 .jstree-anchor {
-  width: 100%;
-  padding: 4px var(--file-tree-padding);
-}
-
-.jstree-anchor {
-  display: block;
+  min-width: 112px;
+  max-width: calc(100% - 10px);
+  padding: 4px 5px;
+  display: inline-block;
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
+  border-radius: 3px;
+  margin-left: 5px;
+}
+
+.jstree-node.jstree-leaf > .jstree-anchor {
+  min-width: 89px;
 }
 
 .jstree-anchor:hover {
@@ -148,7 +152,7 @@
 }
 
 .jstree-node:not(.jstree-leaf) > .jstree-anchor {
-  padding-left: 30px;
+  padding-left: 25px;
 }
 
 .jstree-node:not(.jstree-leaf) > .jstree-icon {
@@ -160,7 +164,7 @@
   background-position: center 50%;
   margin-right: 5px;
   position: absolute;
-  left: var(--file-tree-padding);
+  left: 12px;
   top: 7px;
   z-index: 2;
 }

@@ -10,7 +10,12 @@
 /* IDE Overrides */
 
 :root {
+  --file-tree-width: 200px;
   --file-tree-padding: 10px;
+}
+
+.app-container {
+  overflow: hidden;
 }
 
 .lm_header .lm_tab {
@@ -28,5 +33,5 @@
 }
 
 .layout-outer-container {
-  max-width: calc(100% - 200px);
+  overflow: hidden;
 }

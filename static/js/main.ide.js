@@ -195,7 +195,7 @@ function createFileTree() {
       use_html5: true,
     },
 
-    plugins: ['wholerow', 'conditionalselect', 'contextmenu', 'sort', 'types', 'dnd'],
+    plugins: ['conditionalselect', 'contextmenu', 'sort', 'types', 'dnd'],
   });
 
   $('#file-tree--add-folder-btn').click(() => {
