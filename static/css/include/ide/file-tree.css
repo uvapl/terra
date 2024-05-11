@@ -106,8 +106,10 @@
 }
 
 .jstree-anchor {
-  display: flex;
-  align-items: center;
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .jstree-anchor:hover {
@@ -128,6 +130,9 @@
   background-size: 16px;
   background-position: center 50%;
   margin-right: 5px;
+  position: relative;
+  top: 1px;
+  float: left;
 }
 
 .file-tree-file-icon {
