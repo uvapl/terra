@@ -349,7 +349,6 @@ function EditorComponent(container, state) {
   });
 
   setFontSize(state.fontSize || BASE_FONT_SIZE);
-  setTheme(getLocalStorageItem('theme') || 'light');
   setProgLang(container.parent.config.title.split('.').pop());
 }
 
@@ -512,6 +511,7 @@ class Layout extends GoldenLayout {
         // through the registerComponent() function, prior to calling this part.
         setTimeout(() => {
           this.emitToAllComponents('afterFirstRender');
+          this.setTheme(getLocalStorageItem('theme') || 'light');
           this.createControls();
           this.showTermStartupMessage();
 
