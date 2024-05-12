@@ -284,7 +284,6 @@ function EditorComponent(container, state) {
   });
 
   container.on('show', () => {
-    setProgLang(container.parent.config.title.split('.').pop());
     this.editor.focus();
 
     // Add custom class for styling purposes.
@@ -351,6 +350,7 @@ function EditorComponent(container, state) {
 
   setFontSize(state.fontSize || BASE_FONT_SIZE);
   setTheme(getLocalStorageItem('theme') || 'light');
+  setProgLang(container.parent.config.title.split('.').pop());
 }
 
 /**
