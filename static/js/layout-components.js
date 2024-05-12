@@ -251,6 +251,10 @@ function EditorComponent(container, state) {
         mode = 'html'
         break;
 
+      case 'yml':
+        mode = 'yaml'
+        break;
+
       default:
         mode = proglang.toLowerCase();
         break;
