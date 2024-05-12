@@ -264,8 +264,6 @@ function EditorComponent(container, state) {
     this.editor.getSession().setMode(`ace/mode/${mode}`);
   };
 
-  setFontSize(state.fontSize || BASE_FONT_SIZE);
-
   this.editor.on('load', () => {
     this.editor.getSession().getUndoMananger().reset();
   });
@@ -350,6 +348,9 @@ function EditorComponent(container, state) {
       this.editor = null;
     }
   });
+
+  setFontSize(state.fontSize || BASE_FONT_SIZE);
+  setTheme(getLocalStorageItem('theme') || 'light');
 }
 
 /**
@@ -512,7 +513,6 @@ class Layout extends GoldenLayout {
         setTimeout(() => {
           this.emitToAllComponents('afterFirstRender');
           this.createControls();
-          this.setTheme(getLocalStorageItem('theme') || 'light');
           this.showTermStartupMessage();
 
           if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
