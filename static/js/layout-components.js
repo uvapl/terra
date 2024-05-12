@@ -247,6 +247,10 @@ function EditorComponent(container, state) {
         mode = 'text';
         break;
 
+      case 'svg':
+        mode = 'html'
+        break;
+
       default:
         mode = proglang.toLowerCase();
         break;
