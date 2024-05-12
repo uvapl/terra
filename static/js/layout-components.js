@@ -252,7 +252,6 @@ function EditorComponent(container, state) {
         break;
     }
 
-    console.log('Seting mode', mode);
     this.proglang = proglang;
     this.editor.getSession().setMode(`ace/mode/${mode}`);
   };
