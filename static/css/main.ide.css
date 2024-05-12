@@ -29,6 +29,16 @@
 .lm_header .lm_tab .lm_close_tab {
   top: 50%;
   transform: translateY(-50%);
+  background-image: url('../img/icons/close.png');
+  background-size: contain;
+}
+
+.lm_header .lm_tab.lm_active .lm_close_tab {
+  opacity: 0.4;
+}
+
+.lm_header .lm_tab.lm_active .lm_close_tab:hover {
+  opacity: 1;
 }
 
 .lm_goldenlayout,
@@ -38,4 +48,8 @@
 
 .layout-outer-container {
   overflow: hidden;
+}
+
+.dark-mode .lm_tab.lm_active .lm_close_tab {
+  background-image: url('../img/icons/close-white.png');
 }
