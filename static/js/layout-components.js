@@ -286,6 +286,15 @@ function EditorComponent(container, state) {
   container.on('show', () => {
     this.editor.focus();
 
+    if (isIDE && this.editor.getValue() === '') {
+      // Load file content from vfs.
+      const file = VFS.findFileById(container.getState().fileId);
+      if (file) {
+        this.editor.setValue(file.content);
+        this.editor.clearSelection();
+      }
+    }
+
     // Add custom class for styling purposes.
     getParentComponentElement().classList.add('component-container', 'editor-component-container');
 
@@ -348,6 +357,7 @@ function EditorComponent(container, state) {
     }
   });
 
+  setTheme(getLocalStorageItem('theme') || 'light');
   setFontSize(state.fontSize || BASE_FONT_SIZE);
   setProgLang(container.parent.config.title.split('.').pop());
 }

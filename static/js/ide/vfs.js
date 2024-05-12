@@ -67,6 +67,20 @@ VFS.findFilesWhere = (conditions) => VFS.files.filter(VFS._where(conditions));
 VFS.findFoldersWhere = (conditions) => VFS.folders.filter(VFS._where(conditions));
 
 /**
+ * Find a file by its id.
+ *
+ * @param {string} id - The id of the file to find.
+ */
+VFS.findFileById = (id) => VFS.files.find((file) => file.id === id);
+
+/**
+ * Find a folder by its id.
+ *
+ * @param {string} id - The id of the folder to find.
+ */
+VFS.findFolderById = (id) => VFS.files.find((folder) => folder.id === id);
+
+/**
  * Close the active tab in the editor, except when it is an untitled tab.
  */
 VFS.closeFile = () => {
@@ -165,7 +179,7 @@ VFS.createFolder = (name, parentId = null) => {
  * @returns {object} The updated file object.
  */
 VFS.updateFile = (id, obj) => {
-  const file = VFS.files.find((file) => file.id === id);
+  const file = VFS.findFileById(id);
 
   if (file) {
     for (const [key, value] of Object.entries(obj)) {
@@ -189,7 +203,7 @@ VFS.updateFile = (id, obj) => {
  * @returns {object} The updated folder object.
  */
 VFS.updateFolder = (id, obj) => {
-  const folder = VFS.folders.find((folder) => folder.id === id);
+  const folder = VFS.findFolderById(id);
 
   if (folder) {
     for (const [key, value] of Object.entries(obj)) {
