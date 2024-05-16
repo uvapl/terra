@@ -165,29 +165,43 @@ function createFileTree() {
 
     contextmenu: {
       items: (node) => {
-        const defaultItems = $.jstree.defaults.contextmenu.items();
-        const newItems = {};
+        const defaultMenu = $.jstree.defaults.contextmenu.items();
+        const menu = {};
 
         if (node.type === 'folder') {
-          newItems.createFile = {
+          menu.createFile = {
             separator_before: false,
             separator_after: false,
             label: 'New File',
             action: () => createNewFileTreeFile(node),
           };
 
-          newItems.createFolder = {
+          menu.createFolder = {
             separator_before: false,
             separator_after: false,
             label: 'New Folder',
             action: () => createNewFileTreeFolder(node),
           };
+
+          menu.download = {
+            separator_before: false,
+            separator_after: false,
+            label: 'Download',
+            action: () => VFS.downloadFolder(node.id),
+          };
+        } else {
+          menu.download = {
+            separator_before: false,
+            separator_after: false,
+            label: 'Download',
+            action: () => VFS.downloadFile(node.id),
+          };
         }
 
-        newItems.rename = defaultItems.rename;
-        newItems.remove = defaultItems.remove;
+        menu.rename = defaultMenu.rename;
+        menu.remove = defaultMenu.remove;
 
-        return newItems;
+        return menu;
       }
     },
 

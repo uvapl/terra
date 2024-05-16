@@ -359,7 +359,10 @@ function EditorComponent(container, state) {
 
   setTheme(getLocalStorageItem('theme') || 'light');
   setFontSize(state.fontSize || BASE_FONT_SIZE);
-  setProgLang(container.parent.config.title.split('.').pop());
+
+  const filename = container.parent.config.title;
+  const proglang = filename.includes('.') ? filename.split('.').pop() : 'text';
+  setProgLang(proglang);
 }
 
 /**

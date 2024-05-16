@@ -80,7 +80,7 @@ class VirtualFileSystem {
    *
    * @param {string} id - The id of the folder to find.
    */
-  findFolderById = (id) => this.files.find((folder) => folder.id === id)
+  findFolderById = (id) => this.folders.find((folder) => folder.id === id)
 
   /**
    * Close the active tab in the editor, except when it is an untitled tab.
@@ -93,7 +93,7 @@ class VirtualFileSystem {
   }
 
   /**
-   * Open a file in the editor. When the file is already open, switch to the tab.
+   * Open a file in the editor, otherwise switch to the tab.
    *
    * @param {string} id - The file id. Leave empty to create new file.
    * @param {string} filename - The name of the file to open.
@@ -206,6 +206,7 @@ class VirtualFileSystem {
    */
   updateFolder = (id, obj) => {
     const folder = this.findFolderById(id);
+    console.log('updating folder', id, folder, obj);
 
     if (folder) {
       for (const [key, value] of Object.entries(obj)) {
@@ -246,15 +247,70 @@ class VirtualFileSystem {
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
   deleteFolder = (id) => {
-    const folder = this.folders.find((folder) => folder.id === id);
+    const folder = this.findFolderById(id);
 
     if (folder) {
-      this.folders = this.folders.filter((folder) => folder.id !== id);
+      this.folders = this.folders.filter((f) => f.id !== id);
       this.saveState();
       return true;
     }
 
     return false;
+  }
+
+  /**
+   * Download a file through the browser by creating a new blob and trigger a
+   * download by creating a new temporary anchor element.
+   *
+   * @param {string} id - The file id.
+   */
+  downloadFile = (id) => {
+    const file = this.findFileById(id);
+    if (!file) return;
+
+    const fileBlob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
+    saveAs(fileBlob, file.filename);
+  }
+
+  /**
+   * Internal helper function to recursively add files to a zip object.
+   *
+   * @param {JSZip} zip - The JSZip object to add files to.
+   * @param {string} folderId - The folder id to add files from.
+   */
+  _addFilesToZipRecursively = (zip, folderId) => {
+    // Put all direct files into the zip file.
+    const files = this.findFilesWhere({ parentId: folderId });
+    for (const file of files) {
+      zip.file(file.filename, file.content);
+    }
+
+    // Get all the nested folders and files.
+    const nestedFolders = this.findFoldersWhere({ parentId: folderId });
+    for (const nestedFolder of nestedFolders) {
+      const folderZip = zip.folder(nestedFolder.name);
+      this._addFilesToZipRecursively(folderZip, nestedFolder.id);
+    }
+  }
+
+  /**
+   * Download a folder as a zip file. This includes all files in the folder as
+   * well as all the nested folders.
+   *
+   * @param {string} id - The folder id.
+   */
+  downloadFolder = (id) => {
+    const folder = this.findFolderById(id);
+    if (!folder) return;
+
+    const zip = new JSZip();
+    const rootFolderZip = zip.folder(folder.name);
+
+    this._addFilesToZipRecursively(rootFolderZip, folder.id);
+
+    zip.generateAsync({ type: 'blob' }).then((content) => {
+      saveAs(content, `${folder.name}.zip`);
+    });
   }
 }
 
