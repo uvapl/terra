@@ -115,6 +115,11 @@ function createFileTreeContextMenuItems(node) {
   const menu = {};
   menu.rename = defaultMenu.rename;
 
+  menu.remove = {
+    label: 'Delete',
+    action: () => deleteFileTreeItem(node),
+  };
+
   if (node.type === 'folder') {
     menu.createFile = {
       label: 'New File',
@@ -140,17 +145,10 @@ function createFileTreeContextMenuItems(node) {
     if (hasWorker(proglang)) {
       menu.run = {
         label: 'Run',
-        action: () => {
-          runCode(node.id);
-        }
+        action: () => runCode(node.id)
       }
     }
   }
-
-  menu.remove = {
-    label: 'Delete',
-    action: () => deleteFileTreeItem(node),
-  };
 
   return menu;
 }
