@@ -72,7 +72,8 @@ function initApp() {
         const content = generateConfigContent(config.tabs, fontSize);
 
         // Create the layout object.
-        const layout = createLayout(content, proglang, fontSize, {
+        const layout = createLayout(content, fontSize, {
+          proglang,
           buttonConfig: config.buttons,
           autocomplete: config.autocomplete,
         });

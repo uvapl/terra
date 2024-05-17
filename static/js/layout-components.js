@@ -408,6 +408,7 @@ function EditorComponent(container, state) {
   setTheme(getLocalStorageItem('theme') || 'light');
   setFontSize(state.fontSize || BASE_FONT_SIZE);
 
+  // Set the proglang, or use 'text' as the filetype if there's no file ext.
   const filename = container.parent.config.title;
   const proglang = filename.includes('.') ? filename.split('.').pop() : 'text';
   setProgLang(proglang);
@@ -541,7 +542,7 @@ class Layout extends GoldenLayout {
   vertical = false;
   iframe = false;
 
-  constructor(proglang, defaultLayoutConfig, options = {}) {
+  constructor(defaultLayoutConfig, options = {}) {
     let layoutConfig = getLocalStorageItem('layout');
     if (layoutConfig) {
       layoutConfig = JSON.parse(layoutConfig);
@@ -551,7 +552,7 @@ class Layout extends GoldenLayout {
 
     super(layoutConfig, $('#layout'));
 
-    this.proglang = proglang;
+    this.proglang = options.proglang;
     this.iframe = $('body').hasClass('examide-embed');
     this.vertical = options.vertical;
 
@@ -763,8 +764,8 @@ class Layout extends GoldenLayout {
 }
 
 class LayoutIDE extends Layout {
-  constructor(proglang, defaultLayoutConfig, options = {}) {
-    super(proglang, defaultLayoutConfig, options);
+  constructor(defaultLayoutConfig, options = {}) {
+    super(defaultLayoutConfig, options);
   }
 
   createControls = () => {

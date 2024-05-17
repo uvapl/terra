@@ -59,7 +59,8 @@ function initApp() {
     const content = generateConfigContent(tabs, fontSize);
 
     // Create the layout object.
-    const layout = createLayout(content, proglang, fontSize, {
+    const layout = createLayout(content, fontSize, {
+      proglang,
       vertical: isVertical,
     });
 

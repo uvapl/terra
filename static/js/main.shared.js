@@ -27,15 +27,15 @@ function generateConfigContent(tabs, fontSize) {
  * Create the layout object with the given content objects and font-size.
  *
  * @param {array} content - List of content objects.
- * @param {string} proglang - The programming language to be used
  * @param {number} fontSize - The default font-size to be used.
  * @param {object} options - Additional options object.
  * @param {boolean} options.vertical - Whether the layout should be vertical.
+ * @param {string} options.proglang - The programming language to be used
  * @param {object} options.buttonConfig - Object containing buttons with their
  * commands that will be rendered by the layout.
  * @returns {Layout} The layout instance.
  */
-function createLayout(content, proglang, fontSize, options = {}) {
+function createLayout(content, fontSize, options = {}) {
   const defaultLayoutConfig = {
     settings: {
       showPopoutIcon: false,
