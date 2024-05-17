@@ -555,7 +555,7 @@ class API extends BaseAPI {
   }
 
   async runUserCode({ activeTabName, files }) {
-    const { filename, content } = files.find(file => file.filename === activeTabName);
+    const { name: filename, content } = files.find(file => file.name === activeTabName);
     const basename = filename.replace(/\.c$/, '');
     const input = `${basename}.cc`;
     const obj = `${basename}.o`;

@@ -30,7 +30,7 @@
   background: #62c0ff;
 }
 
-.run-code-btn:active {
+.run-code-btn:not([disabled]):active {
   background: #5dabdf;
 }
 

@@ -43,7 +43,19 @@ function setMenubarKeystrokeIcons(element) {
 function registerMenubarEventListeners() {
   // Main menu items.
   // ================
-  const closeActiveMenu = () => $('.menubar > li.open').removeClass('open');
+  const closeActiveMenu = (event) => {
+    // Focus the active editor tab, except for making new files/folders.
+    // Check if the event.target has neither the id menu-item--new-file and
+    // and menu-item--new-folder.
+    const isInsideMenu = $('.menubar > li.open').find($(event.target)).length > 0;
+    const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
+    if (isInsideMenu && isNotNewFileOrFolderBtn) {
+      getActiveEditor().instance.editor.focus();
+    }
+
+    // Close the active menu.
+    $('.menubar > li.open').removeClass('open');
+  }
 
   // Open the first menu level when clicking the main menubar items.
   $('.menubar > li').click((event) => {
@@ -57,20 +69,20 @@ function registerMenubarEventListeners() {
   // Close menu when clicking outside of it.
   $(document).click((event) => {
     if (!$(event.target).closest('.menubar').length) {
-      closeActiveMenu();
+      closeActiveMenu(event);
     }
   });
 
   // Close menu when pressing ESC.
   $(document).keydown((event) => {
     if (event.key === 'Escape') {
-      closeActiveMenu();
+      closeActiveMenu(event);
     }
   });
 
   // Close menu when clicking on a menu item.
-  $('.menubar > li li:not(.disabled)').click(() => {
-    closeActiveMenu();
+  $('.menubar > li li:not(.disabled)').click((event) => {
+    closeActiveMenu(event);
   });
 
   // All submenu item event listeners.
@@ -125,7 +137,7 @@ Menubar.copyToClipboard = () => {
 }
 
 Menubar.cut = () => {
-  copyToClipboard();
+  Menubar.copyToClipboard();
 
   // Cut the selected text.
   getActiveEditor().instance.editor.insert('');

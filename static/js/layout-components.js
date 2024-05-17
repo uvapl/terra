@@ -21,7 +21,7 @@ function getActiveEditor() {
  */
 function getAllEditorFiles() {
   return getAllEditorTabs().map((tab) => ({
-    filename: tab.config.title,
+    name: tab.config.title,
     content: tab.container.getState().value,
   }));
 }

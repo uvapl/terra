@@ -96,7 +96,9 @@ function deleteFileTreeItem(node) {
     // Close the file tab if open.
     if (node.type === 'file') {
       const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === node.id);
-      tab.parent.removeChild(tab);
+      if (tab) {
+        tab.parent.removeChild(tab);
+      }
     }
 
     hideModal();
@@ -126,7 +128,7 @@ function createFileTreeContextMenuItems(node) {
       label: 'Download',
       action: () => VFS.downloadFolder(node.id),
     };
-  } else { // file
+  } else if (node.type === 'file') {
     menu.download = {
       label: 'Download',
       action: () => VFS.downloadFile(node.id),
@@ -240,7 +242,10 @@ function registerFileTreeEventListeners($tree) {
 
     const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.id);
     if (tab) {
-      tab.setTitle(data.text);
+      tab.container.setTitle(data.text);
+
+      // For some reason no update is triggered, so we trigger an update.
+      window._layout.emit('stateChanged');
     }
   });
 

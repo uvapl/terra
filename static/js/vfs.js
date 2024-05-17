@@ -57,7 +57,7 @@ class VirtualFileSystem {
   /**
    * Find all files that match the given conditions.
    *
-   * @example findFilesWhere({ filename: 'foo' })
+   * @example findFilesWhere({ name: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
    * @returns {array} List of file objects matching the conditions.
@@ -67,7 +67,7 @@ class VirtualFileSystem {
   /**
    * Find a single file that match the given conditions.
    *
-   * @example findFileWhere({ filename: 'foo' })
+   * @example findFileWhere({ name: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
    * @returns {object|null} The file object matching the conditions or null if
@@ -240,7 +240,7 @@ class VirtualFileSystem {
     if (!file) return;
 
     const fileBlob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
-    saveAs(fileBlob, file.filename);
+    saveAs(fileBlob, file.name);
   }
 
   /**
@@ -253,7 +253,7 @@ class VirtualFileSystem {
     // Put all direct files into the zip file.
     const files = this.findFilesWhere({ parentId: folderId });
     for (const file of files) {
-      zip.file(file.filename, file.content);
+      zip.file(file.name, file.content);
     }
 
     // Get all the nested folders and files.

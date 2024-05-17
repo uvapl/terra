@@ -84,13 +84,13 @@ class API extends BaseAPI {
       // Put each file in the virtual file system. Only do this when the file
       // content is not empty, otherwise pyodide throws an error.
       if (file.content) {
-        this.pyodide.FS.writeFile(file.filename, file.content, { encoding: 'utf8' });
+        this.pyodide.FS.writeFile(file.name, file.content, { encoding: 'utf8' });
       }
 
       // Because pyodide always runs the same session, we have to remove the
       // file as a module from sys.modules to make sure the command runs on
       // a clean state.
-      const module = file.filename.replace('.py', '');
+      const module = file.name.replace('.py', '');
       this.pyodide.runPython(`sys.modules.pop('${module}', None)`);
     }
   }
@@ -107,9 +107,9 @@ class API extends BaseAPI {
     try {
       this.writeFilesToVirtualFS(files);
 
-      const activeTab = files.find(file => file.filename === activeTabName);
+      const activeTab = files.find(file => file.name === activeTabName);
 
-      this.hostWriteCmd(`python3 ${activeTab.filename}`);
+      this.hostWriteCmd(`python3 ${activeTab.name}`);
       const stdout = this.run(activeTab.content, activeTabName);
       if (stdout) {
         this.hostWrite(stdout);

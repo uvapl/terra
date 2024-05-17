@@ -60,7 +60,7 @@ class WorkerAPI {
     hideTermCursor();
 
     if (showTerminateMsg) {
-      term.writeln('\x1b[31mProcess terminated\x1b[0m');
+      term.writeln('\x1b[1;31mProcess terminated\x1b[0m');
     }
 
     // Dispose any active user input.
