@@ -132,15 +132,15 @@ class MemFS {
     this.exports.AddDirectoryNode(path.length);
   }
 
-  addFile(path, contents) {
+  addFile(path, content) {
     const length =
-      contents instanceof ArrayBuffer ? contents.byteLength : contents.length;
+      content instanceof ArrayBuffer ? content.byteLength : content.length;
     this.mem.check();
     this.mem.write(this.exports.GetPathBuf(), path);
     const inode = this.exports.AddFileNode(path.length, length);
     const addr = this.exports.GetFileNodeAddress(inode);
     this.mem.check();
-    this.mem.write(addr, contents);
+    this.mem.write(addr, content);
   }
 
   getFileContents(path) {
@@ -417,7 +417,7 @@ class Tar {
     this.alignUp();
 
     if (entry.type === '0') {        // Regular file.
-      entry.contents = this.u8.subarray(this.offset, this.offset + entry.size);
+      entry.content = this.u8.subarray(this.offset, this.offset + entry.size);
       this.offset += entry.size;
       this.alignUp();
     } else if (entry.type !== '5') { // Directory.
@@ -432,7 +432,7 @@ class Tar {
     while (entry = this.readEntry()) {
       switch (entry.type) {
         case '0': // Regular file.
-          memfs.addFile(entry.filename, entry.contents);
+          memfs.addFile(entry.filename, entry.content);
           break;
         case '5': // Directory.
           memfs.addDirectory(entry.filename);
@@ -514,11 +514,11 @@ class API extends BaseAPI {
 
   async compile(options) {
     const input = options.input;
-    const contents = options.contents;
+    const content = options.content;
     const obj = options.obj;
 
     await this.ready;
-    this.memfs.addFile(input, contents);
+    this.memfs.addFile(input, content);
     const clang = await this.getModule(this.clangFilename);
     return await this.run([
       clang, 'clang', '-cc1', '-emit-obj', '-disable-free',
@@ -555,7 +555,7 @@ class API extends BaseAPI {
   }
 
   async runUserCode({ activeTabName, files }) {
-    const { filename, contents } = files.find(file => file.filename === activeTabName);
+    const { filename, content } = files.find(file => file.filename === activeTabName);
     const basename = filename.replace(/\.c$/, '');
     const input = `${basename}.cc`;
     const obj = `${basename}.o`;
@@ -573,7 +573,7 @@ class API extends BaseAPI {
     this.hostWrite(cmdPlaceholder.join(' ') + '\n');
 
     try {
-      await this.compile({ input, contents, obj });
+      await this.compile({ input, content, obj });
       await this.link(obj, wasm);
       const buffer = this.memfs.getFileContents(wasm);
       const testMod = await WebAssembly.compile(buffer)

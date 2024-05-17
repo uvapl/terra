@@ -162,7 +162,7 @@ function loadConfig() {
     }
 
     if (!isValidConfig(config)) {
-      reject('Invalid config file contents');
+      reject('Invalid config file');
     } else {
       resolve(config);
     }

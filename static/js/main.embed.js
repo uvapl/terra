@@ -8,7 +8,7 @@
 
 initApp().then(({ layout }) => {
 
-  // Listen for the contents of the file to be received.
+  // Listen for the content of the file to be received.
   window.addEventListener('message', function(event) {
     const editor = getActiveEditor().instance.editor;
     editor.setValue(removeIndent(event.data));
@@ -42,7 +42,7 @@ function initApp() {
     const currentStorageKey = makeLocalStorageKey(window.location.href);
     updateLocalStoragePrefix(currentStorageKey);
 
-    // Create tabs with the filename as key and empty string as the contents.
+    // Create tabs with the filename as key and empty string as the content.
     const tabs = {}
     tabs[queryParams.filename] = '';
 

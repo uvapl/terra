@@ -16,13 +16,13 @@ function getActiveEditor() {
 /**
  * Gathers all files from the editor and returns them as an array of objects.
  *
- * @returns {array} List of objects, each containing the filename and contents of
+ * @returns {array} List of objects, each containing the filename and content of
  * the corresponding editor tab.
  */
 function getAllEditorFiles() {
   return getAllEditorTabs().map((tab) => ({
     filename: tab.config.title,
-    contents: tab.container.getState().value,
+    content: tab.container.getState().value,
   }));
 }
 
@@ -113,12 +113,14 @@ function openFile(id, filename) {
 
 /**
  * Runs the code inside the worker by sending all files to the worker along with
- * the current active tab name.
+ * the current active tab name. If the `fileId` is set, then solely that file
+ * will be run.
  *
+ * @param {string} [id] - The ID of the file to run.
  * @param {boolean} [clearTerm=false] Whether to clear the terminal before
  * printing the output.
  */
-function runCode(clearTerm = false) {
+function runCode(fileId = null, clearTerm = false) {
   if (clearTerm) term.reset();
 
   if ($('#run-code').prop('disabled')) {
@@ -127,14 +129,45 @@ function runCode(clearTerm = false) {
     return window._workerApi.restart(true);
   }
 
-  const activeTabName = getActiveEditor().config.title;
-  const files = getAllEditorFiles();
-  window._workerApi.runUserCode(activeTabName, files);
-
   $('#run-code').prop('disabled', true);
 
-  // Change the run-code button to a stop-code button if after 1 second the code
-  // has not finished running (potentially infinite loop scenario).
+  let filename = null;
+  let files = null;
+
+  if (fileId) {
+    const file = VFS.findFileById(fileId);
+    filename = file.filename;
+    files = [file];
+  } else {
+    filename = getActiveEditor().config.title;
+    files = getAllEditorFiles();
+  }
+
+  // Create a new worker instance if needed.
+  const proglang = getFileExtension(filename);
+  createWorkerApi(proglang);
+
+  // Wait for the worker to be ready before running the code.
+  if (window._workerApi && !window._workerApi.isReady) {
+    const runFileIntervalId = setInterval(() => {
+      if (window._workerApi && window._workerApi.isReady) {
+        window._workerApi.runUserCode(filename, files);
+        checkForStopCodeButton();
+        clearInterval(runFileIntervalId);
+      }
+    }, 200);
+  } else {
+    // If the worker is ready, run the code immediately.
+    window._workerApi.runUserCode(filename, files);
+    checkForStopCodeButton();
+  }
+}
+
+/**
+ * Change the run-code button to a stop-code button if after 1 second the code
+ * has not finished running (potentially infinite loop scenario).
+ */
+function checkForStopCodeButton() {
   window._showStopCodeButtonTimeoutId = setTimeout(() => {
     const $button = $('#run-code');
     const newText = $button.text().replace('Run', 'Stop');
@@ -746,7 +779,7 @@ class Layout extends GoldenLayout {
   }
 
   addControlsEventListeners = () => {
-    $('#run-code').click(() => runCode(this.iframe));
+    $('#run-code').click(() => runCode(null, this.iframe));
     $('#clear-term').click(() => term.reset());
 
     // Update font-size for all components on change.

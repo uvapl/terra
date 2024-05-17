@@ -58,34 +58,37 @@ function createFileTreeContextMenuItems(node) {
 
   if (node.type === 'folder') {
     menu.createFile = {
-      separator_before: false,
-      separator_after: false,
       label: 'New File',
       action: () => createNewFileTreeFile(node),
     };
 
     menu.createFolder = {
-      separator_before: false,
-      separator_after: false,
       label: 'New Folder',
       action: () => createNewFileTreeFolder(node),
     };
 
     menu.download = {
-      separator_before: false,
-      separator_after: false,
       label: 'Download',
       action: () => VFS.downloadFolder(node.id),
     };
-  } else {
+  } else { // file
     menu.download = {
-      separator_before: false,
-      separator_after: false,
       label: 'Download',
       action: () => VFS.downloadFile(node.id),
     };
+
+    const proglang = getFileExtension(node.text);
+    if (hasWorker(proglang)) {
+      menu.run = {
+        label: 'Run',
+        action: () => {
+          runCode(node.id);
+        }
+      }
+    }
   }
 
+  // By default this is added for folders and files.
   menu.rename = defaultMenu.rename;
   menu.remove = defaultMenu.remove;
 

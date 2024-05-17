@@ -5,6 +5,7 @@ class WorkerAPI {
   _proglang = null;
   _prevProglang = null;
   isRunningCode = false;
+  isReady = false;
   sharedMem = null;
 
   constructor(proglang) {
@@ -73,6 +74,8 @@ class WorkerAPI {
    * indicating the current worker process has been terminated.
    */
   _createWorker(showTerminateMsg) {
+    this.isReady = false;
+
     if (this.worker) {
       this.terminate(showTerminateMsg);
     }
@@ -106,7 +109,7 @@ class WorkerAPI {
    *
    * @param {string} activeTabName - The name of the currently active tab.
    * @param {array} files - List of objects, each containing the filename
-   * and contents of the corresponding editor tab.
+   * and content of the corresponding editor tab.
    */
   runUserCode(activeTabName, files) {
     this.isRunningCode = true;
@@ -125,7 +128,7 @@ class WorkerAPI {
    * @param {string} activeTabName - The name of the currently active tab.
    * @param {array} cmd - List of commands to execute.
    * @param {array} files - List of objects, each containing the filename and
-   * contents of the corresponding editor tab.
+   * content of the corresponding editor tab.
    */
   runButtonCommand(selector, activeTabName, cmd, files) {
     this.port.postMessage({
@@ -191,6 +194,7 @@ class WorkerAPI {
   onmessage(event) {
     switch (event.data.id) {
       case 'ready':
+        this.isReady = true;
         $('.lm_header .button').prop('disabled', false);
         break;
 
@@ -225,12 +229,12 @@ class WorkerAPI {
 }
 
 /**
- * Check whether a given proglang is valid for the worker.
+ * Check whether a given proglang has a corresponding worker implementation.
  *
  * @param {string} proglang - The proglang to check for.
  * @returns {boolean} True if proglang is valid, false otherwise.
  */
-function isValidProgLang(proglang) {
+function hasWorker(proglang) {
   const whitelist = ['c', 'py'];
   return whitelist.some((lang) => proglang === lang);
 }
@@ -243,15 +247,13 @@ function isValidProgLang(proglang) {
  */
 function createWorkerApi(proglang) {
   // Situation 1: no worker, thus spawn a new one.
-  if (!window._workerApi) {
-    if (isValidProgLang(proglang)) {
-      window._workerApi = new WorkerAPI(proglang);
-    }
-  } else if (window._workerApi.proglang !== proglang) {
+  if (!window._workerApi && hasWorker(proglang)) {
+    window._workerApi = new WorkerAPI(proglang);
+  } else if (window._workerApi && window._workerApi.proglang !== proglang) {
     window._workerApi.proglang = proglang;
 
     // Situation 2: existing worker but new proglang is invalid.
-    if (!isValidProgLang(proglang)) {
+    if (!hasWorker(proglang)) {
       window._workerApi.terminate();
       window._workerApi = null;
     } else {

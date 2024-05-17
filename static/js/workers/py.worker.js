@@ -82,11 +82,7 @@ class API extends BaseAPI {
   writeFilesToVirtualFS(files) {
     for (const file of files) {
       // Put each file in the virtual file system.
-      // It is important to check the contents, otherwise pyodide
-      // throws an error.
-      if (file.contents) {
-        this.pyodide.FS.writeFile(file.filename, file.contents, { encoding: 'utf8' });
-      }
+      this.pyodide.FS.writeFile(file.filename, file.content, { encoding: 'utf8' });
 
       // Because pyodide always runs the same session, we have to remove the
       // file as a module from sys.modules to make sure the command runs on
@@ -94,8 +90,6 @@ class API extends BaseAPI {
       const module = file.filename.replace('.py', '');
       this.pyodide.runPython(`sys.modules.pop('${module}', None)`);
     }
-
-    console.log('returning ')
   }
 
   /**
@@ -104,19 +98,16 @@ class API extends BaseAPI {
    * @param {object} data - The data object coming from the worker.
    * @param {string} data.activeTabName - The name of the active editor tab.
    * @param {array} data.files - List of objects, each containing the filename
-   * and contents of the corresponding editor tab.
+   * and content of the corresponding editor tab.
    */
   runUserCode({ activeTabName, files }) {
-    console.log('runUserCode', activeTabName, files);
     try {
       this.writeFilesToVirtualFS(files);
 
-      console.log('trying to find active tab');
       const activeTab = files.find(file => file.filename === activeTabName);
-      console.log('activeTab', activeTab);
 
       this.hostWriteCmd(`python3 ${activeTab.filename}`);
-      const stdout = this.run(activeTab.contents, activeTabName);
+      const stdout = this.run(activeTab.content, activeTabName);
       if (stdout) {
         this.hostWrite(stdout);
       }
@@ -136,7 +127,7 @@ class API extends BaseAPI {
    * @param {string} activeTabName - The name of the active editor tab.
    * @param {array} data.cmd - A list of python commands to execute.
    * @param {array} data.files - List of objects, each containing the filename
-   * and contents of the corresponding editor tab.
+   * and content of the corresponding editor tab.
    */
   runButtonCommand({ selector, activeTabName, cmd, files }) {
     try {
