@@ -216,3 +216,14 @@ function uuidv4() {
     (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> +c / 4).toString(16)
   );
 }
+
+/**
+ * Get the file extension from a given filename.
+ *
+ * @param {string} filename - The filename to get the extension from.
+ * @returns {string|null} The file extension without the dot, or null if there
+ * is no file extension.
+ */
+function getFileExtension(filename) {
+  return filename.includes('.') ? filename.split('.').pop() : null;
+}

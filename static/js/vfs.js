@@ -57,12 +57,16 @@ class VirtualFileSystem {
   /**
    * Find all files that match the given conditions.
    *
+   * @example findFilesWhere({ filename: 'foo' })
+   *
    * @param {object} conditions - The conditions to filter on.
    */
   findFilesWhere = (conditions) => this.files.filter(this._where(conditions))
 
   /**
    * Find all folders that match the given conditions.
+   *
+   * @example findFoldersWhere({ name: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
    */

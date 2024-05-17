@@ -2,7 +2,8 @@
  * Bridge class between the main app and the currently loaded worker.
  */
 class WorkerAPI {
-  proglang = null;
+  _proglang = null;
+  _prevProglang = null;
   isRunningCode = false;
   sharedMem = null;
 
@@ -28,18 +29,57 @@ class WorkerAPI {
     }
   }
 
-  _createWorker() {
-    if (this.worker) {
-      this.isRunningCode = false;
-      this.worker.terminate();
-      this.runUserCodeCallback();
+  set proglang(newLang) {
+    this._prevProglang = this.proglang;
+    this._proglang = newLang;
+  }
 
-      // Disable the button and wait for the worker to remove the disabled prop
-      // once it has been loaded.
-      $('#run-code').prop('disabled', true);
+  get proglang() {
+    return this._proglang;
+  }
+
+  /**
+   * Terminate the existing worker process, hides term cursor and disposes any
+   * active user input that is active.
+   *
+   * @param {boolean} [showTerminateMsg] - Print a message in the terminal
+   * indicating the current worker process has been terminated.
+   */
+  terminate(showTerminateMsg) {
+    console.log(`Terminating existing ${this._prevProglang || this.proglang} worker`);
+
+    this.isRunningCode = false;
+    this.worker.terminate();
+    this.runUserCodeCallback();
+
+    // Disable the button and wait for the worker to remove the disabled prop
+    // once it has been loaded.
+    $('#run-code').prop('disabled', true);
+
+    hideTermCursor();
+
+    if (showTerminateMsg) {
+      term.writeln('\x1b[31mProcess terminated\x1b[0m');
     }
 
-    this.worker = new Worker(this.getWorkerPath(this.proglang));
+    // Dispose any active user input.
+    disposeUserInput();
+  }
+
+  /**
+   * Creates a new worker process and terminates the existing worker if needed.
+   *
+   * @param {boolean} [showTerminateMsg] - Print a message in the terminal
+   * indicating the current worker process has been terminated.
+   */
+  _createWorker(showTerminateMsg) {
+    if (this.worker) {
+      this.terminate(showTerminateMsg);
+    }
+
+    console.log(`Spawning new ${this.proglang} worker`);
+
+    this.worker = new Worker(this.getWorkerPath(this._proglang));
     const channel = new MessageChannel();
     this.port = channel.port1;
     this.port.onmessage = this.onmessage.bind(this);
@@ -114,9 +154,12 @@ class WorkerAPI {
    * Terminate the code that is being run by the user. Useful when e.g. an
    * infinite loop is detected. This process terminates the existing worker and
    * create a complete new instance.
+   *
+   * @param {boolean} [showTerminateMsg] - Print a message in the terminal
+   * indicating the current worker process has been terminated.
    */
-  terminate() {
-    this._createWorker();
+  restart(showTerminateMsg) {
+    this._createWorker(showTerminateMsg);
   }
 
   /**
@@ -177,6 +220,43 @@ class WorkerAPI {
       case 'runUserCodeCallback':
         this.runUserCodeCallback();
         break;
+    }
+  }
+}
+
+/**
+ * Check whether a given proglang is valid for the worker.
+ *
+ * @param {string} proglang - The proglang to check for.
+ * @returns {boolean} True if proglang is valid, false otherwise.
+ */
+function isValidProgLang(proglang) {
+  const whitelist = ['c', 'py'];
+  return whitelist.some((lang) => proglang === lang);
+}
+
+/**
+ * Create a new worker API instance if none exists already. The existing
+ * instance will be terminated and restarted if necessary.
+ *
+ * @param {string} proglang - The proglang to spawn the related worker for.
+ */
+function createWorkerApi(proglang) {
+  // Situation 1: no worker, thus spawn a new one.
+  if (!window._workerApi) {
+    if (isValidProgLang(proglang)) {
+      window._workerApi = new WorkerAPI(proglang);
+    }
+  } else if (window._workerApi.proglang !== proglang) {
+    window._workerApi.proglang = proglang;
+
+    // Situation 2: existing worker but new proglang is invalid.
+    if (!isValidProgLang(proglang)) {
+      window._workerApi.terminate();
+      window._workerApi = null;
+    } else {
+      // Situation 3: existing worker and new proglang is valid.
+      window._workerApi.restart();
     }
   }
 }

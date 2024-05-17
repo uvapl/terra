@@ -70,7 +70,8 @@ function closeFile() {
 }
 
 /**
- * Open a file in the editor, otherwise switch to the tab.
+ * Open a file in the editor, otherwise switch to the tab of the filename.
+ * Next, spawn a new worker based on the file extension.
  *
  * @param {string} id - The file id. Leave empty to create new file.
  * @param {string} filename - The name of the file to open.
@@ -105,6 +106,9 @@ function openFile(id, filename) {
       currentTab.parent.removeChild(currentTab);
     }
   }
+
+  const proglang = getFileExtension(filename);
+  createWorkerApi(proglang);
 }
 
 /**
@@ -120,10 +124,7 @@ function runCode(clearTerm = false) {
   if ($('#run-code').prop('disabled')) {
     return;
   } else if (window._workerApi.isRunningCode) {
-    hideTermCursor();
-    term.write('\nProcess terminated\n');
-    disposeUserInput();
-    return window._workerApi.terminate();
+    return window._workerApi.restart(true);
   }
 
   const activeTabName = getActiveEditor().config.title;
@@ -223,7 +224,7 @@ function EditorComponent(container, state) {
     this.editor.commands.addCommand({
       name: 'closeFile',
       bindKey: 'Ctrl+W',
-      exec: closeFile,
+      exec: () => closeFile(),
     });
 
     this.editor.commands.addCommand({
@@ -349,6 +350,9 @@ function EditorComponent(container, state) {
     if (!getActiveEditor()) {
       setActiveEditor();
     }
+
+    // Spawn a new worker if necessary.
+    createWorkerApi(this.proglang);
   });
 
   container.on('lock', () => {
@@ -410,7 +414,7 @@ function EditorComponent(container, state) {
 
   // Set the proglang, or use 'text' as the filetype if there's no file ext.
   const filename = container.parent.config.title;
-  const proglang = filename.includes('.') ? filename.split('.').pop() : 'text';
+  const proglang = filename.includes('.') ? getFileExtension(filename) : 'text';
   setProgLang(proglang);
 }
 

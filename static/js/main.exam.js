@@ -60,7 +60,7 @@ function initApp() {
     loadConfig()
       .then(async (config) => {
         // Get the programming language based on tabs filename.
-        const proglang = Object.keys(config.tabs)[0].split('.').pop();
+        const proglang = getFileExtension(Object.keys(config.tabs)[0]);
 
         // Initialise the programming language specific worker API.
         window._workerApi = new WorkerAPI(proglang);

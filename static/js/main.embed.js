@@ -47,7 +47,7 @@ function initApp() {
     tabs[queryParams.filename] = '';
 
     // Get the programming language based on the filename.
-    const proglang = queryParams.filename.split('.').pop();
+    const proglang = getFileExtension(queryParams.filename);
 
     // Initialise the programming language specific worker API.
     window._workerApi = new WorkerAPI(proglang);
