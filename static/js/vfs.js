@@ -60,8 +60,23 @@ class VirtualFileSystem {
    * @example findFilesWhere({ filename: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
+   * @returns {array} List of file objects matching the conditions.
    */
   findFilesWhere = (conditions) => this.files.filter(this._where(conditions))
+
+  /**
+   * Find a single file that match the given conditions.
+   *
+   * @example findFileWhere({ filename: 'foo' })
+   *
+   * @param {object} conditions - The conditions to filter on.
+   * @returns {object|null} The file object matching the conditions or null if
+   * the file is not found.
+   */
+  findFileWhere = (conditions) => {
+    const files = this.findFilesWhere(conditions);
+    return files.length > 0 ? files[0] : null;
+  }
 
   /**
    * Find all folders that match the given conditions.
@@ -69,6 +84,7 @@ class VirtualFileSystem {
    * @example findFoldersWhere({ name: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
+   * @returns {array} List of folder objects matching the conditions.
    */
   findFoldersWhere = (conditions) => this.folders.filter(this._where(conditions))
 
@@ -89,16 +105,16 @@ class VirtualFileSystem {
   /**
    * Create a new file in the virtual filesystem.
    *
-   * @param {string} filename - The basename of the file including extension.
-   * @param {string} [parentId] - The parent folder id.
+   * @param {object} fileObj - The file object to create.
    * @returns {object} The new file object.
    */
-  createFile = (filename, parentId = null) => {
+  createFile = (fileObj) => {
     const newFile = {
       id: uuidv4(),
-      filename,
-      parentId,
+      name: 'Untitled',
+      parentId: null,
       content: '',
+      ...fileObj,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -111,15 +127,15 @@ class VirtualFileSystem {
   /**
    * Create a new folder in the virtual filesystem.
    *
-   * @param {string} name - The name of the folder.
-   * @param {string} [parentId] - The parent folder id.
+   * @param {object} folderObj - The folder object to create.
    * @returns {object} The new folder object.
    */
-  createFolder = (name, parentId = null) => {
+  createFolder = (folderObj) => {
     const newFolder = {
       id: uuidv4(),
-      name,
-      parentId,
+      name: 'Untitled',
+      parentId: null,
+      ...folderObj,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -162,7 +178,6 @@ class VirtualFileSystem {
    */
   updateFolder = (id, obj) => {
     const folder = this.findFolderById(id);
-    console.log('updating folder', id, folder, obj);
 
     if (folder) {
       for (const [key, value] of Object.entries(obj)) {

@@ -354,8 +354,9 @@ function EditorComponent(container, state) {
     window._editorIsDirty = true;
     container.extendState({ value: this.editor.getValue() });
 
-    if (isIDE) {
-      VFS.updateFile(container.getState().fileId, {
+    const { fileId } = container.getState();
+    if (fileId) {
+      VFS.updateFile(fileId, {
         content: this.editor.getValue(),
       });
     }
@@ -367,6 +368,20 @@ function EditorComponent(container, state) {
 
   container.on('show', () => {
     this.editor.focus();
+
+    // If we ran into a layout state from localStorage that doesn't have
+    // a file ID, or the file ID is not the same, then we should sync the
+    // filesystem ID with this tab state's file ID. We can only do this for
+    // non-IDE versions, because the ID always uses IDs properly and can have
+    // multiple filenames. It can be assumed that both the exam and iframe wil
+    // not hve duplicate filenames.
+    if (!isIDE) {
+      const file = VFS.findFileWhere({ name: container.parent.config.title });
+      const { fileId } = container.getState();
+      if (!fileId || (file && fileId !== file.id)) {
+        container.extendState({ fileId: file.id });
+      }
+    }
 
     if (isIDE && this.editor.getValue() === '') {
       // Load file content from vfs.

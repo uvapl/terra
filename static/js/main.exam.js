@@ -71,6 +71,15 @@ function initApp() {
         // Create the content objects that represent each tab in the editor.
         const content = generateConfigContent(config.tabs, fontSize);
 
+        // Create the files inside the virtual file system.
+        content.forEach((file) => {
+          VFS.createFile({
+            id: file.componentState.fileId,
+            name: file.title,
+            content: file.componentState.value,
+          })
+        });
+
         // Create the layout object.
         const layout = createLayout(content, fontSize, {
           proglang,

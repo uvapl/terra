@@ -22,7 +22,7 @@ initApp().then(({ layout }) => {
  * @returns {Promise<{ layout: Layout }>} Object containing the layout instance.
  */
 function initApp() {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     // Create the layout object.
     const layout = createLayout();
 

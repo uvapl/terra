@@ -17,6 +17,7 @@ function generateConfigContent(tabs, fontSize) {
     componentState: {
       fontSize: fontSize,
       value: tabs[filename],
+      fileId: uuidv4(),
     },
     title: filename,
     isClosable: false,

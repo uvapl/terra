@@ -45,7 +45,7 @@ function createFileTreeFromVFS(parentId = null) {
 
   const files = VFS.findFilesWhere({ parentId }).map((file) => ({
     id: file.id,
-    text: file.filename,
+    text: file.name,
     type: 'file',
   }));
 
@@ -171,19 +171,16 @@ function registerFileTreeEventListeners($tree) {
       : VFS.createFile;
 
     const parentId = data.node.parent !== '#' ? data.node.parent : null;
-    const { id } = fn(data.node.original.text, parentId);
+    const { id } = fn({ name: data.node.original.text, parentId });
     $tree.jstree('set_id', data.node, id);
   });
 
   $tree.on('rename_node.jstree', (event, data) => {
-    const id = data.node.id;
-    const newName = data.text;
+    const fn = data.node.type === 'folder'
+      ? VFS.updateFolder
+      : VFS.updateFile;
 
-    if (data.node.type === 'folder') {
-      VFS.updateFolder(id, { name: newName });
-    } else {
-      VFS.updateFile(id, { filename: newName });
-    }
+    fn(data.node.id, { name: data.text });
   });
 
   $tree.on('delete_node.jstree', (event, data) => {
