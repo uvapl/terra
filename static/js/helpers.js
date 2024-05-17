@@ -225,5 +225,7 @@ function uuidv4() {
  * is no file extension.
  */
 function getFileExtension(filename) {
-  return filename.includes('.') ? filename.split('.').pop() : null;
+  return typeof filename === 'string' && filename.includes('.')
+    ? filename.split('.').pop()
+    : null;
 }

@@ -93,13 +93,10 @@ function deleteFileTreeItem(node) {
     // Delete from file-tree, including VFS.
     $('#file-tree').jstree('delete_node', node);
 
+    // Close the file tab if open.
     if (node.type === 'file') {
-      // Close the file tab if open.
-      getAllEditorTabs().forEach((tab) => {
-        if (tab.container.getState().fileId === node.id) {
-          tab.parent.removeChild(tab);
-        }
-      });
+      const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === node.id);
+      tab.parent.removeChild(tab);
     }
 
     hideModal();
@@ -113,12 +110,6 @@ function deleteFileTreeItem(node) {
 function createFileTreeContextMenuItems(node) {
   const defaultMenu = $.jstree.defaults.contextmenu.items();
   const menu = {};
-  menu.rename = defaultMenu.rename;
-
-  menu.remove = {
-    label: 'Delete',
-    action: () => deleteFileTreeItem(node),
-  };
 
   if (node.type === 'folder') {
     menu.createFile = {
@@ -149,6 +140,13 @@ function createFileTreeContextMenuItems(node) {
       }
     }
   }
+
+  menu.rename = defaultMenu.rename;
+
+  menu.remove = {
+    label: 'Delete',
+    action: () => deleteFileTreeItem(node),
+  };
 
   return menu;
 }
@@ -239,6 +237,11 @@ function registerFileTreeEventListeners($tree) {
       : VFS.updateFile;
 
     fn(data.node.id, { name: data.text });
+
+    const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.id);
+    if (tab) {
+      tab.setTitle(data.text);
+    }
   });
 
   $tree.on('delete_node.jstree', (event, data) => {

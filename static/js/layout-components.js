@@ -136,7 +136,7 @@ function runCode(fileId = null, clearTerm = false) {
 
   if (fileId) {
     const file = VFS.findFileById(fileId);
-    filename = file.filename;
+    filename = file.name;
     files = [file];
   } else {
     filename = getActiveEditor().config.title;
@@ -156,7 +156,7 @@ function runCode(fileId = null, clearTerm = false) {
         clearInterval(runFileIntervalId);
       }
     }, 200);
-  } else {
+  } else if (window._workerApi) {
     // If the worker is ready, run the code immediately.
     window._workerApi.runUserCode(filename, files);
     checkForStopCodeButton();

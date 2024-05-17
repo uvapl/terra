@@ -81,8 +81,11 @@ class API extends BaseAPI {
    */
   writeFilesToVirtualFS(files) {
     for (const file of files) {
-      // Put each file in the virtual file system.
-      this.pyodide.FS.writeFile(file.filename, file.content, { encoding: 'utf8' });
+      // Put each file in the virtual file system. Only do this when the file
+      // content is not empty, otherwise pyodide throws an error.
+      if (file.content) {
+        this.pyodide.FS.writeFile(file.filename, file.content, { encoding: 'utf8' });
+      }
 
       // Because pyodide always runs the same session, we have to remove the
       // file as a module from sys.modules to make sure the command runs on
