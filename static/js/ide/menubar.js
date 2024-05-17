@@ -81,8 +81,8 @@ function registerMenubarEventListeners() {
   $('#menu-item--new-folder').click(() => createNewFileTreeFolder());
   Mousetrap.bind(['ctrl+shift+t'], () => createNewFileTreeFolder());
 
-  $('#menu-item--close-file').click(VFS.closeFile);
-  Mousetrap.bind(['ctrl+w'], VFS.closeFile);
+  $('#menu-item--close-file').click(closeFile);
+  Mousetrap.bind(['ctrl+w'], closeFile);
 
   $('#menu-item--undo').click(Menubar.undo);
   $('#menu-item--redo').click(Menubar.redo);

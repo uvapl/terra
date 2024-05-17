@@ -83,54 +83,6 @@ class VirtualFileSystem {
   findFolderById = (id) => this.folders.find((folder) => folder.id === id)
 
   /**
-   * Close the active tab in the editor, except when it is an untitled tab.
-   */
-  closeFile = () => {
-    const editor = getActiveEditor();
-    if (editor) {
-      editor.parent.removeChild(editor);
-    }
-  }
-
-  /**
-   * Open a file in the editor, otherwise switch to the tab.
-   *
-   * @param {string} id - The file id. Leave empty to create new file.
-   * @param {string} filename - The name of the file to open.
-   */
-  openFile = (id, filename) => {
-    const tab = getAllEditorTabs().filter((tab) =>
-      id === null
-        ? tab.config.title === filename
-        : tab.container.getState().fileId === id
-    );
-
-    if (tab.length > 0) {
-      // Switch to the active tab.
-      tab[0].parent.setActiveContentItem(tab[0]);
-      tab[0].instance.editor.focus();
-    } else {
-      const currentTab = getActiveEditor();
-
-      // Add a new tab next to the current active tab.
-      currentTab.parent.addChild({
-        type: 'component',
-        componentName: 'editor',
-        componentState: {
-          fontSize: BASE_FONT_SIZE,
-          fileId: id,
-        },
-        title: filename,
-      });
-
-      // Check if the current tab is an untitled tab with no content.
-      if (currentTab.config.title === 'Untitled' && currentTab.instance.editor.getValue() === '') {
-        currentTab.parent.removeChild(currentTab);
-      }
-    }
-  }
-
-  /**
    * Create a new file in the virtual filesystem.
    *
    * @param {string} filename - The basename of the file including extension.
