@@ -34,10 +34,10 @@
   background: #5dabdf;
 }
 
-.stop-code-btn {
-  background: #f9776a;
+.danger-btn {
+  background: var(--color-error);
 }
 
-.stop-code-btn:active {
-  background: #e64a3a;
+.danger-btn:active {
+  background: var(--color-error-hover);
 }

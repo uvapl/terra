@@ -1,6 +1,8 @@
 :root {
   --color-white: #fff;
   --color-black: #000;
+  --color-error: #f9776a;
+  --color-error-hover: #e64a3a;
   --font-size: 16px;
   --navbar-padding: 10px;
   --editor-tab-font-size: 12px;

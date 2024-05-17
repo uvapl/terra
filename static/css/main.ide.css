@@ -6,6 +6,7 @@
 @import 'include/goldenlayout.css';
 @import 'include/term.css';
 @import 'include/editor.css';
+@import 'include/modal.css';
 
 /* IDE Overrides */
 
@@ -48,6 +49,10 @@
 
 .layout-outer-container {
   overflow: hidden;
+}
+
+.delete-confirmation-modal .modal-footer {
+  justify-content: space-between;
 }
 
 .dark-mode .lm_tab.lm_active .lm_close_tab {

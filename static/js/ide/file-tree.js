@@ -52,9 +52,68 @@ function createFileTreeFromVFS(parentId = null) {
   return folders.concat(files);
 }
 
+/**
+ * Delete a file tree item from the VFS and the file tree. When the node is a
+ * file and its corresponding tab is open, then it'll be closed.
+ *
+ * @param {jsTree.Node} node - The node to delete.
+ */
+function deleteFileTreeItem(node) {
+  const modalHtml = `
+    <div id="ide-delete-confirmation-modal" class="modal delete-confirmation-modal" tabindex="-1">
+      <div class="modal-content">
+        <div class="modal-header">
+          <p class="modal-title">Confirmation required</p>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete the ${node.type} <strong>${node.text}</strong> permanently? This action can't be undone.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="button cancel-btn">Cancel</button>
+          <button type="button" class="button confirm-btn danger-btn">I'm sure</button>
+        </div>
+      </div>
+    </div>
+  `;
+  $('body').append(modalHtml);
+
+  $modal = $('#ide-delete-confirmation-modal');
+
+  const hideModal = () => {
+    $modal.removeClass('show');
+
+    // Wait for animation to be completed.
+    setTimeout(() => {
+      $modal.remove();
+    }, 300);
+  };
+
+  $modal.find('.cancel-btn').click(hideModal);
+  $modal.find('.confirm-btn').click(() => {
+    // Delete from file-tree, including VFS.
+    $('#file-tree').jstree('delete_node', node);
+
+    if (node.type === 'file') {
+      // Close the file tab if open.
+      getAllEditorTabs().forEach((tab) => {
+        if (tab.container.getState().fileId === node.id) {
+          tab.parent.removeChild(tab);
+        }
+      });
+    }
+
+    hideModal();
+  });
+
+  // Use setTimeout trick to add the class after the modal HTML has been
+  // rendered to the DOM to show the fade-in animation.
+  setTimeout(() => $modal.addClass('show'), 10);
+}
+
 function createFileTreeContextMenuItems(node) {
   const defaultMenu = $.jstree.defaults.contextmenu.items();
   const menu = {};
+  menu.rename = defaultMenu.rename;
 
   if (node.type === 'folder') {
     menu.createFile = {
@@ -88,9 +147,10 @@ function createFileTreeContextMenuItems(node) {
     }
   }
 
-  // By default this is added for folders and files.
-  menu.rename = defaultMenu.rename;
-  menu.remove = defaultMenu.remove;
+  menu.remove = {
+    label: 'Delete',
+    action: () => deleteFileTreeItem(node),
+  };
 
   return menu;
 }

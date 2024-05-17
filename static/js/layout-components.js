@@ -174,7 +174,7 @@ function checkForStopCodeButton() {
     $button.text(newText)
       .prop('disabled', false)
       .removeClass('run-code-btn')
-      .addClass('stop-code-btn');
+      .addClass('danger-btn');
   }, 1000);
 }
 
