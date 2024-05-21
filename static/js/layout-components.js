@@ -364,6 +364,9 @@ function EditorComponent(container, state) {
 
   this.editor.on('focus', () => {
     setActiveEditor();
+
+    // Spawn a new worker if necessary.
+    createWorkerApi(this.proglang);
   });
 
   container.on('show', () => {
