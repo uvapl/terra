@@ -30,7 +30,7 @@
   width: 750px;
   min-width: 400px;
   background-color: var(--color-white);
-  border-radius: 3px;
+  border-radius: var(--border-radius);
   opacity: 0;
   transition-timing-function: ease;
   transition-property: transform, opacity;

@@ -1,0 +1,145 @@
+/* ========================================================================== */
+/* Custom modal (because bootstrap is too overkill)                           */
+/* ========================================================================== */
+.navbar {
+  position: relative;
+  padding: 0 var(--navbar-padding);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--color-black);
+  user-select: none;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.navbar-right ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-right li {
+  padding: 0 10px;
+}
+
+.navbar-right li:hover {
+  cursor: pointer;
+}
+
+.page-title {
+  user-select: none;
+  margin: 0;
+  font-weight: bold;
+  font-size: 18px;
+  color: #5F5F5F;
+}
+
+/* ========================================================================== */
+/* Menubar                                                                    */
+/* ========================================================================== */
+.navbar-left {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.menubar {
+  list-style: none;
+  margin: 0 0 0 20px;
+  padding: 0;
+  display: flex;
+  color: var(--tab-fg-color);
+}
+
+.menubar > li {
+  padding: 8px;
+}
+
+.menubar li:hover,
+.menubar li:focus {
+  background: var(--tab-menu--tab-bg-color);;
+  color: var(--color-black);
+  cursor: pointer;
+}
+
+/* The main submenu items require a click, any nested submenu shows on hover. */
+.menubar > li li:hover > ul {
+  display: block;
+}
+
+.menubar > li.open {
+  background: var(--tab-menu--tab-bg-color);;
+  color: var(--color-black);
+}
+
+.menubar li.active {
+  color: var(--color-black);
+  font-weight: bold;
+}
+
+.menubar li.disabled {
+  color: #cecece;
+}
+
+.menubar > li.open > ul {
+  display: block;
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.3));
+  left: 0;
+  top: 100%;
+}
+
+.menubar li {
+  position: relative;
+  white-space: nowrap;
+  display: flex;
+  color: var(--tab-fg-color);
+}
+
+.menubar .text {
+  flex-grow: 1;
+  pointer-events: none;
+}
+
+.menubar .keystroke {
+  padding-left: 30px;
+  pointer-events: none;
+}
+
+.menubar ul {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  border: 1px solid var(--border-color);
+  background: var(--color-white);
+  z-index: 50;
+  margin: 0;
+  padding: 0;
+  display: none;
+  list-style: none;
+}
+
+.menubar li.has-dropdown {
+  padding-right: 25px;
+}
+
+.menubar li.has-dropdown:before {
+  content: '';
+  position: absolute;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  background: url('../../../img/icons/arrow-head-right.png') no-repeat center center;
+  background-size: contain;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.6;
+}
+
+.menubar ul li {
+  padding: 8px 10px;
+}
+
+.menubar ul li:hover,
+.menubar ul li:focus {
+  background-color: var(--tab-menu--tab-bg-color);;
+}

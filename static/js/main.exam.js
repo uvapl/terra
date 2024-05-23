@@ -60,7 +60,7 @@ function initApp() {
     loadConfig()
       .then(async (config) => {
         // Get the programming language based on tabs filename.
-        const proglang = Object.keys(config.tabs)[0].split('.').pop();
+        const proglang = getFileExtension(Object.keys(config.tabs)[0]);
 
         // Initialise the programming language specific worker API.
         window._workerApi = new WorkerAPI(proglang);
@@ -71,17 +71,27 @@ function initApp() {
         // Create the content objects that represent each tab in the editor.
         const content = generateConfigContent(config.tabs, fontSize);
 
+        // Create the files inside the virtual file system.
+        content.forEach((file) => {
+          VFS.createFile({
+            id: file.componentState.fileId,
+            name: file.title,
+            content: file.componentState.value,
+          })
+        });
+
         // Create the layout object.
-        const layout = createLayout(content, proglang, fontSize, {
+        const layout = createLayout(content, fontSize, {
+          proglang,
           buttonConfig: config.buttons,
           autocomplete: config.autocomplete,
         });
 
-        // Call the init function that creates all components.
-        layout.init();
-
         // Make layout instance available at all times.
         window._layout = layout;
+
+        // Call the init function that creates all components.
+        layout.init();
 
         resolve({ layout, config });
       })
@@ -161,7 +171,7 @@ function loadConfig() {
     }
 
     if (!isValidConfig(config)) {
-      reject('Invalid config file contents');
+      reject('Invalid config file');
     } else {
       resolve(config);
     }
@@ -485,3 +495,41 @@ function lockApp() {
   $('#submit-btn').remove();
 }
 
+/**
+ * Wrapper function to render a notification as an error type.
+ *
+ * @param {string} msg - The message to be displayed.
+ * @param {object} options - Additional options for the notification.
+ */
+function notifyError(msg, options) {
+  notify(msg, { ...options, type: 'error' });
+}
+
+/**
+ * Render a given message inside the notification container in the UI.
+ *
+ * @param {string} msg - The message to be displayed.
+ * @param {object} options - Additional options for the notification.
+ * @param {string} options.type - The type of notification (e.g. 'error').
+ * @param {number} options.fadeOutAfterMs - The time in milliseconds to fade.
+ */
+function notify(msg, options = {}) {
+  if (window.notifyTimeoutId !== null) {
+    clearTimeout(window.notifyTimeoutId);
+    window.notifyTimeoutId = null;
+  }
+
+  const $msgContainer = $('.msg-container');
+
+  if (options.type === 'error') {
+    $msgContainer.addClass('error');
+  }
+
+  $msgContainer.html(`<span>${msg}</span>`);
+
+  if (options.fadeOutAfterMs) {
+    window.notifyTimeoutId = setTimeout(() => {
+      $('.msg-container span').fadeOut();
+    }, options.fadeOutAfterMs);
+  }
+}

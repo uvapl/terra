@@ -11,8 +11,8 @@
   font-size: inherit;
   font-family: inherit;
   user-select: none;
-  border-top-right-radius: 3px;
-  border-top-left-radius: 3px;
+  border-top-right-radius: var(--border-radius);
+  border-top-left-radius: var(--border-radius);
   padding: 2px 10px 5px;
   height: calc(100% - 1px);
   margin-right: 5px;
@@ -120,11 +120,11 @@
 }
 
 .lm_splitter.lm_vertical:before {
-  top: 2px;
+  top: 4px;
 }
 
 .lm_splitter.lm_vertical:after {
-  bottom: 2px;
+  bottom: 0;
 }
 
 .lm_content {

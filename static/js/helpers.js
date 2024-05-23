@@ -64,45 +64,6 @@ function formatDate(date) {
 }
 
 /**
- * Wrapper function to render a notification as an error type.
- *
- * @param {string} msg - The message to be displayed.
- * @param {object} options - Additional options for the notification.
- */
-function notifyError(msg, options) {
-  notify(msg, { ...options, type: 'error' });
-}
-
-/**
- * Render a given message inside the notification container in the UI.
- *
- * @param {string} msg - The message to be displayed.
- * @param {object} options - Additional options for the notification.
- * @param {string} options.type - The type of notification (e.g. 'error').
- * @param {number} options.fadeOutAfterMs - The time in milliseconds to fade.
- */
-function notify(msg, options = {}) {
-  if (window.notifyTimeoutId !== null) {
-    clearTimeout(window.notifyTimeoutId);
-    window.notifyTimeoutId = null;
-  }
-
-  const $msgContainer = $('.msg-container');
-
-  if (options.type === 'error') {
-    $msgContainer.addClass('error');
-  }
-
-  $msgContainer.html(`<span>${msg}</span>`);
-
-  if (options.fadeOutAfterMs) {
-    window.notifyTimeoutId = setTimeout(() => {
-      $('.msg-container span').fadeOut();
-    }, options.fadeOutAfterMs);
-  }
-}
-
-/**
  * Parse the query parameters from the window.location.search.
  *
  * @returns {object} A key-value object with all the query params.
@@ -225,4 +186,46 @@ function removeIndent(text) {
     .split('\n')
     .map(line => line.replace(new RegExp(`^${indent}`), ''))
     .join('\n');
+}
+
+/**
+ * Check whether the clipboard writing is allowed.
+ *
+ * @returns {Promise<boolean>} True when allowed, false otherwise.
+ */
+function isClipboardWritingAllowed() {
+  return new Promise((resolve, reject) => {
+    try {
+      navigator.permissions.query({ name: 'clipboard-write' }).then(function(status) {
+        resolve((status.state == 'granted'));
+      });
+    } catch (error) {
+      // This feature works only through HTTPS
+      reject(error);
+    }
+  });
+}
+
+/**
+ * Generate a random UUIDv4.
+ *
+ * @returns {string} The UUID.
+ */
+function uuidv4() {
+  return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c =>
+    (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> +c / 4).toString(16)
+  );
+}
+
+/**
+ * Get the file extension from a given filename.
+ *
+ * @param {string} filename - The filename to get the extension from.
+ * @returns {string|null} The file extension without the dot, or null if there
+ * is no file extension.
+ */
+function getFileExtension(filename) {
+  return typeof filename === 'string' && filename.includes('.')
+    ? filename.split('.').pop()
+    : null;
 }

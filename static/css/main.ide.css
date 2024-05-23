@@ -1,0 +1,60 @@
+@import 'include/base.css';
+@import 'include/button.css';
+@import 'include/ide/navbar.css';
+@import 'include/ide/file-tree.css';
+@import 'include/settings-dropdown.css';
+@import 'include/goldenlayout.css';
+@import 'include/term.css';
+@import 'include/editor.css';
+@import 'include/modal.css';
+
+/* IDE Overrides */
+
+:root {
+  --file-tree-width: 200px;
+  --file-tree-padding: 10px;
+}
+
+.app-container {
+  overflow: hidden;
+}
+
+.layout-container {
+  width: calc(100% - var(--file-tree-width)) !important;
+}
+
+.lm_header .lm_tab {
+  padding-right: 20px;
+}
+
+.lm_header .lm_tab .lm_close_tab {
+  top: 50%;
+  transform: translateY(-50%);
+  background-image: url('../img/icons/close.png');
+  background-size: contain;
+}
+
+.lm_header .lm_tab.lm_active .lm_close_tab {
+  opacity: 0.4;
+}
+
+.lm_header .lm_tab.lm_active .lm_close_tab:hover {
+  opacity: 1;
+}
+
+.lm_goldenlayout,
+.lm_goldenlayout > div {
+  max-width: 100%;
+}
+
+.layout-outer-container {
+  overflow: hidden;
+}
+
+.delete-confirmation-modal .modal-footer {
+  justify-content: space-between;
+}
+
+.dark-mode .lm_tab.lm_active .lm_close_tab {
+  background-image: url('../img/icons/close-white.png');
+}

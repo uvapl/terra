@@ -3,7 +3,7 @@
   appearance: none;
   padding: 3px 5px;
   background: var(--color-white);
-  border-radius: 4px;
+  border-radius: var(--border-radius);
   border: 1px solid var(--color-black);
 }
 
@@ -30,14 +30,14 @@
   background: #62c0ff;
 }
 
-.run-code-btn:active {
+.run-code-btn:not([disabled]):active {
   background: #5dabdf;
 }
 
-.stop-code-btn {
-  background: #f9776a;
+.danger-btn {
+  background: var(--color-error);
 }
 
-.stop-code-btn:active {
-  background: #e64a3a;
+.danger-btn:active {
+  background: var(--color-error-hover);
 }

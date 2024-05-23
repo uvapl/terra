@@ -7,3 +7,7 @@
   height: 100%;
   width: 100%;
 }
+
+.terminal-component-container .lm_content {
+  border: 0;
+}

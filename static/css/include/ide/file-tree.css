@@ -1,0 +1,231 @@
+.file-tree-container {
+  min-width: var(--file-tree-width);
+  max-width: var(--file-tree-width);
+  overflow: auto;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-tree-container .title-container {
+  padding: var(--file-tree-padding);
+  display: flex;
+  align-items: center;
+}
+
+.file-tree-container .title {
+  font-size: 14px;
+  flex-grow: 1;
+  text-transform: uppercase;
+}
+
+.file-tree-container button {
+  background: none;
+  border: 0;
+  display: block;
+  width: 20px;
+  height: 20px;
+  background-repeat: no-repeat;
+  background-size: 20px;
+  background-position: center 50%;
+  margin: 0 5px 0 10px;
+  position: relative;
+  opacity: 0.4;
+}
+
+.file-tree-container button:hover {
+  opacity: 1;
+  cursor: pointer;
+}
+
+.file-tree-container button:before {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: -5px;
+  border: 1px solid var(--color-black);
+  background: var(--color-white);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.file-tree-container button:after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  display: block;
+  width: 8px;
+  height: 8px;
+  background-repeat: no-repeat;
+  background-size: 10px;
+  background-position: center 50%;
+  background-image: url('../../../img/icons/plus.png');
+}
+
+.file-tree-container .add-file-btn {
+  background-image: url('../../../img/icons/file.png');
+}
+
+.file-tree-container .add-folder-btn {
+  background-image: url('../../../img/icons/folder.png');
+}
+
+.jstree {
+  height: 100%;
+  overflow: auto;
+}
+
+.jstree ul {
+  list-style: none;
+  padding-left: 25px;
+  margin: 0;
+}
+
+.jstree > .jstree-container-ul {
+  padding: 0;
+}
+
+.jstree-node {
+  position: relative;
+}
+
+.jstree-anchor,
+.jstree-anchor:visited,
+.jstree-anchor:active,
+.jstree-anchor:focus {
+  color: inherit;
+  text-decoration: none;
+  outline: 0;
+}
+
+.jstree-anchor {
+  min-width: 112px;
+  max-width: calc(100% - 10px);
+  padding: 4px 5px;
+  display: inline-block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  border-radius: var(--border-radius);
+  margin-left: 5px;
+}
+
+.jstree-node.jstree-leaf > .jstree-anchor {
+  min-width: 89px;
+}
+
+.jstree-anchor:hover {
+  background-color: var(--tab-menu--tab-bg-color);
+}
+
+.jstree-anchor input {
+  outline: 0;
+  height: 20px !important;
+  max-width: calc(100% - 30px);
+}
+
+.file-tree-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  background-position: center 50%;
+  margin-right: 5px;
+  position: relative;
+  top: 1px;
+  float: left;
+}
+
+.file-tree-file-icon {
+  background-image: url('../../../img/icons/file.png');
+}
+
+.file-tree-folder-icon {
+  background-image: url('../../../img/icons/folder.png');
+}
+
+.jstree-node:not(.jstree-leaf) {
+  position: relative;
+}
+
+.jstree-node:not(.jstree-leaf) > .jstree-anchor {
+  padding-left: 25px;
+}
+
+.jstree-node:not(.jstree-leaf) > .jstree-icon {
+  display: block;
+  width: 12px;
+  height: 12px;
+  background-repeat: no-repeat;
+  background-size: 12px;
+  background-position: center 50%;
+  margin-right: 5px;
+  position: absolute;
+  left: 12px;
+  top: 7px;
+  z-index: 2;
+}
+
+.jstree-node.jstree-closed > .jstree-icon {
+  background-image: url('../../../img/icons/arrow-head-right.png');
+}
+
+.jstree-node.jstree-open > .jstree-icon {
+  background-image: url('../../../img/icons/arrow-head-down.png');
+}
+
+.vakata-context {
+  list-style: none;
+  margin: 0 0 0 20px;
+  padding: 0;
+  position: absolute;
+  background-color: var(--color-white);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+}
+
+.vakata-context-separator {
+  display: none;
+}
+
+.vakata-context a,
+.vakata-context a:visited,
+.vakata-context a:active,
+.vakata-context a:focus {
+  color: inherit;
+  text-decoration: none;
+  outline: 0;
+}
+
+.vakata-context a {
+  display: block;
+  padding: 5px 10px;
+}
+
+.vakata-context a:hover {
+  background-color: var(--tab-menu--tab-bg-color);
+  cursor: pointer;
+  outline: 0;
+}
+
+.jstree-dnd-parent {
+  position: relative;
+}
+
+.jstree-dnd-parent:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 3px;
+  height: 100%;
+  border-left: 3px solid var(--color-black);
+}
+
+#jstree-marker {
+  display: none !important;
+}
