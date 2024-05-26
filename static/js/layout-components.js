@@ -63,9 +63,9 @@ function disposeUserInput() {
  * Close the active tab in the editor, except when it is an untitled tab.
  */
 function closeFile() {
-  const editor = getActiveEditor();
-  if (editor) {
-    editor.parent.removeChild(editor);
+  const currentTab = getActiveEditor();
+  if (currentTab) {
+    currentTab.parent.removeChild(currentTab);
   }
 }
 
@@ -89,21 +89,22 @@ function openFile(id, filename) {
     tab[0].instance.editor.focus();
   } else {
     const currentTab = getActiveEditor();
+    if (currentTab) {
+      // Add a new tab next to the current active tab.
+      currentTab.parent.addChild({
+        type: 'component',
+        componentName: 'editor',
+        componentState: {
+          fontSize: BASE_FONT_SIZE,
+          fileId: id,
+        },
+        title: filename,
+      });
 
-    // Add a new tab next to the current active tab.
-    currentTab.parent.addChild({
-      type: 'component',
-      componentName: 'editor',
-      componentState: {
-        fontSize: BASE_FONT_SIZE,
-        fileId: id,
-      },
-      title: filename,
-    });
-
-    // Check if the current tab is an untitled tab with no content.
-    if (currentTab.config.title === 'Untitled' && currentTab.instance.editor.getValue() === '') {
-      currentTab.parent.removeChild(currentTab);
+      // Check if the current tab is an untitled tab with no content.
+      if (currentTab.config.title === 'Untitled' && currentTab.instance.editor.getValue() === '') {
+        currentTab.parent.removeChild(currentTab);
+      }
     }
   }
 
@@ -403,7 +404,9 @@ function EditorComponent(container, state) {
     }
 
     // Spawn a new worker if necessary.
-    createWorkerApi(this.proglang);
+    if (this.ready) {
+      createWorkerApi(this.proglang);
+    }
   });
 
   container.on('lock', () => {
@@ -433,6 +436,8 @@ function EditorComponent(container, state) {
   });
 
   container.on('afterFirstRender', () => {
+    this.ready = true;
+
     // Reset the session after the first initial page render to prevent the
     // initial content is removed when users hit ctrl+z or cmd+z.
     this.editor.getSession().getUndoManager().reset();
@@ -442,14 +447,17 @@ function EditorComponent(container, state) {
     // If it's the last tab being closed, then we insert another 'Untitled' tab,
     // because we always need at least one tab open.
     if (getAllEditorTabs().length === 1) {
-      getActiveEditor().parent.addChild({
-        type: 'component',
-        componentName: 'editor',
-        componentState: {
-          fontSize: BASE_FONT_SIZE,
-        },
-        title: 'Untitled',
-      });
+      const currentTab = getActiveEditor();
+      if (currentTab) {
+        currentTab.parent.addChild({
+          type: 'component',
+          componentName: 'editor',
+          componentState: {
+            fontSize: BASE_FONT_SIZE,
+          },
+          title: 'Untitled',
+        });
+      }
     } else {
       setActiveEditor(null);
     }
@@ -648,10 +656,10 @@ class Layout extends GoldenLayout {
   }
 
   showTermStartupMessage = () => {
-    const msg = ['Click the "Run" button to execute code'];
+    const msg = ['Click the "Run" button to execute code.'];
 
     if (!this.iframe) {
-      msg.push('Click the "Clear terminal" button to clear this screen');
+      msg.push('Click the "Clear terminal" button to clear this screen.');
     }
 
     for (const line of msg) {
