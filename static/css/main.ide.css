@@ -4,6 +4,7 @@
 @import 'include/ide/file-tree.css';
 @import 'include/settings-dropdown.css';
 @import 'include/goldenlayout.css';
+@import 'include/spinner.css';
 @import 'include/term.css';
 @import 'include/editor.css';
 @import 'include/modal.css';

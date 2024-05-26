@@ -76,6 +76,8 @@ class WorkerAPI {
   _createWorker(showTerminateMsg) {
     this.isReady = false;
 
+    $('#run-code').addClass('loading');
+
     if (this.worker) {
       this.terminate(showTerminateMsg);
     }
@@ -196,6 +198,7 @@ class WorkerAPI {
       case 'ready':
         this.isReady = true;
         $('.lm_header .button').prop('disabled', false);
+        $('#run-code').removeClass('loading');
         break;
 
       case 'write':
