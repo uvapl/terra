@@ -93,12 +93,10 @@ function deleteFileTreeItem(node) {
     // Delete from file-tree, including VFS.
     $('#file-tree').jstree('delete_node', node);
 
-    // Close the file tab if open.
     if (node.type === 'file') {
-      const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === node.id);
-      if (tab) {
-        tab.parent.removeChild(tab);
-      }
+      closeFileTab(node.id);
+    } else if (node.type === 'folder') {
+      closeFilesInFolderRecursively(node.id);
     }
 
     hideModal();
@@ -109,6 +107,45 @@ function deleteFileTreeItem(node) {
   setTimeout(() => $modal.addClass('show'), 10);
 }
 
+/**
+ * Close a single file tab by its fileId, including removing it from the vfs.
+ *
+ * @param {string} fileId - The file ID to close.
+ */
+function closeFileTab(fileId) {
+  const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === fileId);
+  if (tab) {
+    tab.parent.removeChild(tab);
+  }
+
+  VFS.deleteFile(fileId);
+}
+
+/**
+ * Close all files inside a folder, including nested files in subfolders.
+ *
+ * @param {string} folderId - The folder ID to close all files from.
+ */
+function closeFilesInFolderRecursively(folderId) {
+  const files = VFS.findFilesWhere({ parentId: folderId });
+  for (const file of files) {
+    closeFileTab(file.id);
+  }
+
+  const folders = VFS.findFoldersWhere({ parentId: folderId });
+  for (const folder of folders) {
+    closeFilesInFolderRecursively(folder.id);
+  }
+}
+
+/**
+ * Create a contextmenu for the file tree. This function is called when the user
+ * right-clicks on a file or folder in the file tree. The contextmenu items are
+ * dynamically created based on the node type (file or folder).
+ *
+ * @param {jsTree.Node} node - The node that was right-clicked.
+ * @returns {object} The contextmenu object.
+ */
 function createFileTreeContextMenuItems(node) {
   const defaultMenu = $.jstree.defaults.contextmenu.items();
   const menu = {};
