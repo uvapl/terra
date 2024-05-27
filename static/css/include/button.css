@@ -30,6 +30,22 @@
   background: #62c0ff;
 }
 
+/* loading spinner */
+.run-code-btn.loading:before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #606060;
+  border-right-color: transparent;
+  margin-right: 5px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+  animation: spin 1s linear infinite;
+}
+
 .run-code-btn:not([disabled]):active {
   background: #5dabdf;
 }
@@ -40,4 +56,8 @@
 
 .danger-btn:active {
   background: var(--color-error-hover);
+}
+
+.modal .danger-btn {
+  font-weight: bold;
 }

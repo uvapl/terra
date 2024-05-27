@@ -4,6 +4,7 @@
 @import 'include/ide/file-tree.css';
 @import 'include/settings-dropdown.css';
 @import 'include/goldenlayout.css';
+@import 'include/spinner.css';
 @import 'include/term.css';
 @import 'include/editor.css';
 @import 'include/modal.css';
@@ -11,7 +12,7 @@
 /* IDE Overrides */
 
 :root {
-  --file-tree-width: 200px;
+  --file-tree-width: 250px;
   --file-tree-padding: 10px;
 }
 

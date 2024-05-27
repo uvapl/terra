@@ -76,6 +76,8 @@ class WorkerAPI {
   _createWorker(showTerminateMsg) {
     this.isReady = false;
 
+    $('#run-code').addClass('loading');
+
     if (this.worker) {
       this.terminate(showTerminateMsg);
     }
@@ -193,15 +195,24 @@ class WorkerAPI {
    */
   onmessage(event) {
     switch (event.data.id) {
+
+      // Ready callback from the worker instance. This will be run after
+      // everything has been initialised and ready to run some code.
       case 'ready':
         this.isReady = true;
         $('.lm_header .button').prop('disabled', false);
+        $('#run-code').removeClass('loading');
         break;
 
+      // Write callback from the worker instance. When the worker wants to write
+      // code the terminal, this event will be triggered.
       case 'write':
         term.write(event.data.data);
         break;
 
+      // Stdin callback from the worker instance. When the worker requests user
+      // input, this event will be triggered. The user input will be requested
+      // and sent back to the worker through the usage of shared memory.
       case 'readStdin':
         waitForInput().then((value) => {
           const view = new Uint8Array(this.sharedMem.buffer);
@@ -217,10 +228,15 @@ class WorkerAPI {
         });
         break;
 
+      // Run custom config button callback from the worker instance.
+      // This event will be triggered after a custom config button's command has
+      // been executed.
       case 'runButtonCommandCallback':
         $(event.data.selector).prop('disabled', false);
         break;
 
+      // Run user code callback from the worker instance. This event will be
+      // triggered after excecuting the user's code.
       case 'runUserCodeCallback':
         this.runUserCodeCallback();
         break;

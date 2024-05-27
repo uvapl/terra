@@ -122,6 +122,7 @@
 
 .jstree-anchor input {
   outline: 0;
+  border: 1px dotted var(--color-black) !important;
   height: 20px !important;
   max-width: calc(100% - 30px);
 }
