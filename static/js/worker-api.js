@@ -179,7 +179,7 @@ class WorkerAPI {
     const newText = $button.text().replace('Stop', 'Run');
     $button.text(newText)
       .prop('disabled', false)
-      .addClass('run-code-btn')
+      .addClass('primary-btn')
       .removeClass('danger-btn');
 
     if (window._showStopCodeButtonTimeoutId) {
