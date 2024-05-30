@@ -2,11 +2,30 @@
  * Bridge class between the main app and the currently loaded worker.
  */
 class WorkerAPI {
+  /**
+   * The current programming language that is being used.
+   */
   _proglang = null;
+
+  /**
+   * The previous programming language that was used.
+   */
   _prevProglang = null;
-  isRunningCode = false;
-  isReady = false;
+
+  /**
+   * Contains a shared memory object when enabled.
+   */
   sharedMem = null;
+
+  /**
+   * Whether the worker is currently running code from the user.
+   */
+  isRunningCode = false;
+
+  /**
+   * Whether the worker has been initialised.
+   */
+  isReady = false;
 
   constructor(proglang) {
     this.proglang = proglang;
@@ -174,11 +193,21 @@ class WorkerAPI {
   runUserCodeCallback() {
     this.isRunningCode = false;
 
+    // Only disable the button again if the current tab has a worker,
+    // because users can still run code through the contextmenu in the
+    // file-tree in the IDE app.
+    const tab = getActiveEditor();
+    let disableRunBtn = false;
+    if (!hasWorker(getFileExtension(tab.config.title))) {
+      disableRunBtn = true;
+    }
+
+
     // Change the stop-code button back to a run-code button.
     const $button = $('#run-code');
     const newText = $button.text().replace('Stop', 'Run');
     $button.text(newText)
-      .prop('disabled', false)
+      .prop('disabled', disableRunBtn)
       .addClass('primary-btn')
       .removeClass('danger-btn');
 

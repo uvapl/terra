@@ -239,7 +239,7 @@ class VirtualFileSystem {
     const file = this.findFileById(id);
     if (!file) return;
 
-    const fileBlob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
+    const fileBlob = new Blob([addNewLineCharacter(file.content)], { type: 'text/plain;charset=utf-8' });
     saveAs(fileBlob, file.name);
   }
 
@@ -253,7 +253,7 @@ class VirtualFileSystem {
     // Put all direct files into the zip file.
     const files = this.findFilesWhere({ parentId: folderId });
     for (const file of files) {
-      zip.file(file.name, file.content);
+      zip.file(file.name, addNewLineCharacter(file.content));
     }
 
     // Get all the nested folders and files.

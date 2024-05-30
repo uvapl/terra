@@ -229,3 +229,13 @@ function getFileExtension(filename) {
     ? filename.split('.').pop()
     : null;
 }
+
+/**
+ * Adds a new line character at the end of a given text if it doesn't exist.
+ *
+ * @param {string} text - The text to add the new line character to.
+ * @returns {string} Updated text with a new line character at the end.
+ */
+function addNewLineCharacter(text) {
+  return text.replace(/\n?$/g, '\n');
+}

@@ -219,10 +219,13 @@ function saveFile() {
 function runCode(fileId = null, clearTerm = false) {
   if (clearTerm) term.reset();
 
-  if ($('#run-code').prop('disabled')) {
-    return;
-  } else if (window._workerApi.isRunningCode) {
-    return window._workerApi.restart(true);
+  if (window._workerApi) {
+    if (!window._workerApi.isReady) {
+      // Worker API is busy, wait for it to be done.
+      return;
+    } else if (window._workerApi.isRunningCode) {
+      return window._workerApi.restart(true);
+    }
   }
 
   $('#run-code').prop('disabled', true);
