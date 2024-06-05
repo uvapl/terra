@@ -158,7 +158,7 @@ function saveFile() {
         <label>Select a folder:</label>
         <div class="right-container">
           <select class="select">
-            <option value="null">root</option>
+            <option value="root">/</option>
             ${folderOptions}
           </select>
         </div>
@@ -183,7 +183,7 @@ function saveFile() {
     const filename = $modal.find('.text-input').val();
 
     let folderId = $modal.find('.select').val();
-    if (folderId === 'null') {
+    if (folderId === 'root') {
       folderId = null;
     }
 
