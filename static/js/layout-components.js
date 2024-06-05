@@ -112,6 +112,101 @@ function openFile(id, filename) {
   createWorkerApi(proglang);
 }
 
+function createFolderOptionsHtml(html = '', parentId = null, indent = '--') {
+  VFS.findFoldersWhere({ parentId }).forEach((folder, index) => {
+    html += `<option value="${folder.id}">${indent} ${folder.name}</option>`;
+    html += createFolderOptionsHtml('', folder.id, indent + '--');
+  });
+
+  return html;
+}
+
+/**
+ * Save the current file. Another piece of code in the codebase is responsible
+ * for auto-saving the file, but this saveFile will be used mainly for any file
+ * that doesn't exist in th vfs yet. It will prompt the user with a modal for a
+ * filename and where to save the file. Finally, the file will be created in the
+ * file-tree which automatically creates the file in the vfs.
+ *
+ * This function get's triggered on each 'save' keystroke, i.e. <cmd/ctrl + s>.
+ */
+function saveFile() {
+  const tab = getActiveEditor();
+
+  if (!tab) return;
+
+  // If the file exists in the vfs, then return, because the contents will be
+  // auto-saved already in another part of the codebase.
+  if (tab.container.getState().fileId) {
+    const file = VFS.findFileById(tab.container.getState().fileId);
+    if (file) return;
+  }
+
+  const folderOptions = createFolderOptionsHtml();
+
+  const $modal = createModal({
+    title: 'Save file',
+    body: `
+    <div class="form-grid">
+      <div class="form-wrapper">
+        <label>Enter a filename:</label>
+        <div class="right-container">
+          <input class="text-input" placeholder="Enter a filename" value="${tab.config.title}" maxlength="30" />
+        </div>
+      </div>
+      <div class="form-wrapper">
+        <label>Select a folder:</label>
+        <div class="right-container">
+          <select class="select">
+            <option value="root">/</option>
+            ${folderOptions}
+          </select>
+        </div>
+      </div>
+    </div>
+    `,
+    footer: `
+      <button type="button" class="button cancel-btn">Cancel</button>
+      <button type="button" class="button confirm-btn primary-btn">Save</button>
+    `,
+    attrs: {
+      id: 'ide-save-file-modal',
+      class: 'save-file-modal'
+    }
+  });
+
+  showModal($modal);
+  $modal.find('.text-input').focus().select();
+
+  $modal.find('.cancel-btn').click(() => hideModal($modal));
+  $modal.find('.primary-btn').click(() => {
+    const filename = $modal.find('.text-input').val();
+
+    let folderId = $modal.find('.select').val();
+    if (folderId === 'root') {
+      folderId = null;
+    }
+
+    // Create a new file in the file-tree, which automatically creates the
+    // file for us in the vfs.
+    const nodeId = $('#file-tree').jstree('create_node', folderId, {
+      text: filename,
+      type: 'file',
+    });
+
+    // Change the Untitled tab to the new filename.
+    tab.container.setTitle(filename);
+
+    // Update the container state.
+    tab.container.setState({ fileId: nodeId });
+
+    // For some reason no layout update is triggered, so we trigger an update.
+    window._layout.emit('stateChanged');
+
+    hideModal($modal);
+  });
+}
+
 /**
  * Runs the code inside the worker by sending all files to the worker along with
  * the current active tab name. If the `fileId` is set, then solely that file
@@ -124,10 +219,13 @@ function openFile(id, filename) {
 function runCode(fileId = null, clearTerm = false) {
   if (clearTerm) term.reset();
 
-  if ($('#run-code').prop('disabled')) {
-    return;
-  } else if (window._workerApi.isRunningCode) {
-    return window._workerApi.restart(true);
+  if (window._workerApi) {
+    if (!window._workerApi.isReady) {
+      // Worker API is busy, wait for it to be done.
+      return;
+    } else if (window._workerApi.isRunningCode) {
+      return window._workerApi.restart(true);
+    }
   }
 
   $('#run-code').prop('disabled', true);
@@ -174,7 +272,7 @@ function checkForStopCodeButton() {
     const newText = $button.text().replace('Run', 'Stop');
     $button.text(newText)
       .prop('disabled', false)
-      .removeClass('run-code-btn')
+      .removeClass('primary-btn')
       .addClass('danger-btn');
   }, 1000);
 }
@@ -251,7 +349,11 @@ function EditorComponent(container, state) {
   this.editor.commands.addCommand({
     name: 'save',
     bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
-    exec: () => { }
+    exec: () => {
+      if (isIDE) {
+        saveFile();
+      }
+    }
   });
 
   if (isIDE) {
@@ -709,7 +811,7 @@ class Layout extends GoldenLayout {
 
   getRunCodeButtonHtml = () => {
     const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
-    return `<button id="run-code" class="button run-code-btn" disabled>Run (${runCodeShortcut})</button>`;
+    return `<button id="run-code" class="button primary-btn" disabled>Run (${runCodeShortcut})</button>`;
   };
 
   getClearTermButtonHtml = () => '<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>';

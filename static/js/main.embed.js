@@ -66,11 +66,11 @@ function initApp() {
 
     $('body').addClass(isVertical ? 'vertical' : 'horizontal');
 
-    // Call the init function that creates all components.
-    layout.init();
-
     // Make layout instance available at all times.
     window._layout = layout;
+
+    // Call the init function that creates all components.
+    layout.init();
 
     resolve({ layout });
   });

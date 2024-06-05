@@ -59,36 +59,22 @@ function createFileTreeFromVFS(parentId = null) {
  * @param {jsTree.Node} node - The node to delete.
  */
 function deleteFileTreeItem(node) {
-  const modalHtml = `
-    <div id="ide-delete-confirmation-modal" class="modal delete-confirmation-modal" tabindex="-1">
-      <div class="modal-content">
-        <div class="modal-header">
-          <p class="modal-title">Confirmation required</p>
-        </div>
-        <div class="modal-body">
-          <p>Are you sure you want to delete the ${node.type} <strong>${node.text}</strong> permanently? This action can't be undone.</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="button cancel-btn">Cancel</button>
-          <button type="button" class="button confirm-btn danger-btn">I'm sure</button>
-        </div>
-      </div>
-    </div>
-  `;
-  $('body').append(modalHtml);
+  const $modal = createModal({
+    title: 'Confirmation required',
+    body: `<p>Are you sure you want to delete the ${node.type} <strong>${node.text}</strong> permanently? This action can't be undone.</p>`,
+    footer: `
+      <button type="button" class="button cancel-btn">Cancel</button>
+      <button type="button" class="button confirm-btn danger-btn">I'm sure</button>
+    `,
+    attrs: {
+      id: 'ide-delete-confirmation-modal',
+      class: 'delete-confirmation-modal'
+    }
+  });
 
-  $modal = $('#ide-delete-confirmation-modal');
+  showModal($modal);
 
-  const hideModal = () => {
-    $modal.removeClass('show');
-
-    // Wait for animation to be completed.
-    setTimeout(() => {
-      $modal.remove();
-    }, 300);
-  };
-
-  $modal.find('.cancel-btn').click(hideModal);
+  $modal.find('.cancel-btn').click(() => hideModal($modal));
   $modal.find('.confirm-btn').click(() => {
     // Delete from file-tree, including VFS.
     $('#file-tree').jstree('delete_node', node);
@@ -99,12 +85,8 @@ function deleteFileTreeItem(node) {
       closeFilesInFolderRecursively(node.id);
     }
 
-    hideModal();
+    hideModal($modal);
   });
-
-  // Use setTimeout trick to add the class after the modal HTML has been
-  // rendered to the DOM to show the fade-in animation.
-  setTimeout(() => $modal.addClass('show'), 10);
 }
 
 /**

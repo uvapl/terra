@@ -26,12 +26,12 @@
   border-color: #606060;
 }
 
-.run-code-btn {
+.primary-btn {
   background: #62c0ff;
 }
 
 /* loading spinner */
-.run-code-btn.loading:before {
+.primary-btn.loading:before {
   content: '';
   display: inline-block;
   width: 10px;
@@ -46,7 +46,7 @@
   animation: spin 1s linear infinite;
 }
 
-.run-code-btn:not([disabled]):active {
+.primary-btn:not([disabled]):active {
   background: #5dabdf;
 }
 

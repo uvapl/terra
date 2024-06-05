@@ -52,10 +52,6 @@
   overflow: hidden;
 }
 
-.delete-confirmation-modal .modal-footer {
-  justify-content: space-between;
-}
-
 .dark-mode .lm_tab.lm_active .lm_close_tab {
   background-image: url('../img/icons/close-white.png');
 }
