@@ -5,6 +5,7 @@
 .lm_goldenlayout,
 .lm_goldenlayout > div {
   min-width: 100% !important;
+  height: 100% !important;
 }
 
 .lm_header .lm_tab {
