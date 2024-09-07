@@ -1,4 +1,5 @@
 @import 'include/base.css';
+@import 'include/form.css';
 @import 'include/button.css';
 @import 'include/ide/navbar.css';
 @import 'include/ide/file-tree.css';

@@ -8,6 +8,7 @@
 
 initApp().then(({ layout }) => {
   createFileTree();
+  createGitFSWorker();
 }).catch((err) => {
   console.error('Failed to bootstrap IDE app:', err);
 });

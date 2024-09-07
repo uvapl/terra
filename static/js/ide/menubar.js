@@ -113,7 +113,7 @@ function registerMenubarEventListeners() {
 
   $('#menu-item--run-tab').click(Menubar.runTab);
 
-  $('#menu-item--add-ssh-key').click(Menubar.addSshKey);
+  $('#menu-item--add-credentials').click(Menubar.addCredentials);
   $('#menu-item--connect-repo').click(Menubar.connectRepo);
 }
 
@@ -172,16 +172,32 @@ Menubar.runTab = () => {
   getActiveEditor().instance.editor.execCommand('run');
 }
 
-Menubar.addSshKey = () => {
+Menubar.addCredentials = () => {
   const $modal = createModal({
-    title: 'Add SSH key',
-    body: '<textarea class="text-input full-width-input ssh-key" placeholder="Fill in your public SSH key"></textarea>',
+    title: 'Add GitHub credentials',
+    body: `
+      <div class="form-wrapper-full-width">
+        <label>Username:</label>
+        <input type="text" class="text-input git-user" placeholder="Fill in your username" />
+      </div>
+
+      <div class="form-wrapper-full-width">
+        <label>Personal access token:</label>
+        <input type="password" class="text-input git-access-token" placeholder="Fill in your personal access token" />
+      </div>
+
+      <p class="text-small">
+        In order to clone private repositories or push and pull contents from any
+        repository, your GitHub credentials are required. These credentials will
+        be stored locally in your browser and will not be shared with anyone.
+      </p>
+    `,
     footer: `
       <button type="button" class="button cancel-btn">Cancel</button>
       <button type="button" class="button primary-btn confirm-btn">Save</button>
     `,
     attrs: {
-      id: 'ide-add-ssh-key-modal',
+      id: 'ide-git-creds-modal',
       class: 'modal-width-small',
     }
   });
@@ -190,10 +206,13 @@ Menubar.addSshKey = () => {
 
   $modal.find('.cancel-btn').click(() => hideModal($modal));
   $modal.find('.confirm-btn').click(() => {
-    const sshKey = $modal.find('.ssh-key').val();
-    setLocalStorageItem('ssh-key', sshKey);
-
-    hideModal($modal);
+    const username = $modal.find('.git-user').val();
+    const accessToken = $modal.find('.git-access-token').val();
+    if (username && accessToken) {
+      setLocalStorageItem('git-user', username);
+      setLocalStorageItem('git-access-token', accessToken);
+      hideModal($modal);
+    }
   });
 }
 
@@ -201,7 +220,7 @@ Menubar.connectRepo = () => {
   const $modal = createModal({
     title: 'Connect repository',
     body: `
-      <p>You can link any repository from any provider, such as GitHub, GitLab, BitBucket and more.</p>
+      <p>For now, we only support GitHub repository links.</p>
       <input class="text-input full-width-input repo-link" placeholder="Fill in a repository link"></textarea>
     `,
     footer: `
@@ -218,10 +237,15 @@ Menubar.connectRepo = () => {
 
   $modal.find('.cancel-btn').click(() => hideModal($modal));
   $modal.find('.confirm-btn').click(() => {
-    // TODO: verify the repo link
     const repoLink = $modal.find('.repo-link').val();
-    setLocalStorageItem('connected-repo', repoLink);
 
+    // For now, we only allow GitHub repo links.
+    if (!/^https:\/\/github.com\/[\w-]+\/[\w-]+(?:\.git)?/.test(repoLink)) {
+      alert('Invalid GitHub repository');
+      return;
+    }
+
+    setLocalStorageItem('connected-repo', repoLink);
     hideModal($modal);
   });
 }

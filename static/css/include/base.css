@@ -94,51 +94,6 @@ body {
   backdrop-filter: blur(1px) grayscale(40%);
 }
 
-textarea {
-  min-height: 100px;
-  max-height: 300px;
-  min-width: 100%;
-  max-width: 100%;
-}
-
-.text-input,
-.select {
-  background-color: #fff;
-  border: 1px solid var(--border-color);
-  border-radius: 3px;
-  padding: 4px 5px;
-  font: inherit;
-}
-
-.select:focus,
-.text-input:focus {
-  outline: 0;
-  border-color: var(--color-black);
-}
-
-.full-width-input {
-  width: 100%;
-}
-
-.form-wrapper {
-  display: flex;
-}
-
-.form-wrapper + .form-wrapper {
-  margin-top: 10px;
-}
-
-.form-wrapper input,
-.form-wrapper select {
-  width: 100%;
-}
-
-.form-wrapper label,
-.form-wrapper .right-container {
-  width: 50%;
-}
-
-
-.form-wrapper label {
-  white-space: nowrap;
+.text-small {
+  font-size: 11px;
 }
