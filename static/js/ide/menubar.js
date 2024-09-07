@@ -178,7 +178,7 @@ Menubar.addSshKey = () => {
     body: '<textarea class="text-input full-width-input ssh-key" placeholder="Fill in your public SSH key"></textarea>',
     footer: `
       <button type="button" class="button cancel-btn">Cancel</button>
-      <button type="button" class="button confirm-btn">Save</button>
+      <button type="button" class="button primary-btn confirm-btn">Save</button>
     `,
     attrs: {
       id: 'ide-add-ssh-key-modal',
@@ -198,5 +198,30 @@ Menubar.addSshKey = () => {
 }
 
 Menubar.connectRepo = () => {
-  console.log('TODO: connect repo');
+  const $modal = createModal({
+    title: 'Connect repository',
+    body: `
+      <p>You can link any repository from any provider, such as GitHub, GitLab, BitBucket and more.</p>
+      <input class="text-input full-width-input repo-link" placeholder="Fill in a repository link"></textarea>
+    `,
+    footer: `
+      <button type="button" class="button cancel-btn">Cancel</button>
+      <button type="button" class="button primary-btn confirm-btn">Connect</button>
+    `,
+    attrs: {
+      id: 'ide-connect-repo-modal',
+      class: 'modal-width-small',
+    }
+  });
+
+  showModal($modal);
+
+  $modal.find('.cancel-btn').click(() => hideModal($modal));
+  $modal.find('.confirm-btn').click(() => {
+    // TODO: verify the repo link
+    const repoLink = $modal.find('.repo-link').val();
+    setLocalStorageItem('connected-repo', repoLink);
+
+    hideModal($modal);
+  });
 }
