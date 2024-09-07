@@ -112,6 +112,9 @@ function registerMenubarEventListeners() {
   $('#menu-item--replace').click(Menubar.replace);
 
   $('#menu-item--run-tab').click(Menubar.runTab);
+
+  $('#menu-item--add-ssh-key').click(Menubar.addSshKey);
+  $('#menu-item--connect-repo').click(Menubar.connectRepo);
 }
 
 const Menubar = {};
@@ -167,4 +170,33 @@ Menubar.replace = () => {
 
 Menubar.runTab = () => {
   getActiveEditor().instance.editor.execCommand('run');
+}
+
+Menubar.addSshKey = () => {
+  const $modal = createModal({
+    title: 'Add SSH key',
+    body: '<textarea class="text-input full-width-input ssh-key" placeholder="Fill in your public SSH key"></textarea>',
+    footer: `
+      <button type="button" class="button cancel-btn">Cancel</button>
+      <button type="button" class="button confirm-btn">Save</button>
+    `,
+    attrs: {
+      id: 'ide-add-ssh-key-modal',
+      class: 'modal-width-small',
+    }
+  });
+
+  showModal($modal);
+
+  $modal.find('.cancel-btn').click(() => hideModal($modal));
+  $modal.find('.confirm-btn').click(() => {
+    const sshKey = $modal.find('.ssh-key').val();
+    setLocalStorageItem('ssh-key', sshKey);
+
+    hideModal($modal);
+  });
+}
+
+Menubar.connectRepo = () => {
+  console.log('TODO: connect repo');
 }

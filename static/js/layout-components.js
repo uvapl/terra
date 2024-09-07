@@ -171,7 +171,7 @@ function saveFile() {
     `,
     attrs: {
       id: 'ide-save-file-modal',
-      class: 'save-file-modal'
+      class: 'modal-width-small'
     }
   });
 

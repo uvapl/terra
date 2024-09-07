@@ -94,6 +94,13 @@ body {
   backdrop-filter: blur(1px) grayscale(40%);
 }
 
+textarea {
+  min-height: 100px;
+  max-height: 300px;
+  min-width: 100%;
+  max-width: 100%;
+}
+
 .text-input,
 .select {
   background-color: #fff;
@@ -107,6 +114,10 @@ body {
 .text-input:focus {
   outline: 0;
   border-color: var(--color-black);
+}
+
+.full-width-input {
+  width: 100%;
 }
 
 .form-wrapper {

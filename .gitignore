@@ -1,4 +1,5 @@
 # Custom
+server.py
 static/wasm/py/stdlib
 
 # Project
