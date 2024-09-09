@@ -1,20 +1,9 @@
-// NOTE: The libgit2.js hardcoded a `var wasmBinaryFile = "lg2.wasm"`, so the
-// libgit2.js has been modified to use this `wasmBinaryFilePath` variable that
-// can now be configured externally in order to make this work.
-const wasmBinaryFilePath = '../../wasm/git/libgit2.wasm';
-
 let accessToken = null;
 XMLHttpRequest.prototype._open = XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
   this._open(method, url, async, user, password);
   this.setRequestHeader('Authorization', `Bearer ${accessToken}`);
 }
-
-// Libgit will add two global variables:
-// - Module: The libgit2 module
-// - FS: The filesystem
-self.importScripts('../vendor/libgit2.js');
-
 
 class API {
   /**
@@ -39,24 +28,22 @@ class API {
     accessToken = options.accessToken;
     this.repoLink = options.repoLink;
 
-    this.readyCallback = options.readyCallback;
-
-    this._init();
+    this._init().then(() => {
+      options.readyCallback();
+    });
   }
 
   async _init() {
-    this.lg = await (new Promise(resolve => {
-      Module.onRuntimeInitialized = () => {
-        console.log('Initialized libgit2 successfully');
-        this.readyCallback();
-        resolve(Module);
-      }
-    }));
+    const lg2mod = await import(new URL('../vendor/lg2.js', import.meta.url));
+    this.lg = await lg2mod.default();
+    this.fs = this.lg.FS;
+    this.fs.writeFile('/home/web_user/.gitconfig',
+      `[user]
+    name = "Proglab IDE"
+    email = ide@proglab.nl`);
 
-    this.fs = FS;
 
     this.clone('http://localhost:5000/kkoomen/ide-test');
-    // this.clone('http://localhost:5000/kkoomen/qbr');
   }
 
   clone(link) {
@@ -80,33 +67,22 @@ class API {
   }
 }
 
-// =============================================================================
-// Worker message handling.
-// =============================================================================
+// // =============================================================================
+// // Worker message handling.
+// // =============================================================================
 
 let api;
-let port;
 
-const onAnyMessage = async event => {
+self.onmessage = (event) => {
   switch (event.data.id) {
     case 'constructor':
-      const { port, ...args } = event.data.data;
-      port.onmessage = onAnyMessage;
       api = new API({
-        ...args,
+        ...event.data.data,
 
         readyCallback() {
-          port.postMessage({ id: 'ready' });
+          postMessage({ id: 'ready' });
         },
       });
       break;
-
-    // EXAMPLE
-    // ----------------------------------------
-    // case 'runButtonCommand':
-    //   api.runButtonCommand(event.data.data);
-    //   break;
   }
 };
-
-self.onmessage = onAnyMessage;

@@ -1,10 +1,11 @@
 /**
  * GitFS worker class that handles all Git operations using wasm-git.
+ * This is the bridge class between the app and the git.worker.js.
  * @see https://github.com/petersalomonsen/wasm-git
  */
 class GitFS {
   /**
-   * The user's personal access token used for authentication.
+   * The user's personal GitHub access token used for authentication.
    * @type {string}
    */
   _accessToken = null;
@@ -45,21 +46,16 @@ class GitFS {
 
     console.log('Spawning new git worker');
 
-    this.worker = new Worker('static/js/workers/git.worker.js');
-    const channel = new MessageChannel();
-    this.port = channel.port1;
-    this.port.onmessage = this.onmessage.bind(this);
-    const remotePort = channel.port2;
-    const constructorData = {
-      port: remotePort,
-      accessToken: this._accessToken,
-      repoLink: this._repoLink,
-    };
+    this.worker = new Worker('static/js/workers/git.worker.js', { type: 'module' });
+    this.worker.onmessage = this.onmessage.bind(this);
 
     this.worker.postMessage({
       id: 'constructor',
-      data: constructorData,
-    }, [remotePort]);
+      data: {
+        accessToken: this._accessToken,
+        repoLink: this._repoLink,
+      },
+    });
   }
 
   /**
