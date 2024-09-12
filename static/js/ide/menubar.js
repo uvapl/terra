@@ -177,18 +177,13 @@ Menubar.addCredentials = () => {
     title: 'Add GitHub credentials',
     body: `
       <div class="form-wrapper-full-width">
-        <label>Username:</label>
-        <input type="text" class="text-input git-user" placeholder="Fill in your username" />
-      </div>
-
-      <div class="form-wrapper-full-width">
         <label>Personal access token:</label>
         <input type="password" class="text-input git-access-token" placeholder="Fill in your personal access token" />
       </div>
 
       <p class="text-small">
         In order to clone private repositories or push and pull contents from any
-        repository, your GitHub credentials are required. These credentials will
+        repository, your GitHub personal access token is required. These credentials will
         be stored locally in your browser and will not be shared with anyone.
       </p>
     `,
@@ -220,7 +215,7 @@ Menubar.connectRepo = () => {
   const $modal = createModal({
     title: 'Connect repository',
     body: `
-      <p>For now, we only support GitHub repository links.</p>
+      <p>Only GitHub repostory links are supported.</p>
       <input class="text-input full-width-input repo-link" placeholder="Fill in a repository link"></textarea>
     `,
     footer: `
