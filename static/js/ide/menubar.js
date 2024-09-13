@@ -201,10 +201,8 @@ Menubar.addCredentials = () => {
 
   $modal.find('.cancel-btn').click(() => hideModal($modal));
   $modal.find('.confirm-btn').click(() => {
-    const username = $modal.find('.git-user').val();
     const accessToken = $modal.find('.git-access-token').val();
-    if (username && accessToken) {
-      setLocalStorageItem('git-user', username);
+    if (accessToken) {
       setLocalStorageItem('git-access-token', accessToken);
       hideModal($modal);
     }
