@@ -248,5 +248,6 @@ Menubar.connectRepo = () => {
 
     setLocalStorageItem('connected-repo', repoLink);
     hideModal($modal);
+    createGitFSWorker();
   });
 }

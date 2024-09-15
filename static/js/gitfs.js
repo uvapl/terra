@@ -5,12 +5,6 @@
  */
 class GitFS {
   /**
-   * The user's personal GitHub access token used for authentication.
-   * @type {string}
-   */
-  _accessToken = null;
-
-  /**
    * The repository link that the user is connected to.
    * @type {string}
    */
@@ -28,15 +22,17 @@ class GitFS {
    */
   worker = null;
 
-  constructor(accessToken, repoLink) {
-    this._accessToken = accessToken;
+  constructor(repoLink) {
     this._repoLink = repoLink;
   }
 
   /**
    * Creates a new worker process.
+   *
+   * @param {string} username - The username of the user's account.
+   * @param {string} accessToken - The user's personal access token.
    */
-  _createWorker() {
+  _createWorker(username, accessToken) {
     if (this.worker instanceof Worker) {
       console.error('[GitFS] failed to create a new worker as an instance is already running');
       return;
@@ -52,10 +48,45 @@ class GitFS {
     this.worker.postMessage({
       id: 'constructor',
       data: {
-        accessToken: this._accessToken,
+        username: username,
+        accessToken: accessToken,
+        repoLink: this._repoLink,
+        isDev: isDev,
+      },
+    });
+  }
+
+  terminate() {
+    console.log('Terminating existing GitFS worker')
+    this.worker.terminate();
+  }
+
+  setRepoLink() {
+    this.worker.postMessage({
+      id: 'setRepoLink',
+      data: {
         repoLink: this._repoLink,
       },
     });
+  }
+
+  clone() {
+    this.worker.postMessage({ id: 'clone' });
+  }
+
+  commit() {
+    const tab = getActiveEditor();
+    this.worker.postMessage({
+      id: 'commit',
+      data: {
+        filename: tab.config.title,
+        filecontents: tab.container.getState().value,
+      },
+    });
+  }
+
+  push() {
+    this.worker.postMessage({ id: 'push' });
   }
 
   /**
@@ -69,9 +100,21 @@ class GitFS {
       // libgit2 has been initialised successfully.
       case 'ready':
         this.isReady = true;
+
+        // Clone the repo as soon as the worker is ready.
+        this.clone();
         break;
     }
   }
+}
+
+/**
+ * Check whether the GitFS worker has been initialised.
+ *
+ * @returns {boolean} True if the worker has been initialised, false otherwise.
+ */
+function hasGitFSWorker() {
+  return window._gitFS instanceof GitFS;
 }
 
 /**
@@ -81,11 +124,17 @@ class GitFS {
  * repository.
  */
 function createGitFSWorker() {
+  const username = getLocalStorageItem('git-username');
   const accessToken = getLocalStorageItem('git-access-token');
   const repoLink = getLocalStorageItem('connected-repo');
-  if (!(window._gitFS instanceof GitFS) && accessToken && repoLink) {
-    const gitFS = new GitFS(accessToken, repoLink);
+
+  if (hasGitFSWorker()) {
+    window._gitFS.terminate();
+  }
+
+  if (username && accessToken && repoLink) {
+    const gitFS = new GitFS(repoLink);
     window._gitFS = gitFS;
-    gitFS._createWorker();
+    gitFS._createWorker(username, accessToken);
   }
 }

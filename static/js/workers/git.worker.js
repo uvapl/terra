@@ -18,26 +18,43 @@ class API {
   repoDir = 'project';
 
   /**
-   * The user's GitHub username.
-   * @type {string}
+   * Whether to app is running development mode.
+   * @type {boolean}
    */
-  username = null;
+  isDev = false;
 
   /**
-   * The user's personal GitHub access token.
-   * @type {[TODO:type]}
+   * The absolute link to the repository.
+   * @type {string}
    */
-  accessToken = null;
+  repoLink = null;
+
+  /**
+   * Defines the URL to the proxy server used for local development.
+   * @type {string}
+   */
+  proxyUrl = 'http://localhost:5000';
+
+  /**
+   * Whether there are new commits that need to be pushed.
+   * @type {boolean}
+   */
+  hasNewCommits = false;
 
   constructor(options) {
-    this.username = options.username;
-    this.accessToken = options.accessToken;
-    this.repoLink = options.repoLink;
+    this.isDev = options.isDev;
 
-    this._alterXHR();
+    this.setRepoLink(options.repoLink);
+    this._alterXHR(options.username, options.accessToken);
     this._init().then(() => {
       options.readyCallback();
     });
+  }
+
+  setRepoLink(repoLink) {
+    this.repoLink = this.isDev
+      ? repoLink.replace(new URL(repoLink).origin, this.proxyUrl)
+      : repoLink;
   }
 
   /**
@@ -57,16 +74,23 @@ class API {
       ].join('\n')
     );
 
-    this.clone('http://localhost:5000/kkoomen/ide-test');
+    // Setup a timer that triggers a push once per minute.
+    this.pushIntervalId = setInterval(() => {
+      if (this.hasNewCommits) {
+        this.push();
+        this.hasNewCommits = false;
+      }
+    }, 1000 * 60);
   }
 
   /**
    * Modifies the XMLHttpRequest object to include the user's GitHub credentials
    * essential for cloning/pushing repositories.
+   *
+   * @param {string} username - The username of the user's account.
+   * @param {string} accessToken - The user's personal access token.
    */
-  _alterXHR() {
-    const username = this.username;
-    const accessToken = this.accessToken;
+  _alterXHR(username, accessToken) {
     XMLHttpRequest.prototype._open = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
       this._open(method, url, async, user, password);
@@ -75,43 +99,70 @@ class API {
     }
   }
 
-  clone(link) {
-    console.log('Cloning', link);
-    this.lg.callMain(['clone', link, this.repoDir]);
+  /**
+   * Clone a repository to the local wasm-git filesystem and `cd` into the
+   * cloned directory.
+   */
+  clone() {
+    this.lg.callMain(['clone', this.repoLink, this.repoDir]);
     this.fs.chdir(this.repoDir);
-    this.fs.syncfs(false, () => {
-      console.log(this.repoDir, 'stored to indexeddb');
-    });
-    console.log('Dir contents:', this.fs.readdir('.'));
+  }
 
-    const filename = 'README.md';
-    const filecontents = 'Made through gitfs in uvapl!';
+  /**
+   * Commit a file to the repository by writing its contents to a file, adding
+   * it to the staging area and committing it.
+   * @param {string} filename - The name of the file to commit.
+   * @param {string} filecontents - The contents of the file to commit.
+   */
+  commit(filename, filecontents) {
+    this.hasNewCommits = true;
     this.fs.writeFile(filename, filecontents);
-    console.log('File contents:', this.fs.readFile(filename));
-    console.log('Dir contents:', this.fs.readdir('.'));
-
-    this.lg.callMain(['add', '--verbose', filename]);
+    this.lg.callMain(['add', filename]);
     this.lg.callMain(['commit', '-m', `Added ${filename}`]);
+  }
+
+  /**
+   * Trigger a push to the remote repository.
+   */
+  push() {
     this.lg.callMain(['push'])
   }
 }
 
-// // =============================================================================
-// // Worker message handling.
-// // =============================================================================
+// =============================================================================
+// Worker message handling.
+// =============================================================================
 
 let api;
 
 self.onmessage = (event) => {
+  const payload = event.data.data;
+
   switch (event.data.id) {
     case 'constructor':
       api = new API({
-        ...event.data.data,
+        ...payload,
 
         readyCallback() {
           postMessage({ id: 'ready' });
         },
       });
+      break;
+
+    case 'setRepoLink':
+      api.setRepoLink(payload.repoLink);
+      break;
+
+    case 'clone':
+      api.clone();
+      break;
+
+    case 'commit':
+      api.commit(payload.filename, payload.filecontents);
+      break;
+
+    case 'push':
+      api.push();
       break;
   }
 };

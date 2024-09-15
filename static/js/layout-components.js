@@ -463,6 +463,21 @@ function EditorComponent(container, state) {
         content: this.editor.getValue(),
       });
     }
+
+    if (isIDE && hasGitFSWorker()) {
+      if (this.gitCommitTimeoutId) {
+        clearTimeout(this.gitCommitTimeoutId);
+      }
+
+      // Only commit changes after 2 seconds of inactivity.
+      this.gitCommitTimeoutId = setTimeout(() => {
+        console.log('committing changes');
+        window._gitFS.commit(
+          container.parent.config.title,
+          this.editor.getValue(),
+        );
+      }, 2000);
+    }
   });
 
   this.editor.on('focus', () => {
