@@ -476,7 +476,7 @@ function EditorComponent(container, state) {
         window._gitFS.commit(
           this.editor.getValue(),
         );
-      }, 2000);
+      }, seconds(2));
     }
   });
 
