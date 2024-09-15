@@ -177,14 +177,20 @@ Menubar.addCredentials = () => {
     title: 'Add GitHub credentials',
     body: `
       <div class="form-wrapper-full-width">
+        <label>Username:</label>
+        <input type="username" class="text-input full-width-input git-username" placeholder="Fill in your username" />
+      </div>
+
+      <div class="form-wrapper-full-width">
         <label>Personal access token:</label>
-        <input type="password" class="text-input git-access-token" placeholder="Fill in your personal access token" />
+        <input type="password" class="text-input full-width-input git-access-token" placeholder="Fill in your personal access token" />
       </div>
 
       <p class="text-small">
         In order to clone private repositories or push and pull contents from any
-        repository, your GitHub personal access token is required. These credentials will
-        be stored locally in your browser and will not be shared with anyone.
+        repository, your GitHub personal access token and username is required.
+        These credentials will be stored locally in your browser and will not be
+        shared with anyone.
       </p>
     `,
     footer: `
@@ -201,8 +207,10 @@ Menubar.addCredentials = () => {
 
   $modal.find('.cancel-btn').click(() => hideModal($modal));
   $modal.find('.confirm-btn').click(() => {
+    const username = $modal.find('.git-username').val();
     const accessToken = $modal.find('.git-access-token').val();
-    if (accessToken) {
+    if (accessToken && username) {
+      setLocalStorageItem('git-username', username);
       setLocalStorageItem('git-access-token', accessToken);
       hideModal($modal);
     }
