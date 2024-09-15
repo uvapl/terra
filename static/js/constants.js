@@ -13,7 +13,7 @@ const BASE_FONT_SIZE = 18;
 /**
  * The interval time between auto-saves, defined in milliseconds.
  */
-const AUTOSAVE_INTERVAL = minutes(1);
+const AUTOSAVE_INTERVAL = 60 * 1000;
 
 /**
  * To prevent each user will do a POST request for the auto-save at the exact
@@ -21,7 +21,7 @@ const AUTOSAVE_INTERVAL = minutes(1);
  * AUTOSAVE_START_OFFSET value. After this time, the actual timer will start.
  * The offset is defined in milliseconds.
  */
-const AUTOSAVE_START_OFFSET = minutes(1);
+const AUTOSAVE_START_OFFSET = 60 * 1000;
 
 /**
  * Checks whether the current app is the IDE or the embed.
