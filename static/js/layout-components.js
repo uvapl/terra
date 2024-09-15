@@ -471,9 +471,9 @@ function EditorComponent(container, state) {
 
       // Only commit changes after 2 seconds of inactivity.
       this.gitCommitTimeoutId = setTimeout(() => {
-        console.log('committing changes');
+        const filename = container.parent.config.title;
+        console.log(`Committing changes to ${filename}`);
         window._gitFS.commit(
-          container.parent.config.title,
           this.editor.getValue(),
         );
       }, 2000);

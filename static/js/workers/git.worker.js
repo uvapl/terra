@@ -100,6 +100,21 @@ class API {
   }
 
   /**
+   * Check whether a given filepath exists in the filesystem.
+   *
+   * @param {string} filepath - The filepath to check.
+   * @returns {booleab} True if the given filepath exists, false otherwise.
+   */
+  fileExists(filepath) {
+    try {
+      this.fs.readFile(filepath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Clone a repository to the local wasm-git filesystem and `cd` into the
    * cloned directory.
    */
@@ -115,10 +130,11 @@ class API {
    * @param {string} filecontents - The contents of the file to commit.
    */
   commit(filename, filecontents) {
-    this.hasNewCommits = true;
+    const commitPrefix = !this.fileExists(filename) ? 'Add' : 'Update';
     this.fs.writeFile(filename, filecontents);
     this.lg.callMain(['add', filename]);
-    this.lg.callMain(['commit', '-m', `Added ${filename}`]);
+    this.lg.callMain(['commit', '-m', `${commitPrefix} ${filename}`]);
+    this.hasNewCommits = true;
   }
 
   /**
