@@ -80,7 +80,7 @@ class API {
         this.push();
         this.hasNewCommits = false;
       }
-    }, minutes(1));
+    }, 60 * 1000);
   }
 
   /**

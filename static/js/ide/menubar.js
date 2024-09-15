@@ -173,12 +173,13 @@ Menubar.runTab = () => {
 }
 
 Menubar.addCredentials = () => {
+  const username = getLocalStorageItem('git-username', '');
   const $modal = createModal({
     title: 'Add GitHub credentials',
     body: `
       <div class="form-wrapper-full-width">
         <label>Username:</label>
-        <input type="username" class="text-input full-width-input git-username" placeholder="Fill in your username" />
+        <input type="username" class="text-input full-width-input git-username" value="${username}"placeholder="Fill in your username" />
       </div>
 
       <div class="form-wrapper-full-width">
@@ -218,11 +219,12 @@ Menubar.addCredentials = () => {
 }
 
 Menubar.connectRepo = () => {
+  const repoLink = getLocalStorageItem('connected-repo', '');
   const $modal = createModal({
     title: 'Connect repository',
     body: `
       <p>Only GitHub repostory links are supported.</p>
-      <input class="text-input full-width-input repo-link" placeholder="Fill in a repository link"></textarea>
+      <input class="text-input full-width-input repo-link" value="${repoLink}" placeholder="Fill in a repository link"></textarea>
     `,
     footer: `
       <button type="button" class="button cancel-btn">Cancel</button>
