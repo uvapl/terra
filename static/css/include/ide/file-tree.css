@@ -7,6 +7,10 @@
   flex-direction: column;
 }
 
+.file-tree-container .info-msg {
+  padding: var(--file-tree-padding);
+}
+
 .file-tree-container .title-container {
   padding: var(--file-tree-padding);
   display: flex;

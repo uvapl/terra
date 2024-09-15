@@ -7,8 +7,13 @@
 // ===========================================================================
 
 initApp().then(({ layout }) => {
-  createFileTree();
-  createGitFSWorker();
+  // Fetch the repo files or the local storage files (vfs) otherwise.
+  const repoLink = getLocalStorageItem('connected-repo');
+  if (repoLink) {
+    createGitFSWorker();
+  } else {
+    createFileTree();
+  }
 }).catch((err) => {
   console.error('Failed to bootstrap IDE app:', err);
 });

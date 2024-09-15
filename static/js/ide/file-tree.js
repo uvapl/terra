@@ -189,6 +189,9 @@ function sortFileTree(a, b) {
  * Instantiates the file tree with the files in the VFS using TreeJS.
  */
 function createFileTree() {
+  // Make sure we destroy the existing tree instance if it exists.
+  $('#file-tree').jstree('destroy');
+
   const $tree = $('#file-tree').jstree({
     core: {
       animation: 0,
@@ -224,11 +227,11 @@ function createFileTree() {
     plugins: ['conditionalselect', 'contextmenu', 'sort', 'types', 'dnd'],
   });
 
-  $('#file-tree--add-folder-btn').click(() => {
+  $('#file-tree--add-folder-btn').off('click').on('click', () => {
     createNewFileTreeFolder();
   });
 
-  $('#file-tree--add-file-btn').click(() => {
+  $('#file-tree--add-file-btn').off('click').on('click', () => {
     createNewFileTreeFile();
   });
 

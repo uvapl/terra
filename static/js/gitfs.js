@@ -95,14 +95,26 @@ class GitFS {
    * @param {object} event - Event object coming from the UI.
    */
   onmessage(event) {
+    const payload = event.data.data;
+
     switch (event.data.id) {
       // Ready callback from the worker instance. This will be run after
       // libgit2 has been initialised successfully.
       case 'ready':
         this.isReady = true;
 
-        // Clone the repo as soon as the worker is ready.
-        this.clone();
+        const { repoFiles } = payload;
+
+        // Remove all files from the virtual filesystem.
+        VFS.clear();
+
+        // Put repo files inside the virtual filesystem.
+        for (const file of repoFiles) {
+          VFS.createFile(file);
+        }
+
+        // Refresh the file tree.
+        createFileTree();
         break;
     }
   }
@@ -130,11 +142,13 @@ function createGitFSWorker() {
 
   if (hasGitFSWorker()) {
     window._gitFS.terminate();
+    window._gitFS = null;
   }
 
   if (username && accessToken && repoLink) {
     const gitFS = new GitFS(repoLink);
     window._gitFS = gitFS;
     gitFS._createWorker(username, accessToken);
+    $('#file-tree').jstree('destroy').html('<div class="info-msg">Cloning repository...</div>');
   }
 }

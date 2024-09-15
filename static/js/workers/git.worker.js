@@ -46,8 +46,8 @@ class API {
 
     this.setRepoLink(options.repoLink);
     this._alterXHR(options.username, options.accessToken);
-    this._init().then(() => {
-      options.readyCallback();
+    this._init().then((repoFiles) => {
+      options.readyCallback(repoFiles);
     });
   }
 
@@ -81,6 +81,23 @@ class API {
         this.hasNewCommits = false;
       }
     }, 60 * 1000);
+
+    // Clone the repo as soon as the worker is ready.
+    this.clone();
+
+    const repoFiles = this.fs.readdir('.')
+      .filter((filename) => !['.', '..', '.git'].includes(filename))
+      .map((filename) => {
+        const stat = this.fs.stat(filename);
+        return {
+          name: filename,
+          content: this.fs.readFile(filename, { encoding: 'utf8' }),
+          createdAt: new Date(stat.ctime).toISOString(),
+          updatedAt: new Date(stat.mtime).toISOString(),
+        }
+      });
+
+    return repoFiles;
   }
 
   /**
@@ -159,8 +176,11 @@ self.onmessage = (event) => {
       api = new API({
         ...payload,
 
-        readyCallback() {
-          postMessage({ id: 'ready' });
+        readyCallback(repoFiles) {
+          postMessage({
+            id: 'ready',
+            data: { repoFiles }
+          });
         },
       });
       break;

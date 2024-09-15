@@ -11,6 +11,15 @@ class VirtualFileSystem {
   }
 
   /**
+   * Clear the virtual filesystem, removing all files and folders permantly.
+   */
+  clear = () => {
+    this.files = [];
+    this.folders = [];
+    this.saveState();
+  }
+
+  /**
    * Load the saved virtual filesystem state from local storage.
    */
   loadFromLocalStorage = () => {
@@ -114,9 +123,9 @@ class VirtualFileSystem {
       name: 'Untitled',
       parentId: null,
       content: '',
-      ...fileObj,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      ...fileObj,
     };
 
     this.files.push(newFile);
@@ -135,9 +144,9 @@ class VirtualFileSystem {
       id: uuidv4(),
       name: 'Untitled',
       parentId: null,
-      ...folderObj,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      ...folderObj,
     };
 
     this.folders.push(newFolder);

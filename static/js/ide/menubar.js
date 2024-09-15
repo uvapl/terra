@@ -220,11 +220,21 @@ Menubar.addCredentials = () => {
 
 Menubar.connectRepo = () => {
   const repoLink = getLocalStorageItem('connected-repo', '');
+
+  const localFilesNotice = repoLink ? '' :
+    `
+    <p class="text-small">
+      ❗️ Local files will be permanently discarded when connecting a new repository.
+      If you want to keep your local files, please download them manually before continuing.
+    </p>
+    `;
+
   const $modal = createModal({
     title: 'Connect repository',
     body: `
-      <p>Only GitHub repostory links are supported.</p>
+      <p>Only GitHub repostory links are supported. Leave empty to disconnect from the repository.</p>
       <input class="text-input full-width-input repo-link" value="${repoLink}" placeholder="Fill in a repository link"></textarea>
+      ${localFilesNotice}
     `,
     footer: `
       <button type="button" class="button cancel-btn">Cancel</button>
@@ -243,12 +253,17 @@ Menubar.connectRepo = () => {
     const repoLink = $modal.find('.repo-link').val();
 
     // For now, we only allow GitHub repo links.
-    if (!/^https:\/\/github.com\/[\w-]+\/[\w-]+(?:\.git)?/.test(repoLink)) {
+    if (repoLink && !/^https:\/\/github.com\/[\w-]+\/[\w-]+(?:\.git)?/.test(repoLink)) {
       alert('Invalid GitHub repository');
       return;
     }
 
-    setLocalStorageItem('connected-repo', repoLink);
+    if (repoLink) {
+      setLocalStorageItem('connected-repo', repoLink);
+    } else {
+      removeLocalStorageItem('connected-repo');
+    }
+
     hideModal($modal);
     createGitFSWorker();
   });
