@@ -38,6 +38,14 @@ initApp().then(({ layout, config }) => {
     lockApp();
   }
 
+  // Catch ctrl-w and cmd-w to prevent the user from closing the tab.
+  $(window).on('beforeunload', (e) => {
+    const message = 'Are you sure you want to leave this page?';
+    e.preventDefault();
+    e.returnValue = message;
+    return message;
+  });
+
 }).catch((err) => {
   console.error('Failed to bootstrap exam app:', err);
 
