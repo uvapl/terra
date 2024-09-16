@@ -214,6 +214,7 @@ Menubar.addCredentials = () => {
       setLocalStorageItem('git-username', username);
       setLocalStorageItem('git-access-token', accessToken);
       hideModal($modal);
+      createGitFSWorker();
     }
   });
 }

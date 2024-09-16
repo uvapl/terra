@@ -117,10 +117,32 @@ class API {
   }
 
   /**
+   * Create all the directories in a given filepath.
+   *
+   * @example _makeDirs('path/to/dir')
+   *
+   * @param {string} filepath - The filepath to create directories for.
+   */
+  _makeDirs(filepath) {
+    const dirs = filepath.split('/');
+
+    let path = ['.'];
+    dirs.forEach((dirname) => {
+      path.push(dirname);
+      const path_str = path.join('/');
+      try {
+        this.fs.lookupPath(path_str)
+      } catch {
+        this.fs.mkdir(path_str);
+      }
+    });
+  }
+
+  /**
    * Check whether a given filepath exists in the filesystem.
    *
    * @param {string} filepath - The filepath to check.
-   * @returns {booleab} True if the given filepath exists, false otherwise.
+   * @returns {boolean} True if the given filepath exists, false otherwise.
    */
   fileExists(filepath) {
     try {
@@ -147,6 +169,11 @@ class API {
    * @param {string} filecontents - The contents of the file to commit.
    */
   commit(filename, filecontents) {
+    if (filename.includes('/')) {
+      const parentDirs = filename.split('/').slice(0, -1).join('/');
+      this._makeDirs(parentDirs);
+    }
+
     const commitPrefix = !this.fileExists(filename) ? 'Add' : 'Update';
     this.fs.writeFile(filename, filecontents);
     this.lg.callMain(['add', filename]);
@@ -199,6 +226,10 @@ self.onmessage = (event) => {
 
     case 'push':
       api.push();
+      break;
+
+    case 'newFolder':
+      api.newFolder(payload.folderPath);
       break;
   }
 };

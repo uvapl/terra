@@ -4,18 +4,24 @@
 
 class VirtualFileSystem {
   constructor() {
-    this.files = [];
-    this.folders = [];
+    this.files = {};
+    this.folders = {};
 
     this.loadFromLocalStorage();
+  }
+
+  _gitfs(fn, ...payload) {
+    if (!hasGitFSWorker()) return;
+
+    window._gitFS[fn](...payload);
   }
 
   /**
    * Clear the virtual filesystem, removing all files and folders permantly.
    */
   clear = () => {
-    this.files = [];
-    this.folders = [];
+    this.files = {};
+    this.folders = {};
     this.saveState();
   }
 
@@ -48,12 +54,12 @@ class VirtualFileSystem {
   /**
    * Get the root-level folders in the virtual filesystem.
    */
-  getRootFolders = () => this.folders.filter((folder) => !folder.parentId)
+  getRootFolders = () => Object.values(this.folders).filter((folder) => !folder.parentId);
 
   /**
    * Get the root-level files in the virtual filesystem.
    */
-  getRootFiles = () => this.files.filter((file) => !file.parentId)
+  getRootFiles = () => Object.values(this.files).filter((file) => !file.parentId)
 
   /**
    * Internal helper function to filter a list of object based on conditions.
@@ -71,7 +77,7 @@ class VirtualFileSystem {
    * @param {object} conditions - The conditions to filter on.
    * @returns {array} List of file objects matching the conditions.
    */
-  findFilesWhere = (conditions) => this.files.filter(this._where(conditions))
+  findFilesWhere = (conditions) => Object.values(this.files).filter(this._where(conditions))
 
   /**
    * Find a single file that match the given conditions.
@@ -95,29 +101,70 @@ class VirtualFileSystem {
    * @param {object} conditions - The conditions to filter on.
    * @returns {array} List of folder objects matching the conditions.
    */
-  findFoldersWhere = (conditions) => this.folders.filter(this._where(conditions))
+  findFoldersWhere = (conditions) => Object.values(this.folders).filter(this._where(conditions))
 
   /**
    * Find a file by its id.
    *
    * @param {string} id - The id of the file to find.
    */
-  findFileById = (id) => this.files.find((file) => file.id === id)
+  findFileById = (id) => this.files[id];
 
   /**
    * Find a folder by its id.
    *
    * @param {string} id - The id of the folder to find.
    */
-  findFolderById = (id) => this.folders.find((folder) => folder.id === id)
+  findFolderById = (id) => this.folders[id];
+
+  /**
+   * Get the absolute file path of a file.
+   *
+   * @param {string} fileId - The file id.
+   * @returns {string} The absolute file path of the file.
+   */
+  getAbsoluteFilePath = (fileId) => {
+    const file = this.findFileById(fileId);
+    if (!file) return '';
+    if (!file.parentId) return file.name;
+
+    let folder = this.findFolderById(file.parentId);
+    let folderPath = this.getAbsoluteFolderPath(folder.id);
+    let path = `${folderPath}/${file.name}`;
+
+    return path;
+  }
+
+  /**
+   * Get the absolute file path of a folder.
+   *
+   * @param {string} folderId - The folder id.
+   * @returns {string} The absolute file path of the folder.
+   */
+  getAbsoluteFolderPath = (folderId) => {
+    const folder = this.findFolderById(folderId);
+    if (!folder) return '';
+    if (!folder.parentId) return folder.name;
+
+    let parentFolder = this.findFolderById(folder.parentId);
+    let path = folder.name;
+
+    while (parentFolder) {
+      path = `${parentFolder.name}/${path}`;
+      parentFolder = this.findFolderById(parentFolder.parentId);
+    }
+
+    return path;
+  }
 
   /**
    * Create a new file in the virtual filesystem.
    *
    * @param {object} fileObj - The file object to create.
+   * @param {boolean} [commit] - Whether to commit the file to the git repository.
    * @returns {object} The new file object.
    */
-  createFile = (fileObj) => {
+  createFile = (fileObj, commit=true) => {
     const newFile = {
       id: uuidv4(),
       name: 'Untitled',
@@ -128,7 +175,12 @@ class VirtualFileSystem {
       ...fileObj,
     };
 
-    this.files.push(newFile);
+    this.files[newFile.id] = newFile;
+
+    if (commit) {
+      this._gitfs('commit', this.getAbsoluteFilePath(newFile.id), newFile.content);
+    }
+
     this.saveState();
     return newFile;
   }
@@ -137,9 +189,10 @@ class VirtualFileSystem {
    * Create a new folder in the virtual filesystem.
    *
    * @param {object} folderObj - The folder object to create.
+   * @param {boolean} [commit] - Whether to commit the file to the git repository.
    * @returns {object} The new folder object.
    */
-  createFolder = (folderObj) => {
+  createFolder = (folderObj, commit=true) => {
     const newFolder = {
       id: uuidv4(),
       name: 'Untitled',
@@ -149,7 +202,7 @@ class VirtualFileSystem {
       ...folderObj,
     };
 
-    this.folders.push(newFolder);
+    this.folders[newFolder.id] = newFolder;
     this.saveState();
     return newFolder;
   }
@@ -209,10 +262,8 @@ class VirtualFileSystem {
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
   deleteFile = (id) => {
-    const file = this.files.find((file) => file.id === id);
-
-    if (file) {
-      this.files = this.files.filter((file) => file.id !== id);
+    if (this.files[id]) {
+      delete this.files[id];
       this.saveState();
       return true;
     }
@@ -227,10 +278,8 @@ class VirtualFileSystem {
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
   deleteFolder = (id) => {
-    const folder = this.findFolderById(id);
-
-    if (folder) {
-      this.folders = this.folders.filter((f) => f.id !== id);
+    if (this.folder[id]) {
+      delete this.folder[id];
       this.saveState();
       return true;
     }
@@ -248,7 +297,10 @@ class VirtualFileSystem {
     const file = this.findFileById(id);
     if (!file) return;
 
-    const fileBlob = new Blob([addNewLineCharacter(file.content)], { type: 'text/plain;charset=utf-8' });
+    const fileBlob = new Blob(
+      [addNewLineCharacter(file.content)],
+      { type: 'text/plain;charset=utf-8' }
+    );
     saveAs(fileBlob, file.name);
   }
 

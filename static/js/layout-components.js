@@ -474,6 +474,7 @@ function EditorComponent(container, state) {
         const filename = container.parent.config.title;
         console.log(`Committing changes to ${filename}`);
         window._gitFS.commit(
+          filename,
           this.editor.getValue(),
         );
       }, seconds(2));

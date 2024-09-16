@@ -74,14 +74,11 @@ class GitFS {
     this.worker.postMessage({ id: 'clone' });
   }
 
-  commit() {
-    const tab = getActiveEditor();
+  commit(filename, filecontents) {
+    console.log('committing', filename, filecontents)
     this.worker.postMessage({
       id: 'commit',
-      data: {
-        filename: tab.config.title,
-        filecontents: tab.container.getState().value,
-      },
+      data: { filename, filecontents },
     });
   }
 
@@ -110,7 +107,7 @@ class GitFS {
 
         // Put repo files inside the virtual filesystem.
         for (const file of repoFiles) {
-          VFS.createFile(file);
+          VFS.createFile(file, false);
         }
 
         // Refresh the file tree.
@@ -126,7 +123,7 @@ class GitFS {
  * @returns {boolean} True if the worker has been initialised, false otherwise.
  */
 function hasGitFSWorker() {
-  return window._gitFS instanceof GitFS;
+  return isIDE && window._gitFS instanceof GitFS;
 }
 
 /**
@@ -136,6 +133,8 @@ function hasGitFSWorker() {
  * repository.
  */
 function createGitFSWorker() {
+  if (!isIDE) return;
+
   const username = getLocalStorageItem('git-username');
   const accessToken = getLocalStorageItem('git-access-token');
   const repoLink = getLocalStorageItem('connected-repo');
