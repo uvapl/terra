@@ -41,6 +41,12 @@ class API {
    */
   hasNewCommits = false;
 
+  /**
+   * List of folders that should be ignored when traversing the repo contents.
+   * @type {array}
+   */
+  blacklisted_folders = ['.', '..', '.git'];
+
   constructor(options) {
     this.isDev = options.isDev;
 
@@ -85,19 +91,34 @@ class API {
     // Clone the repo as soon as the worker is ready.
     this.clone();
 
-    const repoFiles = this.fs.readdir('.')
-      .filter((filename) => !['.', '..', '.git'].includes(filename))
-      .map((filename) => {
-        const stat = this.fs.stat(filename);
-        return {
-          name: filename,
-          content: this.fs.readFile(filename, { encoding: 'utf8' }),
+    return this._getNestedDirContents('.');
+  }
+
+  /**
+   * Get the nested files of a directory and all its subdirectories.
+   *
+   * @param {string} dirPath - The path to the directory to list contents for.
+   * @returns {array} All nested file objects.
+   */
+  _getNestedDirContents(dirPath) {
+    const files = [];
+
+    this.fs.readdir(dirPath).forEach((filename) => {
+      const filepath = `${dirPath}/${filename}`.replace('./', '');
+      const stat = this.fs.stat(filepath);
+      if (this.fs.isDir(stat.mode) && !this.blacklisted_folders.includes(filename)) {
+        files.push(...this._getNestedDirContents(filepath));
+      } else if (this.fs.isFile(stat.mode)){
+        files.push({
+          name: filepath,
+          content: this.fs.readFile(filepath, { encoding: 'utf8' }),
           createdAt: new Date(stat.ctime).toISOString(),
           updatedAt: new Date(stat.mtime).toISOString(),
-        }
-      });
+        });
+      }
+    });
 
-    return repoFiles;
+    return files;
   }
 
   /**

@@ -164,7 +164,7 @@ class VirtualFileSystem {
    * @param {boolean} [commit] - Whether to commit the file to the git repository.
    * @returns {object} The new file object.
    */
-  createFile = (fileObj, commit=true) => {
+  createFile = (fileObj, commit = true) => {
     const newFile = {
       id: uuidv4(),
       name: 'Untitled',
@@ -192,7 +192,7 @@ class VirtualFileSystem {
    * @param {boolean} [commit] - Whether to commit the file to the git repository.
    * @returns {object} The new folder object.
    */
-  createFolder = (folderObj, commit=true) => {
+  createFolder = (folderObj) => {
     const newFolder = {
       id: uuidv4(),
       name: 'Untitled',
@@ -343,6 +343,51 @@ class VirtualFileSystem {
     zip.generateAsync({ type: 'blob' }).then((content) => {
       saveAs(content, `${folder.name}.zip`);
     });
+  }
+
+  /**
+   * Import files and folders from a git repository into the virtual filesystem.
+   *
+   * A directory contains the path inside the `file.name`, e.g.
+   *   { name: 'folder1/folder2/file.txt', content: '...' }
+   * whereas a file solely contains the file name, e.g.:
+   *   { name: 'file.txt', content: '...' }
+   *
+   * @param {array} repoFiles - List of files and folders from the repository.
+   */
+  importFromGit = (repoFiles) => {
+    // Remove all files from the virtual filesystem.
+    this.clear();
+
+    // Filter on all files and create them in the this.
+    repoFiles
+      .filter((fileOrFolder) => !fileOrFolder.name.includes('/'))
+      .forEach((file) => this.createFile(file, false));
+
+    // Filter on all folders and create them in the this.
+    // Example: /folder1/folder2/file.txt
+    repoFiles
+      .filter((fileOrFolder) => fileOrFolder.name.includes('/'))
+      .forEach((file) => {
+        // Create all parent folders first.
+        const parentDirs = file.name.split('/').slice(0, -1);
+        let parentId = null;
+        for (const dirname of parentDirs) {
+          const newFolder = this.createFolder({
+            name: dirname,
+            parentId,
+          });
+          parentId = newFolder.id;
+        }
+
+        // Create the file in the last folder.
+        const filename = file.name.split('/').pop();
+        this.createFile({
+          ...file,
+          name: filename,
+          parentId,
+        }, false);
+      });
   }
 }
 

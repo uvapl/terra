@@ -100,17 +100,7 @@ class GitFS {
       case 'ready':
         this.isReady = true;
 
-        const { repoFiles } = payload;
-
-        // Remove all files from the virtual filesystem.
-        VFS.clear();
-
-        // Put repo files inside the virtual filesystem.
-        for (const file of repoFiles) {
-          VFS.createFile(file, false);
-        }
-
-        // Refresh the file tree.
+        VFS.importFromGit(payload.repoFiles);
         createFileTree();
         break;
     }
