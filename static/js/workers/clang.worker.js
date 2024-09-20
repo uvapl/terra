@@ -270,7 +270,9 @@ class App {
     try {
       this.exports._start();
     } catch (exn) {
-      let writeStack = true;
+      /* Do NOT write the stacktrace, as this is not useful for students. */
+      let writeStack = false;
+
       if (exn instanceof ProcExit) {
         if (exn.code === RAF_PROC_EXIT_CODE) {
           console.log('Allowing rAF after exit.');
