@@ -63,14 +63,17 @@ function createModal(modalOptions = {}) {
  * Hide a modal and remove it completely from the DOM after the animation.
  *
  * @param {jQuery} $modal - The modal element reference.
+ * @param {boolean} [remove=true] - Whether to remove the modal after hiding.
  */
-const hideModal = ($modal) => {
+const hideModal = ($modal, remove = true) => {
   $modal.removeClass('show');
 
-  // Wait for animation to be completed.
-  setTimeout(() => {
-    $modal.remove();
-  }, 300);
+  if (remove) {
+    // Wait for animation to be completed.
+    setTimeout(() => {
+      $modal.remove();
+    }, MODAL_ANIM_DURATION);
+  }
 };
 
 /**

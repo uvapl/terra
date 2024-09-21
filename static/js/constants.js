@@ -33,3 +33,6 @@ const isIframe = $('body').hasClass('examide-embed');
  * Checks whether the current app is running in development mode.
  */
 const isDev = window.location.hostname === 'localhost';
+
+// The modal's animation duration in milliseconds.
+const MODAL_ANIM_DURATION = 300;
