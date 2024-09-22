@@ -90,7 +90,7 @@ class API {
         this.push();
         this.hasNewCommits = false;
       }
-    }, 10 * 1000);
+    }, 30 * 1000);
 
     // Clone the repo as soon as the worker is ready.
     this.clone();
