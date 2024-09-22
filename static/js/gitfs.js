@@ -145,6 +145,15 @@ class GitFS {
         VFS.importFromGit(payload.repoFiles);
         createFileTree();
         break;
+
+      case 'pushed':
+        // Clear the git color indicators.
+        const $tree = $('#file-tree');
+        $('#file-tree .git-added, #file-tree .git-modified').each((index, element) => {
+          $tree.jstree('get_node', element.id).li_attr.class = '';
+          $tree.jstree('redraw_node', element.id);
+        });
+        break;
     }
   }
 }

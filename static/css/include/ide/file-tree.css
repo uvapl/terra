@@ -234,3 +234,12 @@
 #jstree-marker {
   display: none !important;
 }
+
+/** Git color indicators **/
+.git-added > a {
+  color: #33b91f !important;
+}
+
+.git-modified > a{
+  color: #ffa500 !important;
+}

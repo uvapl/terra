@@ -56,8 +56,9 @@ function registerMenubarEventListeners() {
     // and menu-item--new-folder.
     const isInsideMenu = $('.menubar > li.open').find($(event.target)).length > 0;
     const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
-    if (isInsideMenu && isNotNewFileOrFolderBtn) {
-      getActiveEditor().instance.editor.focus();
+    const editor = getActiveEditor().instance.editor;
+    if (isInsideMenu && isNotNewFileOrFolderBtn && editor) {
+      editor.focus();
     }
 
     // Close the active menu.
@@ -120,6 +121,7 @@ function registerMenubarEventListeners() {
 
   $('#menu-item--run-tab').click(Menubar.runTab);
 
+  $('#menu-item--push-changes').click(Menubar.pushChanges);
   $('#menu-item--add-credentials').click(Menubar.addCredentials);
   $('#menu-item--connect-repo').click(Menubar.connectRepo);
 }
@@ -128,15 +130,15 @@ const Menubar = {};
 
 Menubar.openNewFile = () => {
   createNewFileTreeFile();
-}
+};
 
 Menubar.undo = () => {
   getActiveEditor().instance.editor.undo();
-}
+};
 
 Menubar.redo = () => {
   getActiveEditor().instance.editor.redo();
-}
+};
 
 Menubar.copyToClipboard = () => {
   const editor = getActiveEditor().instance.editor;
@@ -144,40 +146,46 @@ Menubar.copyToClipboard = () => {
     const text = editor.getSelectedText();
     navigator.clipboard.writeText(text);
   }
-}
+};
 
 Menubar.cut = () => {
   Menubar.copyToClipboard();
 
   // Cut the selected text.
   getActiveEditor().instance.editor.insert('');
-}
+};
 
 Menubar.pasteFromClipboard = () => {
   navigator.clipboard.readText().then((text) => {
     getActiveEditor().instance.editor.insert(text);
   });
-}
+};
 
 Menubar.indent = () => {
   getActiveEditor().instance.editor.blockIndent();
-}
+};
 
 Menubar.outdent = () => {
   getActiveEditor().instance.editor.blockOutdent();
-}
+};
 
 Menubar.search = () => {
   getActiveEditor().instance.editor.execCommand('find');
-}
+};
 
 Menubar.replace = () => {
   getActiveEditor().instance.editor.execCommand('replace');
-}
+};
 
 Menubar.runTab = () => {
   getActiveEditor().instance.editor.execCommand('run');
-}
+};
+
+Menubar.pushChanges = () => {
+  if (hasGitFSWorker()) {
+    window._gitFS.push();
+  }
+};
 
 Menubar.addCredentials = () => {
   const username = getLocalStorageItem('git-username', '');
@@ -235,7 +243,7 @@ Menubar.addCredentials = () => {
 
     hideModal($modal);
   });
-}
+};
 
 Menubar.connectRepo = () => {
   const initialRepoLink = getLocalStorageItem('connected-repo', '');
@@ -331,4 +339,4 @@ Menubar.connectRepo = () => {
       }, MODAL_ANIM_DURATION);
     }
   });
-}
+};

@@ -68,7 +68,7 @@
 }
 
 .menubar > li.open {
-  background: var(--tab-menu--tab-bg-color);;
+  background: var(--tab-menu--tab-bg-color);
   color: var(--color-black);
 }
 
@@ -138,4 +138,8 @@
 
 .menubar ul li {
   padding: 8px 10px;
+}
+
+.menubar .separator {
+  border-bottom: 1px solid var(--tab-menu--tab-bg-color);
 }

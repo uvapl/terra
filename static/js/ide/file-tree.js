@@ -252,7 +252,10 @@ function registerFileTreeEventListeners($tree) {
 
     const parentId = data.node.parent !== '#' ? data.node.parent : null;
     const { id } = fn({ name: data.node.original.text, parentId });
+
+    $tree.jstree('get_node', data.node).li_attr.class = 'git-added';
     $tree.jstree('set_id', data.node, id);
+    $tree.jstree('redraw_node', data.node);
   });
 
   $tree.on('rename_node.jstree', (event, data) => {
@@ -261,6 +264,16 @@ function registerFileTreeEventListeners($tree) {
       : VFS.updateFile;
 
     fn(data.node.id, { name: data.text });
+
+    // Add modified classes for visual indicators.
+    if (!$(`#${data.node.id}`).hasClass('git-added')) {
+      $tree.jstree('get_node', data.node).li_attr.class = 'git-modified';
+    }
+
+    if (data.node.type === 'file' && data.node.parent !== '#' && !$(`#${data.node.parent}`).hasClass('git-added')) {
+      $tree.jstree('get_node', data.node.parent).li_attr.class = 'git-modified';
+      $tree.jstree('redraw_node', data.node.parent);
+    }
 
     const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.id);
     if (tab) {
@@ -277,7 +290,6 @@ function registerFileTreeEventListeners($tree) {
       ? VFS.deleteFolder
       : VFS.deleteFile;
 
-    console.log('remove', data.node.type, 'id', id);
     fn(id);
   });
 

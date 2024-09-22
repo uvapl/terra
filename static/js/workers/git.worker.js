@@ -49,6 +49,7 @@ class API {
 
   constructor(options) {
     this.isDev = options.isDev;
+    this.pushedCallback = options.pushedCallback;
 
     this.setRepoLink(options.repoLink);
     this._alterXHR(options.username, options.accessToken);
@@ -86,10 +87,7 @@ class API {
 
     // Setup a timer that triggers a push once per minute.
     this.pushIntervalId = setInterval(() => {
-      if (this.hasNewCommits) {
-        this.push();
-        this.hasNewCommits = false;
-      }
+      this.push();
     }, 30 * 1000);
 
     // Clone the repo as soon as the worker is ready.
@@ -112,7 +110,7 @@ class API {
       const stat = this.fs.stat(filepath);
       if (this.fs.isDir(stat.mode) && !this.blacklisted_folders.includes(filename)) {
         files.push(...this._getNestedDirContents(filepath));
-      } else if (this.fs.isFile(stat.mode)){
+      } else if (this.fs.isFile(stat.mode)) {
         files.push({
           name: filepath,
           content: this.fs.readFile(filepath, { encoding: 'utf8' }),
@@ -242,7 +240,11 @@ class API {
    * Trigger a push to the remote repository.
    */
   push() {
-    this.lg.callMain(['push'])
+    if (this.hasNewCommits) {
+      this.lg.callMain(['push'])
+      this.hasNewCommits = false;
+      this.pushedCallback();
+    }
   }
 
   /**
@@ -303,6 +305,10 @@ self.onmessage = (event) => {
             data: { repoFiles }
           });
         },
+
+        pushedCallback() {
+          postMessage({ id: 'pushed' });
+        }
       });
       break;
 
