@@ -253,7 +253,10 @@ function registerFileTreeEventListeners($tree) {
     const parentId = data.node.parent !== '#' ? data.node.parent : null;
     const { id } = fn({ name: data.node.original.text, parentId });
 
-    $tree.jstree('get_node', data.node).li_attr.class = 'git-added';
+    if (hasGitFSWorker()) {
+      $tree.jstree('get_node', data.node).li_attr.class = 'git-added';
+    }
+
     $tree.jstree('set_id', data.node, id);
     $tree.jstree('redraw_node', data.node);
   });
@@ -265,14 +268,17 @@ function registerFileTreeEventListeners($tree) {
 
     fn(data.node.id, { name: data.text });
 
-    // Add modified classes for visual indicators.
-    if (!$(`#${data.node.id}`).hasClass('git-added')) {
-      $tree.jstree('get_node', data.node).li_attr.class = 'git-modified';
-    }
+    if (hasGitFSWorker()) {
+      // Add modified classes for visual indicators.
+      if (!$(`#${data.node.id}`).hasClass('git-added')) {
+        $tree.jstree('get_node', data.node).li_attr.class = 'git-modified';
+      }
 
-    if (data.node.type === 'file' && data.node.parent !== '#' && !$(`#${data.node.parent}`).hasClass('git-added')) {
-      $tree.jstree('get_node', data.node.parent).li_attr.class = 'git-modified';
-      $tree.jstree('redraw_node', data.node.parent);
+      // Add modified classes to parent folders.
+      if (data.node.type === 'file' && data.node.parent !== '#' && !$(`#${data.node.parent}`).hasClass('git-added')) {
+        $tree.jstree('get_node', data.node.parent).li_attr.class = 'git-modified';
+        $tree.jstree('redraw_node', data.node.parent);
+      }
     }
 
     const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.id);
