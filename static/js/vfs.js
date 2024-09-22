@@ -104,6 +104,20 @@ class VirtualFileSystem {
   findFoldersWhere = (conditions) => Object.values(this.folders).filter(this._where(conditions))
 
   /**
+   * Find a single folders that match the given conditions.
+   *
+   * @example findFolderWhere({ name: 'foo' })
+   *
+   * @param {object} conditions - The conditions to filter on.
+   * @returns {object|null} The folder object matching the conditions or null if
+   * the folder is not found.
+   */
+  findFolderWhere = (conditions) => {
+    const folders = this.findFoldersWhere(conditions);
+    return folders.length > 0 ? folders[0] : null;
+  }
+
+  /**
    * Find a file by its id.
    *
    * @param {string} id - The id of the file to find.
@@ -414,11 +428,16 @@ class VirtualFileSystem {
         const parentDirs = file.name.split('/').slice(0, -1);
         let parentId = null;
         for (const dirname of parentDirs) {
-          const newFolder = this.createFolder({
-            name: dirname,
-            parentId,
-          });
-          parentId = newFolder.id;
+          const currFolder = this.findFolderWhere({ name: dirname, parentId });
+          if (!currFolder) {
+            const newFolder = this.createFolder({
+              name: dirname,
+              parentId,
+            });
+            parentId = newFolder.id;
+          } else {
+            parentId = currFolder.id;
+          }
         }
 
         // Create the file in the last folder.
