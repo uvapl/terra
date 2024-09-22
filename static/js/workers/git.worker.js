@@ -90,7 +90,7 @@ class API {
         this.push();
         this.hasNewCommits = false;
       }
-    }, 60 * 1000);
+    }, 10 * 1000);
 
     // Clone the repo as soon as the worker is ready.
     this.clone();
@@ -216,14 +216,24 @@ class API {
   }
 
   /**
-   * Remove a file from the current repository.
+   * Remove a filepath from the current repository.
    *
    * @param {string} filepath - The absolute filepath to remove.
    */
   rm(filepath) {
-    this.fs.unlink(filepath);
+    this._log(`remove ${filepath}`);
+
+    if (this.fileExists(filepath)) {
+      // File
+      this.fs.unlink(filepath);
+    } else {
+      // Folder
+      this.fs.rmdir(filepath);
+    }
+
     this.lg.callMain(['add', filepath]);
     this.lg.callMain(['commit', '-m', `Remove ${filepath}`]);
+    this.hasNewCommits = true;
   }
 
   /**

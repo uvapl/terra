@@ -68,7 +68,7 @@ function deleteFileTreeItem(node) {
     `,
     attrs: {
       id: 'ide-delete-confirmation-modal',
-      class: 'delete-confirmation-modal'
+      class: 'modal-width-small'
     }
   });
 
@@ -76,14 +76,14 @@ function deleteFileTreeItem(node) {
 
   $modal.find('.cancel-btn').click(() => hideModal($modal));
   $modal.find('.confirm-btn').click(() => {
-    // Delete from file-tree, including VFS.
-    $('#file-tree').jstree('delete_node', node);
-
     if (node.type === 'file') {
       closeFileTab(node.id);
     } else if (node.type === 'folder') {
       closeFilesInFolderRecursively(node.id);
     }
+    //
+    // Delete from file-tree, including VFS.
+    $('#file-tree').jstree('delete_node', node);
 
     hideModal($modal);
   });
@@ -277,6 +277,7 @@ function registerFileTreeEventListeners($tree) {
       ? VFS.deleteFolder
       : VFS.deleteFile;
 
+    console.log('remove', data.node.type, 'id', id);
     fn(id);
   });
 

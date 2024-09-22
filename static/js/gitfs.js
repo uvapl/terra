@@ -104,9 +104,9 @@ class GitFS {
   }
 
   /**
-   * Remove a file from the current repository.
+   * Remove a filepath from the current repository.
    *
-   * @param {string} filename - The absolute filepath within the git repo.
+   * @param {string} filepath - The absolute filepath within the git repo.
    */
   rm(filepath) {
     this.worker.postMessage({

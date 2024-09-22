@@ -302,6 +302,7 @@ class VirtualFileSystem {
    */
   deleteFile = (id) => {
     if (this.files[id]) {
+      this._git('rm', this.getAbsoluteFilePath(id));
       delete this.files[id];
       this.saveState();
       return true;
@@ -317,8 +318,9 @@ class VirtualFileSystem {
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
   deleteFolder = (id) => {
-    if (this.folder[id]) {
-      delete this.folder[id];
+    if (this.folders[id]) {
+      this._git('rm', this.getAbsoluteFolderPath(id));
+      delete this.folders[id];
       this.saveState();
       return true;
     }
