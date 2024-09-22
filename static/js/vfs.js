@@ -143,6 +143,7 @@ class VirtualFileSystem {
     if (!file.parentId) return file.name;
 
     let folder = this.findFolderById(file.parentId);
+    if (!folder) return file.name;
     let folderPath = this.getAbsoluteFolderPath(folder.id);
     let path = `${folderPath}/${file.name}`;
 
@@ -233,7 +234,7 @@ class VirtualFileSystem {
     // This extra check is needed because in the UI, the user can trigger a
     // rename but not actually change the name.
     const isRenamed = typeof obj.name === 'string' && file.name !== obj.name;
-    const isMoved = typeof obj.parentId === 'string' && file.parentId !== obj.parentId;
+    const isMoved = file.parentId !== obj.parentId;
     const isContentChanged = typeof obj.content === 'string' && file.content !== obj.content;
 
     if (file) {
@@ -241,7 +242,7 @@ class VirtualFileSystem {
         if (file.hasOwnProperty(key) && key !== 'id') {
 
           // Check whether the file is renamed.
-          if (key === 'name' && (isRenamed || isMoved)) {
+          if (key === 'name' && isRenamed || key === 'parentId' && isMoved) {
             const oldPath = this.getAbsoluteFilePath(file.id);
             file[key] = value;
             const newPath = this.getAbsoluteFilePath(file.id);
@@ -282,14 +283,14 @@ class VirtualFileSystem {
     // This extra check is needed because in the UI, the user can trigger a
     // rename but not actually change the name.
     const isRenamed = typeof obj.name === 'string' && folder.name !== obj.name;
-    const isMoved = typeof obj.parentId === 'string' && folder.parentId !== obj.parentId;
+    const isMoved = folder.parentId !== obj.parentId;
 
     if (folder) {
       for (const [key, value] of Object.entries(obj)) {
         if (folder.hasOwnProperty(key) && key !== 'id') {
 
           // Check whether the folder is renamed.
-          if (key === 'name' && (isRenamed || isMoved)) {
+          if (key === 'name' && isRenamed || key === 'parentId' && isMoved) {
             const oldPath = this.getAbsoluteFolderPath(folder.id);
             folder[key] = value;
             const newPath = this.getAbsoluteFolderPath(folder.id);

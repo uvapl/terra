@@ -239,6 +239,28 @@ function createFileTree() {
 }
 
 /**
+ * Add a visual indicator to the file tree for files and folder whether they are
+ * added or modified in Git.
+ *
+ * @param {jsTree.Node} node - The node to add the indicator to.
+ */
+function addGitDiffIndicator(node) {
+  $tree = $('#file-tree');
+
+  // Add modified classes for visual indicators.
+  if (!$(`#${node.id}`).hasClass('git-added')) {
+    $tree.jstree('get_node', node).li_attr.class = 'git-modified';
+    $tree.jstree('redraw_node', node);
+  }
+
+  // Add modified classes to parent folders.
+  if (node.type === 'file' && node.parent !== '#' && !$(`#${node.parent}`).hasClass('git-added')) {
+    $tree.jstree('get_node', node.parent).li_attr.class = 'git-modified';
+    $tree.jstree('redraw_node', node.parent);
+  }
+}
+
+/**
  * Registers event listeners for the file tree.
  *
  * @param {jQuery.Object} $tree - File-tree reference object.
@@ -269,16 +291,7 @@ function registerFileTreeEventListeners($tree) {
     fn(data.node.id, { name: data.text });
 
     if (hasGitFSWorker()) {
-      // Add modified classes for visual indicators.
-      if (!$(`#${data.node.id}`).hasClass('git-added')) {
-        $tree.jstree('get_node', data.node).li_attr.class = 'git-modified';
-      }
-
-      // Add modified classes to parent folders.
-      if (data.node.type === 'file' && data.node.parent !== '#' && !$(`#${data.node.parent}`).hasClass('git-added')) {
-        $tree.jstree('get_node', data.node.parent).li_attr.class = 'git-modified';
-        $tree.jstree('redraw_node', data.node.parent);
-      }
+      addGitDiffIndicator(data.node);
     }
 
     const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.id);
@@ -326,6 +339,10 @@ function registerFileTreeEventListeners($tree) {
           : VFS.updateFile;
 
         fn(id, { parentId });
+
+        if (hasGitFSWorker()) {
+          addGitDiffIndicator(sourceNode);
+        }
       }
     }, 0);
   });
