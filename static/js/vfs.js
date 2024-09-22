@@ -226,9 +226,10 @@ class VirtualFileSystem {
    *
    * @param {string} id - The file id.
    * @param {object} obj - Key-value pairs to update in the file object.
+   * @param {boolean} [commit] - Whether to commit the file.
    * @returns {object} The updated file object.
    */
-  updateFile = (id, obj) => {
+  updateFile = (id, obj, commit = true) => {
     const file = this.findFileById(id);
 
     // This extra check is needed because in the UI, the user can trigger a
@@ -259,7 +260,7 @@ class VirtualFileSystem {
 
       file.updatedAt = new Date().toISOString();
 
-      if (isContentChanged) {
+      if (isContentChanged && commit) {
         // Just commit the changes to the file.
         this._git('commit', this.getAbsoluteFilePath(file.id), file.content);
       }

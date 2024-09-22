@@ -470,7 +470,7 @@ function EditorComponent(container, state) {
     if (fileId) {
       VFS.updateFile(fileId, {
         content: this.editor.getValue(),
-      });
+      }, false);
     }
 
     if (isIDE && hasGitFSWorker() && this.initialized) {
@@ -485,6 +485,9 @@ function EditorComponent(container, state) {
           filename,
           this.editor.getValue(),
         );
+
+        const node = $('#file-tree').jstree('get_node', fileId);
+        addGitDiffIndicator(node);
       }, seconds(2));
     }
 

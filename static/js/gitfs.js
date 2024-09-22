@@ -154,6 +154,10 @@ class GitFS {
           $tree.jstree('redraw_node', element.id);
         });
         break;
+
+      case 'clone-fail':
+        $('#file-tree').html('<div class="info-msg error">Failed to clone repository</div>');
+        break;
     }
   }
 }

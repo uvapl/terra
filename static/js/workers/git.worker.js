@@ -50,6 +50,7 @@ class API {
   constructor(options) {
     this.isDev = options.isDev;
     this.pushedCallback = options.pushedCallback;
+    this.cloneFailCallback = options.cloneFailCallback;
 
     this.setRepoLink(options.repoLink);
     this._alterXHR(options.username, options.accessToken);
@@ -211,8 +212,13 @@ class API {
    * cloned directory.
    */
   clone() {
-    this.lg.callMain(['clone', this.repoLink, this.repoDir]);
-    this.fs.chdir(this.repoDir);
+    const exitcode = this.lg.callMain(['clone', this.repoLink, this.repoDir]);
+    if (exitcode !== 0) {
+      this._log('Failed to clone repository');
+      this.cloneFailCallback();
+    } else {
+      this.fs.chdir(this.repoDir);
+    }
   }
 
   /**
@@ -308,6 +314,10 @@ self.onmessage = (event) => {
 
         pushedCallback() {
           postMessage({ id: 'pushed' });
+        },
+
+        cloneFailCallback() {
+          postMessage({ id: 'clone-fail' })
         }
       });
       break;

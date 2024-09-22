@@ -205,6 +205,7 @@ Menubar.addCredentials = () => {
 
       <p class="text-small">
         GitHub access tokens can be created <a href="https://github.com/settings/tokens">here</a>.
+        Make sure to at least check the <em>repo</em> scope such that all its subscopes are checked.
         <br\>
         <br\>
         In order to clone private repositories or push and pull contents from any
@@ -295,7 +296,9 @@ Menubar.connectRepo = () => {
 
     hideModal($connectModal);
 
-    if (!initialRepoLink) {
+    if (initialRepoLink) {
+      createGitFSWorker();
+    } else {
       // Confirms with the user whether they want to discard their local files
       // permanently before connecting to a new repository.
 
