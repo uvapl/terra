@@ -56,11 +56,17 @@ class GitFS {
     });
   }
 
+  /**
+   * Terminate the current worker instance.
+   */
   terminate() {
     console.log('Terminating existing GitFS worker')
     this.worker.terminate();
   }
 
+  /**
+   * Set the current repository link that is cloned in the UI.
+   */
   setRepoLink() {
     this.worker.postMessage({
       id: 'setRepoLink',
@@ -70,20 +76,56 @@ class GitFS {
     });
   }
 
+  /**
+   * Clone the current repository.
+   */
   clone() {
     this.worker.postMessage({ id: 'clone' });
   }
 
-  commit(filename, filecontents) {
-    console.log('committing', filename, filecontents)
+  /**
+   * Commit the changes to the current repository.
+   *
+   * @param {string} filepath - The absolute filepath within the git repo.
+   * @param {string} filecontents - The new contents to commit.
+   */
+  commit(filepath, filecontents) {
     this.worker.postMessage({
       id: 'commit',
-      data: { filename, filecontents },
+      data: { filepath, filecontents },
     });
   }
 
+  /**
+   * Push any unpushed commits to the remote repository.
+   */
   push() {
     this.worker.postMessage({ id: 'push' });
+  }
+
+  /**
+   * Remove a file from the current repository.
+   *
+   * @param {string} filename - The absolute filepath within the git repo.
+   */
+  rm(filepath) {
+    this.worker.postMessage({
+      id: 'rm',
+      data: { filepath },
+    });
+  }
+
+  /**
+   * Move a file from one location to another.
+   *
+   * @param {string} oldPath - The absolute filepath of the file to move.
+   * @param {string} newPath - The absolute filepath to the new file.
+   */
+  mv(oldPath, newPath) {
+    this.worker.postMessage({
+      id: 'mv',
+      data: { oldPath, newPath },
+    });
   }
 
   /**
@@ -124,6 +166,8 @@ function hasGitFSWorker() {
  */
 function createGitFSWorker() {
   if (!isIDE) return;
+
+  closeAllFiles();
 
   const username = getLocalStorageItem('git-username');
   const accessToken = getLocalStorageItem('git-access-token');

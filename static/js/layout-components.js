@@ -70,6 +70,14 @@ function closeFile() {
 }
 
 /**
+ * Close all tabs in the editor.
+ */
+function closeAllFiles() {
+  const tabs = getAllEditorTabs();
+  tabs.forEach((tab) => tab.parent.removeChild(tab));
+}
+
+/**
  * Open a file in the editor, otherwise switch to the tab of the filename.
  * Next, spawn a new worker based on the file extension.
  *
@@ -453,6 +461,7 @@ function EditorComponent(container, state) {
     this.editor.getSession().getUndoMananger().reset();
   });
 
+
   this.editor.on('change', () => {
     window._editorIsDirty = true;
     container.extendState({ value: this.editor.getValue() });
@@ -464,7 +473,7 @@ function EditorComponent(container, state) {
       });
     }
 
-    if (isIDE && hasGitFSWorker()) {
+    if (isIDE && hasGitFSWorker() && this.initialized) {
       if (this.gitCommitTimeoutId) {
         clearTimeout(this.gitCommitTimeoutId);
       }
@@ -472,12 +481,15 @@ function EditorComponent(container, state) {
       // Only commit changes after 2 seconds of inactivity.
       this.gitCommitTimeoutId = setTimeout(() => {
         const filename = container.parent.config.title;
-        console.log(`Committing changes to ${filename}`);
         window._gitFS.commit(
           filename,
           this.editor.getValue(),
         );
       }, seconds(2));
+    }
+
+    if (!this.initialized) {
+      this.initialized = true;
     }
   });
 

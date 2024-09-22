@@ -10,7 +10,7 @@ class VirtualFileSystem {
     this.loadFromLocalStorage();
   }
 
-  _gitfs(fn, ...payload) {
+  _git(fn, ...payload) {
     if (!hasGitFSWorker()) return;
 
     window._gitFS[fn](...payload);
@@ -161,10 +161,9 @@ class VirtualFileSystem {
    * Create a new file in the virtual filesystem.
    *
    * @param {object} fileObj - The file object to create.
-   * @param {boolean} [commit] - Whether to commit the file to the git repository.
    * @returns {object} The new file object.
    */
-  createFile = (fileObj, commit = true) => {
+  createFile = (fileObj) => {
     const newFile = {
       id: uuidv4(),
       name: 'Untitled',
@@ -177,10 +176,6 @@ class VirtualFileSystem {
 
     this.files[newFile.id] = newFile;
 
-    if (commit) {
-      this._gitfs('commit', this.getAbsoluteFilePath(newFile.id), newFile.content);
-    }
-
     this.saveState();
     return newFile;
   }
@@ -189,7 +184,6 @@ class VirtualFileSystem {
    * Create a new folder in the virtual filesystem.
    *
    * @param {object} folderObj - The folder object to create.
-   * @param {boolean} [commit] - Whether to commit the file to the git repository.
    * @returns {object} The new folder object.
    */
   createFolder = (folderObj) => {
@@ -215,17 +209,38 @@ class VirtualFileSystem {
    * @returns {object} The updated file object.
    */
   updateFile = (id, obj) => {
+    let isRenamed = false;
     const file = this.findFileById(id);
 
     if (file) {
       for (const [key, value] of Object.entries(obj)) {
         if (file.hasOwnProperty(key) && key !== 'id') {
+
+          // Check whether the file is renamed.
+          if (key === 'name' && file[key] !== obj[key]) {
+            const oldPath = this.getAbsoluteFilePath(file.id);
+            file[key] = value;
+            const newPath = this.getAbsoluteFilePath(file.id);
+
+            // Move the file to the new location.
+            this._git('mv', oldPath, newPath);
+
+            isRenamed = true;
+            continue;
+          }
+
           file[key] = value;
         }
       }
 
       file.updatedAt = new Date().toISOString();
     }
+
+    if (!isRenamed) {
+      // Just commit the changes to the file.
+      this._git('commit', this.getAbsoluteFilePath(file.id), file.content);
+    }
+
 
     this.saveState();
     return file;
@@ -353,7 +368,7 @@ class VirtualFileSystem {
    * whereas a file solely contains the file name, e.g.:
    *   { name: 'file.txt', content: '...' }
    *
-   * @param {array} repoFiles - List of files and folders from the repository.
+   * @param {array} repoFiles - List of files from the repository.
    */
   importFromGit = (repoFiles) => {
     // Remove all files from the virtual filesystem.
@@ -362,7 +377,7 @@ class VirtualFileSystem {
     // Filter on all files and create them in the this.
     repoFiles
       .filter((fileOrFolder) => !fileOrFolder.name.includes('/'))
-      .forEach((file) => this.createFile(file, false));
+      .forEach((file) => this.createFile(file));
 
     // Filter on all folders and create them in the this.
     // Example: /folder1/folder2/file.txt
@@ -386,7 +401,7 @@ class VirtualFileSystem {
           ...file,
           name: filename,
           parentId,
-        }, false);
+        });
       });
   }
 }

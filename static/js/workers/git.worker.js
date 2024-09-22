@@ -57,6 +57,10 @@ class API {
     });
   }
 
+  _log() {
+    console.log('[git]', ...arguments);
+  }
+
   setRepoLink(repoLink) {
     this.repoLink = this.isDev
       ? repoLink.replace(new URL(repoLink).origin, this.proxyUrl)
@@ -186,19 +190,21 @@ class API {
   /**
    * Commit a file to the repository by writing its contents to a file, adding
    * it to the staging area and committing it.
-   * @param {string} filename - The name of the file to commit.
+   * @param {string} filepath - The absolute filepath to commit.
    * @param {string} filecontents - The contents of the file to commit.
    */
-  commit(filename, filecontents) {
-    if (filename.includes('/')) {
-      const parentDirs = filename.split('/').slice(0, -1).join('/');
+  commit(filepath, filecontents) {
+    this._log('committing', filepath);
+
+    if (filepath.includes('/')) {
+      const parentDirs = filepath.split('/').slice(0, -1).join('/');
       this._makeDirs(parentDirs);
     }
 
-    const commitPrefix = !this.fileExists(filename) ? 'Add' : 'Update';
-    this.fs.writeFile(filename, filecontents);
-    this.lg.callMain(['add', filename]);
-    this.lg.callMain(['commit', '-m', `${commitPrefix} ${filename}`]);
+    const commitPrefix = !this.fileExists(filepath) ? 'Add' : 'Update';
+    this.fs.writeFile(filepath, filecontents);
+    this.lg.callMain(['add', filepath]);
+    this.lg.callMain(['commit', '-m', `${commitPrefix} ${filepath}`]);
     this.hasNewCommits = true;
   }
 
@@ -207,6 +213,31 @@ class API {
    */
   push() {
     this.lg.callMain(['push'])
+  }
+
+  /**
+   * Remove a file from the current repository.
+   *
+   * @param {string} filepath - The absolute filepath to remove.
+   */
+  rm(filepath) {
+    this.fs.unlink(filepath);
+    this.lg.callMain(['add', filepath]);
+    this.lg.callMain(['commit', '-m', `Remove ${filepath}`]);
+  }
+
+  /**
+   * Move a file from one location to another.
+   *
+   * @param {string} oldPath - The absolute filepath of the file to move.
+   * @param {string} newPath - The absolute filepath to the new file.
+   */
+  mv(oldPath, newPath) {
+    this._log(`rename ${oldPath} to ${newPath}`);
+    this.fs.rename(oldPath, newPath);
+    this.lg.callMain(['add', oldPath, newPath])
+    this.lg.callMain(['commit', '-m', `Rename ${oldPath} to ${newPath}`]);
+    this.hasNewCommits = true;
   }
 }
 
@@ -242,7 +273,7 @@ self.onmessage = (event) => {
       break;
 
     case 'commit':
-      api.commit(payload.filename, payload.filecontents);
+      api.commit(payload.filepath, payload.filecontents);
       break;
 
     case 'push':
@@ -251,6 +282,14 @@ self.onmessage = (event) => {
 
     case 'newFolder':
       api.newFolder(payload.folderPath);
+      break;
+
+    case 'rm':
+      api.rm(payload.filepath);
+      break;
+
+    case 'mv':
+      api.mv(payload.oldPath, payload.newPath);
       break;
   }
 };

@@ -38,7 +38,10 @@ function initApp() {
     // Make layout instance available at all times.
     window._layout = layout;
 
-    resolve({ layout });
+    // Use timeout trick to make sure layout.root exists.
+    setTimeout(() => {
+      resolve({ layout });
+    }, 10);
   });
 }
 

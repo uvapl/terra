@@ -101,7 +101,10 @@ function initApp() {
         // Call the init function that creates all components.
         layout.init();
 
-        resolve({ layout, config });
+        // Use timeout trick to make sure layout.root exists.
+        setTimeout(() => {
+          resolve({ layout, config });
+        }, 10);
       })
       .catch((err) => reject(err));
   });
