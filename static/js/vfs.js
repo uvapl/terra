@@ -161,9 +161,10 @@ class VirtualFileSystem {
    * Create a new file in the virtual filesystem.
    *
    * @param {object} fileObj - The file object to create.
+   * @param {boolean} [commit] - Whether to commit the file.
    * @returns {object} The new file object.
    */
-  createFile = (fileObj) => {
+  createFile = (fileObj, commit = true) => {
     const newFile = {
       id: uuidv4(),
       name: 'Untitled',
@@ -175,6 +176,10 @@ class VirtualFileSystem {
     };
 
     this.files[newFile.id] = newFile;
+
+    if (commit) {
+      this._git('commit', this.getAbsoluteFilePath(newFile.id), newFile.content);
+    }
 
     this.saveState();
     return newFile;
@@ -241,7 +246,6 @@ class VirtualFileSystem {
       this._git('commit', this.getAbsoluteFilePath(file.id), file.content);
     }
 
-
     this.saveState();
     return file;
   }
@@ -254,16 +258,36 @@ class VirtualFileSystem {
    * @returns {object} The updated folder object.
    */
   updateFolder = (id, obj) => {
+    let isRenamed = false;
     const folder = this.findFolderById(id);
 
     if (folder) {
       for (const [key, value] of Object.entries(obj)) {
         if (folder.hasOwnProperty(key) && key !== 'id') {
+
+          // Check whether the folder is renamed.
+          if (key === 'name' && folder[key] !== obj[key]) {
+            const oldPath = this.getAbsoluteFolderPath(folder.id);
+            folder[key] = value;
+            const newPath = this.getAbsoluteFolderPath(folder.id);
+
+            // Move the folder to the new location.
+            this._git('mv', oldPath, newPath);
+
+            isRenamed = true;
+            continue;
+          }
+
           folder[key] = value;
         }
       }
 
       folder.updatedAt = new Date().toISOString();
+    }
+
+    if (!isRenamed) {
+      // Just commit the changes to the folder.
+      this._git('commit', this.getAbsoluteFilePath(folder.id), folder.content);
     }
 
     this.saveState();
@@ -377,7 +401,7 @@ class VirtualFileSystem {
     // Filter on all files and create them in the this.
     repoFiles
       .filter((fileOrFolder) => !fileOrFolder.name.includes('/'))
-      .forEach((file) => this.createFile(file));
+      .forEach((file) => this.createFile(file, false));
 
     // Filter on all folders and create them in the this.
     // Example: /folder1/folder2/file.txt
@@ -401,7 +425,7 @@ class VirtualFileSystem {
           ...file,
           name: filename,
           parentId,
-        });
+        }, false);
       });
   }
 }
