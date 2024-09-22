@@ -164,14 +164,44 @@ class API {
   }
 
   /**
-   * Check whether a given filepath exists in the filesystem.
+   * Check whether a given filepath exists in the filesystem and is a file.
    *
    * @param {string} filepath - The filepath to check.
    * @returns {boolean} True if the given filepath exists, false otherwise.
    */
-  fileExists(filepath) {
+  _isFile(filepath) {
     try {
-      this.fs.readFile(filepath);
+      const stat = this.fs.stat(filepath);
+      return this._pathExists(filepath) && this.fs.isFile(stat.mode);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check whether a given folderpath exists in the filesystem and is a directory.
+   *
+   * @param {string} folderpath - The folderpath to check.
+   * @returns {boolean} True if the given folderpath exists, false otherwise.
+   */
+  _isDir(folderpath) {
+    try {
+      const stat = this.fs.stat(folderpath);
+      return this._pathExists(folderpath) && this.fs.isDir(stat.mode);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check whether a given path exists in the filesystem.
+   *
+   * @param {string} path - The path to check.
+   * @returns {boolean} True if the given path exists, false otherwise.
+   */
+  _pathExists(path) {
+    try {
+      this.fs.lookupPath(path);
       return true;
     } catch {
       return false;
@@ -194,14 +224,14 @@ class API {
    * @param {string} filecontents - The contents of the file to commit.
    */
   commit(filepath, filecontents) {
-    this._log('committing', filepath);
+    this._log('comitting', filepath);
 
     if (filepath.includes('/')) {
       const parentDirs = filepath.split('/').slice(0, -1).join('/');
       this._makeDirs(parentDirs);
     }
 
-    const commitPrefix = !this.fileExists(filepath) ? 'Add' : 'Update';
+    const commitPrefix = !this._isFile(filepath) ? 'Add' : 'Update';
     this.fs.writeFile(filepath, filecontents);
     this.lg.callMain(['add', filepath]);
     this.lg.callMain(['commit', '-m', `${commitPrefix} ${filepath}`]);
@@ -223,7 +253,7 @@ class API {
   rm(filepath) {
     this._log(`remove ${filepath}`);
 
-    if (this.fileExists(filepath)) {
+    if (this._isFile(filepath)) {
       // File
       this.fs.unlink(filepath);
     } else {
@@ -243,6 +273,8 @@ class API {
    * @param {string} newPath - The absolute filepath to the new file.
    */
   mv(oldPath, newPath) {
+    if (!this._pathExists(oldPath)) return;
+
     this._log(`rename ${oldPath} to ${newPath}`);
     this.fs.rename(oldPath, newPath);
     this.lg.callMain(['add', oldPath, newPath])

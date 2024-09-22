@@ -81,7 +81,7 @@ function deleteFileTreeItem(node) {
     } else if (node.type === 'folder') {
       closeFilesInFolderRecursively(node.id);
     }
-    //
+
     // Delete from file-tree, including VFS.
     $('#file-tree').jstree('delete_node', node);
 

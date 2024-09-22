@@ -228,15 +228,20 @@ class VirtualFileSystem {
    * @returns {object} The updated file object.
    */
   updateFile = (id, obj) => {
-    let isRenamed = false;
     const file = this.findFileById(id);
+
+    // This extra check is needed because in the UI, the user can trigger a
+    // rename but not actually change the name.
+    const isRenamed = typeof obj.name === 'string' && file.name !== obj.name;
+    const isMoved = typeof obj.parentId === 'string' && file.parentId !== obj.parentId;
+    const isContentChanged = typeof obj.content === 'string' && file.content !== obj.content;
 
     if (file) {
       for (const [key, value] of Object.entries(obj)) {
         if (file.hasOwnProperty(key) && key !== 'id') {
 
           // Check whether the file is renamed.
-          if (key === 'name' && file[key] !== obj[key]) {
+          if (key === 'name' && (isRenamed || isMoved)) {
             const oldPath = this.getAbsoluteFilePath(file.id);
             file[key] = value;
             const newPath = this.getAbsoluteFilePath(file.id);
@@ -244,7 +249,6 @@ class VirtualFileSystem {
             // Move the file to the new location.
             this._git('mv', oldPath, newPath);
 
-            isRenamed = true;
             continue;
           }
 
@@ -253,14 +257,15 @@ class VirtualFileSystem {
       }
 
       file.updatedAt = new Date().toISOString();
+
+      if (isContentChanged) {
+        // Just commit the changes to the file.
+        this._git('commit', this.getAbsoluteFilePath(file.id), file.content);
+      }
+
+      this.saveState();
     }
 
-    if (!isRenamed) {
-      // Just commit the changes to the file.
-      this._git('commit', this.getAbsoluteFilePath(file.id), file.content);
-    }
-
-    this.saveState();
     return file;
   }
 
@@ -272,15 +277,19 @@ class VirtualFileSystem {
    * @returns {object} The updated folder object.
    */
   updateFolder = (id, obj) => {
-    let isRenamed = false;
     const folder = this.findFolderById(id);
+
+    // This extra check is needed because in the UI, the user can trigger a
+    // rename but not actually change the name.
+    const isRenamed = typeof obj.name === 'string' && folder.name !== obj.name;
+    const isMoved = typeof obj.parentId === 'string' && folder.parentId !== obj.parentId;
 
     if (folder) {
       for (const [key, value] of Object.entries(obj)) {
         if (folder.hasOwnProperty(key) && key !== 'id') {
 
           // Check whether the folder is renamed.
-          if (key === 'name' && folder[key] !== obj[key]) {
+          if (key === 'name' && (isRenamed || isMoved)) {
             const oldPath = this.getAbsoluteFolderPath(folder.id);
             folder[key] = value;
             const newPath = this.getAbsoluteFolderPath(folder.id);
@@ -288,7 +297,6 @@ class VirtualFileSystem {
             // Move the folder to the new location.
             this._git('mv', oldPath, newPath);
 
-            isRenamed = true;
             continue;
           }
 
@@ -297,14 +305,10 @@ class VirtualFileSystem {
       }
 
       folder.updatedAt = new Date().toISOString();
+
+      this.saveState();
     }
 
-    if (!isRenamed) {
-      // Just commit the changes to the folder.
-      this._git('commit', this.getAbsoluteFilePath(folder.id), folder.content);
-    }
-
-    this.saveState();
     return folder;
   }
 
