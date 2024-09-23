@@ -1,0 +1,5 @@
+doctest
+mypy
+checkpy
+pytest
+pandas

@@ -185,44 +185,8 @@ class API extends BaseAPI {
 
 # Packaging Python files in stdlib
 
-The `./static/wasm/py/python_stdlib.zip` contains all the default python modules
-that pyodide ships. If you want to import other modules from pypi then it is
-recommended to use the `./static/wasm/py/custom_stdlib.zip`.
-
-Let's say you want to import `mypy`, then you should do the following:
-
-- Locally `cd` into `./static/wasm/py/`
-- Run `unzip custom_stdlib.zip -d stdlib` to extract the files into a `stdlib` directory
-- Run `pip3 install -t . mypy` to install `mypy` and all its dependencies in the current directory
-- Run `rm -rf *.so __pycache__ **/__pycache__ bin` to remove unnecessary files
-- Run `rm ../custom_stdlib.zip && zip -vr ../custom_stdlib.zip .` to create a new zip
-- Run `cd .. && rm -rf stdlib` to remove the folder we just created
-
-It might be that the contents are cached. In that case, clear your browser cache
-through the settings.
-
-When refreshing the page, you should be able to import the module directly
-inside the front-end editor. However, there might be dependencies. If you have
-this error:
-
-```
-PythonError: Traceback (most recent call last):
-  File "/lib/python311.zip/_pyodide/_base.py", line 499, in eval_code
-    .run(globals, locals)
-     ^^^^^^^^^^^^^^^^^^^^
-  File "/lib/python311.zip/_pyodide/_base.py", line 340, in run
-    coroutine = eval(self.code, globals, locals)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "<exec>", line 2, in <module>
-ModuleNotFoundError: The module '<MODULE_NAME_HERE>' is included in the Pyodide distribution, but it is not installed.
-You can install it by calling:
-  await micropip.install("<MODULE_NAME_HERE>") in Python, or
-  await pyodide.loadPackage("<MODULE_NAME_HERE>") in JavaScript
-See https://pyodide.org/en/stable/usage/loading-packages.html for more details.
-```
-
-Then check what `<MODULE_NAME_HERE>` is and repeat the packaging steps described
-above for that package as well, until all dependencies are resolved.
+See [INSTALL_PY_PKG.md](./INSTALL_PY_PKG.md) on how to add a python package to
+the pyodide environment.
 
 # Acknowledgements
 
