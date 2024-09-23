@@ -313,11 +313,15 @@ function registerFileTreeEventListeners($tree) {
   });
 
   $tree.on('select_node.jstree', (event, data) => {
+    console.log('SELECTING')
     if (data.node.type === 'folder') {
       $('#file-tree').jstree('toggle_node', data.node);
     } else {
       openFile(data.node.id, data.node.text);
     }
+
+    // Deselect the node to make sure it is clickable again.
+    $('#file-tree').jstree('deselect_node', data.node);
   });
 
   $(document).on('dnd_stop.vakata', function(event, data) {
