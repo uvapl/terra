@@ -3,7 +3,7 @@
 - [Table of Contents](#table-of-contents)
 - [Packaging Python files in stdlib](#packaging-python-files-in-stdlib)
     + [Download whl-file through pyodide](#download-whl-file-through-pyodide)
-    + [Install package contents through pipo](#install-package-contents-through-pipo)
+    + [Install package contents through pip](#install-package-contents-through-pip)
   * [Running it in the browser](#running-it-in-the-browser)
 
 # Packaging Python files in stdlib
@@ -112,7 +112,7 @@ Then, execute the following steps:
 
 Continue to [Running it in the browser](#running-it-in-the-browser)
 
-### Install package contents through pipo
+### Install package contents through pip
 
 At this point, you should be **certain** that pyodide does not provide the
 package that you want to install.
