@@ -240,7 +240,7 @@ class WorkerAPI {
         try {
           // Only write when the worker is ready. This prevents infinite loops
           // with print statements to continue printing after the worker has
-          // terminatedd after the user has pressed the stop button.
+          // terminated when the user has pressed the stop button.
           if (this.isReady) {
             term.write(event.data.data);
           }
