@@ -14,7 +14,7 @@ recommended to modify the `./static/wasm/py/custom_stdlib.zip`.
 
 There's a [requirements.txt](./static/wasm/py/requirements.txt) that is not
 used, but just to keep track of the packages that have been added in the
-custom_stdlib.zip. Please update this when adding another package to the zip.
+`custom_stdlib.zip`. Please update this when adding another package to the zip.
 
 There are two ways to import a module and both are quite tedious:
 1) Download `.whl` file through pyodide (recommended)
@@ -88,9 +88,9 @@ use the small HTML file below:
 ```
 </details>
 
-Save the HTML code below locally in a file and open it in your browser. Simply fill in a
-package name. If it exists, the website will output all URLs that you need to
-download. For example, searching for `pandas` will yield:
+Save the HTML code above locally in a file and open it in your browser. Simply
+fill in a package name and if it exists, the website will output all URLs that
+you need to download. For example, searching for `pandas` will yield:
 
 ```
 https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pandas-1.5.3-cp311-cp311-emscripten_3_1_46_wasm32.whl
