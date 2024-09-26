@@ -239,3 +239,23 @@ function getFileExtension(filename) {
 function addNewLineCharacter(text) {
   return text.replace(/\n?$/g, '\n');
 }
+
+/**
+ * Convert a given number of seconds to milliseconds.
+ *
+ * @param {number} secs - The amount of seconds to convert.
+ * @returns {number} The amount of seconds in milliseconds.
+ */
+function seconds(secs) {
+  return 1000 * secs;
+}
+
+/**
+ * Convert a given number of minutes to milliseconds.
+ *
+ * @param {number} mins - The amount of minutes to convert.
+ * @returns {number} The amount of minutes in milliseconds.
+ */
+function minutes(mins) {
+  return seconds(60) * mins;
+}

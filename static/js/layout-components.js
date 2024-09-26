@@ -70,6 +70,14 @@ function closeFile() {
 }
 
 /**
+ * Close all tabs in the editor.
+ */
+function closeAllFiles() {
+  const tabs = getAllEditorTabs();
+  tabs.forEach((tab) => tab.parent.removeChild(tab));
+}
+
+/**
  * Open a file in the editor, otherwise switch to the tab of the filename.
  * Next, spawn a new worker based on the file extension.
  *
@@ -171,7 +179,7 @@ function saveFile() {
     `,
     attrs: {
       id: 'ide-save-file-modal',
-      class: 'save-file-modal'
+      class: 'modal-width-small'
     }
   });
 
@@ -454,6 +462,7 @@ function EditorComponent(container, state) {
     this.editor.getSession().getUndoMananger().reset();
   });
 
+
   this.editor.on('change', () => {
     window._editorIsDirty = true;
     container.extendState({ value: this.editor.getValue() });
@@ -462,7 +471,29 @@ function EditorComponent(container, state) {
     if (fileId) {
       VFS.updateFile(fileId, {
         content: this.editor.getValue(),
-      });
+      }, false);
+    }
+
+    if (isIDE && hasGitFSWorker() && this.initialized) {
+      if (this.gitCommitTimeoutId) {
+        clearTimeout(this.gitCommitTimeoutId);
+      }
+
+      // Only commit changes after 2 seconds of inactivity.
+      this.gitCommitTimeoutId = setTimeout(() => {
+        const filename = container.parent.config.title;
+        window._gitFS.commit(
+          filename,
+          this.editor.getValue(),
+        );
+
+        const node = $('#file-tree').jstree('get_node', fileId);
+        addGitDiffIndicator(node);
+      }, seconds(2));
+    }
+
+    if (!this.initialized) {
+      this.initialized = true;
     }
   });
 

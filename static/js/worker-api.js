@@ -4,28 +4,39 @@
 class WorkerAPI {
   /**
    * The current programming language that is being used.
+   * @type {string}
    */
   _proglang = null;
 
   /**
    * The previous programming language that was used.
+   * @type {string}
    */
   _prevProglang = null;
 
   /**
    * Contains a shared memory object when enabled.
+   * @type {WebAssembly.Memory}
    */
   sharedMem = null;
 
   /**
    * Whether the worker is currently running code from the user.
+   * @type {boolean}
    */
   isRunningCode = false;
 
   /**
    * Whether the worker has been initialised.
+   * @type {boolean}
    */
   isReady = false;
+
+  /**
+   * Current active worker instance for a specific proglang.
+   * @type {Worker}
+   */
+  worker = null;
 
   constructor(proglang) {
     this.proglang = proglang;

@@ -55,9 +55,9 @@
   padding: 8px;
 }
 
-.menubar li:hover,
-.menubar li:focus {
-  background: var(--tab-menu--tab-bg-color);;
+.menubar li:not(.disabled):hover,
+.menubar li:not(.disabled):focus {
+  background: var(--tab-menu--tab-bg-color);
   color: var(--color-black);
   cursor: pointer;
 }
@@ -68,7 +68,7 @@
 }
 
 .menubar > li.open {
-  background: var(--tab-menu--tab-bg-color);;
+  background: var(--tab-menu--tab-bg-color);
   color: var(--color-black);
 }
 
@@ -79,6 +79,7 @@
 
 .menubar li.disabled {
   color: #cecece;
+  cursor: not-allowed;
 }
 
 .menubar > li.open > ul {
@@ -139,7 +140,6 @@
   padding: 8px 10px;
 }
 
-.menubar ul li:hover,
-.menubar ul li:focus {
-  background-color: var(--tab-menu--tab-bg-color);;
+.menubar .separator {
+  border-bottom: 1px solid var(--tab-menu--tab-bg-color);
 }

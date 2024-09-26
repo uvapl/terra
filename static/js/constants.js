@@ -23,5 +23,16 @@ const AUTOSAVE_INTERVAL = 60 * 1000;
  */
 const AUTOSAVE_START_OFFSET = 60 * 1000;
 
+/**
+ * Checks whether the current app is the IDE or the embed.
+ */
 const isIDE = $('body').hasClass('examide-ide');
 const isIframe = $('body').hasClass('examide-embed');
+
+/**
+ * Checks whether the current app is running in development mode.
+ */
+const isDev = window.location.hostname === 'localhost';
+
+// The modal's animation duration in milliseconds.
+const MODAL_ANIM_DURATION = 300;

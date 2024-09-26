@@ -12,6 +12,7 @@ code completely offline using WebAssembly.
 - [Adding custom header files to C](#adding-custom-header-files-to-c)
 - [Create custom wasm32-wasi library](#create-custom-wasm32-wasi-library)
 - [Packaging Python files in stdlib](#packaging-python-files-in-stdlib)
+- [Enable stdin](#enable-stdin)
 - [Acknowledgements](#acknowledgements)
 
 # Getting Started
@@ -187,6 +188,21 @@ class API extends BaseAPI {
 
 See [INSTALL_PY_PKG.md](./INSTALL_PY_PKG.md) on how to add a python package to
 the pyodide environment.
+
+# Enable stdin
+
+In order to enable stdin, the index.html (or any HTML-file that works with
+input) requires the following headers to be sent with every request:
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+The above allows the usage of
+[`WebAssembly.Memory`](https://developer.mozilla.org/en-US/docs/WebAssembly/JavaScript_interface/Memory),
+which is needed to make shared memory work in order to make input work properly
+between the main thread and worker instances.
 
 # Acknowledgements
 

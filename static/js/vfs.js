@@ -4,10 +4,25 @@
 
 class VirtualFileSystem {
   constructor() {
-    this.files = [];
-    this.folders = [];
+    this.files = {};
+    this.folders = {};
 
     this.loadFromLocalStorage();
+  }
+
+  _git(fn, ...payload) {
+    if (!hasGitFSWorker()) return;
+
+    window._gitFS[fn](...payload);
+  }
+
+  /**
+   * Clear the virtual filesystem, removing all files and folders permantly.
+   */
+  clear = () => {
+    this.files = {};
+    this.folders = {};
+    this.saveState();
   }
 
   /**
@@ -39,12 +54,12 @@ class VirtualFileSystem {
   /**
    * Get the root-level folders in the virtual filesystem.
    */
-  getRootFolders = () => this.folders.filter((folder) => !folder.parentId)
+  getRootFolders = () => Object.values(this.folders).filter((folder) => !folder.parentId);
 
   /**
    * Get the root-level files in the virtual filesystem.
    */
-  getRootFiles = () => this.files.filter((file) => !file.parentId)
+  getRootFiles = () => Object.values(this.files).filter((file) => !file.parentId)
 
   /**
    * Internal helper function to filter a list of object based on conditions.
@@ -62,7 +77,7 @@ class VirtualFileSystem {
    * @param {object} conditions - The conditions to filter on.
    * @returns {array} List of file objects matching the conditions.
    */
-  findFilesWhere = (conditions) => this.files.filter(this._where(conditions))
+  findFilesWhere = (conditions) => Object.values(this.files).filter(this._where(conditions))
 
   /**
    * Find a single file that match the given conditions.
@@ -86,40 +101,101 @@ class VirtualFileSystem {
    * @param {object} conditions - The conditions to filter on.
    * @returns {array} List of folder objects matching the conditions.
    */
-  findFoldersWhere = (conditions) => this.folders.filter(this._where(conditions))
+  findFoldersWhere = (conditions) => Object.values(this.folders).filter(this._where(conditions))
+
+  /**
+   * Find a single folders that match the given conditions.
+   *
+   * @example findFolderWhere({ name: 'foo' })
+   *
+   * @param {object} conditions - The conditions to filter on.
+   * @returns {object|null} The folder object matching the conditions or null if
+   * the folder is not found.
+   */
+  findFolderWhere = (conditions) => {
+    const folders = this.findFoldersWhere(conditions);
+    return folders.length > 0 ? folders[0] : null;
+  }
 
   /**
    * Find a file by its id.
    *
    * @param {string} id - The id of the file to find.
    */
-  findFileById = (id) => this.files.find((file) => file.id === id)
+  findFileById = (id) => this.files[id];
 
   /**
    * Find a folder by its id.
    *
    * @param {string} id - The id of the folder to find.
    */
-  findFolderById = (id) => this.folders.find((folder) => folder.id === id)
+  findFolderById = (id) => this.folders[id];
+
+  /**
+   * Get the absolute file path of a file.
+   *
+   * @param {string} fileId - The file id.
+   * @returns {string} The absolute file path of the file.
+   */
+  getAbsoluteFilePath = (fileId) => {
+    const file = this.findFileById(fileId);
+    if (!file) return '';
+    if (!file.parentId) return file.name;
+
+    let folder = this.findFolderById(file.parentId);
+    if (!folder) return file.name;
+    let folderPath = this.getAbsoluteFolderPath(folder.id);
+    let path = `${folderPath}/${file.name}`;
+
+    return path;
+  }
+
+  /**
+   * Get the absolute file path of a folder.
+   *
+   * @param {string} folderId - The folder id.
+   * @returns {string} The absolute file path of the folder.
+   */
+  getAbsoluteFolderPath = (folderId) => {
+    const folder = this.findFolderById(folderId);
+    if (!folder) return '';
+    if (!folder.parentId) return folder.name;
+
+    let parentFolder = this.findFolderById(folder.parentId);
+    let path = folder.name;
+
+    while (parentFolder) {
+      path = `${parentFolder.name}/${path}`;
+      parentFolder = this.findFolderById(parentFolder.parentId);
+    }
+
+    return path;
+  }
 
   /**
    * Create a new file in the virtual filesystem.
    *
    * @param {object} fileObj - The file object to create.
+   * @param {boolean} [commit] - Whether to commit the file.
    * @returns {object} The new file object.
    */
-  createFile = (fileObj) => {
+  createFile = (fileObj, commit = true) => {
     const newFile = {
       id: uuidv4(),
       name: 'Untitled',
       parentId: null,
       content: '',
-      ...fileObj,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      ...fileObj,
     };
 
-    this.files.push(newFile);
+    this.files[newFile.id] = newFile;
+
+    if (commit) {
+      this._git('commit', this.getAbsoluteFilePath(newFile.id), newFile.content);
+    }
+
     this.saveState();
     return newFile;
   }
@@ -135,12 +211,12 @@ class VirtualFileSystem {
       id: uuidv4(),
       name: 'Untitled',
       parentId: null,
-      ...folderObj,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      ...folderObj,
     };
 
-    this.folders.push(newFolder);
+    this.folders[newFolder.id] = newFolder;
     this.saveState();
     return newFolder;
   }
@@ -150,22 +226,48 @@ class VirtualFileSystem {
    *
    * @param {string} id - The file id.
    * @param {object} obj - Key-value pairs to update in the file object.
+   * @param {boolean} [commit] - Whether to commit the file.
    * @returns {object} The updated file object.
    */
-  updateFile = (id, obj) => {
+  updateFile = (id, obj, commit = true) => {
     const file = this.findFileById(id);
+
+    // This extra check is needed because in the UI, the user can trigger a
+    // rename but not actually change the name.
+    const isRenamed = typeof obj.name === 'string' && file.name !== obj.name;
+    const isMoved = file.parentId !== obj.parentId;
+    const isContentChanged = typeof obj.content === 'string' && file.content !== obj.content;
 
     if (file) {
       for (const [key, value] of Object.entries(obj)) {
         if (file.hasOwnProperty(key) && key !== 'id') {
+
+          // Check whether the file is renamed.
+          if (key === 'name' && isRenamed || key === 'parentId' && isMoved) {
+            const oldPath = this.getAbsoluteFilePath(file.id);
+            file[key] = value;
+            const newPath = this.getAbsoluteFilePath(file.id);
+
+            // Move the file to the new location.
+            this._git('mv', oldPath, newPath);
+
+            continue;
+          }
+
           file[key] = value;
         }
       }
 
       file.updatedAt = new Date().toISOString();
+
+      if (isContentChanged && commit) {
+        // Just commit the changes to the file.
+        this._git('commit', this.getAbsoluteFilePath(file.id), file.content);
+      }
+
+      this.saveState();
     }
 
-    this.saveState();
     return file;
   }
 
@@ -179,17 +281,36 @@ class VirtualFileSystem {
   updateFolder = (id, obj) => {
     const folder = this.findFolderById(id);
 
+    // This extra check is needed because in the UI, the user can trigger a
+    // rename but not actually change the name.
+    const isRenamed = typeof obj.name === 'string' && folder.name !== obj.name;
+    const isMoved = folder.parentId !== obj.parentId;
+
     if (folder) {
       for (const [key, value] of Object.entries(obj)) {
         if (folder.hasOwnProperty(key) && key !== 'id') {
+
+          // Check whether the folder is renamed.
+          if (key === 'name' && isRenamed || key === 'parentId' && isMoved) {
+            const oldPath = this.getAbsoluteFolderPath(folder.id);
+            folder[key] = value;
+            const newPath = this.getAbsoluteFolderPath(folder.id);
+
+            // Move the folder to the new location.
+            this._git('mv', oldPath, newPath);
+
+            continue;
+          }
+
           folder[key] = value;
         }
       }
 
       folder.updatedAt = new Date().toISOString();
+
+      this.saveState();
     }
 
-    this.saveState();
     return folder;
   }
 
@@ -200,10 +321,9 @@ class VirtualFileSystem {
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
   deleteFile = (id) => {
-    const file = this.files.find((file) => file.id === id);
-
-    if (file) {
-      this.files = this.files.filter((file) => file.id !== id);
+    if (this.files[id]) {
+      this._git('rm', this.getAbsoluteFilePath(id));
+      delete this.files[id];
       this.saveState();
       return true;
     }
@@ -218,10 +338,9 @@ class VirtualFileSystem {
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
   deleteFolder = (id) => {
-    const folder = this.findFolderById(id);
-
-    if (folder) {
-      this.folders = this.folders.filter((f) => f.id !== id);
+    if (this.folders[id]) {
+      this._git('rm', this.getAbsoluteFolderPath(id));
+      delete this.folders[id];
       this.saveState();
       return true;
     }
@@ -239,7 +358,10 @@ class VirtualFileSystem {
     const file = this.findFileById(id);
     if (!file) return;
 
-    const fileBlob = new Blob([addNewLineCharacter(file.content)], { type: 'text/plain;charset=utf-8' });
+    const fileBlob = new Blob(
+      [addNewLineCharacter(file.content)],
+      { type: 'text/plain;charset=utf-8' }
+    );
     saveAs(fileBlob, file.name);
   }
 
@@ -282,6 +404,56 @@ class VirtualFileSystem {
     zip.generateAsync({ type: 'blob' }).then((content) => {
       saveAs(content, `${folder.name}.zip`);
     });
+  }
+
+  /**
+   * Import files and folders from a git repository into the virtual filesystem.
+   *
+   * A directory contains the path inside the `file.name`, e.g.
+   *   { name: 'folder1/folder2/file.txt', content: '...' }
+   * whereas a file solely contains the file name, e.g.:
+   *   { name: 'file.txt', content: '...' }
+   *
+   * @param {array} repoFiles - List of files from the repository.
+   */
+  importFromGit = (repoFiles) => {
+    // Remove all files from the virtual filesystem.
+    this.clear();
+
+    // Filter on all files and create them in the this.
+    repoFiles
+      .filter((fileOrFolder) => !fileOrFolder.name.includes('/'))
+      .forEach((file) => this.createFile(file, false));
+
+    // Filter on all folders and create them in the this.
+    // Example: /folder1/folder2/file.txt
+    repoFiles
+      .filter((fileOrFolder) => fileOrFolder.name.includes('/'))
+      .forEach((file) => {
+        // Create all parent folders first.
+        const parentDirs = file.name.split('/').slice(0, -1);
+        let parentId = null;
+        for (const dirname of parentDirs) {
+          const currFolder = this.findFolderWhere({ name: dirname, parentId });
+          if (!currFolder) {
+            const newFolder = this.createFolder({
+              name: dirname,
+              parentId,
+            });
+            parentId = newFolder.id;
+          } else {
+            parentId = currFolder.id;
+          }
+        }
+
+        // Create the file in the last folder.
+        const filename = file.name.split('/').pop();
+        this.createFile({
+          ...file,
+          name: filename,
+          parentId,
+        }, false);
+      });
   }
 }
 

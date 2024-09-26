@@ -68,7 +68,7 @@ function deleteFileTreeItem(node) {
     `,
     attrs: {
       id: 'ide-delete-confirmation-modal',
-      class: 'delete-confirmation-modal'
+      class: 'modal-width-small'
     }
   });
 
@@ -76,14 +76,14 @@ function deleteFileTreeItem(node) {
 
   $modal.find('.cancel-btn').click(() => hideModal($modal));
   $modal.find('.confirm-btn').click(() => {
-    // Delete from file-tree, including VFS.
-    $('#file-tree').jstree('delete_node', node);
-
     if (node.type === 'file') {
       closeFileTab(node.id);
     } else if (node.type === 'folder') {
       closeFilesInFolderRecursively(node.id);
     }
+
+    // Delete from file-tree, including VFS.
+    $('#file-tree').jstree('delete_node', node);
 
     hideModal($modal);
   });
@@ -189,6 +189,9 @@ function sortFileTree(a, b) {
  * Instantiates the file tree with the files in the VFS using TreeJS.
  */
 function createFileTree() {
+  // Make sure we destroy the existing tree instance if it exists.
+  $('#file-tree').jstree('destroy');
+
   const $tree = $('#file-tree').jstree({
     core: {
       animation: 0,
@@ -224,15 +227,37 @@ function createFileTree() {
     plugins: ['conditionalselect', 'contextmenu', 'sort', 'types', 'dnd'],
   });
 
-  $('#file-tree--add-folder-btn').click(() => {
+  $('#file-tree--add-folder-btn').off('click').on('click', () => {
     createNewFileTreeFolder();
   });
 
-  $('#file-tree--add-file-btn').click(() => {
+  $('#file-tree--add-file-btn').off('click').on('click', () => {
     createNewFileTreeFile();
   });
 
   registerFileTreeEventListeners($tree);
+}
+
+/**
+ * Add a visual indicator to the file tree for files and folder whether they are
+ * added or modified in Git.
+ *
+ * @param {jsTree.Node} node - The node to add the indicator to.
+ */
+function addGitDiffIndicator(node) {
+  $tree = $('#file-tree');
+
+  // Add modified classes for visual indicators.
+  if (!$(`#${node.id}`).hasClass('git-added')) {
+    $tree.jstree('get_node', node).li_attr.class = 'git-modified';
+    $tree.jstree('redraw_node', node);
+  }
+
+  // Add modified classes to parent folders.
+  if (node.type === 'file' && node.parent !== '#' && !$(`#${node.parent}`).hasClass('git-added')) {
+    $tree.jstree('get_node', node.parent).li_attr.class = 'git-modified';
+    $tree.jstree('redraw_node', node.parent);
+  }
 }
 
 /**
@@ -249,7 +274,13 @@ function registerFileTreeEventListeners($tree) {
 
     const parentId = data.node.parent !== '#' ? data.node.parent : null;
     const { id } = fn({ name: data.node.original.text, parentId });
+
+    if (hasGitFSWorker()) {
+      $tree.jstree('get_node', data.node).li_attr.class = 'git-added';
+    }
+
     $tree.jstree('set_id', data.node, id);
+    $tree.jstree('redraw_node', data.node);
   });
 
   $tree.on('rename_node.jstree', (event, data) => {
@@ -258,6 +289,10 @@ function registerFileTreeEventListeners($tree) {
       : VFS.updateFile;
 
     fn(data.node.id, { name: data.text });
+
+    if (hasGitFSWorker()) {
+      addGitDiffIndicator(data.node);
+    }
 
     const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.id);
     if (tab) {
@@ -278,11 +313,15 @@ function registerFileTreeEventListeners($tree) {
   });
 
   $tree.on('select_node.jstree', (event, data) => {
+    console.log('SELECTING')
     if (data.node.type === 'folder') {
       $('#file-tree').jstree('toggle_node', data.node);
     } else {
       openFile(data.node.id, data.node.text);
     }
+
+    // Deselect the node to make sure it is clickable again.
+    $('#file-tree').jstree('deselect_node', data.node);
   });
 
   $(document).on('dnd_stop.vakata', function(event, data) {
@@ -304,6 +343,10 @@ function registerFileTreeEventListeners($tree) {
           : VFS.updateFile;
 
         fn(id, { parentId });
+
+        if (hasGitFSWorker()) {
+          addGitDiffIndicator(sourceNode);
+        }
       }
     }, 0);
   });

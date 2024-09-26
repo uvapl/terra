@@ -7,7 +7,13 @@
 // ===========================================================================
 
 initApp().then(({ layout }) => {
-  createFileTree();
+  // Fetch the repo files or the local storage files (vfs) otherwise.
+  const repoLink = getLocalStorageItem('connected-repo');
+  if (repoLink) {
+    createGitFSWorker();
+  } else {
+    createFileTree();
+  }
 }).catch((err) => {
   console.error('Failed to bootstrap IDE app:', err);
 });
@@ -32,7 +38,10 @@ function initApp() {
     // Make layout instance available at all times.
     window._layout = layout;
 
-    resolve({ layout });
+    // Use timeout trick to make sure layout.root exists.
+    setTimeout(() => {
+      resolve({ layout });
+    }, 10);
   });
 }
 
