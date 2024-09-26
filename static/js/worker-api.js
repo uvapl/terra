@@ -88,6 +88,7 @@ class WorkerAPI {
     $('#run-code').prop('disabled', true);
 
     hideTermCursor();
+    clearTermWriteBuffer();
 
     if (showTerminateMsg) {
       term.writeln('\x1b[1;31mProcess terminated\x1b[0m');
@@ -247,7 +248,16 @@ class WorkerAPI {
       // Write callback from the worker instance. When the worker wants to write
       // code the terminal, this event will be triggered.
       case 'write':
-        term.write(event.data.data);
+        try {
+          // Only write when the worker is ready. This prevents infinite loops
+          // with print statements to continue printing after the worker has
+          // terminated when the user has pressed the stop button.
+          if (this.isReady) {
+            term.write(event.data.data);
+          }
+        } catch (e) {
+          clearTermWriteBuffer();
+        }
         break;
 
       // Stdin callback from the worker instance. When the worker requests user

@@ -232,6 +232,7 @@ function runCode(fileId = null, clearTerm = false) {
       // Worker API is busy, wait for it to be done.
       return;
     } else if (window._workerApi.isRunningCode) {
+      // Terminate worker in cases of infinite loops.
       return window._workerApi.restart(true);
     }
   }
@@ -676,6 +677,24 @@ function waitForInput() {
   });
 }
 
+/**
+ * If the writing goes wrong, this might be due to an infinite loop
+ * that contains a print statement to the terminal. This results in the
+ * write buffer 'exploding' with data that is queued for printing.
+ * This function clears the write buffer which stops (most of the) printing
+ * immediately.
+ *
+ * Furthermore, this function is called either when the user
+ * pressed the 'stop' button or when the xtermjs component throws the error:
+ *
+ *   'Error: write data discarded, use flow control to avoid losing data'
+ */
+function clearTermWriteBuffer() {
+  if (term) {
+    term._core._writeBuffer._writeBuffer = [];
+  }
+}
+
 let term;
 const fitAddon = new FitAddon.FitAddon();
 function TerminalComponent(container, state) {
@@ -822,7 +841,7 @@ class Layout extends GoldenLayout {
   emitToEditorComponents = (event, data) => {
     window._layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data);
-    })
+    });
   }
 
   setTheme = (theme) => {
