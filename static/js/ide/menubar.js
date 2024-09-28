@@ -290,15 +290,20 @@ Menubar.connectRepo = () => {
 
     if (repoLink) {
       setLocalStorageItem('connected-repo', repoLink);
+      console.log('Connecting to repository:', repoLink);
     } else {
       removeLocalStorageItem('connected-repo');
+
+      // Clear all files after disconnecting.
+      VFS.clear();
+      createFileTree();
     }
 
     hideModal($connectModal);
 
-    if (initialRepoLink) {
+    if (initialRepoLink || VFS.isEmpty()) {
       createGitFSWorker();
-    } else {
+    } else if (!VFS.isEmpty()) {
       // Confirms with the user whether they want to discard their local files
       // permanently before connecting to a new repository.
 

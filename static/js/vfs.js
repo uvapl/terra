@@ -26,6 +26,11 @@ class VirtualFileSystem {
   }
 
   /**
+   * Check whether the virtual filesystem is empty.
+   */
+  isEmpty = () => Object.keys(this.files).length === 0 && Object.keys(this.folders).length === 0;
+
+  /**
    * Load the saved virtual filesystem state from local storage.
    */
   loadFromLocalStorage = () => {

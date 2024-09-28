@@ -22,9 +22,6 @@ function incrementString(string) {
   return `${string} (1)`;
 }
 
-function createUntitledFilename(parentId = null) {
-}
-
 /**
  * Create a new file element in the file tree and trigger edit mode.
  *
