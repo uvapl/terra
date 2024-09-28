@@ -1,0 +1,8 @@
+.tippy-box[data-theme="error"] {
+  background-color: var(--color-error);
+  color: var(--color-black);
+}
+
+.tippy-box[data-theme="error"] .tippy-arrow {
+  color: var(--color-error);
+}

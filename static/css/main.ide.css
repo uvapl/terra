@@ -9,6 +9,7 @@
 @import 'include/term.css';
 @import 'include/editor.css';
 @import 'include/modal.css';
+@import 'include/tooltip.css';
 
 /* IDE Overrides */
 

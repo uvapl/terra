@@ -94,6 +94,21 @@ class VirtualFileSystem {
   }
 
   /**
+   * Check whether either a folder or file exists with the given conditions.
+   *
+   * @example existsWhere({ name: 'foo' })
+   *
+   * @param {object} conditions - The conditions to filter on.
+   * @returns {boolean} True if a folder or file exists with the given
+   * conditions, false otherwise.
+   */
+  existsWhere = (conditions) => {
+    const files = this.findFilesWhere(conditions);
+    const folders = this.findFoldersWhere(conditions);
+    return [...files, ...folders].length > 0;
+  }
+
+  /**
    * Find all folders that match the given conditions.
    *
    * @example findFoldersWhere({ name: 'foo' })
