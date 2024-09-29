@@ -506,7 +506,6 @@ function EditorComponent(container, state) {
 
   container.on('show', () => {
     this.editor.focus();
-
     // If we ran into a layout state from localStorage that doesn't have
     // a file ID, or the file ID is not the same, then we should sync the
     // filesystem ID with this tab state's file ID. We can only do this for
@@ -525,8 +524,22 @@ function EditorComponent(container, state) {
       // Load file content from vfs.
       const file = VFS.findFileById(container.getState().fileId);
       if (file) {
-        this.editor.setValue(file.content);
-        this.editor.clearSelection();
+        if (typeof file.size === 'number' && typeof LFS !== 'undefined' && file.size > LFS.MAX_FILE_SIZE) {
+          // Disable the editor if the file is too large.
+          this.editor.setValue(`This file exceeds the maximum file size.`);
+          this.editor.setReadOnly(true);
+          this.editor.clearSelection();
+          this.editor.blur();
+        } else if (!file.content && typeof LFS !== 'undefined') {
+          LFS.getFileContent(file.id).then((content) => {
+            this.editor.setValue(content);
+            this.editor.clearSelection();
+          });
+        } else {
+          this.editor.setValue(file.content);
+          this.editor.clearSelection();
+        }
+
       }
     }
 

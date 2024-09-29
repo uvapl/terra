@@ -8,7 +8,7 @@ class LocalFileSystem {
   DB_NAME = 'examide';
   FILE_HANDLES_STORE_NAME = 'file-handles';
   FOLDER_HANDLES_STORE_NAME = 'folder-handles';
-  MAX_FILE_SIZE = 300 * 1024; // 300 KB
+  MAX_FILE_SIZE = 1024 * 1024; // 1MB
 
   /**
    * Opens a file picker dialog and returns the selected file.
@@ -25,13 +25,12 @@ class LocalFileSystem {
     }
 
     const file = await fileHandle.getFile();
-    if (file.size <= this.MAX_FILE_SIZE) {
-      const content = await file.text();
-
-      const { id: fileId } = VFS.createFile({ name: file.name, content });
-      await this._saveFileHandle(fileHandle, fileId);
-      createFileTree();
-    }
+    const { id: fileId } = VFS.createFile({
+      name: file.name,
+      size: file.size
+    })
+    await this._saveFileHandle(fileHandle, fileId);
+    createFileTree();
   }
 
   /**
@@ -57,6 +56,20 @@ class LocalFileSystem {
   }
 
   /**
+   * Retrieve the content of a file by its ID.
+   *
+   * @async
+   * @param {string} id - The VFS file id.
+   * @returns {Promise<string>} The file content.
+   */
+  async getFileContent(id) {
+    const handle = await this.getFileHandle(id);
+    const file = await handle.getFile();
+    const content = await file.text();
+    return content;
+  }
+
+  /**
    * Read the contents of a folder recursively and create the file tree in VFS.
    *
    * @async
@@ -68,11 +81,12 @@ class LocalFileSystem {
     for await (const [name, handle] of dirHandle) {
       if (handle.kind === 'file') {
         const file = await handle.getFile();
-        if (file.size <= this.MAX_FILE_SIZE) {
-          const content = await file.text();
-          const { id: fileId } = VFS.createFile({ name, content, parentId })
-          await this._saveFileHandle(handle, fileId);
-        }
+        const { id: fileId } = VFS.createFile({
+          name: file.name,
+          parentId,
+          size: file.size
+        });
+        await this._saveFileHandle(handle, fileId);
       } else if (handle.kind === 'directory') {
         const folder = VFS.createFolder({ name, parentId });
         await this._saveFolderHandle(handle, folder.id);
@@ -137,11 +151,11 @@ class LocalFileSystem {
         .objectStore(storeName)
         .put(handle, key);
 
-      request.onsuccess = (event) => {
+      request.onsuccess = () => {
         resolve();
       }
 
-      request.onerror = (event) => {
+      request.onerror = () => {
         reject();
       }
     });
@@ -182,6 +196,7 @@ class LocalFileSystem {
 
     return new Promise((resolve, reject) => {
       const request = db.transaction(storeName).objectStore(storeName).get(key);
+
       request.onsuccess = (event) => {
         resolve(event.target.result);
       }
