@@ -4,6 +4,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 class LocalFileSystem {
+  DB_VERSION = 1;
   DB_NAME = 'examide';
   FILE_HANDLES_STORE_NAME = 'file-handles';
   FOLDER_HANDLES_STORE_NAME = 'folder-handles';
@@ -17,13 +18,13 @@ class LocalFileSystem {
   async openFile() {
     const [fileHandle] = await window.showOpenFilePicker();
 
-    const file = await fileHandle.getFile();
-    const content = await file.text();
-
     const permission = await fileHandle.requestPermission({ mode: 'readwrite' });
     if (permission !== 'granted') {
-      return console.error('Permission denied');
+      return console.error('Permission denied readwrite file');
     }
+
+    const file = await fileHandle.getFile();
+    const content = await file.text();
 
     const { id: fileId } = VFS.createFile({ name: file.name, content });
     await this._saveFileHandle(fileHandle, fileId);
@@ -38,7 +39,16 @@ class LocalFileSystem {
    */
   async openFolder() {
     const dirHandle = await window.showDirectoryPicker();
+
+    const permission = await dirHandle.requestPermission({ mode: 'readwrite' });
+    if (permission !== 'granted') {
+      return console.error('Permission denied readwrite directory');
+    }
+
+    closeAllFiles();
     VFS.clear();
+    indexedDB.deleteDatabase(this.DB_NAME);
+
     await this._readFolder(dirHandle, null);
     createFileTree();
   }
@@ -73,7 +83,7 @@ class LocalFileSystem {
    */
   _openDB() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.DB_NAME, 1);
+      const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
 
       request.onblocked = (event) => {
         console.error('IDB is blocked', event);
