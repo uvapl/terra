@@ -531,19 +531,15 @@ function EditorComponent(container, state) {
           this.editor.setReadOnly(true);
           this.editor.clearSelection();
           this.editor.blur();
-          console.log(1);
         } else if (!file.content && typeof LFS !== 'undefined') {
-          console.log(2);
           LFS.getFileContent(file.id).then((content) => {
             this.editor.setValue(content);
             this.editor.clearSelection();
           });
         } else {
-          console.log(3);
           this.editor.setValue(file.content);
           this.editor.clearSelection();
         }
-
       }
     }
 
