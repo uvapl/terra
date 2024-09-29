@@ -32,3 +32,23 @@
 .ace-cloud_editor_dark.ace_dark.ace_editor.ace_autocomplete .ace_marker-layer .ace_active-line {
   border: 0;
 }
+
+.editor.exceeded-filesize:after  {
+  padding-left: 50px;
+  content: 'This file exceeds the maximum file size';
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.editor.exceeded-filesize .ace_cursor {
+  display: none !important;
+}

@@ -8,7 +8,6 @@ class LocalFileSystem {
   DB_NAME = 'examide';
   FILE_HANDLES_STORE_NAME = 'file-handles';
   FOLDER_HANDLES_STORE_NAME = 'folder-handles';
-  MAX_FILE_SIZE = 1024 * 1024; // 1MB
 
   /**
    * Opens a file picker dialog and returns the selected file.

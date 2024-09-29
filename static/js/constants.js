@@ -36,3 +36,6 @@ const isDev = window.location.hostname === 'localhost';
 
 // The modal's animation duration in milliseconds.
 const MODAL_ANIM_DURATION = 300;
+
+// The maximum file size in bytes allowed for LFS.
+const LFS_MAX_FILE_SIZE = 1024 * 1024; // 1MB
