@@ -468,7 +468,7 @@ function EditorComponent(container, state) {
     container.extendState({ value: this.editor.getValue() });
 
     const { fileId } = container.getState();
-    if (fileId) {
+    if (fileId && !isIframe) {
       VFS.updateFile(fileId, {
         content: this.editor.getValue(),
       }, false);

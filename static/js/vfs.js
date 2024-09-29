@@ -10,10 +10,28 @@ class VirtualFileSystem {
     this.loadFromLocalStorage();
   }
 
+  /**
+   * Call a function on the git filesystem worker.
+   *
+   * @param {string} fn - Name of the function to call.
+   * @param {array} payload - Arguments to pass to the function.
+   */
   _git(fn, ...payload) {
     if (!hasGitFSWorker()) return;
 
     window._gitFS[fn](...payload);
+  }
+
+  /**
+   * Call a function to the local filesystem class.
+   *
+   * @param {string} fn - Name of the function to call.
+   * @param {array} payload - Arguments to pass to the function.
+   */
+  _lfs(fn, ...payload) {
+    if (!(LFS instanceof LocalFileSystem)) return;
+
+    LFS[fn](...payload);
   }
 
   /**
@@ -284,6 +302,12 @@ class VirtualFileSystem {
         // Just commit the changes to the file.
         this._git('commit', this.getAbsoluteFilePath(file.id), file.content);
       }
+
+      // Update the file content in the LFS after a second of inactivity.
+      clearTimeout(window._lfsUpdateFileTimeoutId);
+      window._lfsUpdateFileTimeoutId = setTimeout(() => {
+        this._lfs('updateFile', file.id, file.content);
+      }, seconds(1));
 
       this.saveState();
     }
