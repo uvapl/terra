@@ -128,6 +128,13 @@ function isMac() {
 }
 
 /**
+ * Check whether the user's browser is some Chrome device.
+ */
+function isChrome() {
+  return /Chrome/i.test(navigator.userAgent);
+}
+
+/**
  * Make a url with a given query params object.
  *
  * @param {string} url - The URL where the query params will be appended to.
