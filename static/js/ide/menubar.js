@@ -278,6 +278,18 @@ Menubar.connectRepo = () => {
 
   showModal($connectModal);
 
+  // Change the connect to a disconnect button when the repo link is removed.
+  if (initialRepoLink) {
+    $connectModal.find('.repo-link').on('keyup', (event) => {
+      const repoLink = event.target.value;
+      if (!repoLink) {
+        $connectModal.find('.primary-btn').removeClass('primary-btn').addClass('danger-btn').text('Disconnect');
+      } else {
+        $connectModal.find('.danger-btn').addClass('primary-btn').removeClass('danger-btn').text('Connect');
+      }
+    });
+  }
+
   $connectModal.find('.cancel-btn').click(() => hideModal($connectModal));
   $connectModal.find('.confirm-btn').click(() => {
     const repoLink = $connectModal.find('.repo-link').val();
