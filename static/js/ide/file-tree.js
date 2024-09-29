@@ -456,6 +456,5 @@ function registerFileTreeEventListeners($tree) {
   $tree.on('rename_node.jstree', renameNodeCallback($tree));
   $tree.on('delete_node.jstree', deleteNodeCallback($tree));
   $tree.on('select_node.jstree', selectNodeCallback($tree));
-  $tree.on('select_node.jstree', selectNodeCallback($tree));
   $(document).on('dnd_stop.vakata', dndStopCallback);
 }
