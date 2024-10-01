@@ -251,10 +251,10 @@ class VirtualFileSystem {
    * Create a new file in the virtual filesystem.
    *
    * @param {object} fileObj - The file object to create.
-   * @param {boolean} [commit] - Whether to commit the file.
+   * @param {boolean} [userInvoked] - Whether to user invoked the action.
    * @returns {object} The new file object.
    */
-  createFile = (fileObj, commit = true) => {
+  createFile = (fileObj, userInvoked = true) => {
     const newFile = {
       id: uuidv4(),
       name: 'Untitled',
@@ -267,7 +267,7 @@ class VirtualFileSystem {
 
     this.files[newFile.id] = newFile;
 
-    if (commit) {
+    if (userInvoked) {
       this._git('commit', this.getAbsoluteFilePath(newFile.id), newFile.content);
     }
 
@@ -301,10 +301,10 @@ class VirtualFileSystem {
    *
    * @param {string} id - The file id.
    * @param {object} obj - Key-value pairs to update in the file object.
-   * @param {boolean} [commit] - Whether to commit the file.
+   * @param {boolean} [userInvoked] - Whether to user invoked the action.
    * @returns {object} The updated file object.
    */
-  updateFile = (id, obj, commit = true) => {
+  updateFile = (id, obj, userInvoked = true) => {
     const file = this.findFileById(id);
 
     // This extra check is needed because in the UI, the user can trigger a
@@ -335,15 +335,16 @@ class VirtualFileSystem {
 
       file.updatedAt = new Date().toISOString();
 
-      if (isContentChanged && commit) {
+      if (isContentChanged && userInvoked) {
         // Just commit the changes to the file.
         this._git('commit', this.getAbsoluteFilePath(file.id), file.content);
       }
 
+
       // Update the file content in the LFS after a second of inactivity.
       clearTimeout(window._lfsUpdateFileTimeoutId);
       window._lfsUpdateFileTimeoutId = setTimeout(() => {
-        this._lfs('updateFile', file.id, file.content);
+        this._lfs('writeFileToFolder', file.parentId, file.id, file.name, file.content);
       }, seconds(1));
 
       this.saveState();

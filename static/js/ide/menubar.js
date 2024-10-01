@@ -104,11 +104,11 @@ function registerMenubarEventListeners() {
   $('#menu-item--close-file').click(closeFile);
   Mousetrap.bind(['ctrl+w'], closeFile);
 
-  $('#menu-item--open-file').click(() => LFS.openFile());
-  Mousetrap.bind(['ctrl+o'], () => LFS.openFile());
+  $('#menu-item--open-file').click(() => LFS.openFilePicker());
+  Mousetrap.bind(['ctrl+o'], () => LFS.openFilePicker());
 
-  $('#menu-item--open-folder').click(() => LFS.openFolder());
-  Mousetrap.bind(['ctrl+shift+o'], () => LFS.openFolder());
+  $('#menu-item--open-folder').click(() => LFS.openFolderPicker());
+  Mousetrap.bind(['ctrl+shift+o'], () => LFS.openFolderPicker());
 
   $('#menu-item--undo').click(Menubar.undo);
   $('#menu-item--redo').click(Menubar.redo);

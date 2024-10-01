@@ -15,7 +15,7 @@ class LocalFileSystem {
    * @async
    * @returns {Promise<void>}
    */
-  async openFile() {
+  async openFilePicker() {
     const [fileHandle] = await window.showOpenFilePicker();
 
     const permission = await fileHandle.requestPermission({ mode: 'readwrite' });
@@ -27,7 +27,7 @@ class LocalFileSystem {
     const { id: fileId } = VFS.createFile({
       name: file.name,
       size: file.size
-    })
+    }, false);
     await this._saveFileHandle(fileHandle, fileId);
     createFileTree();
   }
@@ -38,7 +38,7 @@ class LocalFileSystem {
    * @async
    * @returns {Promise<void>}
    */
-  async openFolder() {
+  async openFolderPicker() {
     const dirHandle = await window.showDirectoryPicker();
 
     const permission = await dirHandle.requestPermission({ mode: 'readwrite' });
@@ -48,7 +48,11 @@ class LocalFileSystem {
 
     closeAllFiles();
     VFS.clear();
-    indexedDB.deleteDatabase(this.DB_NAME);
+    createFileTree(); // show empty file tree
+    this._clearDB();
+
+    // Save dirHandle under the 'root' key for reference.
+    await this._saveFolderHandle(dirHandle, 'root');
 
     await this._readFolder(dirHandle, null);
     createFileTree();
@@ -84,10 +88,10 @@ class LocalFileSystem {
           name: file.name,
           parentId,
           size: file.size
-        });
+        }, false);
         await this._saveFileHandle(handle, fileId);
       } else if (handle.kind === 'directory') {
-        const folder = VFS.createFolder({ name, parentId });
+        const folder = VFS.createFolder({ name, parentId }, false);
         await this._saveFolderHandle(handle, folder.id);
         await this._readFolder(handle, folder.id);
       }
@@ -122,13 +126,16 @@ class LocalFileSystem {
         }
       };
 
-      request.onsuccess = (event) => {
-        resolve(event.target.result);
-      };
+      request.onsuccess = (event) => event.target.result ? resolve(event.target.result) : reject();
+      request.onerror = (event) => reject(event.target.error);
+    });
+  }
 
-      request.onerror = (event) => {
-        reject(event.target.error);
-      };
+  _clearDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(this.DB_NAME);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject();
     });
   }
 
@@ -150,13 +157,8 @@ class LocalFileSystem {
         .objectStore(storeName)
         .put(handle, key);
 
-      request.onsuccess = () => {
-        resolve();
-      }
-
-      request.onerror = () => {
-        reject();
-      }
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject();
     });
   }
 
@@ -195,14 +197,8 @@ class LocalFileSystem {
 
     return new Promise((resolve, reject) => {
       const request = db.transaction(storeName).objectStore(storeName).get(key);
-
-      request.onsuccess = (event) => {
-        resolve(event.target.result);
-      }
-
-      request.onerror = (event) => {
-        reject(event.target.error);
-      }
+      request.onsuccess = (event) => event.target.result ? resolve(event.target.result) : reject();
+      request.onerror = (event) => reject(event.target.error);
     });
   }
 
@@ -227,22 +223,34 @@ class LocalFileSystem {
   }
 
   /**
-   * Update the content of a file in the local filesystem of the user.
+   * Write the content to a file in the specified folder. If no folderId is
+   * provided, the file will be written to the root folder the user selected.
    *
    * @async
-   * @param {string} id - The VFS file id.
-   * @param {string} content - The new file content to write.
-   * @throws {Error} - If the file handle is not found.
+   * @param {string} folderId - Unique VFS folder id.
+   * @param {string} fileId - Unique VFS file id.
+   * @param {string} filename - The filename to write to.
+   * @param {string} content - The file contents to write.
    * @returns {Promise<void>}
    */
-  async updateFile(id, content) {
-    const handle = await this.getFileHandle(id);
-
-    if (!handle) {
-      throw new Error(`File handle not found for file id: ${id}`);
+  async writeFileToFolder(folderId, fileId, filename, content) {
+    if (!folderId) {
+      folderId = 'root';
     }
 
-    const writable = await handle.createWritable();
+    const folderHandle = await this.getFolderHandle(folderId);
+
+    let fileHandle;
+    try {
+      // Get file handle if it exists.
+      fileHandle = await this.getFileHandle(fileId);
+    } catch {
+      // No file handle exists, create a new one.
+      fileHandle = await folderHandle.getFileHandle(filename, { create: true });
+      this._saveFileHandle(fileHandle, fileId);
+    }
+
+    const writable = await fileHandle.createWritable();
     await writable.write(content);
     await writable.close();
   }
