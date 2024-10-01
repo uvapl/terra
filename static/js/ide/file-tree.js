@@ -32,7 +32,7 @@ function createNewFileTreeFile(parentNode = null) {
 
   // Create a new unique filename.
   let filename = 'Untitled';
-  while (VFS.existsWhere({ parentId, name: filename })) {
+  while (VFS.existsWhere({ parentId, name: filename }, true)) {
     filename = incrementString(filename)
   }
 
@@ -53,7 +53,7 @@ function createNewFileTreeFolder(parentNode = null) {
 
   // Create a new unique foldername.
   let foldername = 'Untitled';
-  while (VFS.existsWhere({ parentId, name: foldername })) {
+  while (VFS.existsWhere({ parentId, name: foldername }, true)) {
     foldername = incrementString(foldername)
   }
 
@@ -327,12 +327,12 @@ function createNodeCallback($tree) {
  */
 function renameNodeCallback($tree) {
   return (event, data) => {
-    const name = data.text;
+    const name = data.text.trim();
 
     // Check if the name already exists in the parent folder.
     // If so, trigger edit mode again and show error tooltip.
     const parentId = data.node.parent === '#' ? null : data.node.parent;
-    if (VFS.existsWhere({ parentId, name }) && name !== data.node.original.text) {
+    if (VFS.existsWhere({ parentId, name }, true) && name.toLowerCase() !== data.node.original.text.toLowerCase()) {
       return setTimeout(() => {
         $('#file-tree').jstree(true).edit(data.node);
 
