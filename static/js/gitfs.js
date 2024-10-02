@@ -163,15 +163,6 @@ class GitFS {
 }
 
 /**
- * Check whether the GitFS worker has been initialised.
- *
- * @returns {boolean} True if the worker has been initialised, false otherwise.
- */
-function hasGitFSWorker() {
-  return isIDE && window._gitFS instanceof GitFS;
-}
-
-/**
  * Create a new GitFSWorker instance if it doesn't exist yet and only if the the
  * user provided an ssh-key and repository link that are saved in local storage.
  * Otherwise, a worker will be created automatically when the user adds a new

@@ -266,3 +266,12 @@ function seconds(secs) {
 function minutes(mins) {
   return seconds(60) * mins;
 }
+
+/**
+ * Check whether the GitFS worker has been initialised.
+ *
+ * @returns {boolean} True if the worker has been initialised, false otherwise.
+ */
+function hasGitFSWorker() {
+  return isIDE && window._gitFS instanceof GitFS;
+}
