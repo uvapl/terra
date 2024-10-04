@@ -67,6 +67,10 @@ function initApp() {
   return new Promise((resolve, reject) => {
     loadConfig()
       .then(async (config) => {
+        if (!config.tabs) {
+          config.tabs = {};
+        }
+
         // Get the programming language based on tabs filename.
         const proglang = getFileExtension(Object.keys(config.tabs)[0]);
 

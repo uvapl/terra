@@ -110,9 +110,9 @@ class API extends BaseAPI {
       const activeTab = files.find(file => file.name === activeTabName);
 
       this.hostWriteCmd(`python3 ${activeTab.name}`);
-      const stdout = this.run(activeTab.content, activeTabName);
-      if (stdout) {
-        this.hostWrite(stdout);
+      const error = this.run(activeTab.content, activeTabName);
+      if (error) {
+        this.hostWrite(error);
       }
     } finally {
       if (typeof this.runUserCodeCallback === 'function') {
@@ -140,11 +140,10 @@ class API extends BaseAPI {
       const moduleName = activeTabName.replace('.py', '');
       cmd = cmd.map((line) => line.replace('<filename>', moduleName));
 
-      // Run the command and gather its results.
-      const results = this.run(cmd, activeTabName);
-
-      // Print the reults to the terminal in the UI.
-      this.hostWrite(results);
+      const error = this.run(cmd, activeTabName);
+      if (error) {
+        this.hostWrite(error);
+      }
     } finally {
       this.runButtonCommandCallback(selector);
     }
@@ -216,7 +215,7 @@ class API extends BaseAPI {
    *
    * @param {string} code - The python code to run.
    * @param {string} activeTabName - The filename of the active editor tab.
-   * @returns {string} The output of the python code.
+   * @returns {string|undefined} The error message or undefined.
    */
   run(code, activeTabName) {
     if (!Array.isArray(code)) {
