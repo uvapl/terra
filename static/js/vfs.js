@@ -26,6 +26,11 @@ class VirtualFileSystem {
   }
 
   /**
+   * Check whether the virtual filesystem is empty.
+   */
+  isEmpty = () => Object.keys(this.files).length === 0 && Object.keys(this.folders).length === 0;
+
+  /**
    * Load the saved virtual filesystem state from local storage.
    */
   loadFromLocalStorage = () => {
@@ -91,6 +96,21 @@ class VirtualFileSystem {
   findFileWhere = (conditions) => {
     const files = this.findFilesWhere(conditions);
     return files.length > 0 ? files[0] : null;
+  }
+
+  /**
+   * Check whether either a folder or file exists with the given conditions.
+   *
+   * @example existsWhere({ name: 'foo' })
+   *
+   * @param {object} conditions - The conditions to filter on.
+   * @returns {boolean} True if a folder or file exists with the given
+   * conditions, false otherwise.
+   */
+  existsWhere = (conditions) => {
+    const files = this.findFilesWhere(conditions);
+    const folders = this.findFoldersWhere(conditions);
+    return [...files, ...folders].length > 0;
   }
 
   /**

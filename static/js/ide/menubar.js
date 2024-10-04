@@ -278,6 +278,18 @@ Menubar.connectRepo = () => {
 
   showModal($connectModal);
 
+  // Change the connect to a disconnect button when the repo link is removed.
+  if (initialRepoLink) {
+    $connectModal.find('.repo-link').on('keyup', (event) => {
+      const repoLink = event.target.value;
+      if (!repoLink) {
+        $connectModal.find('.primary-btn').removeClass('primary-btn').addClass('danger-btn').text('Disconnect');
+      } else {
+        $connectModal.find('.danger-btn').addClass('primary-btn').removeClass('danger-btn').text('Connect');
+      }
+    });
+  }
+
   $connectModal.find('.cancel-btn').click(() => hideModal($connectModal));
   $connectModal.find('.confirm-btn').click(() => {
     const repoLink = $connectModal.find('.repo-link').val();
@@ -290,15 +302,20 @@ Menubar.connectRepo = () => {
 
     if (repoLink) {
       setLocalStorageItem('connected-repo', repoLink);
+      console.log('Connecting to repository:', repoLink);
     } else {
       removeLocalStorageItem('connected-repo');
+
+      // Clear all files after disconnecting.
+      VFS.clear();
+      createFileTree();
     }
 
     hideModal($connectModal);
 
-    if (initialRepoLink) {
+    if (initialRepoLink || VFS.isEmpty()) {
       createGitFSWorker();
-    } else {
+    } else if (!VFS.isEmpty()) {
       // Confirms with the user whether they want to discard their local files
       // permanently before connecting to a new repository.
 

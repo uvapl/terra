@@ -57,7 +57,3 @@
 .danger-btn:active {
   background: var(--color-error-hover);
 }
-
-.modal .danger-btn {
-  font-weight: bold;
-}

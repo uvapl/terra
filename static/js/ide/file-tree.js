@@ -3,13 +3,41 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
+ * Increment the number in a string with the pattern `XXXXXX (N)`.
+ *
+ * @example incrementString('Untitled')     -> 'Untitled (1)'
+ * @example incrementString('Untitled (1)') -> 'Untitled (2)'
+ *
+ * @param {string} string - The string to update.
+ * @returns {string} The updated string containing the number.
+ */
+function incrementString(string) {
+  const match = /\((\d+)\)$/g.exec(string);
+
+  if (match) {
+    const num = parseInt(match[1]) + 1;
+    return string.replace(/\d+/, num);
+  }
+
+  return `${string} (1)`;
+}
+
+/**
  * Create a new file element in the file tree and trigger edit mode.
  *
  * @param {jQuery.Object} [parentNode] - The parent node of the new file.
  */
 function createNewFileTreeFile(parentNode = null) {
+  const parentId = parentNode ? parentNode.id : null;
+
+  // Create a new unique filename.
+  let filename = 'Untitled';
+  while (VFS.existsWhere({ parentId, name: filename })) {
+    filename = incrementString(filename)
+  }
+
   const nodeId = $('#file-tree').jstree('create_node', parentNode, {
-    text: 'Untitled',
+    text: filename,
     type: 'file',
   });
   $('#file-tree').jstree(true).edit(nodeId);
@@ -21,8 +49,16 @@ function createNewFileTreeFile(parentNode = null) {
  * @param {jQuery.Object} [parentNode] - The parent node of the new folder.
  */
 function createNewFileTreeFolder(parentNode = null) {
+  const parentId = parentNode ? parentNode.id : null;
+
+  // Create a new unique foldername.
+  let foldername = 'Untitled';
+  while (VFS.existsWhere({ parentId, name: foldername })) {
+    foldername = incrementString(foldername)
+  }
+
   const nodeId = $('#file-tree').jstree('create_node', parentNode, {
-    text: 'Untitled',
+    text: foldername,
     type: 'folder',
   });
 
@@ -261,12 +297,12 @@ function addGitDiffIndicator(node) {
 }
 
 /**
- * Registers event listeners for the file tree.
+ * Callback when the user creates a new node in the file tree.
  *
- * @param {jQuery.Object} $tree - File-tree reference object.
+ * @param {jsTree} $tree - The file tree instance.
  */
-function registerFileTreeEventListeners($tree) {
-  $tree.on('create_node.jstree', (event, data) => {
+function createNodeCallback($tree) {
+  return (event, data) => {
     // Create the new file or folder in the filesystem.
     const fn = data.node.type === 'folder'
       ? VFS.createFolder
@@ -281,14 +317,47 @@ function registerFileTreeEventListeners($tree) {
 
     $tree.jstree('set_id', data.node, id);
     $tree.jstree('redraw_node', data.node);
-  });
+  }
+}
 
-  $tree.on('rename_node.jstree', (event, data) => {
+/**
+ * Callback when the user renames a node in the file tree.
+ *
+ * @param {jsTree} $tree - The file tree instance.
+ */
+function renameNodeCallback($tree) {
+  return (event, data) => {
+    const name = data.text;
+
+    // Check if the name already exists in the parent folder.
+    // If so, trigger edit mode again and show error tooltip.
+    const parentId = data.node.parent === '#' ? null : data.node.parent;
+    if (VFS.existsWhere({ parentId, name }) && name !== data.node.original.text) {
+      return setTimeout(() => {
+        $('#file-tree').jstree(true).edit(data.node);
+
+        // Delete previous tooltip.
+        const inputWrapper = $(`#${data.node.id} input`).parent()[0];
+        if (window._renameNodeTippy) {
+          window._renameNodeTippy.destroy();
+          window._renameNodeTippy = null;
+        }
+
+        // Create new tooltip.
+        window._renameNodeTippy = tippy(inputWrapper, {
+          content: `${data.node.type} "${name}" already exists`,
+          showOnCreate: true,
+          placement: 'right',
+          theme: 'error',
+        });
+      }, 10);
+    }
+
     const fn = data.node.type === 'folder'
       ? VFS.updateFolder
       : VFS.updateFile;
 
-    fn(data.node.id, { name: data.text });
+    fn(data.node.id, { name });
 
     if (hasGitFSWorker()) {
       addGitDiffIndicator(data.node);
@@ -296,24 +365,43 @@ function registerFileTreeEventListeners($tree) {
 
     const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.id);
     if (tab) {
-      tab.container.setTitle(data.text);
+      tab.container.setTitle(name);
 
       // For some reason no update is triggered, so we trigger an update.
       window._layout.emit('stateChanged');
     }
-  });
 
-  $tree.on('delete_node.jstree', (event, data) => {
+    // Destroy the leftover tooltip if it exists.
+    if (window._renameNodeTippy) {
+      window._renameNodeTippy.destroy();
+      window._renameNodeTippy = null;
+    }
+  };
+}
+
+/**
+ * Callback when the user deletes a node in the file tree.
+ *
+ * @param {jsTree} $tree - The file tree instance.
+ */
+function deleteNodeCallback($tree) {
+  return (event, data) => {
     const id = data.node.id;
     const fn = data.node.type === 'folder'
       ? VFS.deleteFolder
       : VFS.deleteFile;
 
     fn(id);
-  });
+  };
+}
 
-  $tree.on('select_node.jstree', (event, data) => {
-    console.log('SELECTING')
+/**
+ * Callback when the user selects a node in the file tree.
+ *
+ * @param {jsTree} $tree - The file tree instance.
+ */
+function selectNodeCallback($tree) {
+  return (event, data) => {
     if (data.node.type === 'folder') {
       $('#file-tree').jstree('toggle_node', data.node);
     } else {
@@ -322,32 +410,51 @@ function registerFileTreeEventListeners($tree) {
 
     // Deselect the node to make sure it is clickable again.
     $('#file-tree').jstree('deselect_node', data.node);
-  });
+  };
+}
 
-  $(document).on('dnd_stop.vakata', function(event, data) {
-    // Use setTimeout-trick to check after the drop process is finished.
-    setTimeout(() => {
-      const $treeRef = $('#file-tree').jstree(true);
-      const targetNode = $treeRef.get_node(data.event.target);
+/**
+ * Callback when the user stops dragging and dropping a node in the file tree.
+ *
+ * @param {Event} event - The event object.
+ * @param {object} data - The data object containing the nodes.
+ */
+function dndStopCallback(event, data) {
+  // Use setTimeout-trick to check after the drop process is finished.
+  setTimeout(() => {
+    const $treeRef = $('#file-tree').jstree(true);
+    const targetNode = $treeRef.get_node(data.event.target);
 
-      if (targetNode) {
-        const sourceNode = $treeRef.get_node(data.data.nodes[0]);
+    if (targetNode) {
+      const sourceNode = $treeRef.get_node(data.data.nodes[0]);
 
-        // If the dropped node became a root node, unset parentId.
-        const atRootLevel = $('#' + sourceNode.id).parent().parent().attr('id') === 'file-tree';
-        const parentId = atRootLevel ? null : targetNode.id;
+      // If the dropped node became a root node, unset parentId.
+      const atRootLevel = $('#' + sourceNode.id).parent().parent().attr('id') === 'file-tree';
+      const parentId = atRootLevel ? null : targetNode.id;
 
-        const id = sourceNode.id;
-        const fn = sourceNode.type === 'folder'
-          ? VFS.updateFolder
-          : VFS.updateFile;
+      const id = sourceNode.id;
+      const fn = sourceNode.type === 'folder'
+        ? VFS.updateFolder
+        : VFS.updateFile;
 
-        fn(id, { parentId });
+      fn(id, { parentId });
 
-        if (hasGitFSWorker()) {
-          addGitDiffIndicator(sourceNode);
-        }
+      if (hasGitFSWorker()) {
+        addGitDiffIndicator(sourceNode);
       }
-    }, 0);
-  });
+    }
+  }, 0);
+}
+
+/**
+ * Registers event listeners for the file tree.
+ *
+ * @param {jQuery.Object} $tree - File-tree reference object.
+ */
+function registerFileTreeEventListeners($tree) {
+  $tree.on('create_node.jstree', createNodeCallback($tree));
+  $tree.on('rename_node.jstree', renameNodeCallback($tree));
+  $tree.on('delete_node.jstree', deleteNodeCallback($tree));
+  $tree.on('select_node.jstree', selectNodeCallback($tree));
+  $(document).on('dnd_stop.vakata', dndStopCallback);
 }
