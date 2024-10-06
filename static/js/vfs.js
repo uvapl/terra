@@ -27,11 +27,12 @@ class VirtualFileSystem {
    *
    * @param {string} fn - Name of the function to call.
    * @param {array} payload - Arguments to pass to the function.
+   * @returns {*} The return value of the function.
    */
   _lfs(fn, ...payload) {
     if (!(LFS instanceof LocalFileSystem)) return;
 
-    LFS[fn](...payload);
+    return LFS[fn](...payload);
   }
 
   /**
@@ -292,6 +293,7 @@ class VirtualFileSystem {
     };
 
     this.folders[newFolder.id] = newFolder;
+    this._lfs('createFolder', newFolder.id, newFolder.parentId, newFolder.name);
     this.saveState();
     return newFolder;
   }
@@ -400,12 +402,18 @@ class VirtualFileSystem {
    * Delete a file from the virtual filesystem.
    *
    * @param {string} id - The file id.
+   * @param {boolean} [deleteInLFS] - Whether to delete the file in the LFS.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFile = (id) => {
+  deleteFile = (id, deleteInLFS = true) => {
     if (this.files[id]) {
       this._git('rm', this.getAbsoluteFilePath(id));
-      this._lfs('deleteFile', id);
+      this._lfs('removeFileHandle', id);
+
+      if (deleteInLFS) {
+        this._lfs('deleteFile', id);
+      }
+
       delete this.files[id];
       this.saveState();
       return true;
@@ -415,14 +423,42 @@ class VirtualFileSystem {
   }
 
   /**
-   * Delete a folder from the virtual filesystem.
+   * Delete a folder from the virtual filesystem, including its nested files and
+   * folders. The deleteInLFS parameter will only be true on the first call to
+   * it. All subsequent calls will have it set to false, because the LFS uses
+   * async and thus needs to wait for nested files and folders to be deleted
+   * before deleting the parent folder itself.
    *
    * @param {string} id - The folder id.
+   * @param {boolean} [deleteInLFS] - Whether to delete the folder in the LFS.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFolder = (id) => {
+  deleteFolder = (id, deleteInLFS = true) => {
+    // Delete all the files inside the current folder.
+    const files = this.findFilesWhere({ parentId: id });
+    for (const file of files) {
+      this.deleteFile(file.id, false);
+    }
+
+    // Delete all the nested folders inside the current folder.
+    const folders = this.findFoldersWhere({ parentId: id });
+    for (const folder of folders) {
+      this.deleteFolder(folder.id, false);
+    }
+
     if (this.folders[id]) {
       this._git('rm', this.getAbsoluteFolderPath(id));
+
+      // The deleteInLFS is only true on the first call to this function.
+      // Inside the LFS class we'll delete everything properly including the
+      // root folder handle.
+      if (deleteInLFS) {
+        this._lfs('deleteFolder', id);
+      } else {
+        // If it's not the root folder, then delete the folder handle.
+        this._lfs('removeFolderHandle', id);
+      }
+
       delete this.folders[id];
       this.saveState();
       return true;

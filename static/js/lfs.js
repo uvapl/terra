@@ -200,6 +200,49 @@ class LocalFileSystem {
   }
 
   /**
+   * Delete a handle from the specified store by key.
+   *
+   * @async
+   * @param {string} storeName - The store name to delete the handle from.
+   * @param {string} key - A unique key to identify the handle.
+   * @returns {Promise<void>}
+   */
+  async _removeHandle(storeName, key) {
+    const db = await this._openDB();
+
+    return new Promise((resolve, reject) => {
+      const request = db
+        .transaction(storeName, 'readwrite')
+        .objectStore(storeName)
+        .delete(key);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject();
+    });
+  }
+
+  /**
+   * Remove a file handle from the IndexedDB.
+   *
+   * @async
+   * @param {string} key - The VFS file id.
+   * @returns {Promise<void>}
+   */
+  async removeFileHandle(key) {
+    await this._removeHandle(this.FILE_HANDLES_STORE_NAME, key);
+  }
+
+  /**
+   * Remove a folder handle from the IndexedDB.
+   *
+   * @async
+   * @param {string} key - The VFS folder id.
+   * @returns {Promise<void>}
+   */
+  async removeFolderHandle(key) {
+    await this._removeHandle(this.FOLDER_HANDLES_STORE_NAME, key);
+  }
+
+  /**
    * Write the content to a file in the specified folder. If no folderId is
    * provided, the file will be written to the root folder the user selected.
    *
@@ -233,6 +276,27 @@ class LocalFileSystem {
   }
 
   /**
+   * Create a new folder in the specified parent folder. If no parentId is not
+   * provided or is either null or undefined, then the folder will be created in
+   * the root folder.
+   *
+   * @async
+   * @param {string} folderId - Unique VFS folder id.
+   * @param {string} parentId - Unique VFS parent folder id.
+   * @param {string} folderName - The name of the folder to create.
+   * @returns {Promise<void>}
+   */
+  async createFolder(folderId, parentId, folderName) {
+    if (!parentId) {
+      parentId = 'root';
+    }
+
+    const parentFolder = await this.getFolderHandle(parentId);
+    const folderHandle = await parentFolder.getDirectoryHandle(folderName, { create: true });
+    this._saveFolderHandle(folderHandle, folderId);
+  }
+
+  /**
    * Delete a file by its VFS file id.
    *
    * @async
@@ -240,14 +304,56 @@ class LocalFileSystem {
    * @returns {Promise<boolean>} True if deleted successfully, otherwise false.
    */
   async deleteFile(id) {
-    const fileHandle = await this.getFileHandle(id);
     try {
+      const fileHandle = await this.getFileHandle(id);
       await fileHandle.remove();
+      await this.removeFileHandle(id);
       return true;
     } catch (err) {
       console.error('Failed to delete file:', err);
       return false;
     }
+  }
+
+  /**
+   * Delete a folder by its VFS folder id.
+   *
+   * @async
+   * @param {string} id - Unique VFS folder id.
+   * @returns {Promise<boolean>} True if deleted successfully, otherwise false.
+   */
+  async deleteFolder(id) {
+    try {
+      const folderHandle = await this.getFolderHandle(id);
+      await this._recursivelyDeleteFolder(folderHandle);
+      await this.removeFolderHandle(id);
+      return true;
+    } catch (err) {
+      console.error('Failed to delete folder:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Recursively deletes the contents of the folder, then the folder itself.
+   *
+   * @async
+   * @param {FileSystemDirectoryHandle} folderHandle - Handle to the folder.
+   * @returns {Promise<void>}
+   */
+  async _recursivelyDeleteFolder(folderHandle) {
+    for await (const [name, handle] of folderHandle.entries()) {
+      if (handle.kind === 'directory') {
+        // Delete nested directory.
+        await this._recursivelyDeleteFolder(handle);
+      } else {
+        // Delete nested file.
+        await handle.remove();
+      }
+    }
+
+    // Remove the folder itself.
+    await folderHandle.remove();
   }
 }
 

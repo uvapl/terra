@@ -114,6 +114,7 @@ function deleteFileTreeItem(node) {
   $modal.find('.confirm-btn').click(() => {
     if (node.type === 'file') {
       closeFileTab(node.id);
+      VFS.deleteFile(node.id);
     } else if (node.type === 'folder') {
       closeFilesInFolderRecursively(node.id);
     }
@@ -126,7 +127,7 @@ function deleteFileTreeItem(node) {
 }
 
 /**
- * Close a single file tab by its fileId, including removing it from the vfs.
+ * Close a single file tab by its fileId.
  *
  * @param {string} fileId - The file ID to close.
  */
@@ -135,8 +136,6 @@ function closeFileTab(fileId) {
   if (tab) {
     tab.parent.removeChild(tab);
   }
-
-  VFS.deleteFile(fileId);
 }
 
 /**
