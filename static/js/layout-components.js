@@ -463,46 +463,24 @@ function EditorComponent(container, state) {
   });
 
   this.editor.commands.on('exec', (e) => {
-    if (LFS.loaded) {
-      const cmd = e.command.name;
-      if (cmd === 'paste') {
-        const filesize = new Blob([this.editor.getValue() + e.args.txt]).size;
-        if (filesize > LFS_MAX_FILE_SIZE) {
-          e.preventDefault();
+    if (LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
+      const filesize = new Blob([this.editor.getValue() + e.args.txt]).size;
+      if (filesize > LFS_MAX_FILE_SIZE) {
+        e.preventDefault();
 
-          const $modal = createModal({
-            title: 'Exceeded maximum file size',
-            body: 'The file size exceeds the maximum file size. Please reduce the file size before pasting the content.',
-            footer: ' <button type="button" class="button primary-btn confirm-btn">Go back</button>',
-            footerClass: 'flex-end',
-            attrs: {
-              id: 'ide-paste-exceeded-file-size-modal',
-              class: 'modal-width-small',
-            }
-          });
+        const $modal = createModal({
+          title: 'Exceeded maximum file size',
+          body: 'The file size exceeds the maximum file size. Plese reduce the file size beforing adding more content.',
+          footer: ' <button type="button" class="button primary-btn confirm-btn">Go back</button>',
+          footerClass: 'flex-end',
+          attrs: {
+            id: 'ide-exceeded-file-size-modal',
+            class: 'modal-width-small',
+          }
+        });
 
-          showModal($modal);
-          $modal.find('.confirm-btn').click(() => hideModal($modal));
-        }
-      } else if (cmd === 'insertstring') {
-        const filesize = new Blob([this.editor.getValue()]).size;
-        if (filesize > LFS_MAX_FILE_SIZE) {
-          e.preventDefault();
-
-          const $modal = createModal({
-            title: 'Exceeded maximum file size',
-            body: 'The file has reached the maximum file size. Please reduce the file size before adding more content.',
-            footer: '<button type="button" class="button primary-btn confirm-btn">Go back</button>',
-            footerClass: 'flex-end',
-            attrs: {
-              id: 'ide-exceeded-file-size-modal',
-              class: 'modal-width-small',
-            }
-          });
-
-          showModal($modal);
-          $modal.find('.confirm-btn').click(() => hideModal($modal));
-        }
+        showModal($modal);
+        $modal.find('.confirm-btn').click(() => hideModal($modal));
       }
     }
   });
