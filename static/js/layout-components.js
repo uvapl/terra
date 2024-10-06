@@ -464,13 +464,15 @@ function EditorComponent(container, state) {
 
   this.editor.commands.on('exec', (e) => {
     if (LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
-      const filesize = new Blob([this.editor.getValue() + e.args.txt]).size;
-      if (filesize > LFS_MAX_FILE_SIZE) {
+      const inputText = e.args.text || '';
+      const filesize = new Blob([this.editor.getValue() + inputText]).size;
+      if (filesize >= LFS_MAX_FILE_SIZE) {
+        // Prevent the event from happening.
         e.preventDefault();
 
         const $modal = createModal({
           title: 'Exceeded maximum file size',
-          body: 'The file size exceeds the maximum file size. Plese reduce the file size beforing adding more content.',
+          body: 'The file size exceeds the maximum file size. This limit is solely required when you are connected to your local filesystem. Please reduce the file size beforing adding more content.',
           footer: ' <button type="button" class="button primary-btn confirm-btn">Go back</button>',
           footerClass: 'flex-end',
           attrs: {
