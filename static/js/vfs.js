@@ -405,6 +405,7 @@ class VirtualFileSystem {
   deleteFile = (id) => {
     if (this.files[id]) {
       this._git('rm', this.getAbsoluteFilePath(id));
+      this._lfs('deleteFile', id);
       delete this.files[id];
       this.saveState();
       return true;

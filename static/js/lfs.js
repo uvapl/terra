@@ -231,6 +231,24 @@ class LocalFileSystem {
     await writable.write(content);
     await writable.close();
   }
+
+  /**
+   * Delete a file by its VFS file id.
+   *
+   * @async
+   * @param {string} id - Unique VFS file id.
+   * @returns {Promise<boolean>} True if deleted successfully, otherwise false.
+   */
+  async deleteFile(id) {
+    const fileHandle = await this.getFileHandle(id);
+    try {
+      await fileHandle.remove();
+      return true;
+    } catch (err) {
+      console.error('Failed to delete file:', err);
+      return false;
+    }
+  }
 }
 
 const LFS = new LocalFileSystem();
