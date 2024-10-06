@@ -10,6 +10,12 @@ class LocalFileSystem {
   FOLDER_HANDLES_STORE_NAME = 'folder-handles';
 
   /**
+   * Whether the user loaded a project through the LFS.
+   * @type {boolean}
+   */
+  loaded = false;
+
+  /**
    * Open a directory picker dialog and returns the selected directory.
    *
    * @async
@@ -33,6 +39,7 @@ class LocalFileSystem {
 
     await this._readFolder(dirHandle, null);
     createFileTree();
+    this.loaded = true;
   }
 
   /**

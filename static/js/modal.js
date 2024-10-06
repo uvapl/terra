@@ -5,6 +5,7 @@
  * @param {string} modalOptions.title - The title HTML of the modal.
  * @param {string} modalOptions.body - The body HTML of the modal.
  * @param {string} modalOptions.footer - The footer HTML of the modal.
+ * @param {string} modalOptions.footerClass - Additional footer container classes.
  * @param {object} modalOptions.attrs - Object with additional attributes.
  * @param {object} modalOptions.attrs.id - The ID of the outer container.
  * @param {object} [modalOptions.attrs.class] - Optional container classes.
@@ -25,6 +26,8 @@ function createModal(modalOptions = {}) {
     modalOptions.attrs.id = uuiv4();
   }
 
+  const footerClasses = ['modal-footer'].concat(modalOptions.footerClass || []).join(' ');
+
   const html = `
     <div ${attrsString} tabindex="-1">
       <div class="modal-content">
@@ -32,7 +35,7 @@ function createModal(modalOptions = {}) {
           <p class="modal-title">${modalOptions.title}</p>
         </div>
         <div class="modal-body">${modalOptions.body}</div>
-        <div class="modal-footer flex-between">${modalOptions.footer}</div>
+        <div class="${footerClasses}">${modalOptions.footer}</div>
       </div>
     </div>
   `;
