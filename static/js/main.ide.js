@@ -19,8 +19,8 @@ initApp().then(({ layout }) => {
     // Enable code for local filesystem.
     $('body').append('<script src="static/js/lfs.js"></script>');
   } else {
-    // Disable open-file and open-folder if the FileSystemAPI is not supported.
-    $('#menu-item--open-file, #menu-item--open-folder').remove();
+    // Disable open-folder if the FileSystemAPI is not supported.
+    $('#menu-item--open-folder').remove();
   }
 }).catch((err) => {
   console.error('Failed to bootstrap IDE app:', err);

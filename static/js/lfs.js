@@ -4,33 +4,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 class LocalFileSystem {
-  DB_VERSION = 1;
-  DB_NAME = 'examide';
+  IDB_VERSION = 1;
+  IDB_NAME = 'examide';
   FILE_HANDLES_STORE_NAME = 'file-handles';
   FOLDER_HANDLES_STORE_NAME = 'folder-handles';
-
-  /**
-   * Opens a file picker dialog and returns the selected file.
-   *
-   * @async
-   * @returns {Promise<void>}
-   */
-  async openFilePicker() {
-    const [fileHandle] = await window.showOpenFilePicker();
-
-    const permission = await fileHandle.requestPermission({ mode: 'readwrite' });
-    if (permission !== 'granted') {
-      return console.error('Permission denied readwrite file');
-    }
-
-    const file = await fileHandle.getFile();
-    const { id: fileId } = VFS.createFile({
-      name: file.name,
-      size: file.size
-    }, false);
-    await this._saveFileHandle(fileHandle, fileId);
-    createFileTree();
-  }
 
   /**
    * Open a directory picker dialog and returns the selected directory.
@@ -105,7 +82,7 @@ class LocalFileSystem {
    */
   _openDB() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+      const request = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
 
       request.onblocked = (event) => {
         console.error('IDB is blocked', event);
@@ -133,7 +110,7 @@ class LocalFileSystem {
 
   _clearDB() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.deleteDatabase(this.DB_NAME);
+      const request = indexedDB.deleteDatabase(this.IDB_NAME);
       request.onsuccess = () => resolve();
       request.onerror = () => reject();
     });
