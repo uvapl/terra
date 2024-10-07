@@ -366,7 +366,7 @@ class VirtualFileSystem {
     // This extra check is needed because in the UI, the user can trigger a
     // rename but not actually change the name.
     const isRenamed = typeof obj.name === 'string' && folder.name !== obj.name;
-    const isMoved = folder.parentId !== obj.parentId;
+    const isMoved = typeof obj.parentId !== 'undefined' && folder.parentId !== obj.parentId;
 
     if (folder) {
       for (const [key, value] of Object.entries(obj)) {
