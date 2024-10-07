@@ -270,6 +270,7 @@ class VirtualFileSystem {
 
     if (userInvoked) {
       this._git('commit', this.getAbsoluteFilePath(newFile.id), newFile.content);
+      this._lfs('writeFileToFolder', newFile.parentId, newFile.id, newFile.name, newFile.content);
     }
 
     this.saveState();
@@ -327,6 +328,7 @@ class VirtualFileSystem {
 
             // Move the file to the new location.
             this._git('mv', oldPath, newPath);
+            this._lfs('moveFile', file.id, file.name, file.parentId);
 
             continue;
           }
@@ -340,14 +342,13 @@ class VirtualFileSystem {
       if (isContentChanged && userInvoked) {
         // Just commit the changes to the file.
         this._git('commit', this.getAbsoluteFilePath(file.id), file.content);
+
+        // Update the file content in the LFS after a second of inactivity.
+        clearTimeout(window._lfsUpdateFileTimeoutId);
+        window._lfsUpdateFileTimeoutId = setTimeout(() => {
+          this._lfs('writeFileToFolder', file.parentId, file.id, file.name, file.content);
+        }, seconds(1));
       }
-
-
-      // Update the file content in the LFS after a second of inactivity.
-      clearTimeout(window._lfsUpdateFileTimeoutId);
-      window._lfsUpdateFileTimeoutId = setTimeout(() => {
-        this._lfs('writeFileToFolder', file.parentId, file.id, file.name, file.content);
-      }, seconds(1));
 
       this.saveState();
     }

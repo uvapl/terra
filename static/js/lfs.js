@@ -274,7 +274,7 @@ class LocalFileSystem {
     } catch {
       // No file handle exists, create a new one.
       fileHandle = await folderHandle.getFileHandle(filename, { create: true });
-      this._saveFileHandle(fileHandle, fileId);
+      await this._saveFileHandle(fileHandle, fileId);
     }
 
     const writable = await fileHandle.createWritable();
@@ -300,7 +300,7 @@ class LocalFileSystem {
 
     const parentFolder = await this.getFolderHandle(parentId);
     const folderHandle = await parentFolder.getDirectoryHandle(folderName, { create: true });
-    this._saveFolderHandle(folderHandle, folderId);
+    await this._saveFolderHandle(folderHandle, folderId);
   }
 
   /**
@@ -361,6 +361,30 @@ class LocalFileSystem {
 
     // Remove the folder itself.
     await folderHandle.remove();
+  }
+
+  /**
+   * Move a file to a new location.
+   *
+   * @async
+   * @param {string} id - Unique VFS file id.
+   * @param {string} newName - The name of the file (can be unchanged).
+   * @param {string} newParentId - Unique VFS parent folder id (can be unchanged).
+   * @returns {Promise<void>}
+   */
+  async moveFile(id, newName, newParentId) {
+    if (!newParentId) {
+      newParentId = 'root';
+    }
+
+    // Remove current file.
+    const currentFileHandle = await this.getFileHandle(id);
+    await currentFileHandle.remove();
+
+    // Make new file and store handle under the same id.
+    const folderHandle = await this.getFolderHandle(newParentId);
+    const fileHandle = await folderHandle.getFileHandle(newName, { create: true });
+    await this._saveFileHandle(fileHandle, id);
   }
 }
 
