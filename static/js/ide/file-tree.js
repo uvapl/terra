@@ -428,8 +428,7 @@ function dndStopCallback(event, data) {
       const sourceNode = $treeRef.get_node(data.data.nodes[0]);
 
       // If the dropped node became a root node, unset parentId.
-      const atRootLevel = $('#' + sourceNode.id).parent().parent().attr('id') === 'file-tree';
-      const parentId = atRootLevel ? null : targetNode.id;
+      const parentId = targetNode.parent === '#' ? null : targetNode.parent;
 
       const id = sourceNode.id;
       const fn = sourceNode.type === 'folder'
