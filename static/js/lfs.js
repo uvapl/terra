@@ -35,7 +35,7 @@ class LocalFileSystem {
     this._clearDB();
 
     // Save dirHandle under the 'root' key for reference.
-    await this._saveFolderHandle(dirHandle, 'root');
+    await this.saveFolderHandle(dirHandle, 'root');
 
     await this._readFolder(dirHandle, null);
     createFileTree();
@@ -73,10 +73,10 @@ class LocalFileSystem {
           parentId,
           size: file.size
         }, false);
-        await this._saveFileHandle(handle, fileId);
+        await this.saveFileHandle(handle, fileId);
       } else if (handle.kind === 'directory') {
         const folder = VFS.createFolder({ name, parentId }, false);
-        await this._saveFolderHandle(handle, folder.id);
+        await this.saveFolderHandle(handle, folder.id);
         await this._readFolder(handle, folder.id);
       }
     }
@@ -153,7 +153,7 @@ class LocalFileSystem {
    * @param {string} key - The VFS file id.
    * @returns {Promise<FileSystemFileHandle>}
    */
-  _saveFileHandle(handle, key) {
+  saveFileHandle(handle, key) {
     return this._saveHandle(this.FILE_HANDLES_STORE_NAME, handle, key);
   }
 
@@ -164,7 +164,7 @@ class LocalFileSystem {
    * @param {string} key - The VFS folder id.
    * @returns {Promise<FileSystemDirectoryHandle>}
    */
-  _saveFolderHandle(handle, key) {
+  saveFolderHandle(handle, key) {
     return this._saveHandle(this.FOLDER_HANDLES_STORE_NAME, handle, key);
   }
 
@@ -274,7 +274,7 @@ class LocalFileSystem {
     } catch {
       // No file handle exists, create a new one.
       fileHandle = await folderHandle.getFileHandle(filename, { create: true });
-      await this._saveFileHandle(fileHandle, fileId);
+      await this.saveFileHandle(fileHandle, fileId);
     }
 
     const writable = await fileHandle.createWritable();
@@ -300,7 +300,7 @@ class LocalFileSystem {
 
     const parentFolder = await this.getFolderHandle(parentId);
     const folderHandle = await parentFolder.getDirectoryHandle(folderName, { create: true });
-    await this._saveFolderHandle(folderHandle, folderId);
+    await this.saveFolderHandle(folderHandle, folderId);
   }
 
   /**
@@ -384,7 +384,71 @@ class LocalFileSystem {
     // Make new file and store handle under the same id.
     const folderHandle = await this.getFolderHandle(newParentId);
     const fileHandle = await folderHandle.getFileHandle(newName, { create: true });
-    await this._saveFileHandle(fileHandle, id);
+    await this.saveFileHandle(fileHandle, id);
+  }
+
+  /**
+   * Move a folder to a new location.
+   *
+   * @async
+   * @param {string} id - Unique VFS folder id.
+   * @param {string} newName - The new folder name (can be unchanged).
+   * @param {string|null} newParentId - Unique VFS parent folder id.
+   * @returns {Promise<void>}
+   */
+  async moveFolder(id, newName, newParentId) {
+    const folder = VFS.findFolderById(id);
+
+    // Move current folder in VFS.
+    folder.parentId = newParentId;
+
+    // Now move the folders in the LFS.
+    await this._moveFolderRecursively(id, newParentId, newName);
+  }
+
+  /**
+   * Move a folder recursively to a new location, depth-first.
+   *
+   * @async
+   * @param {string} folderId - Unique VFS folder id.
+   * @param {string} parentFolderId - Unique VFS parent folder id.
+   * @param {string} [newName] - New folder name for root folder.
+   * @returns {Promise<void>}
+   */
+  async _moveFolderRecursively(folderId, parentFolderId, newName) {
+    const folderHandle = await this.getFolderHandle(folderId);
+    const parentFolderHandle = await this.getFolderHandle(parentFolderId || 'root');
+
+    // Create the current folder in the new parent folder.
+    const newCurrentFolderHandle = await parentFolderHandle.getDirectoryHandle(newName || folderHandle.name, { create: true });
+    await this.saveFolderHandle(newCurrentFolderHandle, folderId);
+
+    // Create the subfolders and files in the new folder.
+    await Promise.all(
+      VFS.findFoldersWhere({ parentId: folderId }).map(
+        (subfolder) => this._moveFolderRecursively(subfolder.id, folderId)
+      )
+    )
+
+    await Promise.all(
+      VFS.findFilesWhere({ parentId: folderId })
+        .map(async (subfile) => {
+          const currentFileHandle = await this.getFileHandle(subfile.id);
+          await currentFileHandle.remove();
+
+          const newFileHandle = await newCurrentFolderHandle.getFileHandle(subfile.name, { create: true });
+
+          if (subfile.content) {
+            const writable = await newFileHandle.createWritable();
+            await writable.write(subfile.content);
+            await writable.close();
+          }
+
+          await this.saveFileHandle(newFileHandle, subfile.id);
+        })
+    )
+
+    await folderHandle.remove();
   }
 }
 

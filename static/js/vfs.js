@@ -30,7 +30,7 @@ class VirtualFileSystem {
    * @returns {*} The return value of the function.
    */
   _lfs(fn, ...payload) {
-    if (!(LFS instanceof LocalFileSystem)) return;
+    if (!LFS.loaded) return;
 
     return LFS[fn](...payload);
   }
@@ -309,39 +309,35 @@ class VirtualFileSystem {
    */
   updateFile = (id, obj, userInvoked = true) => {
     const file = this.findFileById(id);
+    const oldPath = this.getAbsoluteFilePath(file.id);
 
-    // This extra check is needed because in the UI, the user can trigger a
+    // These extra checks is needed because in the UI, the user can trigger a
     // rename but not actually change the name.
     const isRenamed = typeof obj.name === 'string' && file.name !== obj.name;
-    const isMoved = file.parentId !== obj.parentId;
+    const isMoved = typeof obj.parentId !== 'undefined' && file.parentId !== obj.parentId;
     const isContentChanged = typeof obj.content === 'string' && file.content !== obj.content;
 
     if (file) {
       for (const [key, value] of Object.entries(obj)) {
         if (file.hasOwnProperty(key) && key !== 'id') {
-
-          // Check whether the file is renamed.
-          if (key === 'name' && isRenamed || key === 'parentId' && isMoved) {
-            const oldPath = this.getAbsoluteFilePath(file.id);
-            file[key] = value;
-            const newPath = this.getAbsoluteFilePath(file.id);
-
-            // Move the file to the new location.
-            this._git('mv', oldPath, newPath);
-            this._lfs('moveFile', file.id, file.name, file.parentId);
-
-            continue;
-          }
-
           file[key] = value;
         }
       }
 
       file.updatedAt = new Date().toISOString();
 
+      const newPath = this.getAbsoluteFilePath(file.id);
+
+      if (isRenamed || isMoved) {
+        // Move the file to the new location.
+        this._git('mv', oldPath, newPath);
+        this._lfs('moveFile', file.id, file.name, file.parentId);
+      }
+
+
       if (isContentChanged && userInvoked) {
         // Just commit the changes to the file.
-        this._git('commit', this.getAbsoluteFilePath(file.id), file.content);
+        this._git('commit', newPath, file.content);
 
         // Update the file content in the LFS after a second of inactivity.
         clearTimeout(window._lfsUpdateFileTimeoutId);
@@ -365,6 +361,7 @@ class VirtualFileSystem {
    */
   updateFolder = (id, obj) => {
     const folder = this.findFolderById(id);
+    const oldPath = this.getAbsoluteFolderPath(folder.id);
 
     // This extra check is needed because in the UI, the user can trigger a
     // rename but not actually change the name.
@@ -374,24 +371,20 @@ class VirtualFileSystem {
     if (folder) {
       for (const [key, value] of Object.entries(obj)) {
         if (folder.hasOwnProperty(key) && key !== 'id') {
-
-          // Check whether the folder is renamed.
-          if (key === 'name' && isRenamed || key === 'parentId' && isMoved) {
-            const oldPath = this.getAbsoluteFolderPath(folder.id);
-            folder[key] = value;
-            const newPath = this.getAbsoluteFolderPath(folder.id);
-
-            // Move the folder to the new location.
-            this._git('mv', oldPath, newPath);
-
-            continue;
-          }
-
           folder[key] = value;
         }
       }
 
       folder.updatedAt = new Date().toISOString();
+
+      const newPath = this.getAbsoluteFolderPath(folder.id);
+
+      // Check whether the file is renamed or moved, in either case we
+      // just need to move the file to the new location.
+      if (isRenamed || isMoved) {
+        this._git('mv', oldPath, newPath);
+        this._lfs('moveFolder', folder.id, folder.name, folder.parentId);
+      }
 
       this.saveState();
     }
