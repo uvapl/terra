@@ -173,7 +173,7 @@ class API extends BaseAPI {
     // while regular Python shows the following:
     //
     //     Traceback (most recent call last):
-    //       File "/Users/koomen/tech/uva/examide/src/example.py", line 1, in <module>
+    //       File "/Users/<user>/terra/src/example.py", line 1, in <module>
     //         print(x)
     //               ^
     //     NameError: name 'x' is not defined

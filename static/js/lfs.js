@@ -5,7 +5,7 @@
 
 class LocalFileSystem {
   IDB_VERSION = 1;
-  IDB_NAME = 'examide';
+  IDB_NAME = 'terra';
   FILE_HANDLES_STORE_NAME = 'file-handles';
   FOLDER_HANDLES_STORE_NAME = 'folder-handles';
 

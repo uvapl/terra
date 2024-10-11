@@ -805,7 +805,7 @@ class Layout extends GoldenLayout {
     super(layoutConfig, $('#layout'));
 
     this.proglang = options.proglang;
-    this.iframe = $('body').hasClass('examide-embed');
+    this.iframe = $('body').hasClass('terra-embed');
     this.vertical = options.vertical;
 
     if (isObject(options.buttonConfig)) {
