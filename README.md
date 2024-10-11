@@ -1,4 +1,6 @@
-# Examide
+# Terra IDE
+
+![A preliminary logo for the Terra IDE](terra-ide-first.jpg)
 
 Exam website that ships with an editor and a terminal that can run C or Python
 code completely offline using WebAssembly.
