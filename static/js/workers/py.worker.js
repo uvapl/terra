@@ -225,6 +225,9 @@ class API extends BaseAPI {
     // Gather the current globals (i.e. vars, funcs, classes).
     const globals = this.pyodide.globals.get('dict')();
 
+    // Allow the user to run code in the __main__ scope.
+    globals.set('__name__', '__main__');
+
     try {
       this.pyodide.runPython(code.join('\n'), { globals, locals: globals });
     } catch (err) {
