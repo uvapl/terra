@@ -170,6 +170,7 @@ class GitFS {
  */
 function createGitFSWorker() {
   if (!isIDE) return;
+  LFS.terminate();
 
   closeAllFiles();
 

@@ -15,6 +15,45 @@ class LocalFileSystem {
    */
   loaded = false;
 
+  constructor() {
+    this._init();
+  }
+
+  terminate() {
+    this.loaded = false;
+    setLocalStorageItem('use-lfs', false);
+  }
+
+  async _init() {
+    const lastTimeUsedLFS = getLocalStorageItem('use-lfs', false);
+    if (lastTimeUsedLFS) {
+      const rootFolderHandle = await this.getFolderHandle('root');
+      if (rootFolderHandle) {
+        await this._requestPermission(rootFolderHandle);
+        await this._importFolderToVFS(rootFolderHandle);
+      }
+    }
+  }
+
+  /**
+   * Request permission for a given handle, either file or directory handle.
+   *
+   * @param {FileSystemDirectoryHandle|FileSystemFileHandle} handle
+   * @param {string} [mode] - The mode to request permission for.
+   * @returns {Promise<void>} Resolves if permission is granted by the user.
+   */
+  _requestPermission(handle, mode = 'readwrite') {
+    return new Promise(async (resolve, reject) => {
+      const permission = await handle.requestPermission({ mode: 'readwrite' });
+      if (permission !== 'granted') {
+        console.error(`Permission ${mode} denied for handle`, handle);
+        reject();
+      } else {
+        resolve();
+      }
+    });
+  }
+
   /**
    * Open a directory picker dialog and returns the selected directory.
    *
@@ -22,24 +61,37 @@ class LocalFileSystem {
    * @returns {Promise<void>}
    */
   async openFolderPicker() {
-    const dirHandle = await window.showDirectoryPicker();
+    try {
+      const rootFolderHandle = await window.showDirectoryPicker();
+      await this._requestPermission(rootFolderHandle);
 
-    const permission = await dirHandle.requestPermission({ mode: 'readwrite' });
-    if (permission !== 'granted') {
-      return console.error('Permission denied readwrite directory');
+      closeAllFiles();
+      await this._importFolderToVFS(rootFolderHandle);
+    } catch {
+      // User most likely aborted.
+      return;
     }
+  }
 
-    closeAllFiles();
+  /**
+   * Import the contents of a folder on the local filesystem of the user to VFS.
+   *
+   * @async
+   * @param {FileSystemDirectoryHandle} rootFolderHandle
+   * @returns {Promise<void>}
+   */
+  async _importFolderToVFS(rootFolderHandle) {
     VFS.clear();
     createFileTree(); // show empty file tree
-    this._clearDB();
+    await this._clearStores();
 
-    // Save dirHandle under the 'root' key for reference.
-    await this.saveFolderHandle(dirHandle, 'root');
+    // Save rootFolderHandle under the 'root' key for reference.
+    await this.saveFolderHandle(rootFolderHandle, 'root');
 
-    await this._readFolder(dirHandle, null);
+    await this._readFolder(rootFolderHandle, null);
     createFileTree();
     this.loaded = true;
+    setLocalStorageItem('use-lfs', true);
   }
 
   /**
@@ -110,16 +162,46 @@ class LocalFileSystem {
         }
       };
 
-      request.onsuccess = (event) => event.target.result ? resolve(event.target.result) : reject();
+      request.onsuccess = (event) => event.target.result ? resolve(event.target.result) : resolve();
       request.onerror = (event) => reject(event.target.error);
     });
   }
 
-  _clearDB() {
+  _clearStores() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.deleteDatabase(this.IDB_NAME);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject();
+      const request = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
+
+      request.onsuccess = (event) => {
+        const db = event.target.result;
+
+        // Check if the database has any object stores
+        if (db.objectStoreNames.length > 0) {
+          const transaction = db.transaction(db.objectStoreNames, 'readwrite');
+
+          transaction.oncomplete = () => {
+            resolve();
+          };
+
+          transaction.onerror = () => {
+            console.error('Error clearing stores');
+            reject(transaction.error);
+          };
+
+          // Clear each object store.
+          for (const storeName of db.objectStoreNames) {
+            const store = transaction.objectStore(storeName);
+            store.clear();
+          }
+        } else {
+          // No object stores, resolve immediately.
+          resolve();
+        }
+      };
+
+      request.onerror = () => {
+        console.error('Error opening database');
+        reject(request.error);
+      };
     });
   }
 
@@ -181,7 +263,7 @@ class LocalFileSystem {
 
     return new Promise((resolve, reject) => {
       const request = db.transaction(storeName).objectStore(storeName).get(key);
-      request.onsuccess = (event) => event.target.result ? resolve(event.target.result) : reject();
+      request.onsuccess = (event) => event.target.result ? resolve(event.target.result) : resolve();
       request.onerror = (event) => reject(event.target.error);
     });
   }
@@ -267,11 +349,8 @@ class LocalFileSystem {
 
     const folderHandle = await this.getFolderHandle(folderId);
 
-    let fileHandle;
-    try {
-      // Get file handle if it exists.
-      fileHandle = await this.getFileHandle(fileId);
-    } catch {
+    let fileHandle = await this.getFileHandle(fileId);
+    if (!fileHandle) {
       // No file handle exists, create a new one.
       fileHandle = await folderHandle.getFileHandle(filename, { create: true });
       await this.saveFileHandle(fileHandle, fileId);
@@ -313,8 +392,10 @@ class LocalFileSystem {
   async deleteFile(id) {
     try {
       const fileHandle = await this.getFileHandle(id);
-      await fileHandle.remove();
-      await this.removeFileHandle(id);
+      if (fileHandle) {
+        await fileHandle.remove();
+        await this.removeFileHandle(id);
+      }
       return true;
     } catch (err) {
       console.error('Failed to delete file:', err);
