@@ -15,7 +15,7 @@ initApp().then(({ layout }) => {
     createFileTree();
   }
 
-  if (isChrome()) {
+  if (hasLFSApi()) {
     // Enable code for local filesystem.
     $('body').append('<script src="static/js/lfs.js"></script>');
   } else {
