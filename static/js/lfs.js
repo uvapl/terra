@@ -26,13 +26,21 @@ class LocalFileSystem {
 
   async _init() {
     const lastTimeUsedLFS = getLocalStorageItem('use-lfs', false);
-    if (lastTimeUsedLFS) {
-      const rootFolderHandle = await this.getFolderHandle('root');
-      if (rootFolderHandle) {
-        await this._requestPermission(rootFolderHandle);
-        await this._importFolderToVFS(rootFolderHandle);
-      }
+    if (!lastTimeUsedLFS) return;
+
+    const rootFolderHandle = await this.getFolderHandle('root');
+    if (!rootFolderHandle) return;
+
+    const hasPermission = await this._requestPermission(rootFolderHandle);
+    if (!hasPermission) {
+      // If we have no permission, clear VFS and the indexedDB stores.
+      VFS.clear();
+      createFileTree(); // show empty file tree
+      await this._clearStores();
+      return;
     }
+
+    await this._importFolderToVFS(rootFolderHandle);
   }
 
   /**
@@ -40,16 +48,16 @@ class LocalFileSystem {
    *
    * @param {FileSystemDirectoryHandle|FileSystemFileHandle} handle
    * @param {string} [mode] - The mode to request permission for.
-   * @returns {Promise<void>} Resolves if permission is granted by the user.
+   * @returns {Promise<boolean>} True if permission is granted, false otherwise.
    */
   _requestPermission(handle, mode = 'readwrite') {
     return new Promise(async (resolve, reject) => {
-      const permission = await handle.requestPermission({ mode: 'readwrite' });
+      const permission = await handle.queryPermission({ mode });
       if (permission !== 'granted') {
         console.error(`Permission ${mode} denied for handle`, handle);
-        reject();
+        resolve(false);
       } else {
-        resolve();
+        resolve(true);
       }
     });
   }
@@ -63,10 +71,11 @@ class LocalFileSystem {
   async openFolderPicker() {
     try {
       const rootFolderHandle = await window.showDirectoryPicker();
-      await this._requestPermission(rootFolderHandle);
-
-      closeAllFiles();
-      await this._importFolderToVFS(rootFolderHandle);
+      const hasPermission = await this._requestPermission(rootFolderHandle);
+      if (hasPermission) {
+        closeAllFiles();
+        await this._importFolderToVFS(rootFolderHandle);
+      }
     } catch {
       // User most likely aborted.
       return;
