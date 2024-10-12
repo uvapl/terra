@@ -28,6 +28,8 @@ function incrementString(string) {
  * @param {jQuery.Object} [parentNode] - The parent node of the new file.
  */
 function createNewFileTreeFile(parentNode = null) {
+  if (hasLFS() && LFS.busy) return;
+
   const parentId = parentNode ? parentNode.id : null;
 
   // Create a new unique filename.
@@ -49,6 +51,8 @@ function createNewFileTreeFile(parentNode = null) {
  * @param {jQuery.Object} [parentNode] - The parent node of the new folder.
  */
 function createNewFileTreeFolder(parentNode = null) {
+  if (hasLFS() && LFS.busy) return;
+
   const parentId = parentNode ? parentNode.id : null;
 
   // Create a new unique foldername.

@@ -234,6 +234,7 @@ class VirtualFileSystem {
    */
   getAbsoluteFolderPath = (folderId) => {
     const folder = this.findFolderById(folderId);
+
     if (!folder) return '';
     if (!folder.parentId) return folder.name;
 

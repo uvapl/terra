@@ -15,6 +15,12 @@ class LocalFileSystem {
    */
   loaded = false;
 
+  /**
+   * Whether an action is happening, such as moving a file/folder.
+   * @type {boolean}
+   */
+  busy = false;
+
   constructor() {
     this._init();
   }
@@ -31,7 +37,7 @@ class LocalFileSystem {
     const rootFolderHandle = await this.getFolderHandle('root');
     if (!rootFolderHandle) return;
 
-    const hasPermission = await this._requestPermission(rootFolderHandle);
+    const hasPermission = await this._verifyPermission(rootFolderHandle);
     if (!hasPermission) {
       // If we have no permission, clear VFS and the indexedDB stores.
       VFS.clear();
@@ -50,15 +56,22 @@ class LocalFileSystem {
    * @param {string} [mode] - The mode to request permission for.
    * @returns {Promise<boolean>} True if permission is granted, false otherwise.
    */
-  _requestPermission(handle, mode = 'readwrite') {
+  _verifyPermission(handle, mode = 'readwrite') {
+    const opts = { mode };
+
     return new Promise(async (resolve, reject) => {
-      const permission = await handle.queryPermission({ mode });
-      if (permission !== 'granted') {
-        console.error(`Permission ${mode} denied for handle`, handle);
-        resolve(false);
-      } else {
-        resolve(true);
+      // Check if we already have permission.
+      if ((await handle.queryPermission(opts)) === 'granted') {
+        return resolve(true);
       }
+
+      // Request permission to the handle.
+      if ((await handle.requestPermission(opts)) === 'granted') {
+        return resolve(true);
+      }
+
+      // The user did not grant permission.
+      return resolve(false);
     });
   }
 
@@ -71,7 +84,7 @@ class LocalFileSystem {
   async openFolderPicker() {
     try {
       const rootFolderHandle = await window.showDirectoryPicker();
-      const hasPermission = await this._requestPermission(rootFolderHandle);
+      const hasPermission = await this._verifyPermission(rootFolderHandle);
       if (hasPermission) {
         closeAllFiles();
         await this._importFolderToVFS(rootFolderHandle);
@@ -176,6 +189,11 @@ class LocalFileSystem {
     });
   }
 
+  /**
+   * Clear all stores inside the app's indexedDB.
+   *
+   * @returns {Promise<void>}
+   */
   _clearStores() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
@@ -352,22 +370,28 @@ class LocalFileSystem {
    * @returns {Promise<void>}
    */
   async writeFileToFolder(folderId, fileId, filename, content) {
-    if (!folderId) {
-      folderId = 'root';
+    try {
+      this.busy = true;
+
+      if (!folderId) {
+        folderId = 'root';
+      }
+
+      const folderHandle = await this.getFolderHandle(folderId);
+
+      let fileHandle = await this.getFileHandle(fileId);
+      if (!fileHandle) {
+        // No file handle exists, create a new one.
+        fileHandle = await folderHandle.getFileHandle(filename, { create: true });
+        await this.saveFileHandle(fileHandle, fileId);
+      }
+
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+    } finally {
+      this.busy = false;
     }
-
-    const folderHandle = await this.getFolderHandle(folderId);
-
-    let fileHandle = await this.getFileHandle(fileId);
-    if (!fileHandle) {
-      // No file handle exists, create a new one.
-      fileHandle = await folderHandle.getFileHandle(filename, { create: true });
-      await this.saveFileHandle(fileHandle, fileId);
-    }
-
-    const writable = await fileHandle.createWritable();
-    await writable.write(content);
-    await writable.close();
   }
 
   /**
@@ -382,13 +406,19 @@ class LocalFileSystem {
    * @returns {Promise<void>}
    */
   async createFolder(folderId, parentId, folderName) {
-    if (!parentId) {
-      parentId = 'root';
-    }
+    try {
+      this.busy = true;
 
-    const parentFolder = await this.getFolderHandle(parentId);
-    const folderHandle = await parentFolder.getDirectoryHandle(folderName, { create: true });
-    await this.saveFolderHandle(folderHandle, folderId);
+      if (!parentId) {
+        parentId = 'root';
+      }
+
+      const parentFolder = await this.getFolderHandle(parentId);
+      const folderHandle = await parentFolder.getDirectoryHandle(folderName, { create: true });
+      await this.saveFolderHandle(folderHandle, folderId);
+    } finally {
+      this.busy = false;
+    }
   }
 
   /**
@@ -400,15 +430,20 @@ class LocalFileSystem {
    */
   async deleteFile(id) {
     try {
+      this.busy = true;
+
       const fileHandle = await this.getFileHandle(id);
       if (fileHandle) {
         await fileHandle.remove();
         await this.removeFileHandle(id);
       }
+
       return true;
     } catch (err) {
       console.error('Failed to delete file:', err);
       return false;
+    } finally {
+      this.busy = false;
     }
   }
 
@@ -421,6 +456,7 @@ class LocalFileSystem {
    */
   async deleteFolder(id) {
     try {
+      this.busy = true;
       const folderHandle = await this.getFolderHandle(id);
       await this._recursivelyDeleteFolder(folderHandle);
       await this.removeFolderHandle(id);
@@ -428,6 +464,8 @@ class LocalFileSystem {
     } catch (err) {
       console.error('Failed to delete folder:', err);
       return false;
+    } finally {
+      this.busy = false;
     }
   }
 
@@ -463,18 +501,24 @@ class LocalFileSystem {
    * @returns {Promise<void>}
    */
   async moveFile(id, newName, newParentId) {
-    if (!newParentId) {
-      newParentId = 'root';
+    try {
+      this.busy = true;
+
+      if (!newParentId) {
+        newParentId = 'root';
+      }
+
+      // Remove current file.
+      const currentFileHandle = await this.getFileHandle(id);
+      await currentFileHandle.remove();
+
+      // Make new file and store handle under the same id.
+      const folderHandle = await this.getFolderHandle(newParentId);
+      const fileHandle = await folderHandle.getFileHandle(newName, { create: true });
+      await this.saveFileHandle(fileHandle, id);
+    } finally {
+      this.busy = false;
     }
-
-    // Remove current file.
-    const currentFileHandle = await this.getFileHandle(id);
-    await currentFileHandle.remove();
-
-    // Make new file and store handle under the same id.
-    const folderHandle = await this.getFolderHandle(newParentId);
-    const fileHandle = await folderHandle.getFileHandle(newName, { create: true });
-    await this.saveFileHandle(fileHandle, id);
   }
 
   /**
@@ -487,13 +531,19 @@ class LocalFileSystem {
    * @returns {Promise<void>}
    */
   async moveFolder(id, newName, newParentId) {
-    const folder = VFS.findFolderById(id);
+    try {
+      this.busy = true;
 
-    // Move current folder in VFS.
-    folder.parentId = newParentId;
+      const folder = VFS.findFolderById(id);
 
-    // Now move the folders in the LFS.
-    await this._moveFolderRecursively(id, newParentId, newName);
+      // Move current folder in VFS.
+      folder.parentId = newParentId;
+
+      // Now move the folders in the LFS.
+      await this._moveFolderRecursively(id, newParentId, newName);
+    } finally {
+      this.busy = false;
+    }
   }
 
   /**

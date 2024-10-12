@@ -275,3 +275,12 @@ function minutes(mins) {
 function hasGitFSWorker() {
   return isIDE && window._gitFS instanceof GitFS;
 }
+
+/**
+ * Check whether the LFS has been initialized.
+ *
+ * @returns {boolean} True when LFS has been initialized, false otherwise.
+ */
+function hasLFS() {
+  return typeof LFS !== 'undefined' && LFS instanceof LocalFileSystem;
+}
