@@ -327,11 +327,12 @@ function createNodeCallback($tree) {
 function renameNodeCallback($tree) {
   return (event, data) => {
     const name = data.text.trim();
+    const parentId = data.node.parent === '#' ? null : data.node.parent;
 
     // Check if the name already exists in the parent folder.
     // If so, trigger edit mode again and show error tooltip.
-    const parentId = data.node.parent === '#' ? null : data.node.parent;
-    if (VFS.existsWhere({ parentId, name }, true) && name.toLowerCase() !== data.node.original.text.toLowerCase()) {
+    const nameConflicts = VFS.findWhere({ parentId, name }, true);
+    if (nameConflicts.length > 0 && nameConflicts[0].id !== data.node.id) {
       return setTimeout(() => {
         $('#file-tree').jstree(true).edit(data.node);
 
@@ -344,7 +345,7 @@ function renameNodeCallback($tree) {
 
         // Create new tooltip.
         window._renameNodeTippy = tippy(inputWrapper, {
-          content: `${data.node.type} "${name}" already exists`,
+          content: `There already exists a "${name}" file or folder`,
           showOnCreate: true,
           placement: 'right',
           theme: 'error',
