@@ -16,7 +16,7 @@ class VirtualFileSystem {
    * @param {string} fn - Name of the function to call.
    * @param {array} payload - Arguments to pass to the function.
    */
-  _git(fn, ...payload) {
+  _git = (fn, ...payload) => {
     if (!hasGitFSWorker()) return;
 
     window._gitFS[fn](...payload);
@@ -29,8 +29,8 @@ class VirtualFileSystem {
    * @param {array} payload - Arguments to pass to the function.
    * @returns {*} The return value of the function.
    */
-  _lfs(fn, ...payload) {
-    if (!LFS.loaded) return;
+  _lfs = (fn, ...payload) => {
+    if (!hasLFS() || (hasLFS() && !LFS.loaded)) return;
 
     return LFS[fn](...payload);
   }
