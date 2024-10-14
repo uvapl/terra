@@ -229,7 +229,13 @@ class API extends BaseAPI {
     globals.set('__name__', '__main__');
 
     try {
-      this.pyodide.runPython(code.join('\n'), { globals, locals: globals });
+      // Most of the output will end up in the raw stdout handler defined
+      // earlier, but some output will still end up in the console, which
+      // generally happens solely for config buttons.
+      const result = this.pyodide.runPython(code.join('\n'), { globals, locals: globals });
+      if (result) {
+        this.hostWrite(result);
+      }
     } catch (err) {
       return this.formatErrorMsg(err.message, activeTabName);
     } finally {
