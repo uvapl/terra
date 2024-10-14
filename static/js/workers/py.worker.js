@@ -1,5 +1,5 @@
 self.importScripts('../vendor/pyodide-0.25.0.min.js');
-self.importScripts('../helpers.js')
+// self.importScripts('../helpers.js')
 self.importScripts('base-api.js')
 
 class API extends BaseAPI {

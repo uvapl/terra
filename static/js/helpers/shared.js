@@ -30,6 +30,16 @@ function removeLocalStorageItem(key) {
 }
 
 /**
+ * Update the local storage prefix with an additional key.
+ *
+ * @param {string} additionalKey - An additional prefix that will be appended to
+ * the current local storage prefix.
+ */
+function updateLocalStoragePrefix(additionalKey) {
+  LOCAL_STORAGE_PREFIX = `${DEFAULT_LOCAL_STORAGE_PREFIX}-${additionalKey}`;
+}
+
+/**
  * Check whether an object is a real object, because essentially, everything
  * is an object in JavaScript.
  *
@@ -140,16 +150,6 @@ function makeUrl(url, queryParams) {
     .join('&');
 
   return `${url}?${query}`;
-}
-
-/**
- * Update the local storage prefix with an additional key.
- *
- * @param {string} additionalKey - An additional prefix that will be appended to
- * the current local storage prefix.
- */
-function updateLocalStoragePrefix(additionalKey) {
-  LOCAL_STORAGE_PREFIX = `${DEFAULT_LOCAL_STORAGE_PREFIX}-${additionalKey}`;
 }
 
 /**
