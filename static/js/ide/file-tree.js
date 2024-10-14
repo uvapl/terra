@@ -226,16 +226,27 @@ function sortFileTree(a, b) {
 
 /**
  * Instantiates the file tree with the files in the VFS using TreeJS.
+ * If an existing instance already exists, only the data is updated and redrawn.
  */
 function createFileTree() {
-  // Make sure we destroy the existing tree instance if it exists.
-  $('#file-tree').jstree('destroy');
+  // Request existing instance, if it exists.
+  let $tree = $('#file-tree').jstree(true);
 
-  const $tree = $('#file-tree').jstree({
+  if ($tree) {
+    // Just update the tree.
+    $tree.settings.core.data = createFileTreeFromVFS();
+    $tree.redraw(true);
+    return;
+  }
+
+  // Otherwise, instantiate a new tree.
+
+  $tree = $('#file-tree').jstree({
     core: {
-      animation: 0,
-      check_callback: true,
-      data: createFileTreeFromVFS(),
+      animation: 0,                     // Disable animation when opening folder.
+      check_callback: true,             // Allow create/rename/delete node callbacks.
+      strings: () => '',                // Disable 'Loading...' text.
+      data: createFileTreeFromVFS(),    // Create the internal structure for jsTree based on VFS.
     },
 
     conditionalselect: (node, event) => {
