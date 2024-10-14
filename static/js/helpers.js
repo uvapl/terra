@@ -268,3 +268,30 @@ function hasLFSApi() {
 function hasLFS() {
   return typeof LFS !== 'undefined' && LFS instanceof LocalFileSystem;
 }
+
+/**
+ * Set the file tree title.
+ *
+ * @param {string} title - The title to set.
+ */
+function setFileTreeTitle(title) {
+  $('#file-tree-title').text(title);
+}
+
+/**
+ * Get the repo name and username of a given repo link.
+ *
+ * @example getRepoName('https://github.com/<user>/<repo>')
+ *   => { user: '<user>', repo: '<repo>' }
+ *
+ * @param {string} repoLink - Absolute link to the repository.
+ */
+function getRepoInfo(repoLink) {
+  const match = repoLink.match(/^https:\/\/(?:www\.)?github.com\/([^/]+)\/([\w-]+)/);
+  if (!match) return null;
+
+  return {
+    'user': match[1],
+    'repo': match[2],
+  }
+}

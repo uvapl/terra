@@ -24,15 +24,20 @@
 .file-tree-container .title {
   font-size: 14px;
   flex-grow: 1;
-  text-transform: uppercase;
+  color: var(--tab-fg-color);
+  overflow: hidden;
+  text-wrap: nowrap;
+  text-overflow: ellipsis;
 }
 
 .file-tree-container button {
   background: none;
   border: 0;
   display: block;
-  width: 20px;
-  height: 20px;
+  max-width: 20px;
+  max-height: 20px;
+  min-width: 20px;
+  min-height: 20px;
   background-repeat: no-repeat;
   background-size: 20px;
   background-position: center 50%;

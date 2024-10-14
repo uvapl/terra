@@ -170,13 +170,20 @@ class GitFS {
  */
 function createGitFSWorker() {
   if (!isIDE) return;
-  LFS.terminate();
+
+  if (hasLFS()) {
+    LFS.terminate();
+  }
 
   closeAllFiles();
 
   const username = getLocalStorageItem('git-username');
   const accessToken = getLocalStorageItem('git-access-token');
   const repoLink = getLocalStorageItem('connected-repo');
+  const repoInfo = getRepoInfo(repoLink);
+  if (repoInfo) {
+    setFileTreeTitle(`${repoInfo.user}/${repoInfo.repo}`)
+  }
 
   if (hasGitFSWorker()) {
     window._gitFS.terminate();

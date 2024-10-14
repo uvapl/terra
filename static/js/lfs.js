@@ -110,6 +110,7 @@ class LocalFileSystem {
     // Save rootFolderHandle under the 'root' key for reference.
     await this.saveFolderHandle(rootFolderHandle, 'root');
 
+    setFileTreeTitle(rootFolderHandle.name);
     await this._readFolder(rootFolderHandle, null);
     createFileTree();
     this.loaded = true;
