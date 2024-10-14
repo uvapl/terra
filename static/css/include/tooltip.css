@@ -6,3 +6,8 @@
 .tippy-box[data-theme="error"] .tippy-arrow {
   color: var(--color-error);
 }
+
+[data-tippy-root] {
+  /* This z-index must be higher than the .modal z-index */
+  z-index: 9999999 !important;
+}

@@ -295,3 +295,13 @@ function getRepoInfo(repoLink) {
     'repo': match[2],
   }
 }
+
+/**
+ * Check whether a given filename is valid for a fileystem.
+ *
+ * @param {string} filename - The filename to check.
+ * @returns {boolean} True if the filename is valid, false otherwise.
+ */
+function isValidFilename(filename) {
+  return !/[\/\\:*?"<>|]/.test(filename) && !['&lt;', '&gt;'].includes(filename);
+}

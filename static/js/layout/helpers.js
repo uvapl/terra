@@ -180,13 +180,46 @@ function saveFile() {
   showModal($modal);
   $modal.find('.text-input').focus().select();
 
-  $modal.find('.cancel-btn').click(() => hideModal($modal));
+  $modal.find('.cancel-btn').click(() => {
+    if (window._saveFileTippy) {
+      window._saveFileTippy.destroy();
+      window._saveFileTippy = null;
+    }
+
+    hideModal($modal);
+  });
   $modal.find('.primary-btn').click(() => {
     const filename = $modal.find('.text-input').val();
 
     let folderId = $modal.find('.select').val();
     if (folderId === 'root') {
       folderId = null;
+    }
+
+    let errorMsg;
+    if (!isValidFilename(filename)) {
+      errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
+    } else if (VFS.existsWhere({ parentId: folderId, name: filename })) {
+      errorMsg = `There already exists a "${filename}" file or folder`;
+    }
+
+    if (errorMsg) {
+      if (window._saveFileTippy) {
+        window._saveFileTippy.destroy();
+        window._saveFileTippy = null;
+      }
+
+      // Create new tooltip.
+      window._saveFileTippy = tippy($modal.find('input').parent()[0], {
+        content: errorMsg,
+        showOnCreate: true,
+        placement: 'top',
+        theme: 'error',
+      });
+
+      $modal.find('input').focus().select();
+
+      return;
     }
 
     // Create a new file in the file-tree, which automatically creates the
@@ -206,6 +239,13 @@ function saveFile() {
     window._layout.emit('stateChanged');
 
     hideModal($modal);
+
+    const proglang = getFileExtension(filename);
+
+    // Set correct syntax highlighting.
+    tab.instance.setProgLang(proglang)
+
+    createWorkerApi(proglang);
   });
 }
 

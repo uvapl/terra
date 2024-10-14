@@ -333,10 +333,18 @@ function renameNodeCallback($tree) {
     const name = data.text.trim();
     const parentId = data.node.parent === '#' ? null : data.node.parent;
 
+    let errorMsg;
+
     // Check if the name already exists in the parent folder.
     // If so, trigger edit mode again and show error tooltip.
     const nameConflicts = VFS.findWhere({ parentId, name }, true);
-    if (nameConflicts.length > 0 && nameConflicts[0].id !== data.node.id) {
+    if (!isValidFilename(name)) {
+      errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
+    } else if (nameConflicts.length > 0 && nameConflicts[0].id !== data.node.id) {
+      errorMsg = `There already exists a "${name}" file or folder`;
+    }
+
+    if (errorMsg) {
       return setTimeout(() => {
         $('#file-tree').jstree(true).edit(data.node);
 
@@ -349,7 +357,7 @@ function renameNodeCallback($tree) {
 
         // Create new tooltip.
         window._renameNodeTippy = tippy(inputWrapper, {
-          content: `There already exists a "${name}" file or folder`,
+          content: errorMsg,
           showOnCreate: true,
           placement: 'right',
           theme: 'error',

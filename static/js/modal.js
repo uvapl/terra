@@ -48,13 +48,7 @@ function createModal(modalOptions = {}) {
   $modal.focus();
 
   $modal.off('keydown').on('keydown', (e) => {
-    // Close modal when pressing ESC.
-    if (e.key === 'Escape') {
-      hideModal($modal);
-    }
-
-    // Submit modal when pressing ENTER.
-    else if (e.key === 'Enter') {
+    if (e.key === 'Enter') {
       $modal.find('.modal-footer .confirm-btn').click();
     }
   });
