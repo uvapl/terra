@@ -86,6 +86,11 @@ class LocalFileSystem {
       const rootFolderHandle = await window.showDirectoryPicker();
       const hasPermission = await this._verifyPermission(rootFolderHandle);
       if (hasPermission) {
+        // Make sure GitFS is stopped.
+        if (hasGitFSWorker()) {
+          window._gitfs.terminate();
+        }
+
         closeAllFiles();
         await this._importFolderToVFS(rootFolderHandle);
       }
