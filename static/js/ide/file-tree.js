@@ -235,7 +235,7 @@ function createFileTree() {
   if ($tree) {
     // Just update the tree.
     $tree.settings.core.data = createFileTreeFromVFS();
-    $tree.redraw(true);
+    $tree.refresh();
     return;
   }
 
