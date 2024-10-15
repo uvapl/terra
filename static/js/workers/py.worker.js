@@ -22,6 +22,10 @@ class API extends BaseAPI {
       indexURL: '../../wasm/py/',
       stdout: this.hostWrite,
       stdin: this.stdinHandler,
+
+      // Disable buffering, needed when the user uses the end kwarg:
+      //     -> print('..', end='')
+      args: ['-u'],
     }).then(async (pyodide) => {
       this.pyodide = pyodide;
 
