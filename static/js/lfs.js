@@ -47,6 +47,15 @@ class LocalFileSystem {
     }
 
     await this._importFolderToVFS(rootFolderHandle);
+
+    // this._watchRootFolder();
+  }
+
+  _watchRootFolder() {
+    setInterval(async () => {
+      const rootFolderHandle = await this.getFolderHandle('root');
+      await this._importFolderToVFS(rootFolderHandle);
+    }, seconds(5));
   }
 
   /**
