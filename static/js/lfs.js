@@ -587,17 +587,12 @@ class LocalFileSystem {
    */
   async _moveFolderRecursively(folderId, parentFolderId, newName) {
     const folderKey = VFS.getAbsoluteFolderPath(folderId);
-    console.log('folderKey', folderKey, folderId)
-    console.log('parentFolderId', parentFolderId);
     const folderHandle = await this.getFolderHandle(folderKey);
     const parentFolderHandle = await this.getFolderHandle(
       parentFolderId
         ? VFS.getAbsoluteFolderPath(parentFolderId)
         : 'root'
     );
-
-    console.log('parent folder', parentFolderHandle.handle.name);
-    console.log('new name:', newName, folderHandle.handle.name);
 
     // Create the current folder in the new parent folder.
     const newCurrentFolderHandle = await parentFolderHandle.handle.getDirectoryHandle(
@@ -613,7 +608,6 @@ class LocalFileSystem {
       )
     )
 
-    console.log('files', VFS.findFilesWhere({ parentId: folderId }).length)
     await Promise.all(
       VFS.findFilesWhere({ parentId: folderId }).map(async (subfile) => {
         const subfileKey = VFS.getAbsoluteFilePath(subfile.id);
