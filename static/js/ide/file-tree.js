@@ -334,6 +334,9 @@ function createFileTree() {
   window._fileTree = $("#file-tree").fancytree({
     selectMode: 1,
     debugLevel: 0,
+    strings: {
+      noData: 'No files or folders found.'
+    },
     source: createFileTreeFromVFS(),
     click: onClickNodeCallback,
     init: () => sortFileTree(),

@@ -61,6 +61,7 @@ class GitFS {
    */
   terminate() {
     console.log('Terminating existing GitFS worker')
+    setLocalStorageItem('connected-repo', '');
     this.worker.terminate();
   }
 

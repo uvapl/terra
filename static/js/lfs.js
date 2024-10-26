@@ -101,7 +101,8 @@ class LocalFileSystem {
       if (hasPermission) {
         // Make sure GitFS is stopped.
         if (hasGitFSWorker()) {
-          window._gitfs.terminate();
+          window._gitFS.terminate();
+          window._gitFS = null;
         }
 
         closeAllFiles();
