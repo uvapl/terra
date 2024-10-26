@@ -179,6 +179,44 @@ class LocalFileSystem {
   }
 
   /**
+   * Rebuild the IndexedDB stores by clearing them and recursively reading the
+   * child file/folders. For each file/folder, we find its corresponding VFS
+   * entry based on its path and save the handle.
+   *
+   * @async
+   * @returns {Promise<void>}
+   */
+  async rebuildIndexedDB() {
+    const rootFolderHandle = await this.getFolderHandle('root');
+    await this._clearStores();
+    await this.saveFolderHandle('root', null, rootFolderHandle.handle);
+    await this._rebuildIndexedDB(rootFolderHandle.handle, '');
+  }
+
+  /**
+   * Internal method to rebuild the IndexedDB stores recursively.
+   *
+   * @async
+   * @param {FileSystemDirectoryHandle} dirHandle - The directory handle to read.
+   * @param {string} [pathPrefix] - Absolute path to this file/folder of its parents.
+   * @returns {Promise<void>}
+   */
+  async _rebuildIndexedDB(dirHandle, pathPrefix) {
+    for await (const [name, handle] of dirHandle) {
+      if (handle.kind === 'file') {
+        const fileKey = pathPrefix ? `${pathPrefix}/${name}` : name;
+        const file = VFS.findFileByPath(fileKey);
+        await this.saveFileHandle(fileKey, file.id, handle);
+      } else if (handle.kind === 'directory') {
+        const folderKey = pathPrefix ? `${pathPrefix}/${name}` : name;
+        const folder = VFS.findFolderByPath(folderKey);
+        await this.saveFolderHandle(folderKey, folder.id, handle);
+        await this._rebuildIndexedDB(handle, folderKey);
+      }
+    }
+  }
+
+  /**
    * Opens a request to the IndexedDB.
    *
    * @returns {Promise<IDBRequest>} The IDB request object.
@@ -568,9 +606,7 @@ class LocalFileSystem {
       // Move the folder in VFS.
       folder.parentId = newParentId;
 
-      // Re-import from the root to update the keys inside the indexeddb.
-      const rootFolderHandle = await this.getFolderHandle('root');
-      await this._importFolderToVFS(rootFolderHandle.handle);
+      await this.rebuildIndexedDB();
     } finally {
       this.busy = false;
     }
@@ -617,7 +653,7 @@ class LocalFileSystem {
         const newFileHandle = await newCurrentFolderHandle.getFileHandle(subfile.name, { create: true });
 
         if (subfile.content) {
-          const writable = await newFileHandle.handle.createWritable();
+          const writable = await newFileHandle.createWritable();
           await writable.write(subfile.content);
           await writable.close();
         }

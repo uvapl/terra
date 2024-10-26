@@ -215,6 +215,24 @@ class VirtualFileSystem {
   findFolderById = (id) => this.folders[id];
 
   /**
+   * Find a file by its absolute path.
+   *
+   * @param {string} path - The absolute filepath.
+   */
+  findFileByPath = (path) =>
+    Object.values(this.files)
+    .find((f) => this.getAbsoluteFilePath(f.id) === path);
+
+  /**
+   * Find a folder by its absolute path.
+   *
+   * @param {string} path - The absolute folderpath.
+   */
+  findFolderByPath = (path) =>
+    Object.values(this.folders)
+    .find((f) => this.getAbsoluteFolderPath(f.id) === path);
+
+  /**
    * Get the absolute file path of a file.
    *
    * @param {string} fileId - The file id.
