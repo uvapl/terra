@@ -56,8 +56,10 @@ function createNewFileTreeFile(parentId = null) {
 
   // Append to the parent node if it exists, otherwise append to the root.
   const tree = getFileTreeInstance();
-  const parentNode = tree.getNodeByKey(parentId);
   if (parentId) {
+    const parentNode = tree.getNodeByKey(parentId);
+    parentNode.setExpanded();
+
     parentNode.addChildren(newChildProps);
   } else {
     tree.rootNode.addChildren(newChildProps);
@@ -65,8 +67,15 @@ function createNewFileTreeFile(parentId = null) {
 
   sortFileTree();
 
-  // Trigger edit mode for the new node.
   const newNode = tree.getNodeByKey(id);
+
+  // Check again if the parent node is expanded, because the node might have
+  // been added to a closed folder. Only then we can trigger editStart().
+  if (parentId) {
+    tree.getNodeByKey(parentId).setExpanded();
+  }
+
+  // Trigger edit mode for the new node.
   newNode.editStart();
 }
 
@@ -104,8 +113,10 @@ function createNewFileTreeFolder(parentId = null) {
 
   // Append to the parent node if it exists, otherwise append to the root.
   const tree = getFileTreeInstance();
-  const parentNode = tree.getNodeByKey(parentId);
   if (parentId) {
+    const parentNode = tree.getNodeByKey(parentId);
+    parentNode.setExpanded();
+
     parentNode.addChildren(newChildProps);
   } else {
     tree.rootNode.addChildren(newChildProps);
@@ -115,6 +126,13 @@ function createNewFileTreeFolder(parentId = null) {
 
   // Trigger edit mode for the new node.
   const newNode = tree.getNodeByKey(id);
+
+  // Check again if the parent node is expanded, because the node might have
+  // been added to a closed folder. Only then we can trigger editStart().
+  if (parentId) {
+    tree.getNodeByKey(parentId).setExpanded();
+  }
+
   newNode.editStart();
 }
 
@@ -366,7 +384,7 @@ function createFileTree() {
 
     // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtEdit
     edit: {
-      triggerStart: ['clickActive'],
+      triggerStart: ['dblclick'],
       edit: onStartEditNodeCallback,
       beforeClose: beforeCloseEditNodeCallback,
       close: () => sortFileTree(),

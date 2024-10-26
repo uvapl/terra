@@ -41,7 +41,7 @@ class LocalFileSystem {
     const rootFolderHandle = await this.getFolderHandle('root');
     if (!rootFolderHandle) return;
 
-    const hasPermission = await this._verifyPermission(rootFolderHandle);
+    const hasPermission = await this._verifyPermission(rootFolderHandle.handle);
     if (!hasPermission) {
       // If we have no permission, clear VFS and the indexedDB stores.
       VFS.clear();
@@ -50,7 +50,7 @@ class LocalFileSystem {
       return;
     }
 
-    await this._importFolderToVFS(rootFolderHandle);
+    await this._importFolderToVFS(rootFolderHandle.handle);
 
     // this._watchRootFolder();
   }
@@ -58,7 +58,7 @@ class LocalFileSystem {
   _watchRootFolder() {
     setInterval(async () => {
       const rootFolderHandle = await this.getFolderHandle('root');
-      await this._importFolderToVFS(rootFolderHandle);
+      await this._importFolderToVFS(rootFolderHandle.handle);
     }, seconds(5));
   }
 
@@ -95,22 +95,24 @@ class LocalFileSystem {
    * @returns {Promise<void>}
    */
   async openFolderPicker() {
+    let rootFolderHandle;
     try {
-      const rootFolderHandle = await window.showDirectoryPicker();
-      const hasPermission = await this._verifyPermission(rootFolderHandle);
-      if (hasPermission) {
-        // Make sure GitFS is stopped.
-        if (hasGitFSWorker()) {
-          window._gitFS.terminate();
-          window._gitFS = null;
-        }
-
-        closeAllFiles();
-        await this._importFolderToVFS(rootFolderHandle);
-      }
-    } catch {
+      rootFolderHandle = await window.showDirectoryPicker();
+    } catch (err) {
       // User most likely aborted.
       return;
+    }
+
+    const hasPermission = await this._verifyPermission(rootFolderHandle);
+    if (hasPermission) {
+      // Make sure GitFS is stopped.
+      if (hasGitFSWorker()) {
+        window._gitFS.terminate();
+        window._gitFS = null;
+      }
+
+      closeAllFiles();
+      await this._importFolderToVFS(rootFolderHandle);
     }
   }
 
@@ -127,7 +129,7 @@ class LocalFileSystem {
     await this._clearStores();
 
     // Save rootFolderHandle under the 'root' key for reference.
-    await this.saveFolderHandle(rootFolderHandle, 'root');
+    await this.saveFolderHandle('root', null, rootFolderHandle);
 
     setFileTreeTitle(rootFolderHandle.name);
     await this._readFolder(rootFolderHandle, null);
@@ -144,8 +146,8 @@ class LocalFileSystem {
    * @returns {Promise<string>} The file content.
    */
   async getFileContent(id) {
-    const handle = await this.getFileHandle(id);
-    const file = await handle.getFile();
+    const fileHandle = await this.getFileHandle(VFS.getAbsoluteFilePath(id));
+    const file = await fileHandle.handle.getFile();
     const content = await file.text();
     return content;
   }
@@ -167,10 +169,10 @@ class LocalFileSystem {
           parentId,
           size: file.size
         }, false);
-        await this.saveFileHandle(handle, fileId);
+        await this.saveFileHandle(VFS.getAbsoluteFilePath(fileId), fileId, handle);
       } else if (handle.kind === 'directory') {
         const folder = VFS.createFolder({ name, parentId }, false);
-        await this.saveFolderHandle(handle, folder.id);
+        await this.saveFolderHandle(VFS.getAbsoluteFolderPath(folder.id), folder.id, handle);
         await this._readFolder(handle, folder.id);
       }
     }
@@ -257,18 +259,18 @@ class LocalFileSystem {
    *
    * @async
    * @param {string} storeName - The store name where to save the handle.
-   * @param {FileSystemDirectoryHandle|FileSystemFileHandle} handle - The handle to save.
-   * @param {string} key - A unique key to identify the handle.
-   * @returns {Promise<void>} The file id of the saved handle.
+   * @param {string} key - The key to save the handle under.
+   * @param {*} value - The value to save under the key.
+   * @returns {Promise<void>}
    */
-  async _saveHandle(storeName, handle, key) {
+  async _saveHandle(storeName, key, value) {
     const db = await this._openDB();
 
     return new Promise((resolve, reject) => {
       const request = db
         .transaction(storeName, 'readwrite')
         .objectStore(storeName)
-        .put(handle, key);
+        .put(value, key);
 
       request.onsuccess = () => resolve();
       request.onerror = () => reject();
@@ -278,23 +280,25 @@ class LocalFileSystem {
   /**
    * Save the file handle in the IndexedDB.
    *
+   * @param {string} path - The absolute filepath to save the handle under.
+   * @param {string} id - The VFS file id.
    * @param {FileSystemFileHandle} handle - The file handle to save.
-   * @param {string} key - The VFS file id.
    * @returns {Promise<FileSystemFileHandle>}
    */
-  saveFileHandle(handle, key) {
-    return this._saveHandle(this.FILE_HANDLES_STORE_NAME, handle, key);
+  saveFileHandle(path, id, handle) {
+    return this._saveHandle(this.FILE_HANDLES_STORE_NAME, path, { id, handle });
   }
 
   /**
    * Save the folder handle in the IndexedDB.
    *
+   * @param {string} path - The absolute folderpath to save the handle under.
+   * @param {string} id - The VFS folder id.
    * @param {FileSystemDirectoryHandle} handle - The folder handle to save.
-   * @param {string} key - The VFS folder id.
    * @returns {Promise<FileSystemDirectoryHandle>}
    */
-  saveFolderHandle(handle, key) {
-    return this._saveHandle(this.FOLDER_HANDLES_STORE_NAME, handle, key);
+  saveFolderHandle(path, id, handle) {
+    return this._saveHandle(this.FOLDER_HANDLES_STORE_NAME, path, { id, handle });
   }
 
   /**
@@ -318,7 +322,7 @@ class LocalFileSystem {
   /**
    * Retrieve a file handle from the IndexedDB.
    *
-   * @param {string} key - The VFS file id.
+   * @param {string} key - The VFS absolute filepath.
    * @returns {Promise<FileSystemFileHandle>}
    */
   getFileHandle(key) {
@@ -328,7 +332,7 @@ class LocalFileSystem {
   /**
    * Retrieve a folder handle from the IndexedDB.
    *
-   * @param {string} key - The VFS folder id.
+   * @param {string} key - The VFS absolute folderpath.
    * @returns {Promise<FileSystemDirectoryHandle>}
    */
   getFolderHandle(key) {
@@ -360,7 +364,7 @@ class LocalFileSystem {
    * Remove a file handle from the IndexedDB.
    *
    * @async
-   * @param {string} key - The VFS file id.
+   * @param {string} key - The VFS absolute filepath.
    * @returns {Promise<void>}
    */
   async removeFileHandle(key) {
@@ -371,7 +375,7 @@ class LocalFileSystem {
    * Remove a folder handle from the IndexedDB.
    *
    * @async
-   * @param {string} key - The VFS folder id.
+   * @param {string} key - The VFS absolute folderpath.
    * @returns {Promise<void>}
    */
   async removeFolderHandle(key) {
@@ -392,18 +396,17 @@ class LocalFileSystem {
   async writeFileToFolder(folderId, fileId, filename, content) {
     try {
       this.busy = true;
+      const fileKey = VFS.getAbsoluteFilePath(fileId);
 
-      if (!folderId) {
-        folderId = 'root';
-      }
+      const folderHandle = await this.getFolderHandle(folderId ? VFS.getAbsoluteFolderPath(folderId) : 'root');
 
-      const folderHandle = await this.getFolderHandle(folderId);
-
-      let fileHandle = await this.getFileHandle(fileId);
+      let fileHandle = await this.getFileHandle(fileKey);
       if (!fileHandle) {
         // No file handle exists, create a new one.
-        fileHandle = await folderHandle.getFileHandle(filename, { create: true });
-        await this.saveFileHandle(fileHandle, fileId);
+        fileHandle = await folderHandle.handle.getFileHandle(filename, { create: true });
+        await this.saveFileHandle(fileKey, fileId, fileHandle);
+      } else {
+        fileHandle = fileHandle.handle;
       }
 
       const writable = await fileHandle.createWritable();
@@ -429,13 +432,9 @@ class LocalFileSystem {
     try {
       this.busy = true;
 
-      if (!parentId) {
-        parentId = 'root';
-      }
-
-      const parentFolder = await this.getFolderHandle(parentId);
-      const folderHandle = await parentFolder.getDirectoryHandle(folderName, { create: true });
-      await this.saveFolderHandle(folderHandle, folderId);
+      const parentFolder = await this.getFolderHandle(parentId ? VFS.getAbsoluteFolderPath(parentId) : 'root');
+      const folderHandle = await parentFolder.handle.getDirectoryHandle(folderName, { create: true });
+      await this.saveFolderHandle(VFS.getAbsoluteFolderPath(folderId), folderId, folderHandle);
     } finally {
       this.busy = false;
     }
@@ -452,10 +451,11 @@ class LocalFileSystem {
     try {
       this.busy = true;
 
-      const fileHandle = await this.getFileHandle(id);
+      const fileKey = VFS.getAbsoluteFilePath(id);
+      const fileHandle = await this.getFileHandle(fileKey);
       if (fileHandle) {
-        await fileHandle.remove();
-        await this.removeFileHandle(id);
+        await fileHandle.handle.remove();
+        await this.removeFileHandle(fileKey);
       }
 
       return true;
@@ -477,9 +477,10 @@ class LocalFileSystem {
   async deleteFolder(id) {
     try {
       this.busy = true;
-      const folderHandle = await this.getFolderHandle(id);
-      await this._recursivelyDeleteFolder(folderHandle);
-      await this.removeFolderHandle(id);
+      const folderKey = VFS.getAbsoluteFolderPath(id);
+      const folderHandle = await this.getFolderHandle(folderKey);
+      await this._recursivelyDeleteFolder(folderHandle.handle);
+      await this.removeFolderHandle(folderKey);
       return true;
     } catch (err) {
       console.error('Failed to delete folder:', err);
@@ -524,18 +525,16 @@ class LocalFileSystem {
     try {
       this.busy = true;
 
-      if (!newParentId) {
-        newParentId = 'root';
-      }
+      const fileKey = VFS.getAbsoluteFilePath(id);
 
       // Remove current file.
-      const currentFileHandle = await this.getFileHandle(id);
-      await currentFileHandle.remove();
+      const currentFileHandle = await this.getFileHandle(fileKey);
+      await currentFileHandle.handle.remove();
 
       // Make new file and store handle under the same id.
-      const folderHandle = await this.getFolderHandle(newParentId);
-      const fileHandle = await folderHandle.getFileHandle(newName, { create: true });
-      await this.saveFileHandle(fileHandle, id);
+      const folderHandle = await this.getFolderHandle(newParentId ? VFS.getAbsoluteFolderPath(newParentId) : 'root');
+      const fileHandle = await folderHandle.handle.getFileHandle(newName, { create: true });
+      await this.saveFileHandle(fileKey, id, fileHandle);
     } finally {
       this.busy = false;
     }
@@ -553,14 +552,25 @@ class LocalFileSystem {
   async moveFolder(id, newName, newParentId) {
     try {
       this.busy = true;
-
       const folder = VFS.findFolderById(id);
-
-      // Move current folder in VFS.
-      folder.parentId = newParentId;
 
       // Now move the folders in the LFS.
       await this._moveFolderRecursively(id, newParentId, newName);
+
+      // After moving everything, delete the folder itself on the LFS.
+      const parentFolderHandle = await this.getFolderHandle(
+        folder.parentId
+          ? VFS.getAbsoluteFolderPath(folder.parentId)
+          : 'root'
+      );
+      await parentFolderHandle.handle.removeEntry(folder.name, { recursive: true });
+
+      // Move the folder in VFS.
+      folder.parentId = newParentId;
+
+      // Re-import from the root to update the keys inside the indexeddb.
+      const rootFolderHandle = await this.getFolderHandle('root');
+      await this._importFolderToVFS(rootFolderHandle.handle);
     } finally {
       this.busy = false;
     }
@@ -576,12 +586,25 @@ class LocalFileSystem {
    * @returns {Promise<void>}
    */
   async _moveFolderRecursively(folderId, parentFolderId, newName) {
-    const folderHandle = await this.getFolderHandle(folderId);
-    const parentFolderHandle = await this.getFolderHandle(parentFolderId || 'root');
+    const folderKey = VFS.getAbsoluteFolderPath(folderId);
+    console.log('folderKey', folderKey, folderId)
+    console.log('parentFolderId', parentFolderId);
+    const folderHandle = await this.getFolderHandle(folderKey);
+    const parentFolderHandle = await this.getFolderHandle(
+      parentFolderId
+        ? VFS.getAbsoluteFolderPath(parentFolderId)
+        : 'root'
+    );
+
+    console.log('parent folder', parentFolderHandle.handle.name);
+    console.log('new name:', newName, folderHandle.handle.name);
 
     // Create the current folder in the new parent folder.
-    const newCurrentFolderHandle = await parentFolderHandle.getDirectoryHandle(newName || folderHandle.name, { create: true });
-    await this.saveFolderHandle(newCurrentFolderHandle, folderId);
+    const newCurrentFolderHandle = await parentFolderHandle.handle.getDirectoryHandle(
+      newName || folderHandle.handle.name,
+      { create: true }
+    );
+    await this.saveFolderHandle(folderKey, folderId, newCurrentFolderHandle);
 
     // Create the subfolders and files in the new folder.
     await Promise.all(
@@ -590,25 +613,24 @@ class LocalFileSystem {
       )
     )
 
+    console.log('files', VFS.findFilesWhere({ parentId: folderId }).length)
     await Promise.all(
-      VFS.findFilesWhere({ parentId: folderId })
-        .map(async (subfile) => {
-          const currentFileHandle = await this.getFileHandle(subfile.id);
-          await currentFileHandle.remove();
+      VFS.findFilesWhere({ parentId: folderId }).map(async (subfile) => {
+        const subfileKey = VFS.getAbsoluteFilePath(subfile.id);
+        const currentFileHandle = await this.getFileHandle(subfileKey);
+        await currentFileHandle.handle.remove();
 
-          const newFileHandle = await newCurrentFolderHandle.getFileHandle(subfile.name, { create: true });
+        const newFileHandle = await newCurrentFolderHandle.getFileHandle(subfile.name, { create: true });
 
-          if (subfile.content) {
-            const writable = await newFileHandle.createWritable();
-            await writable.write(subfile.content);
-            await writable.close();
-          }
+        if (subfile.content) {
+          const writable = await newFileHandle.handle.createWritable();
+          await writable.write(subfile.content);
+          await writable.close();
+        }
 
-          await this.saveFileHandle(newFileHandle, subfile.id);
-        })
+        await this.saveFileHandle(subfileKey, subfile.id, newFileHandle);
+      })
     )
-
-    await folderHandle.remove();
   }
 }
 

@@ -315,7 +315,7 @@ class VirtualFileSystem {
    * @param {boolean} [userInvoked] - Whether to user invoked the action.
    * @returns {object} The updated file object.
    */
-  updateFile = (id, obj, userInvoked = true) => {
+  updateFile = async (id, obj, userInvoked = true) => {
     const file = this.findFileById(id);
     const oldPath = this.getAbsoluteFilePath(file.id);
 
@@ -326,6 +326,17 @@ class VirtualFileSystem {
     const isContentChanged = typeof obj.content === 'string' && file.content !== obj.content;
 
     if (file) {
+      // Move the file to the new location before updating the file object,
+      // because the LFS.moveFile needs to use the absolute paths from VFS.
+      if (isRenamed || isMoved) {
+        await this._lfs(
+          'moveFile',
+          file.id,
+          obj.name || file.name,
+          typeof obj.parentId !== 'undefined' ? obj.parentId : file.parentId,
+        );
+      }
+
       for (const [key, value] of Object.entries(obj)) {
         if (file.hasOwnProperty(key) && key !== 'id') {
           file[key] = value;
@@ -339,7 +350,6 @@ class VirtualFileSystem {
       if (isRenamed || isMoved) {
         // Move the file to the new location.
         this._git('mv', oldPath, newPath);
-        this._lfs('moveFile', file.id, file.name, file.parentId);
       }
 
 
@@ -367,7 +377,7 @@ class VirtualFileSystem {
    * @param {object} obj - Key-value pairs to update in the folder object.
    * @returns {object} The updated folder object.
    */
-  updateFolder = (id, obj) => {
+   updateFolder = async (id, obj) => {
     const folder = this.findFolderById(id);
     const oldPath = this.getAbsoluteFolderPath(folder.id);
 
@@ -377,6 +387,17 @@ class VirtualFileSystem {
     const isMoved = typeof obj.parentId !== 'undefined' && folder.parentId !== obj.parentId;
 
     if (folder) {
+      // Move the folder to the new location before updating the folder object,
+      // because the LFS.moveFolder needs to use the absolute paths from VFS.
+      if (isRenamed || isMoved) {
+        await this._lfs(
+          'moveFolder',
+          folder.id,
+          obj.name || folder.name,
+          typeof obj.parentId !== 'undefined' ? obj.parentId : folder.parentId,
+        );
+      }
+
       for (const [key, value] of Object.entries(obj)) {
         if (folder.hasOwnProperty(key) && key !== 'id') {
           folder[key] = value;
@@ -391,7 +412,6 @@ class VirtualFileSystem {
       // just need to move the file to the new location.
       if (isRenamed || isMoved) {
         this._git('mv', oldPath, newPath);
-        this._lfs('moveFolder', folder.id, folder.name, folder.parentId);
       }
 
       this.saveState();
