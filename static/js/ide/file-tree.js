@@ -355,39 +355,10 @@ function createFileTree() {
     // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtDnd
     dnd5: {
       autoExpandMS: 400,
-      dragStart: (node, data) => {
-        // Set custom drag image.
-        data.dataTransfer.setDragImage($(`<div class="custom-drag-helper">${node.title}</div>`).appendTo("body")[0], -10, -10);
-        data.useDefaultImage = false;
-
-        // Return true to enable dnd.
-        return true;
-      },
-      // dragEnter: () => true,
-      dragEnter: (node, data) => {
-        // Add a visual drag area indicator.
-
-        $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
-
-        if ((node.parent.title === 'root' && node.data.isFile) || node.title === 'root') {
-          $('#file-tree').addClass(DROP_AREA_INDICATOR_CLASS);
-        }
-        else if (node.data.isFile) {
-          $(node.parent.li).addClass(DROP_AREA_INDICATOR_CLASS);
-        }
-        else if (node.data.isFolder) {
-          $(node.li).addClass(DROP_AREA_INDICATOR_CLASS);
-        }
-
-        return true;
-      },
-      dragDrop: dndStopCallback,
-      dragEnd: () => {
-        // Remove the visual drag area indicator.
-        $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
-
-        sortFileTree()
-      },
+      dragStart: dragStartCallback,
+      dragEnter: dragEnterCallback,
+      dragDrop: dragStopCallback,
+      dragEnd: dragEndCallback,
     },
 
     // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtEdit
@@ -454,15 +425,15 @@ function beforeCloseEditNodeCallback(event, data) {
 
   if (errorMsg) {
     // Delete previous tooltip.
-    const titleElement = data.node.span;
-    if (window._renameNodeTippy) {
+    if (isObject(window._renameNodeTippy)) {
       window._renameNodeTippy.destroy();
       window._renameNodeTippy = null;
     }
 
     // Create new tooltip.
-    window._renameNodeTippy = tippy(titleElement, {
+    window._renameNodeTippy = tippy(data.node.span, {
       content: errorMsg,
+      animation: false,
       showOnCreate: true,
       placement: 'right',
       theme: 'error',
@@ -490,7 +461,7 @@ function beforeCloseEditNodeCallback(event, data) {
   }
 
   // Destroy the leftover tooltip if it exists.
-  if (window._renameNodeTippy) {
+  if (isObject(window._renameNodeTippy)) {
     window._renameNodeTippy.destroy();
     window._renameNodeTippy = null;
   }
@@ -536,12 +507,105 @@ function onClickNodeCallback(event, data) {
 }
 
 /**
+ * Callback when the user drags a node over another node in the file tree.
+ *
+ * @returns {boolean} True if the user is allowed to drag onto the node.
+ */
+function dragEnterCallback(targetNode, data) {
+  // Add a visual drag area indicator.
+
+  $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
+
+  if ((targetNode.parent.title === 'root' && targetNode.data.isFile) || targetNode.title === 'root') {
+    $('#file-tree').addClass(DROP_AREA_INDICATOR_CLASS);
+  }
+  else if (targetNode.data.isFile) {
+    $(targetNode.parent.li).addClass(DROP_AREA_INDICATOR_CLASS);
+  }
+  else if (targetNode.data.isFolder) {
+    $(targetNode.li).addClass(DROP_AREA_INDICATOR_CLASS);
+  }
+
+  // Check if there exists already a file with the same name on the
+  // target folder. If so, prevent dropping.
+  const sourceNode = data.otherNode;
+  const containsDuplicate = (
+    (
+      targetNode.data.isFile &&
+      VFS.existsWhere({
+        parentId: targetNode.parent.title === 'root' ? null : targetNode.parent.key,
+        name: sourceNode.title
+      }, true)
+    )
+      ||
+    (
+      targetNode.data.isFolder &&
+      VFS.existsWhere({
+        parentId: targetNode.key,
+        name: sourceNode.title
+      }, true)
+    )
+  );
+
+  if (isObject(window._dndDuplicateTippy)) {
+    window._dndDuplicateTippy.destroy();
+    window._dndDuplicateTippy = null;
+  }
+
+  if (containsDuplicate) {
+    // Create new tooltip.
+    const tooltipElement = targetNode.parent.title === 'root'
+      ? $('.file-tree-container .title')[0]
+      : (targetNode.data.isFile ? targetNode.parent.span : targetNode.span);
+
+    window._dndDuplicateTippy = tippy(tooltipElement, {
+      content: `There already exists a "${sourceNode.title}" file or folder`,
+      animation: false,
+      showOnCreate: true,
+      placement: 'right',
+      theme: 'error',
+    });
+
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Callback when the user starts dragging a node in the file tree.
+ */
+function dragStartCallback(node, data) {
+  // Set custom drag image.
+  data.dataTransfer.setDragImage($(`<div class="custom-drag-helper">${node.title}</div>`).appendTo("body")[0], -10, -10);
+  data.useDefaultImage = false;
+
+  // Return true to enable dnd.
+  return true;
+}
+
+/**
+ * Callback when the user stops dragging a node in the file tree.
+ */
+function dragEndCallback() {
+  // Remove the visual drag area indicator.
+  $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
+
+  if (isObject(window._dndDuplicateTippy)) {
+    window._dndDuplicateTippy.destroy();
+    window._dndDuplicateTippy = null;
+  }
+
+  sortFileTree()
+}
+
+/**
  * Callback when the user stops dragging and dropping a node in the file tree.
  *
  * @param {FancytreeNode} targetNode - The node where the other node was dropped
  * @param {object} data - The data object containing the source node.
  */
-function dndStopCallback(targetNode, data) {
+function dragStopCallback(targetNode, data) {
   const sourceNode = data.otherNode;
 
   // If the dropped node became a root node, unset parentId.

@@ -231,6 +231,10 @@
   left: 5px;
 }
 
+.fancytree-drop-reject {
+  color: red;
+}
+
 /* The item that is dragged under the cursor */
 .custom-drag-helper {
   display: inline-block;
