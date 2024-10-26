@@ -129,8 +129,11 @@ function saveFile() {
 
   // If the file exists in the vfs, then return, because the contents will be
   // auto-saved already in another part of the codebase.
-  if (tab.container.getState().fileId) {
-    const file = VFS.findFileById(tab.container.getState().fileId);
+  console.log(tab.container.getState());
+  const existingFileId = tab.container.getState().fileId;
+  if (existingFileId) {
+    const file = VFS.findFileById(existingFileId);
+    console.log('file', file);
     if (file) return;
   }
 
@@ -178,6 +181,7 @@ function saveFile() {
 
     hideModal($modal);
   });
+
   $modal.find('.primary-btn').click(() => {
     const filename = $modal.find('.text-input').val();
 
@@ -194,7 +198,7 @@ function saveFile() {
     }
 
     if (errorMsg) {
-      if (window._saveFileTippy) {
+      if (isObject(window._saveFileTippy)) {
         window._saveFileTippy.destroy();
         window._saveFileTippy = null;
       }
@@ -202,6 +206,7 @@ function saveFile() {
       // Create new tooltip.
       window._saveFileTippy = tippy($modal.find('input').parent()[0], {
         content: errorMsg,
+        animation: false,
         showOnCreate: true,
         placement: 'top',
         theme: 'error',
@@ -212,12 +217,19 @@ function saveFile() {
       return;
     }
 
-    // Create a new file in the file-tree, which automatically creates the
-    // file for us in the vfs.
-    const nodeId = $('#file-tree').jstree('create_node', folderId, {
-      text: filename,
-      type: 'file',
+    // Remove the tooltip if it exists.
+    if (isObject(window._saveFileTippy)) {
+      window._saveFileTippy.destroy();
+      window._saveFileTippy = null;
+    }
+
+    // Create a new file in the VFS and then refresh the file tree.
+    const { id: nodeId } = VFS.createFile({
+      parentId: folderId,
+      name: filename,
+      content: tab.instance.editor.getValue(),
     });
+    createFileTree();
 
     // Change the Untitled tab to the new filename.
     tab.container.setTitle(filename);

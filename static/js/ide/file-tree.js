@@ -32,7 +32,7 @@ function createNewFileTreeFile(parentId = null) {
 
   // Create a new unique filename.
   let filename = 'Untitled';
-  while (VFS.existsWhere({ parentId, name: filename }, true)) {
+  while (VFS.existsWhere({ parentId, name: filename })) {
     filename = incrementString(filename)
   }
 
@@ -52,7 +52,6 @@ function createNewFileTreeFile(parentId = null) {
 
   if (hasGitFSWorker()) {
     newChildProps.extraClasses = 'git-added';
-    // $tree.jstree('get_node', data.node).li_attr.class = 'git-added';
   }
 
   // Append to the parent node if it exists, otherwise append to the root.
@@ -81,7 +80,7 @@ function createNewFileTreeFolder(parentId = null) {
 
   // Create a new unique foldername.
   let foldername = 'Untitled';
-  while (VFS.existsWhere({ parentId, name: foldername }, true)) {
+  while (VFS.existsWhere({ parentId, name: foldername })) {
     foldername = incrementString(foldername)
   }
 
@@ -120,10 +119,10 @@ function createNewFileTreeFolder(parentId = null) {
 }
 
 /**
- * Create a file tree list from the VFS compatible with jsTree.
+ * Create a file tree list from the VFS compatible with FancyTree.
  *
  * @param {string} [parentId] - The parent folder id.
- * @returns {array} jsTree list with file tree objects.
+ * @returns {array} List with file tree objects.
  */
 function createFileTreeFromVFS(parentId = null) {
   const folders = VFS.findFoldersWhere({ parentId }).map((folder) => ({
@@ -334,6 +333,7 @@ function createFileTree() {
   // Otherwise, instantiate a new tree.
   window._fileTree = $("#file-tree").fancytree({
     selectMode: 1,
+    debugLevel: 0,
     source: createFileTreeFromVFS(),
     click: onClickNodeCallback,
     init: () => sortFileTree(),
@@ -535,7 +535,7 @@ function dragEnterCallback(targetNode, data) {
       VFS.existsWhere({
         parentId: targetNode.parent.title === 'root' ? null : targetNode.parent.key,
         name: sourceNode.title
-      }, true)
+      }, sourceNode.key)
     )
       ||
     (
@@ -543,7 +543,7 @@ function dragEnterCallback(targetNode, data) {
       VFS.existsWhere({
         parentId: targetNode.key,
         name: sourceNode.title
-      }, true)
+      }, sourceNode.key)
     )
   );
 

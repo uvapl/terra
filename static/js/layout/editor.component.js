@@ -180,7 +180,7 @@ class EditorComponent {
           this.editor.getValue(),
         );
 
-        const node = $('#file-tree').jstree('get_node', fileId);
+        const node = getFileTreeInstance().getNodeByKey(fileId);
         addGitDiffIndicator(node);
       }, seconds(2));
     }
@@ -230,7 +230,7 @@ class EditorComponent {
           this.editor.setReadOnly(true);
           this.editor.clearSelection();
           this.editor.blur();
-        } else if (hasLFS() && !file.content) {
+        } else if (hasLFS() && LFS.loaded && !file.content) {
           // Load the file content from LFS.
           LFS.getFileContent(file.id).then((content) => {
             this.editor.setValue(content);

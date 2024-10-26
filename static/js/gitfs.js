@@ -148,15 +148,23 @@ class GitFS {
 
       case 'pushed':
         // Clear the git color indicators.
-        const $tree = $('#file-tree');
+        const tree = getFileTreeInstance();
         $('#file-tree .git-added, #file-tree .git-modified').each((index, element) => {
-          $tree.jstree('get_node', element.id).li_attr.class = '';
-          $tree.jstree('redraw_node', element.id);
+          const node = tree.getNodeByKey(element.id);
+          if (node) {
+            const classes = node.extraClasses ? node.extraClasses.split(' ') : [];
+            node.extraClasses = classes.filter((c) => !c.startsWith('git-')).join(' ');
+            node.render();
+          }
         });
         break;
 
+    case 'clone-success':
+      $('#file-tree .info-msg').remove();
+      break;
+
       case 'clone-fail':
-        $('#file-tree').html('<div class="info-msg error">Failed to clone repository</div>');
+        $('#file-tree').html('<div class="info-msg error">Failed to clone repository</div>');V
         break;
     }
   }
@@ -194,6 +202,13 @@ function createGitFSWorker() {
     const gitFS = new GitFS(repoLink);
     window._gitFS = gitFS;
     gitFS._createWorker(username, accessToken);
-    $('#file-tree').jstree('destroy').html('<div class="info-msg">Cloning repository...</div>');
+
+    const tree = getFileTreeInstance();
+    if (tree) {
+      $('#file-tree').fancytree('destroy');
+      window._fileTree = null;
+    }
+    console.log('Creating gitfs worker')
+    $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
   }
 }

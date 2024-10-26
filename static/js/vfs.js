@@ -140,12 +140,19 @@ class VirtualFileSystem {
    * @example existsWhere({ name: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
+   * @param {string|array} [ignoreIds] - List of ids to ignore.
    * @param {boolean} [ignoreCase] - Whether to search case-insensitive.
    * @returns {boolean} True if a folder or file exists with the given
    * conditions, false otherwise.
    */
-  existsWhere = (conditions, ignoreCase = false) => {
-    return this.findWhere(conditions, ignoreCase).length > 0;
+  existsWhere = (conditions, ignoreIds = [], ignoreCase = true) => {
+    if (!Array.isArray(ignoreIds)) {
+      ignoreIds = [ignoreIds];
+    }
+
+    return this.findWhere(conditions, ignoreCase)
+      .filter((f) => !ignoreIds.includes(f.id))
+      .length > 0;
   }
 
   /**
