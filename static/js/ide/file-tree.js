@@ -563,7 +563,6 @@ function dndStopCallback(targetNode, data) {
   // Move the node in the tree, but when files or files are dropped onto other
   // files, prevent a new folder being created and just insert the source file
   // as a sibling next to the target file.
-  console.log(targetNode.data.isFile, sourceNode.data.isFile)
   if (data.hitMode === 'over' && targetNode.data.isFile) {
     sourceNode.moveTo(targetNode, 'before');
   } else {
