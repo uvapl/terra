@@ -245,96 +245,83 @@ function closeFilesInFolderRecursively(folderId) {
 }
 
 /**
- * Create a contextmenu for the file tree. The contextmenu items created once
- * and are made visible throught the `visible` property.
+ * Create a contextmenu for the file tree. The contextmenu items created
+ * dynamically when the user right-clicks on a file or folder in the file tree.
  *
  * @see https://swisnl.github.io/jQuery-contextMenu/docs/items.html
  *
  * @returns {object} The contextmenu object.
  */
-function createFileTreeContextMenuItems() {
-  const isType = (type) => (key, opt) => {
-    const node = $.ui.fancytree.getNode(opt.$trigger[0]);
-    return node.data.type === type;
-  };
+function createFileTreeContextMenuItems($trigger, event) {
+  const menu = {};
+  const node = $.ui.fancytree.getNode($trigger[0]);
 
-  const isFolder = isType('folder');
-  const isFile = isType('file');
-  const getNode = (opt) => $.ui.fancytree.getNode(opt.$trigger[0]);
-
-  const folderMenuItems = {
-    createFile: {
+  if (node.data.isFolder) {
+    menu.createFile = {
       name: 'New File',
-      visible: isFolder,
-      callback: (itemKey, opt, event) => {
+      callback: () => {
         window._userClickedContextMenuItem = true;
-        createNewFileTreeFile(getNode(opt).key);
+        createNewFileTreeFile(node.key);
       },
-    },
+    };
 
-    createFolder: {
+    menu.createFolder = {
       name: 'New Folder',
-      visible: isFolder,
-      callback: (itemKey, opt, event) => {
+      callback: () => {
         window._userClickedContextMenuItem = true;
-        createNewFileTreeFolder(getNode(opt).key);
+        createNewFileTreeFolder(node.key);
       },
-    },
+    };
 
-    downloadFolder: {
+    menu.downloadFolder = {
       name: 'Download',
-      visible: isFolder,
-      callback: (itemKey, opt, event) => {
+      callback: () => {
         window._userClickedContextMenuItem = true;
-        VFS.downloadFolder(getNode(opt).key);
+        VFS.downloadFolder(node.key);
         window._userModifyingFileTree = false;
       },
-    },
-  };
+    };
+  }
 
-  const fileMenuItems = {
-    downloadFile: {
+  if (node.data.isFile) {
+    menu.downloadFile = {
       name: 'Download',
-      visible: isFile,
-      callback: (itemKey, opt, event) => {
+      callback: () => {
         window._userClickedContextMenuItem = true;
-        VFS.downloadFile(getNode(opt).key);
+        VFS.downloadFile(node.key);
         window._userModifyingFileTree = false;
       },
-    },
-    run: {
-      name: 'Run',
-      visible: (key, opt) => {
-        const node = getNode(opt);
-        return isFile(key, opt) && hasWorker(getFileExtension(node.title));
-      },
-      callback: (itemKey, opt, event) => {
-        window._userClickedContextMenuItem = true;
-        runCode(getNode(opt).key);
-        window._userModifyingFileTree = false;
-      }
+    };
+
+    if (hasWorker(getFileExtension(node.title))) {
+      menu.run = {
+        name: 'Run',
+        callback: () => {
+          window._userClickedContextMenuItem = true;
+          runCode(node.key);
+          window._userModifyingFileTree = false;
+        }
+      };
     }
   }
 
-  return {
-    ...folderMenuItems,
-    ...fileMenuItems,
-    rename: {
-      name: 'Rename',
-      callback: (itemKey, opt, event) => {
-        window._userClickedContextMenuItem = true;
-        const node = getNode(opt);
-        node.editStart();
-      },
-    },
-    remove: {
-      name: 'Delete',
-      callback: (itemKey, opt, event) => {
-        window._userClickedContextMenuItem = true;
-        deleteFileTreeItem(getNode(opt));
-      }
+  menu.rename = {
+    name: 'Rename',
+    callback: () => {
+      window._userClickedContextMenuItem = true;
+      node.editStart();
     },
   };
+
+  menu.remove = {
+    name: 'Delete',
+    callback: () => {
+      window._userClickedContextMenuItem = true;
+      deleteFileTreeItem(node);
+    }
+  };
+
+  return { items: menu };
 }
 
 /**
@@ -422,7 +409,7 @@ function createFileTree() {
   $.contextMenu({
     zIndex: 10,
     selector: '#file-tree span.fancytree-title',
-    items: createFileTreeContextMenuItems(),
+    build: createFileTreeContextMenuItems,
     events: {
       show: () => {
         window._userModifyingFileTree = true;
