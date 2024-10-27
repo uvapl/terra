@@ -29,12 +29,6 @@ class LocalFileSystem {
     }
   }
 
-  terminate() {
-    this.loaded = false;
-    setLocalStorageItem('use-lfs', false);
-    clearTimeout(this._watchRootFolderInterval);
-  }
-
   async _init() {
     const lastTimeUsedLFS = getLocalStorageItem('use-lfs', false);
     if (!lastTimeUsedLFS) return;
@@ -54,6 +48,15 @@ class LocalFileSystem {
     await this._importFolderToVFS(rootFolderHandle.handle);
 
     this._watchRootFolder();
+  }
+
+  /**
+   * Disconnect the LFS from the current folder.
+   */
+  terminate() {
+    this.loaded = false;
+    setLocalStorageItem('use-lfs', false);
+    clearTimeout(this._watchRootFolderInterval);
   }
 
   /**
