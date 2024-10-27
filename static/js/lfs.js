@@ -76,7 +76,7 @@ class LocalFileSystem {
 
     this._watchRootFolderInterval = setInterval(async () => {
       // When the user is renaming or dragging, don't replace the tree.
-      if (window._userModifyingFileTree) {
+      if (window._userModifyingFileTree || window._userIsTyping) {
         return;
       }
 

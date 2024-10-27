@@ -157,6 +157,7 @@ class EditorComponent {
    * Callback when the editor content changes, triggered per keystroke.
    */
   onEditorChange = () => {
+    window._userIsTyping = true;
     window._editorIsDirty = true;
     this.container.extendState({ value: this.editor.getValue() });
 
@@ -164,7 +165,7 @@ class EditorComponent {
     if (fileId && !isIframe) {
       VFS.updateFile(fileId, {
         content: this.editor.getValue(),
-      }, false);
+      });
     }
 
     if (isIDE && hasGitFSWorker() && this.initialized) {
@@ -188,6 +189,14 @@ class EditorComponent {
     if (!this.initialized) {
       this.initialized = true;
     }
+
+    if (this.userIsTypingTimeoutId) {
+      clearTimeout(this.userIsTypingTimeoutId);
+    }
+
+    this.userIsTypingTimeoutId = setTimeout(() => {
+      window._userIsTyping = false;
+    }, seconds(2));
   }
 
   /**
@@ -240,6 +249,8 @@ class EditorComponent {
   }
 
   reloadFileContent = () => {
+    if (window._userIsTyping) return;
+
     const file = VFS.findFileById(this.container.getState().fileId);
     if (file) {
       if (hasLFS() && LFS.loaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {

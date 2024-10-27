@@ -76,7 +76,10 @@ class VirtualFileSystem {
     // loaded from the user's LFS, thus we don't want to save these.
     if (isIDE && hasLFS() && LFS.loaded) {
       Object.keys(files).forEach((fileId) => {
-        files[fileId].content = '';
+        files[fileId] = {
+          ...files[fileId],
+          content: '',
+        }
       });
     }
 
