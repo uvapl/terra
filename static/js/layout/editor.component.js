@@ -195,6 +195,7 @@ class EditorComponent {
    */
   onEditorFocus = () => {
     this.setActiveEditor();
+    this.reloadFileContent();
 
     // Spawn a new worker if necessary.
     createWorkerApi(this.proglang);
@@ -220,27 +221,9 @@ class EditorComponent {
       }
     }
 
-    if (isIDE && this.editor.getValue() === '') {
-      // Load file content from vfs.
-      const file = VFS.findFileById(this.container.getState().fileId);
-      if (file) {
-        if (hasLFS() && LFS.loaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
-          // Disable the editor if the file is too large.
-          this.editor.this.container.classList.add('exceeded-filesize');
-          this.editor.setReadOnly(true);
-          this.editor.clearSelection();
-          this.editor.blur();
-        } else if (hasLFS() && LFS.loaded && !file.content) {
-          // Load the file content from LFS.
-          LFS.getFileContent(file.id).then((content) => {
-            this.editor.setValue(content);
-            this.editor.clearSelection();
-          });
-        } else {
-          this.editor.setValue(file.content);
-          this.editor.clearSelection();
-        }
-      }
+    // Load file content from vfs.
+    if (isIDE) {
+      this.reloadFileContent();
     }
 
     // Add custom class for styling purposes.
@@ -253,6 +236,28 @@ class EditorComponent {
     // Spawn a new worker if necessary.
     if (this.ready) {
       createWorkerApi(this.proglang);
+    }
+  }
+
+  reloadFileContent = () => {
+    const file = VFS.findFileById(this.container.getState().fileId);
+    if (file) {
+      if (hasLFS() && LFS.loaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
+        // Disable the editor if the file is too large.
+        this.editor.this.container.classList.add('exceeded-filesize');
+        this.editor.setReadOnly(true);
+        this.editor.clearSelection();
+        this.editor.blur();
+      } else if (hasLFS() && !file.content) {
+        // Load the file content from LFS.
+        LFS.getFileContent(file.id).then((content) => {
+          this.editor.setValue(content);
+          this.editor.clearSelection();
+        });
+      } else if (file.content) {
+        this.editor.setValue(file.content);
+        this.editor.clearSelection();
+      }
     }
   }
 
@@ -305,23 +310,29 @@ class EditorComponent {
   }
 
   /**
-   * Callback when the container is destroyed.
+   * Callback before the container is destroyed.
    */
   onContainerDestroy = () => {
     // If it's the last tab being closed, then we insert another 'Untitled' tab,
     // because we always need at least one tab open.
-    if (getAllEditorTabs().length === 1) {
-      const currentTab = getActiveEditor();
-      if (currentTab) {
-        currentTab.parent.addChild({
-          type: 'component',
-          componentName: 'editor',
-          componentState: {
-            fontSize: BASE_FONT_SIZE,
-          },
-          title: 'Untitled',
-        });
-      }
+    const tabs = getAllEditorTabs();
+    const totalTabs = tabs.length;
+
+    if (totalTabs >= 2) {
+      // Switch to the first tab.
+      tabs[0].parent.setActiveContentItem(tabs[0]);
+      tabs[0].instance.editor.focus();
+    }
+    else if (totalTabs === 1) {
+      const currentTab = tabs[0];
+      currentTab.parent.addChild({
+        type: 'component',
+        componentName: 'editor',
+        componentState: {
+          fontSize: BASE_FONT_SIZE,
+        },
+        title: 'Untitled',
+      });
     } else {
       this.setActiveEditor(null);
     }
@@ -451,5 +462,6 @@ class EditorComponent {
     this.container.on('resize', this.onContainerResize);
     this.container.on('afterFirstRender', this.onContainerAfterFirstRender);
     this.container.on('destroy', this.onContainerDestroy);
+    this.container.on('reloadContent', this.reloadFileContent);
   }
 }

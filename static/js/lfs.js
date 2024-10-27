@@ -82,11 +82,11 @@ class LocalFileSystem {
 
       // Iterate through all nodes in the tree and obtain all expanded folder
       // nodes their absolute path.
-      const expandedFolderPaths = [];
+      const prevExpandedFolderPaths = [];
 
       getFileTreeInstance().visit((node) => {
         if (node.data.isFolder && node.expanded) {
-          expandedFolderPaths.push(VFS.getAbsoluteFolderPath(node.key));
+          prevExpandedFolderPaths.push(VFS.getAbsoluteFolderPath(node.key));
         }
       });
 
@@ -96,7 +96,7 @@ class LocalFileSystem {
 
       // Expand all folder nodes again that were open (if they still exist).
       getFileTreeInstance().visit((node) => {
-        if (node.data.isFolder && expandedFolderPaths.includes(VFS.getAbsoluteFolderPath(node.key))) {
+        if (node.data.isFolder && prevExpandedFolderPaths.includes(VFS.getAbsoluteFolderPath(node.key))) {
           node.setExpanded(true, { noAnimation: true });
         }
       });
@@ -166,6 +166,15 @@ class LocalFileSystem {
    * @returns {Promise<void>}
    */
   async _importFolderToVFS(rootFolderHandle) {
+    const tabs = getAllEditorTabs();
+    const prevOpenTabs = tabs.map((tab) => {
+      const fileId = tab.container.getState().fileId;
+      return {
+        path: VFS.getAbsoluteFilePath(fileId),
+        tab: tabs.find((tab) => tab.container.getState().fileId === fileId),
+      };
+    });
+
     VFS.clear();
     await this._clearStores();
 
@@ -179,6 +188,15 @@ class LocalFileSystem {
 
     // Recreate the file tree.
     createFileTree();
+
+    // Sync the new imported VFS IDs with the currently open tabs.
+    prevOpenTabs.forEach(({ path, tab }) => {
+      const file = VFS.findFileByPath(path);
+      if (file) {
+        tab.container.setState({ fileId: file.id });
+      }
+    });
+    window._layout.emitToAllComponents('reloadContent');
 
     this.loaded = true;
     setLocalStorageItem('use-lfs', true);

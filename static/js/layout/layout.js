@@ -29,11 +29,7 @@ class Layout extends GoldenLayout {
       this.buttonConfig = options.buttonConfig;
     }
 
-    this.on('stateChanged', () => {
-      const config = this.toConfig();
-      const state = JSON.stringify(config);
-      setLocalStorageItem('layout', state);
-    });
+    this.on('stateChanged', () => this.onStateChanged());
 
     this.on('stackCreated', (stack) => {
       if (!this.initialised) {
@@ -96,6 +92,12 @@ class Layout extends GoldenLayout {
     window._layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data);
     });
+  }
+
+  onStateChanged = () => {
+    const config = this.toConfig();
+    const state = JSON.stringify(config);
+    setLocalStorageItem('layout', state);
   }
 
   setTheme = (theme) => {

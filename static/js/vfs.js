@@ -69,8 +69,19 @@ class VirtualFileSystem {
    * Save the virtual filesystem state to localstorage.
    */
   saveState = () => {
+    let files = this.files;
+
+    // Remove the content from all files when LFS is used, because the LFS uses
+    // lazy loading. Furthermore, we never know how large files will be when
+    // loaded from the user's LFS, thus we don't want to save these.
+    if (isIDE && hasLFS() && LFS.loaded) {
+      Object.keys(files).forEach((fileId) => {
+        files[fileId].content = '';
+      });
+    }
+
     setLocalStorageItem('vfs', JSON.stringify({
-      files: this.files,
+      files,
       folders: this.folders,
     }));
   }

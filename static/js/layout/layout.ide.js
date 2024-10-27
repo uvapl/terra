@@ -30,5 +30,33 @@ class LayoutIDE extends Layout {
     });
 
     this.addControlsEventListeners();
+  };
+
+  onStateChanged = () => {
+    let config = this.toConfig();
+
+    // Exclude the content from all editors for the IDE when LFS is enabled,
+    // because for LFS we use lazy loading, i.e. only load the content when
+    // opening the file.
+    if (hasLFS() && LFS.loaded) {
+      config = this._removeEditorValue(config);
+    }
+
+
+    const state = JSON.stringify(config);
+    setLocalStorageItem('layout', state);
+  }
+
+  _removeEditorValue = (config) => {
+    if (config.content) {
+      config.content.forEach((item) => {
+        if (item.type === 'component') {
+          item.componentState.value = '';
+        } else {
+          this._removeEditorValue(item);
+        }
+      });
+    }
+    return config;
   }
 }
