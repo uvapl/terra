@@ -448,10 +448,9 @@ function beforeCloseEditNodeCallback(event, data) {
 
   // Check if the name already exists in the parent folder.
   // If so, trigger edit mode again and show error tooltip.
-  const nameConflicts = VFS.findWhere({ parentId, name }, true);
   if (!isValidFilename(name)) {
     errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
-  } else if (nameConflicts.length > 0 && nameConflicts[0].id !== data.node.key) {
+  } else if (VFS.existsWhere({ parentId, name }, { ignoreIds: data.node.key })) {
     errorMsg = `There already exists a "${name}" file or folder`;
   }
 
@@ -566,7 +565,7 @@ function dragEnterCallback(targetNode, data) {
       VFS.existsWhere({
         parentId: targetNode.parent.title === 'root' ? null : targetNode.parent.key,
         name: sourceNode.title
-      }, sourceNode.key)
+      }, { ignoreIds: sourceNode.key })
     )
       ||
     (
@@ -574,7 +573,7 @@ function dragEnterCallback(targetNode, data) {
       VFS.existsWhere({
         parentId: targetNode.key,
         name: sourceNode.title
-      }, sourceNode.key)
+      }, { ignoreIds: sourceNode.key })
     )
   );
 

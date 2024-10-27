@@ -86,14 +86,6 @@ class VirtualFileSystem {
   getRootFiles = () => Object.values(this.files).filter((file) => !file.parentId)
 
   /**
-   * Internal helper function to filter an object based on conditions
-   *
-   * @param {object} conditions - The conditions to filter on.
-   */
-  _where = (conditions) => (f) =>
-    Object.entries(conditions).every(([k, v]) => f[k] === v)
-
-  /**
    * Internal helper function to filter an object based on conditions, ignoring
    * the case of the values.
    *
@@ -112,12 +104,10 @@ class VirtualFileSystem {
    * @example findFilesWhere({ name: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
-   * @param {boolean} [ignoreCase] - Whether to search case-insensitive.
    * @returns {array} List of file objects matching the conditions.
    */
-  findFilesWhere = (conditions, ignoreCase = false) => {
-    const filterFn = ignoreCase ? this._whereIgnoreCase : this._where;
-    return Object.values(this.files).filter(filterFn(conditions))
+  findFilesWhere = (conditions) => {
+    return Object.values(this.files).filter(this._whereIgnoreCase(conditions))
   }
   /**
    * Find a single file that match the given conditions.
@@ -125,12 +115,11 @@ class VirtualFileSystem {
    * @example findFileWhere({ name: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
-   * @param {boolean} [ignoreCase] - Whether to search case-insensitive.
    * @returns {object|null} The file object matching the conditions or null if
    * the file is not found.
    */
-  findFileWhere = (conditions, ignoreCase = false) => {
-    const files = this.findFilesWhere(conditions, ignoreCase);
+  findFileWhere = (conditions) => {
+    const files = this.findFilesWhere(conditions);
     return files.length > 0 ? files[0] : null;
   }
 
@@ -140,18 +129,18 @@ class VirtualFileSystem {
    * @example existsWhere({ name: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
-   * @param {string|array} [ignoreIds] - List of ids to ignore.
-   * @param {boolean} [ignoreCase] - Whether to search case-insensitive.
+   * @param {object} [options] - Additional options.
+   * @param {string|array} [options.ignoreIds] - List of ids to ignore.
    * @returns {boolean} True if a folder or file exists with the given
    * conditions, false otherwise.
    */
-  existsWhere = (conditions, ignoreIds = [], ignoreCase = true) => {
-    if (!Array.isArray(ignoreIds)) {
-      ignoreIds = [ignoreIds];
+  existsWhere = (conditions, options = {}) => {
+    if (!Array.isArray(options.ignoreIds)) {
+      options.ignoreIds = [options.ignoreIds];
     }
 
-    return this.findWhere(conditions, ignoreCase)
-      .filter((f) => !ignoreIds.includes(f.id))
+    return this.findWhere(conditions)
+      .filter((f) => !options.ignoreIds.includes(f.id))
       .length > 0;
   }
 
@@ -161,12 +150,10 @@ class VirtualFileSystem {
    * @example findFoldersWhere({ name: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
-   * @param {boolean} [ignoreCase] - Whether to search case-insensitive.
    * @returns {array} List of folder objects matching the conditions.
    */
-  findFoldersWhere = (conditions, ignoreCase = false) => {
-    const filterFn = ignoreCase ? this._whereIgnoreCase : this._where;
-    return Object.values(this.folders).filter(filterFn(conditions))
+  findFoldersWhere = (conditions) => {
+    return Object.values(this.folders).filter(this._whereIgnoreCase(conditions))
   }
 
   /**
@@ -175,12 +162,11 @@ class VirtualFileSystem {
    * @example findFolderWhere({ name: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
-   * @param {boolean} [ignoreCase] - Whether to search case-insensitive.
    * @returns {object|null} The folder object matching the conditions or null if
    * the folder is not found.
    */
-  findFolderWhere = (conditions, ignoreCase) => {
-    const folders = this.findFoldersWhere(conditions, ignoreCase);
+  findFolderWhere = (conditions) => {
+    const folders = this.findFoldersWhere(conditions);
     return folders.length > 0 ? folders[0] : null;
   }
 
@@ -191,12 +177,11 @@ class VirtualFileSystem {
    * @example findWhere({ name: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
-   * @param {boolean} [ignoreCase] - Whether to search case-insensitive.
    * @returns {array} List of objects matching the conditions.
    */
-  findWhere = (conditions, ignoreCase = false) => {
-    const files = this.findFilesWhere(conditions, ignoreCase);
-    const folders = this.findFoldersWhere(conditions, ignoreCase);
+  findWhere = (conditions) => {
+    const files = this.findFilesWhere(conditions);
+    const folders = this.findFoldersWhere(conditions);
     return [...files, ...folders];
   }
 

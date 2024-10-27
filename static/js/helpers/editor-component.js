@@ -129,11 +129,9 @@ function saveFile() {
 
   // If the file exists in the vfs, then return, because the contents will be
   // auto-saved already in another part of the codebase.
-  console.log(tab.container.getState());
   const existingFileId = tab.container.getState().fileId;
   if (existingFileId) {
     const file = VFS.findFileById(existingFileId);
-    console.log('file', file);
     if (file) return;
   }
 
