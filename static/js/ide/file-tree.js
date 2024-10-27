@@ -188,7 +188,11 @@ function deleteFileTreeItem(node) {
 
   showModal($modal);
 
-  $modal.find('.cancel-btn').click(() => hideModal($modal));
+  $modal.find('.cancel-btn').click(() => {
+    window._userModifyingFileTree = false;
+    hideModal($modal);
+  });
+
   $modal.find('.confirm-btn').click(() => {
     if (node.data.isFile) {
       closeFileTab(node.key);
@@ -207,6 +211,7 @@ function deleteFileTreeItem(node) {
     node.remove();
 
     hideModal($modal);
+    window._userModifyingFileTree = false;
   });
 }
 
@@ -261,19 +266,29 @@ function createFileTreeContextMenuItems() {
     createFile: {
       name: 'New File',
       visible: isFolder,
-      callback: (itemKey, opt, event) => createNewFileTreeFile(getNode(opt).key),
+      callback: (itemKey, opt, event) => {
+        window._userClickedContextMenuItem = true;
+        createNewFileTreeFile(getNode(opt).key);
+      },
     },
 
     createFolder: {
       name: 'New Folder',
       visible: isFolder,
-      callback: (itemKey, opt, event) => createNewFileTreeFolder(getNode(opt).key),
+      callback: (itemKey, opt, event) => {
+        window._userClickedContextMenuItem = true;
+        createNewFileTreeFolder(getNode(opt).key);
+      },
     },
 
     downloadFolder: {
       name: 'Download',
       visible: isFolder,
-      callback: (itemKey, opt, event) => VFS.downloadFolder(getNode(opt).key),
+      callback: (itemKey, opt, event) => {
+        window._userClickedContextMenuItem = true;
+        VFS.downloadFolder(getNode(opt).key);
+        window._userModifyingFileTree = false;
+      },
     },
   };
 
@@ -281,7 +296,11 @@ function createFileTreeContextMenuItems() {
     downloadFile: {
       name: 'Download',
       visible: isFile,
-      callback: (itemKey, opt, event) => VFS.downloadFile(getNode(opt).key),
+      callback: (itemKey, opt, event) => {
+        window._userClickedContextMenuItem = true;
+        VFS.downloadFile(getNode(opt).key);
+        window._userModifyingFileTree = false;
+      },
     },
     run: {
       name: 'Run',
@@ -289,7 +308,11 @@ function createFileTreeContextMenuItems() {
         const node = getNode(opt);
         return isFile(key, opt) && hasWorker(getFileExtension(node.title));
       },
-      callback: (itemKey, opt, event) => runCode(getNode(opt).key)
+      callback: (itemKey, opt, event) => {
+        window._userClickedContextMenuItem = true;
+        runCode(getNode(opt).key);
+        window._userModifyingFileTree = false;
+      }
     }
   }
 
@@ -299,13 +322,17 @@ function createFileTreeContextMenuItems() {
     rename: {
       name: 'Rename',
       callback: (itemKey, opt, event) => {
+        window._userClickedContextMenuItem = true;
         const node = getNode(opt);
         node.editStart();
       },
     },
     remove: {
       name: 'Delete',
-      callback: (itemKey, opt, event) => deleteFileTreeItem(getNode(opt)),
+      callback: (itemKey, opt, event) => {
+        window._userClickedContextMenuItem = true;
+        deleteFileTreeItem(getNode(opt));
+      }
     },
   };
 }
@@ -394,8 +421,18 @@ function createFileTree() {
   // @see http://swisnl.github.io/jQuery-contextMenu/docs.html
   $.contextMenu({
     zIndex: 10,
-    selector: "#file-tree span.fancytree-title",
+    selector: '#file-tree span.fancytree-title',
     items: createFileTreeContextMenuItems(),
+    events: {
+      show: () => {
+        window._userModifyingFileTree = true;
+      },
+      hide: () => {
+        if (!window._userClickedContextMenuItem) {
+          window._userModifyingFileTree = false;
+        }
+      }
+    }
   });
 }
 
