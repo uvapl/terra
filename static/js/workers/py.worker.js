@@ -241,7 +241,11 @@ class API extends BaseAPI {
         this.hostWrite(result);
       }
     } catch (err) {
-      return this.formatErrorMsg(err.message, activeTabName);
+      // When the error starts with Traceback, the error is from the code that
+      // was executed. Otherwise, it's an internal error within the codebase.
+      if (err.message.startsWith('Traceback')) {
+        return this.formatErrorMsg(err.message, activeTabName);
+      }
     } finally {
       // Clear the globals after the code has run such that the next execution
       // will be called with a clean state.
