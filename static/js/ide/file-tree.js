@@ -387,7 +387,7 @@ function createFileTree() {
       triggerStart: ['dblclick'],
       edit: onStartEditNodeCallback,
       beforeClose: beforeCloseEditNodeCallback,
-      close: () => sortFileTree(),
+      close: afterCloseEditNodeCallback,
     },
   });
 
@@ -422,6 +422,17 @@ function addGitDiffIndicator(node) {
   }
 }
 
+/**
+ * Callback after the inline editor was removed.
+ */
+function afterCloseEditNodeCallback() {
+  sortFileTree(),
+  window._userModifyingFileTree = false;
+}
+
+/**
+ * Callback before the user closes the edit mode of a node in the file tree.
+ */
 function beforeCloseEditNodeCallback(event, data) {
   // Check if user pressed cancel or text is unchanged.
   if (!data.save) return;
@@ -494,6 +505,8 @@ function beforeCloseEditNodeCallback(event, data) {
  * Callback when the user starts editing a node in the file tree.
  */
 function onStartEditNodeCallback(event, data) {
+  window._userModifyingFileTree = true;
+
   if (window._fileTreeToggleTimeout) {
     clearTimeout(window._fileTreeToggleTimeout);
   }
@@ -503,9 +516,6 @@ function onStartEditNodeCallback(event, data) {
 
 /**
  * Callback when the user clicks on a node in the file tree.
- *
- * @param {[TODO:type]} event - [TODO:description]
- * @param {[TODO:type]} data - [TODO:description]
  */
 function onClickNodeCallback(event, data) {
   // Prevent default behavior for folders.
@@ -597,6 +607,8 @@ function dragEnterCallback(targetNode, data) {
  * Callback when the user starts dragging a node in the file tree.
  */
 function dragStartCallback(node, data) {
+  window._userModifyingFileTree = true;
+
   // Set custom drag image.
   data.dataTransfer.setDragImage($(`<div class="custom-drag-helper">${node.title}</div>`).appendTo("body")[0], -10, -10);
   data.useDefaultImage = false;
@@ -618,6 +630,7 @@ function dragEndCallback() {
   }
 
   sortFileTree()
+  window._userModifyingFileTree = false;
 }
 
 /**

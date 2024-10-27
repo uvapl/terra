@@ -52,13 +52,50 @@ class LocalFileSystem {
 
     await this._importFolderToVFS(rootFolderHandle.handle);
 
-    // this._watchRootFolder();
+    this._watchRootFolder();
   }
 
+  /**
+   * Polling function to watch the root folder for changes. As long as Chrome's
+   * LocalFilesystemAPI does not have event listeners built-in, we have no other
+   * choice to poll the root folder for changes manually.
+   *
+   * Note that this does clear rebuild the VFS, indexedDB and visual tree every
+   * few seconds, which - besides it not being efficient - also creates new
+   * file/folder IDs every time. It's not a problem, but just something to be
+   * aware of.
+   */
   _watchRootFolder() {
-    setInterval(async () => {
+    if (this._watchRootFolderInterval) {
+      clearInterval(this._watchRootFolderInterval);
+    }
+
+    this._watchRootFolderInterval = setInterval(async () => {
+      // When the user is renaming or dragging, don't replace the tree.
+      if (window._userModifyingFileTree) {
+        return;
+      }
+
+      // Iterate through all nodes in the tree and obtain all expanded folder
+      // nodes their absolute path.
+      const expandedFolderPaths = [];
+
+      getFileTreeInstance().visit((node) => {
+        if (node.data.isFolder && node.expanded) {
+          expandedFolderPaths.push(VFS.getAbsoluteFolderPath(node.key));
+        }
+      });
+
+      // Import again from the VFS.
       const rootFolderHandle = await this.getFolderHandle('root');
       await this._importFolderToVFS(rootFolderHandle.handle);
+
+      // Expand all folder nodes again that were open (if they still exist).
+      getFileTreeInstance().visit((node) => {
+        if (node.data.isFolder && expandedFolderPaths.includes(VFS.getAbsoluteFolderPath(node.key))) {
+          node.setExpanded(true, { noAnimation: true });
+        }
+      });
     }, seconds(5));
   }
 
@@ -125,15 +162,19 @@ class LocalFileSystem {
    */
   async _importFolderToVFS(rootFolderHandle) {
     VFS.clear();
-    createFileTree(); // show empty file tree
     await this._clearStores();
 
     // Save rootFolderHandle under the 'root' key for reference.
     await this.saveFolderHandle('root', null, rootFolderHandle);
 
     setFileTreeTitle(rootFolderHandle.name);
+
+    // Read all contents and create the items in the VFS if they don't exist.
     await this._readFolder(rootFolderHandle, null);
+
+    // Recreate the file tree.
     createFileTree();
+
     this.loaded = true;
     setLocalStorageItem('use-lfs', true);
   }
