@@ -32,6 +32,7 @@ class LocalFileSystem {
   terminate() {
     this.loaded = false;
     setLocalStorageItem('use-lfs', false);
+    clearTimeout(this._watchRootFolderInterval);
   }
 
   async _init() {
@@ -150,6 +151,7 @@ class LocalFileSystem {
 
       closeAllFiles();
       await this._importFolderToVFS(rootFolderHandle);
+      this._watchRootFolder();
     }
   }
 
