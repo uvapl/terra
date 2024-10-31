@@ -16,7 +16,7 @@ initApp().then(({ layout }) => {
   });
 
 }).catch((err) => {
-  console.error('Failed to bootstrap examide iframe:', err);
+  console.error('Failed to bootstrap terra iframe:', err);
 });
 
 // ===========================================================================

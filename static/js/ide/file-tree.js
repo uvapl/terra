@@ -25,10 +25,10 @@ function incrementString(string) {
 /**
  * Create a new file element in the file tree and trigger edit mode.
  *
- * @param {jQuery.Object} [parentNode] - The parent node of the new file.
+ * @param {string|null} [parentId] - The parent folder id.
  */
-function createNewFileTreeFile(parentNode = null) {
-  const parentId = parentNode ? parentNode.id : null;
+function createNewFileTreeFile(parentId = null) {
+  if (hasLFS() && LFS.busy) return;
 
   // Create a new unique filename.
   let filename = 'Untitled';
@@ -36,20 +36,56 @@ function createNewFileTreeFile(parentNode = null) {
     filename = incrementString(filename)
   }
 
-  const nodeId = $('#file-tree').jstree('create_node', parentNode, {
-    text: filename,
-    type: 'file',
-  });
-  $('#file-tree').jstree(true).edit(nodeId);
+  // Create the new file in the filesystem.
+  const { id } = VFS.createFile({ name: filename, parentId });
+
+  // Create the new node in the file tree.
+  const newChildProps = {
+    title: filename,
+    folder: false,
+    key: id,
+    data: {
+      type: 'file',
+      isFile: true,
+    },
+  };
+
+  if (hasGitFSWorker()) {
+    newChildProps.extraClasses = 'git-added';
+  }
+
+  // Append to the parent node if it exists, otherwise append to the root.
+  const tree = getFileTreeInstance();
+  if (parentId) {
+    const parentNode = tree.getNodeByKey(parentId);
+    parentNode.setExpanded();
+
+    parentNode.addChildren(newChildProps);
+  } else {
+    tree.rootNode.addChildren(newChildProps);
+  }
+
+  sortFileTree();
+
+  const newNode = tree.getNodeByKey(id);
+
+  // Check again if the parent node is expanded, because the node might have
+  // been added to a closed folder. Only then we can trigger editStart().
+  if (parentId) {
+    tree.getNodeByKey(parentId).setExpanded();
+  }
+
+  // Trigger edit mode for the new node.
+  newNode.editStart();
 }
 
 /**
  * Create a new folder element in the file tree and trigger edit mode.
  *
- * @param {jQuery.Object} [parentNode] - The parent node of the new folder.
+ * @param {string|null} [parentId] - The parent id of the new folder.
  */
-function createNewFileTreeFolder(parentNode = null) {
-  const parentId = parentNode ? parentNode.id : null;
+function createNewFileTreeFolder(parentId = null) {
+  if (hasLFS() && LFS.busy) return;
 
   // Create a new unique foldername.
   let foldername = 'Untitled';
@@ -57,47 +93,89 @@ function createNewFileTreeFolder(parentNode = null) {
     foldername = incrementString(foldername)
   }
 
-  const nodeId = $('#file-tree').jstree('create_node', parentNode, {
-    text: foldername,
-    type: 'folder',
-  });
+  // Create the new folder in the filesystem.
+  const { id } = VFS.createFolder({ name: foldername, parentId });
 
-  $('#file-tree').jstree(true).edit(nodeId);
+  // Create the new node in the file tree.
+  const newChildProps = {
+    title: foldername,
+    folder: true,
+    key: id,
+    data: {
+      type: 'folder',
+      isFolder: true,
+    },
+  };
+
+  if (hasGitFSWorker()) {
+    newChildProps.extraClasses = 'git-added';
+  }
+
+  // Append to the parent node if it exists, otherwise append to the root.
+  const tree = getFileTreeInstance();
+  if (parentId) {
+    const parentNode = tree.getNodeByKey(parentId);
+    parentNode.setExpanded();
+
+    parentNode.addChildren(newChildProps);
+  } else {
+    tree.rootNode.addChildren(newChildProps);
+  }
+
+  sortFileTree();
+
+  // Trigger edit mode for the new node.
+  const newNode = tree.getNodeByKey(id);
+
+  // Check again if the parent node is expanded, because the node might have
+  // been added to a closed folder. Only then we can trigger editStart().
+  if (parentId) {
+    tree.getNodeByKey(parentId).setExpanded();
+  }
+
+  newNode.editStart();
 }
 
 /**
- * Create a file tree list from the VFS compatible with jsTree.
+ * Create a file tree list from the VFS compatible with FancyTree.
  *
  * @param {string} [parentId] - The parent folder id.
- * @returns {array} jsTree list with file tree objects.
+ * @returns {array} List with file tree objects.
  */
 function createFileTreeFromVFS(parentId = null) {
   const folders = VFS.findFoldersWhere({ parentId }).map((folder) => ({
-    id: folder.id,
-    text: folder.name,
-    type: 'folder',
+    key: folder.id,
+    title: folder.name,
+    folder: true,
+    data: {
+      type: 'folder',
+      isFolder: true,
+    },
     children: createFileTreeFromVFS(folder.id),
   }));
 
   const files = VFS.findFilesWhere({ parentId }).map((file) => ({
-    id: file.id,
-    text: file.name,
-    type: 'file',
+    key: file.id,
+    title: file.name,
+    folder: false,
+    data: {
+      type: 'file',
+      isFile: true,
+    },
   }));
 
   return folders.concat(files);
 }
-
 /**
  * Delete a file tree item from the VFS and the file tree. When the node is a
  * file and its corresponding tab is open, then it'll be closed.
  *
- * @param {jsTree.Node} node - The node to delete.
+ * @param {FancytreeNode} node - The node to delete.
  */
 function deleteFileTreeItem(node) {
   const $modal = createModal({
     title: 'Confirmation required',
-    body: `<p>Are you sure you want to delete the ${node.type} <strong>${node.text}</strong> permanently? This action can't be undone.</p>`,
+    body: `<p>You are about to delete the ${node.data.type} <strong>${node.title}</strong> permanently, are you sure? This action can't be undone.</p>`,
     footer: `
       <button type="button" class="button cancel-btn">Cancel</button>
       <button type="button" class="button confirm-btn danger-btn">I'm sure</button>
@@ -110,23 +188,35 @@ function deleteFileTreeItem(node) {
 
   showModal($modal);
 
-  $modal.find('.cancel-btn').click(() => hideModal($modal));
+  $modal.find('.cancel-btn').click(() => {
+    window._userModifyingFileTree = false;
+    hideModal($modal);
+  });
+
   $modal.find('.confirm-btn').click(() => {
-    if (node.type === 'file') {
-      closeFileTab(node.id);
-    } else if (node.type === 'folder') {
-      closeFilesInFolderRecursively(node.id);
+    if (node.data.isFile) {
+      closeFileTab(node.key);
+      VFS.deleteFile(node.key);
+    } else if (node.data.isFolder) {
+      closeFilesInFolderRecursively(node.key);
     }
 
-    // Delete from file-tree, including VFS.
-    $('#file-tree').jstree('delete_node', node);
+    // Delete from the VFS.
+    const fn = node.data.isFolder
+      ? VFS.deleteFolder
+      : VFS.deleteFile;
+    fn(node.key);
+
+    // Delete from the file tree.
+    node.remove();
 
     hideModal($modal);
+    window._userModifyingFileTree = false;
   });
 }
 
 /**
- * Close a single file tab by its fileId, including removing it from the vfs.
+ * Close a single file tab by its fileId.
  *
  * @param {string} fileId - The file ID to close.
  */
@@ -135,8 +225,6 @@ function closeFileTab(fileId) {
   if (tab) {
     tab.parent.removeChild(tab);
   }
-
-  VFS.deleteFile(fileId);
 }
 
 /**
@@ -157,304 +245,449 @@ function closeFilesInFolderRecursively(folderId) {
 }
 
 /**
- * Create a contextmenu for the file tree. This function is called when the user
- * right-clicks on a file or folder in the file tree. The contextmenu items are
- * dynamically created based on the node type (file or folder).
+ * Create a contextmenu for the file tree. The contextmenu items created
+ * dynamically when the user right-clicks on a file or folder in the file tree.
  *
- * @param {jsTree.Node} node - The node that was right-clicked.
+ * @see https://swisnl.github.io/jQuery-contextMenu/docs/items.html
+ *
  * @returns {object} The contextmenu object.
  */
-function createFileTreeContextMenuItems(node) {
-  const defaultMenu = $.jstree.defaults.contextmenu.items();
+function createFileTreeContextMenuItems($trigger, event) {
   const menu = {};
+  const node = $.ui.fancytree.getNode($trigger[0]);
 
-  if (node.type === 'folder') {
+  if (node.data.isFolder) {
     menu.createFile = {
-      label: 'New File',
-      action: () => createNewFileTreeFile(node),
+      name: 'New File',
+      callback: () => {
+        window._userClickedContextMenuItem = true;
+        createNewFileTreeFile(node.key);
+      },
     };
 
     menu.createFolder = {
-      label: 'New Folder',
-      action: () => createNewFileTreeFolder(node),
+      name: 'New Folder',
+      callback: () => {
+        window._userClickedContextMenuItem = true;
+        createNewFileTreeFolder(node.key);
+      },
     };
 
-    menu.download = {
-      label: 'Download',
-      action: () => VFS.downloadFolder(node.id),
+    menu.downloadFolder = {
+      name: 'Download',
+      callback: () => {
+        window._userClickedContextMenuItem = true;
+        VFS.downloadFolder(node.key);
+        window._userModifyingFileTree = false;
+      },
     };
-  } else if (node.type === 'file') {
-    menu.download = {
-      label: 'Download',
-      action: () => VFS.downloadFile(node.id),
+  }
+
+  if (node.data.isFile) {
+    menu.downloadFile = {
+      name: 'Download',
+      callback: () => {
+        window._userClickedContextMenuItem = true;
+        VFS.downloadFile(node.key);
+        window._userModifyingFileTree = false;
+      },
     };
 
-    const proglang = getFileExtension(node.text);
-    if (hasWorker(proglang)) {
+    if (hasWorker(getFileExtension(node.title))) {
       menu.run = {
-        label: 'Run',
-        action: () => runCode(node.id)
-      }
+        name: 'Run',
+        callback: () => {
+          window._userClickedContextMenuItem = true;
+          runCode(node.key);
+          window._userModifyingFileTree = false;
+        }
+      };
     }
   }
 
-  menu.rename = defaultMenu.rename;
-
-  menu.remove = {
-    label: 'Delete',
-    action: () => deleteFileTreeItem(node),
+  menu.rename = {
+    name: 'Rename',
+    callback: () => {
+      window._userClickedContextMenuItem = true;
+      node.editStart();
+    },
   };
 
-  return menu;
+  menu.remove = {
+    name: 'Delete',
+    callback: () => {
+      window._userClickedContextMenuItem = true;
+      deleteFileTreeItem(node);
+    }
+  };
+
+  return { items: menu };
 }
 
 /**
  * Sort folders before files and then alphabetically.
  */
-function sortFileTree(a, b) {
-  // Sort folders before files and then alphabetically.
-  const nodeA = this.get_node(a);
-  const nodeB = this.get_node(b);
-  if (nodeA.type === nodeB.type) {
-    return nodeA.text.localeCompare(nodeB.text);
-  }
-  return nodeA.type === 'folder' ? -1 : 1;
+function sortFileTree() {
+  const tree = getFileTreeInstance();
+
+  tree.rootNode.sortChildren((a, b) => {
+    if (a.data.type === b.data.type) {
+      return a.title.localeCompare(b.title);
+    }
+    return a.folder ? -1 : 1;
+  }, true);
+}
+
+/**
+ * Get the file tree instance.
+ */
+function getFileTreeInstance() {
+  return $.ui.fancytree.getTree("#file-tree");
 }
 
 /**
  * Instantiates the file tree with the files in the VFS using TreeJS.
+ * If an existing instance already exists, only the data is updated and redrawn.
+ *
+ * @see https://wwwendt.de/tech/fancytree/doc/jsdoc/global.html#FancytreeOptions
  */
 function createFileTree() {
-  // Make sure we destroy the existing tree instance if it exists.
-  $('#file-tree').jstree('destroy');
+  // Reload the tree if it already exists by re-importing from VFS.
+  if (window._fileTree) {
+    getFileTreeInstance().reload(createFileTreeFromVFS());
+    return;
+  }
 
-  const $tree = $('#file-tree').jstree({
-    core: {
-      animation: 0,
-      check_callback: true,
-      data: createFileTreeFromVFS(),
+  // Bind buttons for creating new folders/files.
+  $('#file-tree--add-folder-btn').off('click').on('click', () => createNewFileTreeFolder());
+  $('#file-tree--add-file-btn').off('click').on('click', () => createNewFileTreeFile());
+
+  // Otherwise, instantiate a new tree.
+  window._fileTree = $("#file-tree").fancytree({
+    selectMode: 1,
+    debugLevel: 0,
+    strings: {
+      noData: 'No files or folders found.'
     },
+    source: createFileTreeFromVFS(),
+    click: onClickNodeCallback,
+    init: () => sortFileTree(),
 
-    conditionalselect: (node, event) => {
-      // Only trigger the select_node event when it's not triggered by the
-      // contextmenu event.
-      return event.type !== 'contextmenu';
-    },
+    // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtensionIndex
+    extensions: ['glyph', 'edit', 'dnd5'],
 
-    contextmenu: { items: createFileTreeContextMenuItems },
-    sort: sortFileTree,
-
-    types: {
-      folder: {
-        icon: 'file-tree-icon file-tree-folder-icon',
-        valid_children: ['folder', 'file'],
+    // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtGlyph
+    glyph: {
+      map: {
+        dropMarker: '',
+        doc: "file-tree-icon file-tree-file-icon",
+        docOpen: "file-tree-icon file-tree-file-icon open",
+        folder: "file-tree-icon file-tree-folder-icon",
+        folderOpen: "file-tree-icon file-tree-folder-icon open",
       },
-      file: {
-        icon: 'file-tree-icon file-tree-file-icon',
-        valid_children: [],
+    },
+
+    // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtDnd
+    dnd5: {
+      autoExpandMS: 400,
+      dragStart: dragStartCallback,
+      dragEnter: dragEnterCallback,
+      dragDrop: dragStopCallback,
+      dragEnd: dragEndCallback,
+    },
+
+    // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtEdit
+    edit: {
+      triggerStart: ['dblclick'],
+      edit: onStartEditNodeCallback,
+      beforeClose: beforeCloseEditNodeCallback,
+      close: afterCloseEditNodeCallback,
+    },
+  });
+
+  // @see http://swisnl.github.io/jQuery-contextMenu/docs.html
+  $.contextMenu({
+    zIndex: 10,
+    selector: '#file-tree span.fancytree-title',
+    build: createFileTreeContextMenuItems,
+    events: {
+      show: () => {
+        window._userModifyingFileTree = true;
+      },
+      hide: () => {
+        if (!window._userClickedContextMenuItem) {
+          window._userModifyingFileTree = false;
+        }
       }
-    },
-
-    dnd: {
-      copy: false,
-      use_html5: true,
-    },
-
-    plugins: ['conditionalselect', 'contextmenu', 'sort', 'types', 'dnd'],
+    }
   });
-
-  $('#file-tree--add-folder-btn').off('click').on('click', () => {
-    createNewFileTreeFolder();
-  });
-
-  $('#file-tree--add-file-btn').off('click').on('click', () => {
-    createNewFileTreeFile();
-  });
-
-  registerFileTreeEventListeners($tree);
 }
 
 /**
  * Add a visual indicator to the file tree for files and folder whether they are
  * added or modified in Git.
  *
- * @param {jsTree.Node} node - The node to add the indicator to.
+ * @param {FancytreeNode} node - The node to add the indicator to.
  */
 function addGitDiffIndicator(node) {
-  $tree = $('#file-tree');
+  const classes = node.extraClasses ? node.extraClasses.split(' ') : []
+  const parentClasses = node.parent.extraClasses ? node.parent.extraClasses.split(' ') : [];
 
   // Add modified classes for visual indicators.
-  if (!$(`#${node.id}`).hasClass('git-added')) {
-    $tree.jstree('get_node', node).li_attr.class = 'git-modified';
-    $tree.jstree('redraw_node', node);
+  if (!classes.includes('git-added')) {
+    node.extraClasses = classes.concat('git-added').join(' ');
+    node.render();
   }
 
   // Add modified classes to parent folders.
-  if (node.type === 'file' && node.parent !== '#' && !$(`#${node.parent}`).hasClass('git-added')) {
-    $tree.jstree('get_node', node.parent).li_attr.class = 'git-modified';
-    $tree.jstree('redraw_node', node.parent);
+  if (node.data.isFile && !node.parent.title === 'root' && !parentClasses.includes('git-added')) {
+    node.parent.extraClasses = parentClasses.concat('git-modified').join(' ');
+    node.parent.render();
   }
 }
 
 /**
- * Callback when the user creates a new node in the file tree.
- *
- * @param {jsTree} $tree - The file tree instance.
+ * Callback after the inline editor was removed.
  */
-function createNodeCallback($tree) {
-  return (event, data) => {
-    // Create the new file or folder in the filesystem.
-    const fn = data.node.type === 'folder'
-      ? VFS.createFolder
-      : VFS.createFile;
-
-    const parentId = data.node.parent !== '#' ? data.node.parent : null;
-    const { id } = fn({ name: data.node.original.text, parentId });
-
-    if (hasGitFSWorker()) {
-      $tree.jstree('get_node', data.node).li_attr.class = 'git-added';
-    }
-
-    $tree.jstree('set_id', data.node, id);
-    $tree.jstree('redraw_node', data.node);
-  }
+function afterCloseEditNodeCallback() {
+  sortFileTree(),
+  window._userModifyingFileTree = false;
 }
 
 /**
- * Callback when the user renames a node in the file tree.
- *
- * @param {jsTree} $tree - The file tree instance.
+ * Callback before the user closes the edit mode of a node in the file tree.
  */
-function renameNodeCallback($tree) {
-  return (event, data) => {
-    const name = data.text;
+function beforeCloseEditNodeCallback(event, data) {
+  // Check if user pressed cancel or text is unchanged.
+  if (!data.save) return;
 
-    // Check if the name already exists in the parent folder.
-    // If so, trigger edit mode again and show error tooltip.
-    const parentId = data.node.parent === '#' ? null : data.node.parent;
-    if (VFS.existsWhere({ parentId, name }) && name !== data.node.original.text) {
-      return setTimeout(() => {
-        $('#file-tree').jstree(true).edit(data.node);
+  const name = data.input.val().trim();
+  if (!name) {
+    return false;
+  }
 
-        // Delete previous tooltip.
-        const inputWrapper = $(`#${data.node.id} input`).parent()[0];
-        if (window._renameNodeTippy) {
-          window._renameNodeTippy.destroy();
-          window._renameNodeTippy = null;
-        }
+  const parentId = data.node.parent.title === 'root' ? null : data.node.parent.key;
 
-        // Create new tooltip.
-        window._renameNodeTippy = tippy(inputWrapper, {
-          content: `${data.node.type} "${name}" already exists`,
-          showOnCreate: true,
-          placement: 'right',
-          theme: 'error',
-        });
-      }, 10);
-    }
+  let errorMsg;
 
-    const fn = data.node.type === 'folder'
-      ? VFS.updateFolder
-      : VFS.updateFile;
+  // Check if the name already exists in the parent folder.
+  // If so, trigger edit mode again and show error tooltip.
+  if (!isValidFilename(name)) {
+    errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
+  } else if (VFS.existsWhere({ parentId, name }, { ignoreIds: data.node.key })) {
+    errorMsg = `There already exists a "${name}" file or folder`;
+  }
 
-    fn(data.node.id, { name });
-
-    if (hasGitFSWorker()) {
-      addGitDiffIndicator(data.node);
-    }
-
-    const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.id);
-    if (tab) {
-      tab.container.setTitle(name);
-
-      // For some reason no update is triggered, so we trigger an update.
-      window._layout.emit('stateChanged');
-    }
-
-    // Destroy the leftover tooltip if it exists.
-    if (window._renameNodeTippy) {
+  if (errorMsg) {
+    // Delete previous tooltip.
+    if (isObject(window._renameNodeTippy)) {
       window._renameNodeTippy.destroy();
       window._renameNodeTippy = null;
     }
-  };
+
+    // Create new tooltip.
+    window._renameNodeTippy = tippy(data.node.span, {
+      content: errorMsg,
+      animation: false,
+      showOnCreate: true,
+      placement: 'right',
+      theme: 'error',
+    });
+
+    return false;
+  }
+
+  const fn = data.node.data.isFolder
+    ? VFS.updateFolder
+    : VFS.updateFile;
+
+  fn(data.node.key, { name });
+
+  if (hasGitFSWorker()) {
+    addGitDiffIndicator(data.node);
+  }
+
+  const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.key);
+  if (tab) {
+    tab.container.setTitle(name);
+
+    // For some reason no update is triggered, so we trigger an update.
+    window._layout.emit('stateChanged');
+  }
+
+  // Destroy the leftover tooltip if it exists.
+  if (isObject(window._renameNodeTippy)) {
+    window._renameNodeTippy.destroy();
+    window._renameNodeTippy = null;
+  }
+
+  return true;
 }
 
 /**
- * Callback when the user deletes a node in the file tree.
- *
- * @param {jsTree} $tree - The file tree instance.
+ * Callback when the user starts editing a node in the file tree.
  */
-function deleteNodeCallback($tree) {
-  return (event, data) => {
-    const id = data.node.id;
-    const fn = data.node.type === 'folder'
-      ? VFS.deleteFolder
-      : VFS.deleteFile;
+function onStartEditNodeCallback(event, data) {
+  window._userModifyingFileTree = true;
 
-    fn(id);
-  };
+  if (window._fileTreeToggleTimeout) {
+    clearTimeout(window._fileTreeToggleTimeout);
+  }
+
+  data.input.select();
 }
 
 /**
- * Callback when the user selects a node in the file tree.
- *
- * @param {jsTree} $tree - The file tree instance.
+ * Callback when the user clicks on a node in the file tree.
  */
-function selectNodeCallback($tree) {
-  return (event, data) => {
-    if (data.node.type === 'folder') {
-      $('#file-tree').jstree('toggle_node', data.node);
-    } else {
-      openFile(data.node.id, data.node.text);
+function onClickNodeCallback(event, data) {
+  // Prevent default behavior for folders.
+  if (data.node.data.isFile) {
+    openFile(data.node.key, data.node.title);
+  } else if (data.node.data.isFolder) {
+    if (window._fileTreeToggleTimeout) {
+      clearTimeout(window._fileTreeToggleTimeout);
     }
 
-    // Deselect the node to make sure it is clickable again.
-    $('#file-tree').jstree('deselect_node', data.node);
-  };
+    // Only toggle with a debounce of 200ms when clicked on the title
+    // to prevent double-clicks.
+    if (event.originalEvent.target.classList.contains('fancytree-title')) {
+      window._fileTreeToggleTimeout = setTimeout(() => data.node.toggleExpanded(), 200);
+    } else {
+      // Otherwise, immediately toggle the folder.
+      data.node.toggleExpanded();
+    }
+  }
+}
+
+/**
+ * Callback when the user drags a node over another node in the file tree.
+ *
+ * @returns {boolean} True if the user is allowed to drag onto the node.
+ */
+function dragEnterCallback(targetNode, data) {
+  // Add a visual drag area indicator.
+
+  $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
+
+  if ((targetNode.parent.title === 'root' && targetNode.data.isFile) || targetNode.title === 'root') {
+    $('#file-tree').addClass(DROP_AREA_INDICATOR_CLASS);
+  }
+  else if (targetNode.data.isFile) {
+    $(targetNode.parent.li).addClass(DROP_AREA_INDICATOR_CLASS);
+  }
+  else if (targetNode.data.isFolder) {
+    $(targetNode.li).addClass(DROP_AREA_INDICATOR_CLASS);
+  }
+
+  // Check if there exists already a file with the same name on the
+  // target folder. If so, prevent dropping.
+  const sourceNode = data.otherNode;
+  const containsDuplicate = (
+    (
+      targetNode.data.isFile &&
+      VFS.existsWhere({
+        parentId: targetNode.parent.title === 'root' ? null : targetNode.parent.key,
+        name: sourceNode.title
+      }, { ignoreIds: sourceNode.key })
+    )
+      ||
+    (
+      targetNode.data.isFolder &&
+      VFS.existsWhere({
+        parentId: targetNode.key,
+        name: sourceNode.title
+      }, { ignoreIds: sourceNode.key })
+    )
+  );
+
+  if (isObject(window._dndDuplicateTippy)) {
+    window._dndDuplicateTippy.destroy();
+    window._dndDuplicateTippy = null;
+  }
+
+  if (containsDuplicate) {
+    // Create new tooltip.
+    const tooltipElement = targetNode.parent.title === 'root'
+      ? $('.file-tree-container .title')[0]
+      : (targetNode.data.isFile ? targetNode.parent.span : targetNode.span);
+
+    window._dndDuplicateTippy = tippy(tooltipElement, {
+      content: `There already exists a "${sourceNode.title}" file or folder`,
+      animation: false,
+      showOnCreate: true,
+      placement: 'right',
+      theme: 'error',
+    });
+
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Callback when the user starts dragging a node in the file tree.
+ */
+function dragStartCallback(node, data) {
+  window._userModifyingFileTree = true;
+
+  // Set custom drag image.
+  data.dataTransfer.setDragImage($(`<div class="custom-drag-helper">${node.title}</div>`).appendTo("body")[0], -10, -10);
+  data.useDefaultImage = false;
+
+  // Return true to enable dnd.
+  return true;
+}
+
+/**
+ * Callback when the user stops dragging a node in the file tree.
+ */
+function dragEndCallback() {
+  // Remove the visual drag area indicator.
+  $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
+
+  if (isObject(window._dndDuplicateTippy)) {
+    window._dndDuplicateTippy.destroy();
+    window._dndDuplicateTippy = null;
+  }
+
+  sortFileTree()
+  window._userModifyingFileTree = false;
 }
 
 /**
  * Callback when the user stops dragging and dropping a node in the file tree.
  *
- * @param {Event} event - The event object.
- * @param {object} data - The data object containing the nodes.
+ * @param {FancytreeNode} targetNode - The node where the other node was dropped
+ * @param {object} data - The data object containing the source node.
  */
-function dndStopCallback(event, data) {
-  // Use setTimeout-trick to check after the drop process is finished.
-  setTimeout(() => {
-    const $treeRef = $('#file-tree').jstree(true);
-    const targetNode = $treeRef.get_node(data.event.target);
+function dragStopCallback(targetNode, data) {
+  const sourceNode = data.otherNode;
 
-    if (targetNode) {
-      const sourceNode = $treeRef.get_node(data.data.nodes[0]);
+  // If the dropped node became a root node, unset parentId.
+  let parentId = (targetNode.data.isFolder)
+    ? targetNode.key
+    : (targetNode.parent.title === 'root' ? null : targetNode.parent.key);
 
-      // If the dropped node became a root node, unset parentId.
-      const atRootLevel = $('#' + sourceNode.id).parent().parent().attr('id') === 'file-tree';
-      const parentId = atRootLevel ? null : targetNode.id;
+  const id = sourceNode.key;
+  const fn = sourceNode.data.isFolder
+    ? VFS.updateFolder
+    : VFS.updateFile;
 
-      const id = sourceNode.id;
-      const fn = sourceNode.type === 'folder'
-        ? VFS.updateFolder
-        : VFS.updateFile;
+  fn(id, { parentId });
 
-      fn(id, { parentId });
+  if (hasGitFSWorker()) {
+    addGitDiffIndicator(sourceNode);
+  }
 
-      if (hasGitFSWorker()) {
-        addGitDiffIndicator(sourceNode);
-      }
-    }
-  }, 0);
-}
-
-/**
- * Registers event listeners for the file tree.
- *
- * @param {jQuery.Object} $tree - File-tree reference object.
- */
-function registerFileTreeEventListeners($tree) {
-  $tree.on('create_node.jstree', createNodeCallback($tree));
-  $tree.on('rename_node.jstree', renameNodeCallback($tree));
-  $tree.on('delete_node.jstree', deleteNodeCallback($tree));
-  $tree.on('select_node.jstree', selectNodeCallback($tree));
-  $(document).on('dnd_stop.vakata', dndStopCallback);
+  // Move the node in the tree, but when files or files are dropped onto other
+  // files, prevent a new folder being created and just insert the source file
+  // as a sibling next to the target file.
+  if (data.hitMode === 'over' && targetNode.data.isFile) {
+    sourceNode.moveTo(targetNode, 'before');
+  } else {
+    sourceNode.moveTo(targetNode, data.hitMode);
+    targetNode.setExpanded();
+  }
 }

@@ -1,3 +1,7 @@
+/* ==========================================================================
+ *  File tree general styling.
+ * ========================================================================== */
+
 .file-tree-container {
   min-width: var(--file-tree-width);
   max-width: var(--file-tree-width);
@@ -5,10 +9,6 @@
   user-select: none;
   display: flex;
   flex-direction: column;
-}
-
-.file-tree-container .jstree-icon {
-  pointer-events: none;
 }
 
 .file-tree-container .info-msg {
@@ -24,15 +24,20 @@
 .file-tree-container .title {
   font-size: 14px;
   flex-grow: 1;
-  text-transform: uppercase;
+  color: var(--tab-fg-color);
+  overflow: hidden;
+  text-wrap: nowrap;
+  text-overflow: ellipsis;
 }
 
 .file-tree-container button {
   background: none;
   border: 0;
   display: block;
-  width: 20px;
-  height: 20px;
+  max-width: 20px;
+  max-height: 20px;
+  min-width: 20px;
+  min-height: 20px;
   background-repeat: no-repeat;
   background-size: 20px;
   background-position: center 50%;
@@ -80,59 +85,50 @@
   background-image: url('../../../img/icons/folder.png');
 }
 
-.jstree {
+.fancytree-container {
+  outline: 0;
   height: 100%;
   overflow: auto;
-}
-
-.jstree ul {
   list-style: none;
-  padding-left: 25px;
   margin: 0;
+  padding: 0 var(--file-tree-padding);
 }
 
-.jstree > .jstree-container-ul {
-  padding: 0;
+.fancytree-container ul {
+  list-style: none;
+  margin: 0;
+  padding-left: var(--file-tree-indent);
 }
 
-.jstree-node {
-  position: relative;
+.fancytree-node {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 5px;
+  border-radius: var(--border-radius);
 }
 
-.jstree-anchor,
-.jstree-anchor:visited,
-.jstree-anchor:active,
-.jstree-anchor:focus {
-  color: inherit;
-  text-decoration: none;
-  outline: 0;
+.fancytree-node:not(.fancytree-drop-accept):not(.fancytree-drop-reject):hover {
+  background-color: var(--tab-menu--tab-bg-color);
+  cursor: pointer;
 }
 
-.jstree-anchor {
-  min-width: 112px;
-  max-width: calc(100% - 10px);
-  padding: 4px 5px;
-  display: inline-block;
+.fancytree-icon {
+  pointer-events: none;
+}
+
+.fancytree-title {
+  overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  overflow: hidden;
-  border-radius: var(--border-radius);
-  margin-left: 5px;
+  max-width: 300px;
 }
 
-.jstree-node.jstree-leaf > .jstree-anchor {
-  min-width: 89px;
+.file-tree-file-icon {
+  background-image: url('../../../img/icons/file.png');
 }
 
-.jstree-anchor:hover {
-  background-color: var(--tab-menu--tab-bg-color);
-}
-
-.jstree-anchor input {
-  outline: 0;
-  border: 1px dotted var(--color-black) !important;
-  height: 20px !important;
-  max-width: calc(100% - 30px);
+.file-tree-folder-icon {
+  background-image: url('../../../img/icons/folder.png');
 }
 
 .file-tree-icon {
@@ -144,27 +140,10 @@
   background-position: center 50%;
   margin-right: 5px;
   position: relative;
-  top: 1px;
-  float: left;
 }
 
-.file-tree-file-icon {
-  background-image: url('../../../img/icons/file.png');
-}
-
-.file-tree-folder-icon {
-  background-image: url('../../../img/icons/folder.png');
-}
-
-.jstree-node:not(.jstree-leaf) {
-  position: relative;
-}
-
-.jstree-node:not(.jstree-leaf) > .jstree-anchor {
-  padding-left: 25px;
-}
-
-.jstree-node:not(.jstree-leaf) > .jstree-icon {
+.fancytree-folder.fancytree-has-children > .fancytree-expander {
+  pointer-events: none;
   display: block;
   width: 12px;
   height: 12px;
@@ -172,78 +151,95 @@
   background-size: 12px;
   background-position: center 50%;
   margin-right: 5px;
-  position: absolute;
-  left: 12px;
-  top: 7px;
-  z-index: 2;
 }
 
-.jstree-node.jstree-closed > .jstree-icon {
-  background-image: url('../../../img/icons/arrow-head-right.png');
-}
-
-.jstree-node.jstree-open > .jstree-icon {
+.fancytree-expanded > .fancytree-expander {
   background-image: url('../../../img/icons/arrow-head-down.png');
 }
 
-.vakata-context {
-  list-style: none;
-  margin: 0 0 0 20px;
-  padding: 0;
-  position: absolute;
+.fancytree-node:not(.fancytree-expanded) > .fancytree-expander {
+  background-image: url('../../../img/icons/arrow-head-right.png');
+}
+
+.fancytree-node input {
+  outline: 0;
+  border: 1px dotted var(--color-black);
+  width: 100%;
+  font: inherit;
+}
+
+/* ==========================================================================
+ *  Context menu when right-clicking a node.
+ * ========================================================================== */
+
+.context-menu-list {
+  width: auto !important;
+  min-width: auto;
+  max-width: auto;
   background-color: var(--color-white);
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-  z-index: 10;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
 }
 
-.vakata-context-separator {
-  display: none;
-}
-
-.vakata-context a,
-.vakata-context a:visited,
-.vakata-context a:active,
-.vakata-context a:focus {
-  color: inherit;
-  text-decoration: none;
-  outline: 0;
-}
-
-.vakata-context a {
+.context-menu-item {
   display: block;
   padding: 5px 10px;
 }
 
-.vakata-context a:hover {
+.context-menu-item:hover {
+  color: var(--color-black);
   background-color: var(--tab-menu--tab-bg-color);
   cursor: pointer;
   outline: 0;
 }
 
-.jstree-dnd-parent {
+/* ==========================================================================
+ *  Git diff indicators.
+ * ========================================================================== */
+
+.git-added > .fancytree-title {
+  color: #33b91f;
+}
+
+.git-modified > .fancytree-title {
+  color: #ffa500;
+}
+
+/* ==========================================================================
+ *  Drag and drop.
+ * ========================================================================== */
+
+/* Vertical bar that indicates the drop area */
+.drop-area-indicator {
   position: relative;
 }
 
-.jstree-dnd-parent:before {
+.drop-area-indicator[aria-expanded="true"]::before,
+.file-tree.drop-area-indicator::before {
   content: '';
   position: absolute;
+  top: 25px;
+  left: 10px;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-black);
+}
+
+.file-tree.drop-area-indicator::before {
   top: 0;
-  left: 3px;
-  height: 100%;
-  border-left: 3px solid var(--color-black);
+  left: 5px;
 }
 
-#jstree-marker {
-  display: none !important;
+.fancytree-drop-reject {
+  color: red;
 }
 
-/** Git color indicators **/
-.git-added > a {
-  color: #33b91f !important;
-}
-
-.git-modified > a{
-  color: #ffa500 !important;
+/* The item that is dragged under the cursor */
+.custom-drag-helper {
+  display: inline-block;
+  background-color: var(--color-white);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  padding: 5px 10px;
+  border-radius: var(--border-radius);
 }

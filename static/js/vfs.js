@@ -10,10 +10,29 @@ class VirtualFileSystem {
     this.loadFromLocalStorage();
   }
 
-  _git(fn, ...payload) {
+  /**
+   * Call a function on the git filesystem worker.
+   *
+   * @param {string} fn - Name of the function to call.
+   * @param {array} payload - Arguments to pass to the function.
+   */
+  _git = (fn, ...payload) => {
     if (!hasGitFSWorker()) return;
 
     window._gitFS[fn](...payload);
+  }
+
+  /**
+   * Call a function to the local filesystem class.
+   *
+   * @param {string} fn - Name of the function to call.
+   * @param {array} payload - Arguments to pass to the function.
+   * @returns {*} The return value of the function.
+   */
+  _lfs = (fn, ...payload) => {
+    if (!hasLFS() || (hasLFS() && !LFS.loaded)) return;
+
+    return LFS[fn](...payload);
   }
 
   /**
@@ -50,8 +69,22 @@ class VirtualFileSystem {
    * Save the virtual filesystem state to localstorage.
    */
   saveState = () => {
+    let files = this.files;
+
+    // Remove the content from all files when LFS is used, because the LFS uses
+    // lazy loading. Furthermore, we never know how large files will be when
+    // loaded from the user's LFS, thus we don't want to save these.
+    if (isIDE && hasLFS() && LFS.loaded) {
+      Object.keys(files).forEach((fileId) => {
+        files[fileId] = {
+          ...files[fileId],
+          content: '',
+        }
+      });
+    }
+
     setLocalStorageItem('vfs', JSON.stringify({
-      files: this.files,
+      files,
       folders: this.folders,
     }));
   }
@@ -67,12 +100,17 @@ class VirtualFileSystem {
   getRootFiles = () => Object.values(this.files).filter((file) => !file.parentId)
 
   /**
-   * Internal helper function to filter a list of object based on conditions.
+   * Internal helper function to filter an object based on conditions, ignoring
+   * the case of the values.
    *
    * @param {object} conditions - The conditions to filter on.
    */
-  _where = (conditions) => (f) =>
-    Object.entries(conditions).every(([k, v]) => f[k] === v)
+  _whereIgnoreCase = (conditions) => (f) =>
+    Object.entries(conditions).every(([k, v]) =>
+      typeof f[k] === 'string' && typeof v === 'string'
+        ? f[k].toLowerCase() === v.toLowerCase()
+        : f[k] === v
+    )
 
   /**
    * Find all files that match the given conditions.
@@ -82,8 +120,9 @@ class VirtualFileSystem {
    * @param {object} conditions - The conditions to filter on.
    * @returns {array} List of file objects matching the conditions.
    */
-  findFilesWhere = (conditions) => Object.values(this.files).filter(this._where(conditions))
-
+  findFilesWhere = (conditions) => {
+    return Object.values(this.files).filter(this._whereIgnoreCase(conditions))
+  }
   /**
    * Find a single file that match the given conditions.
    *
@@ -104,13 +143,19 @@ class VirtualFileSystem {
    * @example existsWhere({ name: 'foo' })
    *
    * @param {object} conditions - The conditions to filter on.
+   * @param {object} [options] - Additional options.
+   * @param {string|array} [options.ignoreIds] - List of ids to ignore.
    * @returns {boolean} True if a folder or file exists with the given
    * conditions, false otherwise.
    */
-  existsWhere = (conditions) => {
-    const files = this.findFilesWhere(conditions);
-    const folders = this.findFoldersWhere(conditions);
-    return [...files, ...folders].length > 0;
+  existsWhere = (conditions, options = {}) => {
+    if (!Array.isArray(options.ignoreIds)) {
+      options.ignoreIds = [options.ignoreIds];
+    }
+
+    return this.findWhere(conditions)
+      .filter((f) => !options.ignoreIds.includes(f.id))
+      .length > 0;
   }
 
   /**
@@ -121,7 +166,9 @@ class VirtualFileSystem {
    * @param {object} conditions - The conditions to filter on.
    * @returns {array} List of folder objects matching the conditions.
    */
-  findFoldersWhere = (conditions) => Object.values(this.folders).filter(this._where(conditions))
+  findFoldersWhere = (conditions) => {
+    return Object.values(this.folders).filter(this._whereIgnoreCase(conditions))
+  }
 
   /**
    * Find a single folders that match the given conditions.
@@ -137,6 +184,21 @@ class VirtualFileSystem {
     return folders.length > 0 ? folders[0] : null;
   }
 
+
+  /**
+   * Find a all files and folders that match the given conditions.
+   *
+   * @example findWhere({ name: 'foo' })
+   *
+   * @param {object} conditions - The conditions to filter on.
+   * @returns {array} List of objects matching the conditions.
+   */
+  findWhere = (conditions) => {
+    const files = this.findFilesWhere(conditions);
+    const folders = this.findFoldersWhere(conditions);
+    return [...files, ...folders];
+  }
+
   /**
    * Find a file by its id.
    *
@@ -150,6 +212,24 @@ class VirtualFileSystem {
    * @param {string} id - The id of the folder to find.
    */
   findFolderById = (id) => this.folders[id];
+
+  /**
+   * Find a file by its absolute path.
+   *
+   * @param {string} path - The absolute filepath.
+   */
+  findFileByPath = (path) =>
+    Object.values(this.files)
+    .find((f) => this.getAbsoluteFilePath(f.id) === path);
+
+  /**
+   * Find a folder by its absolute path.
+   *
+   * @param {string} path - The absolute folderpath.
+   */
+  findFolderByPath = (path) =>
+    Object.values(this.folders)
+    .find((f) => this.getAbsoluteFolderPath(f.id) === path);
 
   /**
    * Get the absolute file path of a file.
@@ -178,6 +258,7 @@ class VirtualFileSystem {
    */
   getAbsoluteFolderPath = (folderId) => {
     const folder = this.findFolderById(folderId);
+
     if (!folder) return '';
     if (!folder.parentId) return folder.name;
 
@@ -196,10 +277,10 @@ class VirtualFileSystem {
    * Create a new file in the virtual filesystem.
    *
    * @param {object} fileObj - The file object to create.
-   * @param {boolean} [commit] - Whether to commit the file.
+   * @param {boolean} [userInvoked] - Whether to user invoked the action.
    * @returns {object} The new file object.
    */
-  createFile = (fileObj, commit = true) => {
+  createFile = (fileObj, userInvoked = true) => {
     const newFile = {
       id: uuidv4(),
       name: 'Untitled',
@@ -212,8 +293,9 @@ class VirtualFileSystem {
 
     this.files[newFile.id] = newFile;
 
-    if (commit) {
+    if (userInvoked) {
       this._git('commit', this.getAbsoluteFilePath(newFile.id), newFile.content);
+      this._lfs('writeFileToFolder', newFile.parentId, newFile.id, newFile.name, newFile.content);
     }
 
     this.saveState();
@@ -237,6 +319,7 @@ class VirtualFileSystem {
     };
 
     this.folders[newFolder.id] = newFolder;
+    this._lfs('createFolder', newFolder.id, newFolder.parentId, newFolder.name);
     this.saveState();
     return newFolder;
   }
@@ -246,43 +329,56 @@ class VirtualFileSystem {
    *
    * @param {string} id - The file id.
    * @param {object} obj - Key-value pairs to update in the file object.
-   * @param {boolean} [commit] - Whether to commit the file.
+   * @param {boolean} [userInvoked] - Whether to user invoked the action.
    * @returns {object} The updated file object.
    */
-  updateFile = (id, obj, commit = true) => {
+  updateFile = async (id, obj, userInvoked = true) => {
     const file = this.findFileById(id);
+    const oldPath = this.getAbsoluteFilePath(file.id);
 
-    // This extra check is needed because in the UI, the user can trigger a
+    // These extra checks is needed because in the UI, the user can trigger a
     // rename but not actually change the name.
     const isRenamed = typeof obj.name === 'string' && file.name !== obj.name;
-    const isMoved = file.parentId !== obj.parentId;
+    const isMoved = typeof obj.parentId !== 'undefined' && file.parentId !== obj.parentId;
     const isContentChanged = typeof obj.content === 'string' && file.content !== obj.content;
 
     if (file) {
+      // Move the file to the new location before updating the file object,
+      // because the LFS.moveFile needs to use the absolute paths from VFS.
+      if (isRenamed || isMoved) {
+        await this._lfs(
+          'moveFile',
+          file.id,
+          obj.name || file.name,
+          typeof obj.parentId !== 'undefined' ? obj.parentId : file.parentId,
+        );
+      }
+
       for (const [key, value] of Object.entries(obj)) {
         if (file.hasOwnProperty(key) && key !== 'id') {
-
-          // Check whether the file is renamed.
-          if (key === 'name' && isRenamed || key === 'parentId' && isMoved) {
-            const oldPath = this.getAbsoluteFilePath(file.id);
-            file[key] = value;
-            const newPath = this.getAbsoluteFilePath(file.id);
-
-            // Move the file to the new location.
-            this._git('mv', oldPath, newPath);
-
-            continue;
-          }
-
           file[key] = value;
         }
       }
 
       file.updatedAt = new Date().toISOString();
 
-      if (isContentChanged && commit) {
+      const newPath = this.getAbsoluteFilePath(file.id);
+
+      if (isRenamed || isMoved) {
+        // Move the file to the new location.
+        this._git('mv', oldPath, newPath);
+      }
+
+
+      if (isContentChanged && userInvoked) {
         // Just commit the changes to the file.
-        this._git('commit', this.getAbsoluteFilePath(file.id), file.content);
+        this._git('commit', newPath, file.content);
+
+        // Update the file content in the LFS after a second of inactivity.
+        clearTimeout(window._lfsUpdateFileTimeoutId);
+        window._lfsUpdateFileTimeoutId = setTimeout(() => {
+          this._lfs('writeFileToFolder', file.parentId, file.id, file.name, file.content);
+        }, seconds(1));
       }
 
       this.saveState();
@@ -298,35 +394,42 @@ class VirtualFileSystem {
    * @param {object} obj - Key-value pairs to update in the folder object.
    * @returns {object} The updated folder object.
    */
-  updateFolder = (id, obj) => {
+   updateFolder = async (id, obj) => {
     const folder = this.findFolderById(id);
+    const oldPath = this.getAbsoluteFolderPath(folder.id);
 
     // This extra check is needed because in the UI, the user can trigger a
     // rename but not actually change the name.
     const isRenamed = typeof obj.name === 'string' && folder.name !== obj.name;
-    const isMoved = folder.parentId !== obj.parentId;
+    const isMoved = typeof obj.parentId !== 'undefined' && folder.parentId !== obj.parentId;
 
     if (folder) {
+      // Move the folder to the new location before updating the folder object,
+      // because the LFS.moveFolder needs to use the absolute paths from VFS.
+      if (isRenamed || isMoved) {
+        await this._lfs(
+          'moveFolder',
+          folder.id,
+          obj.name || folder.name,
+          typeof obj.parentId !== 'undefined' ? obj.parentId : folder.parentId,
+        );
+      }
+
       for (const [key, value] of Object.entries(obj)) {
         if (folder.hasOwnProperty(key) && key !== 'id') {
-
-          // Check whether the folder is renamed.
-          if (key === 'name' && isRenamed || key === 'parentId' && isMoved) {
-            const oldPath = this.getAbsoluteFolderPath(folder.id);
-            folder[key] = value;
-            const newPath = this.getAbsoluteFolderPath(folder.id);
-
-            // Move the folder to the new location.
-            this._git('mv', oldPath, newPath);
-
-            continue;
-          }
-
           folder[key] = value;
         }
       }
 
       folder.updatedAt = new Date().toISOString();
+
+      const newPath = this.getAbsoluteFolderPath(folder.id);
+
+      // Check whether the file is renamed or moved, in either case we
+      // just need to move the file to the new location.
+      if (isRenamed || isMoved) {
+        this._git('mv', oldPath, newPath);
+      }
 
       this.saveState();
     }
@@ -338,11 +441,18 @@ class VirtualFileSystem {
    * Delete a file from the virtual filesystem.
    *
    * @param {string} id - The file id.
+   * @param {boolean} [deleteInLFS] - Whether to delete the file in the LFS.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFile = (id) => {
+  deleteFile = (id, deleteInLFS = true) => {
     if (this.files[id]) {
       this._git('rm', this.getAbsoluteFilePath(id));
+
+      if (deleteInLFS) {
+        this._lfs('deleteFile', id);
+      }
+
+      this._lfs('removeFileHandle', id);
       delete this.files[id];
       this.saveState();
       return true;
@@ -352,14 +462,42 @@ class VirtualFileSystem {
   }
 
   /**
-   * Delete a folder from the virtual filesystem.
+   * Delete a folder from the virtual filesystem, including its nested files and
+   * folders. The deleteInLFS parameter will only be true on the first call to
+   * it. All subsequent calls will have it set to false, because the LFS uses
+   * async and thus needs to wait for nested files and folders to be deleted
+   * before deleting the parent folder itself.
    *
    * @param {string} id - The folder id.
+   * @param {boolean} [deleteInLFS] - Whether to delete the folder in the LFS.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFolder = (id) => {
+  deleteFolder = (id, deleteInLFS = true) => {
+    // Delete all the files inside the current folder.
+    const files = this.findFilesWhere({ parentId: id });
+    for (const file of files) {
+      this.deleteFile(file.id, false);
+    }
+
+    // Delete all the nested folders inside the current folder.
+    const folders = this.findFoldersWhere({ parentId: id });
+    for (const folder of folders) {
+      this.deleteFolder(folder.id, false);
+    }
+
     if (this.folders[id]) {
       this._git('rm', this.getAbsoluteFolderPath(id));
+
+      // The deleteInLFS is only true on the first call to this function.
+      // Inside the LFS class we'll delete everything properly including the
+      // root folder handle.
+      if (deleteInLFS) {
+        this._lfs('deleteFolder', id);
+      } else {
+        // If it's not the root folder, then delete the folder handle.
+        this._lfs('removeFolderHandle', id);
+      }
+
       delete this.folders[id];
       this.saveState();
       return true;

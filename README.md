@@ -7,7 +7,7 @@ code completely offline using WebAssembly.
 
 # Table of Contents
 
-- [Examide](#examide)
+- [Terra IDE](#terra-ide)
 - [Table of Contents](#table-of-contents)
 - [Getting Started](#getting-started)
 - [Structure](#structure)
@@ -22,7 +22,7 @@ code completely offline using WebAssembly.
 Simply clone the project:
 
 ```
-git clone https://github.com/uvapl/examide && cd examide
+git clone https://github.com/uvapl/terra && cd terra
 ```
 
 You need some kind of tool that serves static files in order for everything to
@@ -179,7 +179,7 @@ can go into the `./static/js/workers/clang.worker.js` and add `-lfoo` to the
 class API extends BaseAPI {
   constructor(options) {
 
-  // ...
+    // ...
 
     this.ldflags = ['-lc', '-lcs50', '-lfoo'];
   }

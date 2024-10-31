@@ -8,27 +8,27 @@
 
 /* iframe-specific overwrites */
 
-.examide-embed .lm_splitter {
+.terra-embed .lm_splitter {
   display: none;
 }
 
-.examide-embed .terminal-component-container .lm_content {
+.terra-embed .terminal-component-container .lm_content {
   border: 0;
 }
 
-.examide-embed.vertical .editor-component-container .lm_content {
+.terra-embed.vertical .editor-component-container .lm_content {
   border-width: 1px 0 0;
 }
 
-.examide-embed.horizontal .editor-component-container .lm_content {
+.terra-embed.horizontal .editor-component-container .lm_content {
   border-width: 1px 1px 0 0;
 }
 
-.examide-embed .lm_controls {
+.terra-embed .lm_controls {
   margin-top: -2px;
 }
 
-.examide-embed {
+.terra-embed {
   background: var(--color-white);
   border: 1px solid var(--border-color);
   padding: 2px 0 0;

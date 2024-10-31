@@ -16,6 +16,7 @@
 :root {
   --file-tree-width: 250px;
   --file-tree-padding: 10px;
+  --file-tree-indent: 20px;
 }
 
 .app-container {

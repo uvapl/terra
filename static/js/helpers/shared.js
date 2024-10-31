@@ -30,6 +30,16 @@ function removeLocalStorageItem(key) {
 }
 
 /**
+ * Update the local storage prefix with an additional key.
+ *
+ * @param {string} additionalKey - An additional prefix that will be appended to
+ * the current local storage prefix.
+ */
+function updateLocalStoragePrefix(additionalKey) {
+  LOCAL_STORAGE_PREFIX = `${DEFAULT_LOCAL_STORAGE_PREFIX}-${additionalKey}`;
+}
+
+/**
  * Check whether an object is a real object, because essentially, everything
  * is an object in JavaScript.
  *
@@ -143,16 +153,6 @@ function makeUrl(url, queryParams) {
 }
 
 /**
- * Update the local storage prefix with an additional key.
- *
- * @param {string} additionalKey - An additional prefix that will be appended to
- * the current local storage prefix.
- */
-function updateLocalStoragePrefix(additionalKey) {
-  LOCAL_STORAGE_PREFIX = `${DEFAULT_LOCAL_STORAGE_PREFIX}-${additionalKey}`;
-}
-
-/**
  * Converts a string to be a local storage suitable key by replacing
  * non-suitable characters with a hyphen.
  *
@@ -186,24 +186,6 @@ function removeIndent(text) {
     .split('\n')
     .map(line => line.replace(new RegExp(`^${indent}`), ''))
     .join('\n');
-}
-
-/**
- * Check whether the clipboard writing is allowed.
- *
- * @returns {Promise<boolean>} True when allowed, false otherwise.
- */
-function isClipboardWritingAllowed() {
-  return new Promise((resolve, reject) => {
-    try {
-      navigator.permissions.query({ name: 'clipboard-write' }).then(function(status) {
-        resolve((status.state == 'granted'));
-      });
-    } catch (error) {
-      // This feature works only through HTTPS
-      reject(error);
-    }
-  });
 }
 
 /**
@@ -267,4 +249,59 @@ function minutes(mins) {
  */
 function hasGitFSWorker() {
   return isIDE && window._gitFS instanceof GitFS;
+}
+
+/**
+ * Check whether the browser has support for the Local Filesystem API.
+ *
+ * @returns {boolean} True if the browser supports the api.
+ */
+function hasLFSApi() {
+  return 'showOpenFilePicker' in window;
+}
+
+/**
+ * Check whether the LFS has been initialized.
+ *
+ * @returns {boolean} True when LFS has been initialized, false otherwise.
+ */
+function hasLFS() {
+  return typeof LFS !== 'undefined' && LFS instanceof LocalFileSystem;
+}
+
+/**
+ * Set the file tree title.
+ *
+ * @param {string} title - The title to set.
+ */
+function setFileTreeTitle(title) {
+  $('#file-tree-title').text(title);
+}
+
+/**
+ * Get the repo name and username of a given repo link.
+ *
+ * @example getRepoName('https://github.com/<user>/<repo>')
+ *   => { user: '<user>', repo: '<repo>' }
+ *
+ * @param {string} repoLink - Absolute link to the repository.
+ */
+function getRepoInfo(repoLink) {
+  const match = repoLink.match(/^https:\/\/(?:www\.)?github.com\/([^/]+)\/([\w-]+)/);
+  if (!match) return null;
+
+  return {
+    'user': match[1],
+    'repo': match[2],
+  }
+}
+
+/**
+ * Check whether a given filename is valid for a fileystem.
+ *
+ * @param {string} filename - The filename to check.
+ * @returns {boolean} True if the filename is valid, false otherwise.
+ */
+function isValidFilename(filename) {
+  return !/[\/\\:*?"<>|]/.test(filename) && !['&lt;', '&gt;'].includes(filename);
 }

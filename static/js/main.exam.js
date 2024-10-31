@@ -247,7 +247,7 @@ async function getConfig(url) {
 }
 
 /**
- * Do another fallback by checking whether the examide-* local storage keys
+ * Do another fallback by checking whether the terra-* local storage keys
  * exist from the previous app version. If so, migrate them to the new names.
  *
  * @returns {boolean} True when the migration was successful.

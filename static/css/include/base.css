@@ -97,3 +97,7 @@ body {
 .text-small {
   font-size: 11px;
 }
+
+.flex-end {
+  justify-content: flex-end;
+}

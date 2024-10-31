@@ -51,6 +51,7 @@ class API {
     this.isDev = options.isDev;
     this.pushedCallback = options.pushedCallback;
     this.cloneFailCallback = options.cloneFailCallback;
+    this.cloneSuccessCallback = options.cloneSuccessCallback;
 
     this.setRepoLink(options.repoLink);
     this._alterXHR(options.username, options.accessToken);
@@ -218,6 +219,7 @@ class API {
       this.cloneFailCallback();
     } else {
       this.fs.chdir(this.repoDir);
+      this.cloneSuccessCallback();
     }
   }
 
@@ -318,7 +320,11 @@ self.onmessage = (event) => {
 
         cloneFailCallback() {
           postMessage({ id: 'clone-fail' })
-        }
+        },
+
+        cloneSuccessCallback() {
+          postMessage({ id: 'clone-success' })
+        },
       });
       break;
 

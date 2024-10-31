@@ -1,5 +1,5 @@
 self.importScripts('../vendor/pyodide-0.25.0.min.js');
-self.importScripts('../helpers.js')
+// self.importScripts('../helpers.js')
 self.importScripts('base-api.js')
 
 class API extends BaseAPI {
@@ -177,7 +177,7 @@ class API extends BaseAPI {
     // while regular Python shows the following:
     //
     //     Traceback (most recent call last):
-    //       File "/Users/koomen/tech/uva/examide/src/example.py", line 1, in <module>
+    //       File "/Users/<user>/terra/src/example.py", line 1, in <module>
     //         print(x)
     //               ^
     //     NameError: name 'x' is not defined
@@ -241,7 +241,11 @@ class API extends BaseAPI {
         this.hostWrite(result);
       }
     } catch (err) {
-      return this.formatErrorMsg(err.message, activeTabName);
+      // When the error starts with Traceback, the error is from the code that
+      // was executed. Otherwise, it's an internal error within the codebase.
+      if (err.message.startsWith('Traceback')) {
+        return this.formatErrorMsg(err.message, activeTabName);
+      }
     } finally {
       // Clear the globals after the code has run such that the next execution
       // will be called with a clean state.
