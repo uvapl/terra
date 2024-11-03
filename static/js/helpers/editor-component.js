@@ -339,28 +339,83 @@ function runButtonCommand(selector, cmd) {
 }
 
 /**
- * Get default Ace editor completers.
+ * Create local text completer.
+ *
+ * Largely based on text_completer.js from ajaxorg/ace
+ * under the BSD license included in the ace project
+ * https://github.com/ajaxorg/ace/blob/master/LICENSE
  *
  * @returns {array} List of completers.
  */
 function getAceCompleters() {
-  const langTools = ace.require('ace/ext/language_tools');
+  var Range = ace.Range;
 
-  const completers = [];
+  var splitRegex = /[^a-zA-Z_0-9\$\-\u00C0-\u1FFF\u2C00-\uD7FF\w]+/;
 
-  // Only use textCompleter that completes text inside the file.
-  // Alter the results of the textCompleter by removing the 'meta', as it is
-  // always 'local' which isn't useful for the user.
-  completers.push({
-    getCompletions(editor, session, pos, prefix, callback) {
-      langTools.textCompleter.getCompletions(editor, session, pos, prefix, (_, completions) => {
-        callback(null, completions.map((completion) => ({
-          ...completion,
-          meta: ''
-        })));
+  function getWordIndex(doc, pos) {
+      var textBefore = doc.getTextRange(Range.fromPoints({
+          row: 0,
+          column: 0
+      }, pos));
+      return textBefore.split(splitRegex).length - 1;
+  }
+
+  /**
+   * Does a distance analysis of the word `prefix` at position `pos` in `doc`.
+   * @return Map
+   */
+  function wordDistance(doc, pos) {
+      var prefixPos = getWordIndex(doc, pos);
+      var words = [];
+      var wordScores = Object.create(null);
+      var rowCount = doc.getLength();
+
+      // Extract tokens via the ace tokenizer
+      for (var row = 0; row < rowCount; row++) {
+          var tokens = doc.getTokens(row);
+
+          tokens.forEach(token => {
+              // Only include non-comment tokens
+              if (token.type !== "comment") {
+                  var tokenWords = token.value.split(splitRegex);
+                  words.push(...tokenWords);
+              }
+          });
+      }
+
+      // Create a score list
+      var currentWord = words[prefixPos];
+
+      words.forEach(function (word, idx) {
+          if (!word || word === currentWord) return;
+          if (/^[0-9]/.test(word)) return; // Custom: exclude numbers
+
+          var distance = Math.abs(prefixPos - idx);
+          var score = words.length - distance;
+          if (wordScores[word]) {
+              wordScores[word] = Math.max(score, wordScores[word]);
+          }
+          else {
+              wordScores[word] = score;
+          }
       });
-    }
-  });
+      return wordScores;
+  }
 
-  return completers;
+  var customCompleter = {
+    getCompletions: function (editor, session, pos, prefix, callback) {
+      var wordScore = wordDistance(session, pos);
+      var wordList = Object.keys(wordScore);
+      callback(null, wordList.map(function (word) {
+        return {
+          caption: word,
+          value: word,
+          score: wordScore[word],
+          meta: "" // note: this used to be "local" but is removed to make UI cleaner
+        };
+      }));
+    }
+  }
+
+  return [customCompleter];
 }
