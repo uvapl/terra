@@ -287,6 +287,25 @@ class LocalFileSystem {
   }
 
   /**
+   * Callback function when the IndexedDB version is upgraded.
+   *
+   * @param {IDBVersionChangeEvent} event
+   */
+  indexedDBOnUpgradeNeededCallback(event) {
+    const db = event.target.result;
+
+    // Create object stores for file and folder handles
+
+    if (!db.objectStoreNames.contains(this.FILE_HANDLES_STORE_NAME)) {
+      db.createObjectStore(this.FILE_HANDLES_STORE_NAME);
+    }
+
+    if (!db.objectStoreNames.contains(this.FOLDER_HANDLES_STORE_NAME)) {
+      db.createObjectStore(this.FOLDER_HANDLES_STORE_NAME);
+    }
+  };
+
+  /**
    * Opens a request to the IndexedDB.
    *
    * @returns {Promise<IDBRequest>} The IDB request object.
@@ -294,25 +313,12 @@ class LocalFileSystem {
   _openDB() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
+      request.onupgradeneeded = this.indexedDBOnUpgradeNeededCallback;
 
       request.onblocked = (event) => {
         console.error('IDB is blocked', event);
         reject(event.target.error);
       }
-
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-
-        // Create object stores for file and folder handles
-
-        if (!db.objectStoreNames.contains(this.FILE_HANDLES_STORE_NAME)) {
-          db.createObjectStore(this.FILE_HANDLES_STORE_NAME);
-        }
-
-        if (!db.objectStoreNames.contains(this.FOLDER_HANDLES_STORE_NAME)) {
-          db.createObjectStore(this.FOLDER_HANDLES_STORE_NAME);
-        }
-      };
 
       request.onsuccess = (event) => event.target.result ? resolve(event.target.result) : resolve();
       request.onerror = (event) => reject(event.target.error);
@@ -327,6 +333,7 @@ class LocalFileSystem {
   _clearStores() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
+      request.onupgradeneeded = this.indexedDBOnUpgradeNeededCallback;
 
       request.onsuccess = (event) => {
         const db = event.target.result;
