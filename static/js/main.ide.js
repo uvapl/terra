@@ -22,6 +22,10 @@ initApp().then(({ layout }) => {
     // Disable open-folder if the FileSystemAPI is not supported.
     $('#menu-item--open-folder').remove();
   }
+
+  if (!repoLink && !hasLFSApi()) {
+    showLocalStorageWarning();
+  }
 }).catch((err) => {
   console.error('Failed to bootstrap IDE app:', err);
 });

@@ -279,7 +279,9 @@ Menubar.connectRepo = () => {
     }
   });
 
-  showModal($connectModal);
+  showModal($connectModal).then(() => {
+    $('#ide-connect-repo-modal .repo-link').focus();
+  });
 
   // Change the connect to a disconnect button when the repo link is removed.
   if (initialRepoLink) {
@@ -309,9 +311,12 @@ Menubar.connectRepo = () => {
     } else {
       removeLocalStorageItem('connected-repo');
 
+      showLocalStorageWarning();
+
       // Clear all files after disconnecting.
       VFS.clear();
       createFileTree();
+      setFileTreeTitle('local storage');
     }
 
     hideModal($connectModal);

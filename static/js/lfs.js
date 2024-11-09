@@ -31,7 +31,9 @@ class LocalFileSystem {
 
   async _init() {
     const lastTimeUsedLFS = getLocalStorageItem('use-lfs', false);
-    if (!lastTimeUsedLFS) return;
+    if (!lastTimeUsedLFS) {
+      showLocalStorageWarning();
+    };
 
     const rootFolderHandle = await this.getFolderHandle('root');
     if (!rootFolderHandle) return;
@@ -57,6 +59,7 @@ class LocalFileSystem {
     this.loaded = false;
     setLocalStorageItem('use-lfs', false);
     clearTimeout(this._watchRootFolderInterval);
+    this._clearStores();
   }
 
   /**
@@ -151,6 +154,9 @@ class LocalFileSystem {
         window._gitFS.terminate();
         window._gitFS = null;
       }
+
+      // Remove local file storage warning if present.
+      removeLocalStorageWarning();
 
       closeAllFiles();
       await this._importFolderToVFS(rootFolderHandle);

@@ -162,6 +162,9 @@ class GitFS {
 
     case 'clone-success':
       $('#file-tree .info-msg').remove();
+
+      // Remove local file storage warning if present.
+      removeLocalStorageWarning();
       break;
 
       case 'clone-fail':
@@ -209,6 +212,7 @@ function createGitFSWorker() {
       $('#file-tree').fancytree('destroy');
       window._fileTree = null;
     }
+
     console.log('Creating gitfs worker')
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
   }
