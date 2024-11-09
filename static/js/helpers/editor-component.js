@@ -111,7 +111,7 @@ function openFile(id, filename) {
   }
 
   const proglang = getFileExtension(filename);
-  createWorkerApi(proglang);
+  createLangWorkerApi(proglang);
 }
 
 function createFolderOptionsHtml(html = '', parentId = null, indent = '--') {
@@ -255,7 +255,7 @@ function saveFile() {
     // Set correct syntax highlighting.
     tab.instance.setProgLang(proglang)
 
-    createWorkerApi(proglang);
+    createLangWorkerApi(proglang);
   });
 }
 
@@ -271,13 +271,13 @@ function saveFile() {
 async function runCode(fileId = null, clearTerm = false) {
   if (clearTerm) term.reset();
 
-  if (window._workerApi) {
-    if (!window._workerApi.isReady) {
+  if (window._langWorkerApi) {
+    if (!window._langWorkerApi.isReady) {
       // Worker API is busy, wait for it to be done.
       return;
-    } else if (window._workerApi.isRunningCode) {
+    } else if (window._langWorkerApi.isRunningCode) {
       // Terminate worker in cases of infinite loops.
-      return window._workerApi.restart(true);
+      return window._langWorkerApi.restart(true);
     }
   }
 
@@ -305,20 +305,20 @@ async function runCode(fileId = null, clearTerm = false) {
 
   // Create a new worker instance if needed.
   const proglang = getFileExtension(filename);
-  createWorkerApi(proglang);
+  createLangWorkerApi(proglang);
 
   // Wait for the worker to be ready before running the code.
-  if (window._workerApi && !window._workerApi.isReady) {
+  if (window._langWorkerApi && !window._langWorkerApi.isReady) {
     const runFileIntervalId = setInterval(() => {
-      if (window._workerApi && window._workerApi.isReady) {
-        window._workerApi.runUserCode(filename, files);
+      if (window._langWorkerApi && window._langWorkerApi.isReady) {
+        window._langWorkerApi.runUserCode(filename, files);
         checkForStopCodeButton();
         clearInterval(runFileIntervalId);
       }
     }, 200);
-  } else if (window._workerApi) {
+  } else if (window._langWorkerApi) {
     // If the worker is ready, run the code immediately.
-    window._workerApi.runUserCode(filename, files);
+    window._langWorkerApi.runUserCode(filename, files);
     checkForStopCodeButton();
   }
 }
@@ -353,7 +353,7 @@ async function runButtonCommand(selector, cmd) {
   const activeTabName = getActiveEditor().config.title;
   const files = await getAllEditorFiles();
 
-  window._workerApi.runButtonCommand(selector, activeTabName, cmd, files);
+  window._langWorkerApi.runButtonCommand(selector, activeTabName, cmd, files);
 }
 
 /**

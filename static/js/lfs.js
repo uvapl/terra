@@ -216,10 +216,14 @@ class LocalFileSystem {
    * @returns {Promise<string>} The file content.
    */
   async getFileContent(id) {
-    const fileHandle = await this.getFileHandle(VFS.getAbsoluteFilePath(id));
-    const file = await fileHandle.handle.getFile();
-    const content = await file.text();
-    return content;
+    try {
+      const fileHandle = await this.getFileHandle(VFS.getAbsoluteFilePath(id));
+      const file = await fileHandle.handle.getFile();
+      const content = await file.text();
+      return content;
+    } catch (err) {
+      console.error('Failed to get file content:', err);
+    }
   }
 
   /**

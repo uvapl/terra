@@ -1,5 +1,5 @@
 /**
- * Bridge class between the main app and the currently loaded worker.
+ * Bridge class between the main app and the currently loaded language worker.
  */
 class WorkerAPI {
   /**
@@ -311,20 +311,20 @@ function hasWorker(proglang) {
  *
  * @param {string} proglang - The proglang to spawn the related worker for.
  */
-function createWorkerApi(proglang) {
+function createLangWorkerApi(proglang) {
   // Situation 1: no worker, thus spawn a new one.
-  if (!window._workerApi && hasWorker(proglang)) {
-    window._workerApi = new WorkerAPI(proglang);
-  } else if (window._workerApi && window._workerApi.proglang !== proglang) {
-    window._workerApi.proglang = proglang;
+  if (!window._langWorkerApi && hasWorker(proglang)) {
+    window._langWorkerApi = new WorkerAPI(proglang);
+  } else if (window._langWorkerApi && window._langWorkerApi.proglang !== proglang) {
+    window._langWorkerApi.proglang = proglang;
 
     // Situation 2: existing worker but new proglang is invalid.
     if (!hasWorker(proglang)) {
-      window._workerApi.terminate();
-      window._workerApi = null;
+      window._langWorkerApi.terminate();
+      window._langWorkerApi = null;
     } else {
       // Situation 3: existing worker and new proglang is valid.
-      window._workerApi.restart();
+      window._langWorkerApi.restart();
     }
   }
 }

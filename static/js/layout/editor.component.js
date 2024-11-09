@@ -219,7 +219,7 @@ class EditorComponent {
     this.reloadFileContent();
 
     // Spawn a new worker if necessary.
-    createWorkerApi(this.proglang);
+    createLangWorkerApi(this.proglang);
   }
 
   /**
@@ -256,7 +256,7 @@ class EditorComponent {
 
     // Spawn a new worker if necessary.
     if (this.ready) {
-      createWorkerApi(this.proglang);
+      createLangWorkerApi(this.proglang);
     }
   }
 
