@@ -291,7 +291,7 @@ class LocalFileSystem {
    *
    * @param {IDBVersionChangeEvent} event
    */
-  indexedDBOnUpgradeNeededCallback(event) {
+  indexedDBOnUpgradeNeededCallback = (event) => {
     const db = event.target.result;
 
     // Create object stores for file and folder handles
