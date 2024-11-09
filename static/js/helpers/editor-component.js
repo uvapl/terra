@@ -348,16 +348,16 @@ function runButtonCommand(selector, cmd) {
  * @returns {array} List of completers.
  */
 function getAceCompleters() {
-  var Range = ace.Range;
+  const Range = ace.Range;
 
-  var splitRegex = /[^a-zA-Z_0-9\$\-\u00C0-\u1FFF\u2C00-\uD7FF\w]+/;
+  const splitRegex = /[^a-zA-Z_0-9\$\-\u00C0-\u1FFF\u2C00-\uD7FF\w]+/;
 
   function getWordIndex(doc, pos) {
-      var textBefore = doc.getTextRange(Range.fromPoints({
-          row: 0,
-          column: 0
-      }, pos));
-      return textBefore.split(splitRegex).length - 1;
+    const textBefore = doc.getTextRange(Range.fromPoints({
+      row: 0,
+      column: 0
+    }, pos));
+    return textBefore.split(splitRegex).length - 1;
   }
 
   /**
@@ -365,48 +365,47 @@ function getAceCompleters() {
    * @return Map
    */
   function wordDistance(doc, pos) {
-      var prefixPos = getWordIndex(doc, pos);
-      var words = [];
-      var wordScores = Object.create(null);
-      var rowCount = doc.getLength();
+    const prefixPos = getWordIndex(doc, pos);
+    const words = [];
+    const wordScores = Object.create(null);
+    const rowCount = doc.getLength();
 
-      // Extract tokens via the ace tokenizer
-      for (var row = 0; row < rowCount; row++) {
-          var tokens = doc.getTokens(row);
+    // Extract tokens via the ace tokenizer
+    for (let row = 0; row < rowCount; row++) {
+      const tokens = doc.getTokens(row);
 
-          tokens.forEach(token => {
-              // Only include non-comment tokens
-              if (token.type !== "comment") {
-                  var tokenWords = token.value.split(splitRegex);
-                  words.push(...tokenWords);
-              }
-          });
-      }
-
-      // Create a score list
-      var currentWord = words[prefixPos];
-
-      words.forEach(function (word, idx) {
-          if (!word || word === currentWord) return;
-          if (/^[0-9]/.test(word)) return; // Custom: exclude numbers
-
-          var distance = Math.abs(prefixPos - idx);
-          var score = words.length - distance;
-          if (wordScores[word]) {
-              wordScores[word] = Math.max(score, wordScores[word]);
-          }
-          else {
-              wordScores[word] = score;
-          }
+      tokens.forEach(token => {
+        // Only include non-comment tokens
+        if (!['string', 'comment'].includes(token.type)) {
+          const tokenWords = token.value.split(splitRegex);
+          words.push(...tokenWords);
+        }
       });
-      return wordScores;
+    }
+
+    // Create a score list
+    const currentWord = words[prefixPos];
+
+    words.forEach(function(word, idx) {
+      if (!word || word === currentWord || /^[0-9]/.test(word)) return;
+
+      const distance = Math.abs(prefixPos - idx);
+      const score = words.length - distance;
+      if (wordScores[word]) {
+        wordScores[word] = Math.max(score, wordScores[word]);
+      }
+      else {
+        wordScores[word] = score;
+      }
+    });
+    return wordScores;
   }
 
-  var customCompleter = {
-    getCompletions: function (editor, session, pos, prefix, callback) {
-      var wordScore = wordDistance(session, pos);
-      var wordList = Object.keys(wordScore);
-      callback(null, wordList.map(function (word) {
+  const customCompleter = {
+    getCompletions: function(editor, session, pos, prefix, callback) {
+      const wordScore = wordDistance(session, pos);
+      const wordList = Object.keys(wordScore);
+      callback(null, wordList.map(function(word) {
         return {
           caption: word,
           value: word,
