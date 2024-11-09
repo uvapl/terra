@@ -38,17 +38,26 @@ One example is to use Python's http module: `python3 -m http.server`, then open
 ├── index.html
 └── static/
     ├── css/
-    │   ├── main.css                # Includes custom css from include/
     │   ├── include/                # Custom app CSS
+    │   ├── main.embed.css          # Main css file when the embed is loaded
+    │   ├── main.exam.css           # Main css file when the exam app is loaded
+    │   ├── main.ide.css            # Main css file when the IDE is loaded
     │   └── vendor/                 # Third-party CSS
-    ├── img/                        # App images, i.e. icons
+    ├── img/                        # App images, such as icons
     ├── js/
     │   ├── constants.js            # Global app constants
-    │   ├── helpers.js              # Global app helper functions
-    │   ├── layout-components.js    # Main layout and component classes
-    │   ├── main.js                 # Bootstraps the app, contains most logic
+    │   ├── gitfs.js                # Bridge between app and Git worker
+    │   ├── helpers/                # Global app helper functions
+    │   ├── ide/                    # Additional IDE JS files
+    │   ├── layout/                 # Main layout and component classes
+    │   ├── lfs.js                  # Local filesystem main class
+    │   ├── main.embed.js           # Bootstraps the embed app.
+    │   ├── main.exam.js            # Bootstraps the exam app.
+    │   ├── main.ide.js             # Bootstraps the IDE app.
+    │   ├── main.shared.js          # Shared function among main.*.js files
     │   ├── vendor/                 # Third-party javascript files
-    │   ├── worker-api.js           # Bridge between app and other workers
+    │   ├── vfs.js                  # Virtual Filesystem that emits to other filesystems (Git, LFS)
+    │   ├── lang-worker-api.js      # Bridge between app and language other workers
     │   └── workers/                # Language specific workers that compiles and runs the code
     └── wasm                        # WASM files grouped per lang, loaded by corresponding worker
 ```
