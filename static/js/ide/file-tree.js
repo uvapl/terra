@@ -65,6 +65,10 @@ function createNewFileTreeFile(parentId = null) {
     tree.rootNode.addChildren(newChildProps);
   }
 
+  // Reload tree such that the 'No files or folders found' is removed in case
+  // there were no files, but a new has been created.
+  createFileTree();
+
   sortFileTree();
 
   const newNode = tree.getNodeByKey(id);
@@ -121,6 +125,10 @@ function createNewFileTreeFolder(parentId = null) {
   } else {
     tree.rootNode.addChildren(newChildProps);
   }
+
+  // Reload tree such that the 'No files or folders found' is removed in case
+  // there were no files, but a new has been created.
+  createFileTree();
 
   sortFileTree();
 
@@ -212,6 +220,10 @@ function deleteFileTreeItem(node) {
 
     hideModal($modal);
     window._userModifyingFileTree = false;
+
+    // Reload tree such that the 'No files or folders found' becomes visible
+    // when needed.
+    createFileTree();
   });
 }
 
