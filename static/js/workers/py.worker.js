@@ -128,7 +128,7 @@ class API extends BaseAPI {
   /**
    * Run a given command with the given files.
    *
-  * @param {object} data - The data object coming from the worker.
+   * @param {object} data - The data object coming from the worker.
    * @param {string} data.selector - Contains the button selector, which is
    * solely needed for the callback to enable the button after the code ran.
    * @param {string} activeTabName - The name of the active editor tab.

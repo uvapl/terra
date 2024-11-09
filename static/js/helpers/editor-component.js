@@ -10,14 +10,24 @@ function getActiveEditor() {
 /**
  * Gathers all files from the editor and returns them as an array of objects.
  *
- * @returns {array} List of objects, each containing the filename and content of
- * the corresponding editor tab.
+ * @returns {Promise<array>} List of objects, each containing the filename and
+ * content of the corresponding editor tab.
  */
 function getAllEditorFiles() {
-  return getAllEditorTabs().map((tab) => ({
-    name: tab.config.title,
-    content: tab.container.getState().value,
-  }));
+  return Promise.all(
+    getAllEditorTabs().map(async (tab) => {
+      const containerState = tab.container.getState()
+      let content = containerState.value;
+      if (!content && hasLFS() && LFS.loaded) {
+        content = await LFS.getFileContent(containerState.fileId);
+      }
+
+      return {
+        name: tab.config.title,
+        content,
+      }
+    })
+  );
 }
 
 /**
@@ -258,7 +268,7 @@ function saveFile() {
  * @param {boolean} [clearTerm=false] Whether to clear the terminal before
  * printing the output.
  */
-function runCode(fileId = null, clearTerm = false) {
+async function runCode(fileId = null, clearTerm = false) {
   if (clearTerm) term.reset();
 
   if (window._workerApi) {
@@ -277,12 +287,20 @@ function runCode(fileId = null, clearTerm = false) {
   let files = null;
 
   if (fileId) {
+    // Run given file id.
     const file = VFS.findFileById(fileId);
     filename = file.name;
     files = [file];
+
+    if (!file.content && hasLFS() && LFS.loaded) {
+      const content = await LFS.getFileContent(file.id);
+      files = [{ ...file, content }];
+    }
+
   } else {
+    // Run the active editor tab.
     filename = getActiveEditor().config.title;
-    files = getAllEditorFiles();
+    files = await getAllEditorFiles();
   }
 
   // Create a new worker instance if needed.
@@ -327,13 +345,13 @@ function checkForStopCodeButton() {
  * disable it when running and disable it when it's done running.
  * @param {array} cmd - List of commands to execute.
  */
-function runButtonCommand(selector, cmd) {
+async function runButtonCommand(selector, cmd) {
   const $button = $(selector);
   if ($button.prop('disabled')) return;
   $button.prop('disabled', true);
 
   const activeTabName = getActiveEditor().config.title;
-  const files = getAllEditorFiles();
+  const files = await getAllEditorFiles();
 
   window._workerApi.runButtonCommand(selector, activeTabName, cmd, files);
 }
