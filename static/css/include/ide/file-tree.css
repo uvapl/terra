@@ -12,10 +12,6 @@
   flex-direction: column;
 }
 
-.file-tree {
-  flex-grow: 1;
-}
-
 .file-tree-container .info-msg {
   padding: var(--file-tree-padding);
 }
@@ -253,6 +249,10 @@
  *  Local storage warning
  * ========================================================================== */
 .local-storage-warning {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   padding: var(--file-tree-padding);
   border-top: 1px solid var(--border-color);
   background-color: #ffffeb;
@@ -271,4 +271,8 @@
 
 .local-storage-warning p {
   font-size: 12px;
+}
+
+.localstorage-mode {
+  padding-bottom: 130px;
 }

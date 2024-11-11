@@ -320,6 +320,7 @@ function isValidFilename(filename) {
  * Removes the local storage warning from the DOM.
  */
 function removeLocalStorageWarning() {
+  $('.file-tree-container').removeClass('localstorage-mode')
   $('#local-storage-warning').remove();
 }
 
@@ -341,5 +342,5 @@ function showLocalStorageWarning() {
     </div>
   `;
 
-  $('.file-tree-container').append(html);
+  $('.file-tree-container').addClass('localstorage-mode').append(html);
 }
