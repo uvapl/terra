@@ -405,7 +405,8 @@ function getAceCompleters() {
     const currentWord = words[prefixPos];
 
     words.forEach(function(word, idx) {
-      if (!word || word === currentWord || /^[0-9]/.test(word)) return;
+      if (!word || word === currentWord) return;
+      if (/^[0-9]/.test(word)) return; // Custom: exclude numbers
 
       const distance = Math.abs(prefixPos - idx);
       const score = words.length - distance;
