@@ -58,10 +58,10 @@ function registerMenubarEventListeners() {
     const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
     const editor = getActiveEditor().instance.editor;
     if (isInsideMenu && isNotNewFileOrFolderBtn && editor) {
-      // Set window._userIsTyping to prevent file contents being reloaded
-      window._userIsTyping = true;
+      // Set window._blockLFSPolling to prevent file contents being reloaded
+      window._blockLFSPolling = true;
       editor.focus();
-      window._userIsTyping = false;
+      window._blockLFSPolling = false;
     }
 
     // Close the active menu.

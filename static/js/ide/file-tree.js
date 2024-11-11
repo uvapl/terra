@@ -197,7 +197,7 @@ function deleteFileTreeItem(node) {
   showModal($modal);
 
   $modal.find('.cancel-btn').click(() => {
-    window._userModifyingFileTree = false;
+    window._blockLFSPolling = false;
     hideModal($modal);
   });
 
@@ -219,7 +219,7 @@ function deleteFileTreeItem(node) {
     node.remove();
 
     hideModal($modal);
-    window._userModifyingFileTree = false;
+    window._blockLFSPolling = false;
 
     // Reload tree such that the 'No files or folders found' becomes visible
     // when needed.
@@ -291,7 +291,7 @@ function createFileTreeContextMenuItems($trigger, event) {
       callback: () => {
         window._userClickedContextMenuItem = true;
         VFS.downloadFolder(node.key);
-        window._userModifyingFileTree = false;
+        window._blockLFSPolling = false;
       },
     };
   }
@@ -302,7 +302,7 @@ function createFileTreeContextMenuItems($trigger, event) {
       callback: () => {
         window._userClickedContextMenuItem = true;
         VFS.downloadFile(node.key);
-        window._userModifyingFileTree = false;
+        window._blockLFSPolling = false;
       },
     };
 
@@ -312,7 +312,7 @@ function createFileTreeContextMenuItems($trigger, event) {
         callback: () => {
           window._userClickedContextMenuItem = true;
           runCode(node.key);
-          window._userModifyingFileTree = false;
+          window._blockLFSPolling = false;
         }
       };
     }
@@ -431,11 +431,11 @@ function createFileTree() {
     build: createFileTreeContextMenuItems,
     events: {
       show: () => {
-        window._userModifyingFileTree = true;
+        window._blockLFSPolling = true;
       },
       hide: () => {
         if (!window._userClickedContextMenuItem) {
-          window._userModifyingFileTree = false;
+          window._blockLFSPolling = false;
         }
       }
     }
@@ -470,7 +470,7 @@ function addGitDiffIndicator(node) {
  */
 function afterCloseEditNodeCallback() {
   sortFileTree(),
-  window._userModifyingFileTree = false;
+  window._blockLFSPolling = false;
 }
 
 /**
@@ -547,7 +547,7 @@ function beforeCloseEditNodeCallback(event, data) {
  * Callback when the user starts editing a node in the file tree.
  */
 function onStartEditNodeCallback(event, data) {
-  window._userModifyingFileTree = true;
+  window._blockLFSPolling = true;
 
   if (window._fileTreeToggleTimeout) {
     clearTimeout(window._fileTreeToggleTimeout);
@@ -571,7 +571,15 @@ function onClickNodeCallback(event, data) {
     // Only toggle with a debounce of 200ms when clicked on the title
     // to prevent double-clicks.
     if (event.originalEvent.target.classList.contains('fancytree-title')) {
-      window._fileTreeToggleTimeout = setTimeout(() => data.node.toggleExpanded(), 200);
+      window._fileTreeToggleTimeout = setTimeout(() => {
+        window._blockLFSPolling = true;
+        data.node.toggleExpanded();
+
+        // Unblock LFS polling after the animation has completed.
+        setTimeout(() => {
+          window._blockLFSPolling = false;
+        }, 400);
+      }, 200);
     } else {
       // Otherwise, immediately toggle the folder.
       data.node.toggleExpanded();
@@ -649,7 +657,7 @@ function dragEnterCallback(targetNode, data) {
  * Callback when the user starts dragging a node in the file tree.
  */
 function dragStartCallback(node, data) {
-  window._userModifyingFileTree = true;
+  window._blockLFSPolling = true;
 
   // Set custom drag image.
   data.dataTransfer.setDragImage($(`<div class="custom-drag-helper">${node.title}</div>`).appendTo("body")[0], -10, -10);
@@ -672,7 +680,7 @@ function dragEndCallback() {
   }
 
   sortFileTree()
-  window._userModifyingFileTree = false;
+  window._blockLFSPolling = false;
 }
 
 /**

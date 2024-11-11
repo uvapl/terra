@@ -33,6 +33,8 @@
   border: 0;
 }
 
+/* Exceeded filesize popup */
+
 .editor.exceeded-filesize:after  {
   padding-left: 50px;
   content: 'This file exceeds the maximum file size';
@@ -48,6 +50,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 
 .editor.exceeded-filesize .ace_cursor {
   display: none !important;
