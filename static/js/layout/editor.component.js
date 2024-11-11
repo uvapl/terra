@@ -270,10 +270,12 @@ class EditorComponent {
         // Load the file content from LFS.
         const cursorPos = this.editor.getCursorPosition()
         LFS.getFileContent(file.id).then((content) => {
-          this.editor.setValue(content);
-          this.editor.clearSelection();
-          this.editor.moveCursorToPosition(cursorPos);
-          this.editor.container.classList.remove('loading');
+          // Only update the content if it has changed.
+          if (this.editor.getValue() !== content) {
+            this.editor.setValue(content);
+            this.editor.clearSelection();
+            this.editor.moveCursorToPosition(cursorPos);
+          }
         });
       } else if (file.content) {
         this.editor.setValue(file.content);
