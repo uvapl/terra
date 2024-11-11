@@ -26,6 +26,8 @@ initApp().then(({ layout }) => {
   if (!repoLink && !hasLFSApi()) {
     showLocalStorageWarning();
   }
+
+  $(window).resize();
 }).catch((err) => {
   console.error('Failed to bootstrap IDE app:', err);
 });

@@ -78,10 +78,7 @@ class LocalFileSystem {
     }
 
     this._watchRootFolderInterval = setInterval(async () => {
-      // When the user is renaming or dragging, don't replace the tree.
-      if (window._userModifyingFileTree || window._userIsTyping) {
-        return;
-      }
+      if (window._blockLFSPolling) return;
 
       // Iterate through all nodes in the tree and obtain all expanded folder
       // nodes their absolute path.
@@ -235,8 +232,20 @@ class LocalFileSystem {
    * @returns {Promise<void>}
    */
   async _readFolder(dirHandle, parentId) {
+    const blacklistedPaths = [
+      'site-packages',           // when user folder has python virtual env
+      '__pycache__',             // Python cache directory
+      '.mypy_cache',             // Mypy cache directory
+      '.venv', 'venv', 'env',    // virtual environment
+      '.DS_Store',               // Macos metadata file
+      'dist', 'build',           // compiled assets for various languages
+      'coverage', '.nyc_output', // code coverage reports
+      '.git',                    // Git directory
+      'node_modules',            // NodeJS projects
+    ];
+
     for await (const [name, handle] of dirHandle) {
-      if (handle.kind === 'file') {
+      if (handle.kind === 'file' && !blacklistedPaths.includes(name)) {
         const file = await handle.getFile();
         const { id: fileId } = VFS.createFile({
           name: file.name,
@@ -244,7 +253,7 @@ class LocalFileSystem {
           size: file.size
         }, false);
         await this.saveFileHandle(VFS.getAbsoluteFilePath(fileId), fileId, handle);
-      } else if (handle.kind === 'directory') {
+      } else if (handle.kind === 'directory' && !blacklistedPaths.includes(name)) {
         const folder = VFS.createFolder({ name, parentId }, false);
         await this.saveFolderHandle(VFS.getAbsoluteFolderPath(folder.id), folder.id, handle);
         await this._readFolder(handle, folder.id);

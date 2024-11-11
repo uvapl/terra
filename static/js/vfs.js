@@ -306,9 +306,10 @@ class VirtualFileSystem {
    * Create a new folder in the virtual filesystem.
    *
    * @param {object} folderObj - The folder object to create.
+   * @param {boolean} [userInvoked] - Whether to user invoked the action.
    * @returns {object} The new folder object.
    */
-  createFolder = (folderObj) => {
+  createFolder = (folderObj, userInvoked = true) => {
     const newFolder = {
       id: uuidv4(),
       name: 'Untitled',
@@ -319,7 +320,11 @@ class VirtualFileSystem {
     };
 
     this.folders[newFolder.id] = newFolder;
-    this._lfs('createFolder', newFolder.id, newFolder.parentId, newFolder.name);
+
+    if (userInvoked) {
+      this._lfs('createFolder', newFolder.id, newFolder.parentId, newFolder.name);
+    }
+
     this.saveState();
     return newFolder;
   }

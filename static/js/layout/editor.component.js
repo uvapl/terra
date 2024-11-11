@@ -169,7 +169,7 @@ class EditorComponent {
    * Callback when the editor content changes, triggered per keystroke.
    */
   onEditorChange = () => {
-    window._userIsTyping = true;
+    window._blockLFSPolling = true;
     window._editorIsDirty = true;
     this.container.extendState({ value: this.editor.getValue() });
 
@@ -207,7 +207,7 @@ class EditorComponent {
     }
 
     this.userIsTypingTimeoutId = setTimeout(() => {
-      window._userIsTyping = false;
+      window._blockLFSPolling = false;
     }, seconds(2));
   }
 
@@ -242,11 +242,6 @@ class EditorComponent {
       }
     }
 
-    // Load file content from vfs.
-    if (isIDE) {
-      this.reloadFileContent();
-    }
-
     // Add custom class for styling purposes.
     this.getParentComponentElement().classList.add('component-container', 'editor-component-container');
 
@@ -261,14 +256,13 @@ class EditorComponent {
   }
 
   reloadFileContent = () => {
-    if (window._userIsTyping) return;
-
+    if (window._blockLFSPolling) return;
 
     const file = VFS.findFileById(this.container.getState().fileId);
     if (file) {
       if (hasLFS() && LFS.loaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
         // Disable the editor if the file is too large.
-        this.editor.this.container.classList.add('exceeded-filesize');
+        this.editor.container.classList.add('exceeded-filesize');
         this.editor.setReadOnly(true);
         this.editor.clearSelection();
         this.editor.blur();
@@ -276,9 +270,12 @@ class EditorComponent {
         // Load the file content from LFS.
         const cursorPos = this.editor.getCursorPosition()
         LFS.getFileContent(file.id).then((content) => {
-          this.editor.setValue(content);
-          this.editor.clearSelection();
-          this.editor.moveCursorToPosition(cursorPos);
+          // Only update the content if it has changed.
+          if (this.editor.getValue() !== content) {
+            this.editor.setValue(content);
+            this.editor.clearSelection();
+            this.editor.moveCursorToPosition(cursorPos);
+          }
         });
       } else if (file.content) {
         this.editor.setValue(file.content);
