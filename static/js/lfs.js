@@ -235,6 +235,7 @@ class LocalFileSystem {
     const blacklistedPaths = [
       'site-packages',           // when user folder has python virtual env
       '__pycache__',             // Python cache directory
+      '.mypy_cache',             // Mypy cache directory
       '.venv', 'venv', 'env',    // virtual environment
       '.DS_Store',               // Macos metadata file
       'dist', 'build',           // compiled assets for various languages
