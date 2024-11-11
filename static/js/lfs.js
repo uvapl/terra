@@ -31,7 +31,9 @@ class LocalFileSystem {
 
   async _init() {
     const lastTimeUsedLFS = getLocalStorageItem('use-lfs', false);
-    if (!lastTimeUsedLFS) return;
+    if (!lastTimeUsedLFS) {
+      showLocalStorageWarning();
+    };
 
     const rootFolderHandle = await this.getFolderHandle('root');
     if (!rootFolderHandle) return;
@@ -57,6 +59,7 @@ class LocalFileSystem {
     this.loaded = false;
     setLocalStorageItem('use-lfs', false);
     clearTimeout(this._watchRootFolderInterval);
+    this._clearStores();
   }
 
   /**
@@ -152,6 +155,9 @@ class LocalFileSystem {
         window._gitFS = null;
       }
 
+      // Remove local file storage warning if present.
+      removeLocalStorageWarning();
+
       closeAllFiles();
       await this._importFolderToVFS(rootFolderHandle);
       this._watchRootFolder();
@@ -210,10 +216,14 @@ class LocalFileSystem {
    * @returns {Promise<string>} The file content.
    */
   async getFileContent(id) {
-    const fileHandle = await this.getFileHandle(VFS.getAbsoluteFilePath(id));
-    const file = await fileHandle.handle.getFile();
-    const content = await file.text();
-    return content;
+    try {
+      const fileHandle = await this.getFileHandle(VFS.getAbsoluteFilePath(id));
+      const file = await fileHandle.handle.getFile();
+      const content = await file.text();
+      return content;
+    } catch (err) {
+      console.error('Failed to get file content:', err);
+    }
   }
 
   /**
@@ -281,6 +291,25 @@ class LocalFileSystem {
   }
 
   /**
+   * Callback function when the IndexedDB version is upgraded.
+   *
+   * @param {IDBVersionChangeEvent} event
+   */
+  indexedDBOnUpgradeNeededCallback = (event) => {
+    const db = event.target.result;
+
+    // Create object stores for file and folder handles
+
+    if (!db.objectStoreNames.contains(this.FILE_HANDLES_STORE_NAME)) {
+      db.createObjectStore(this.FILE_HANDLES_STORE_NAME);
+    }
+
+    if (!db.objectStoreNames.contains(this.FOLDER_HANDLES_STORE_NAME)) {
+      db.createObjectStore(this.FOLDER_HANDLES_STORE_NAME);
+    }
+  };
+
+  /**
    * Opens a request to the IndexedDB.
    *
    * @returns {Promise<IDBRequest>} The IDB request object.
@@ -288,25 +317,12 @@ class LocalFileSystem {
   _openDB() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
+      request.onupgradeneeded = this.indexedDBOnUpgradeNeededCallback;
 
       request.onblocked = (event) => {
         console.error('IDB is blocked', event);
         reject(event.target.error);
       }
-
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-
-        // Create object stores for file and folder handles
-
-        if (!db.objectStoreNames.contains(this.FILE_HANDLES_STORE_NAME)) {
-          db.createObjectStore(this.FILE_HANDLES_STORE_NAME);
-        }
-
-        if (!db.objectStoreNames.contains(this.FOLDER_HANDLES_STORE_NAME)) {
-          db.createObjectStore(this.FOLDER_HANDLES_STORE_NAME);
-        }
-      };
 
       request.onsuccess = (event) => event.target.result ? resolve(event.target.result) : resolve();
       request.onerror = (event) => reject(event.target.error);
@@ -321,6 +337,7 @@ class LocalFileSystem {
   _clearStores() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
+      request.onupgradeneeded = this.indexedDBOnUpgradeNeededCallback;
 
       request.onsuccess = (event) => {
         const db = event.target.result;

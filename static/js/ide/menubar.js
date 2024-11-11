@@ -58,7 +58,10 @@ function registerMenubarEventListeners() {
     const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
     const editor = getActiveEditor().instance.editor;
     if (isInsideMenu && isNotNewFileOrFolderBtn && editor) {
+      // Set window._userIsTyping to prevent file contents being reloaded
+      window._userIsTyping = true;
       editor.focus();
+      window._userIsTyping = false;
     }
 
     // Close the active menu.
@@ -104,6 +107,8 @@ function registerMenubarEventListeners() {
   $('#menu-item--close-file').click(closeFile);
   Mousetrap.bind(['ctrl+w'], closeFile);
 
+  $('#menu-item--comment').click(Menubar.toggleComment);
+
   $('#menu-item--open-folder').click(() => LFS.openFolderPicker());
   Mousetrap.bind(['ctrl+shift+o'], () => LFS.openFolderPicker());
 
@@ -114,8 +119,14 @@ function registerMenubarEventListeners() {
   $('#menu-item--cut').click(Menubar.cut);
   $('#menu-item--paste').click(Menubar.pasteFromClipboard);
 
+  $('#menu-item--move-lines-up').click(Menubar.moveLinesUp);
+  $('#menu-item--move-lines-down').click(Menubar.moveLinesDown);
+
   $('#menu-item--indent').click(Menubar.indent);
   $('#menu-item--outdent').click(Menubar.outdent);
+
+  $('#menu-item--find-next').click(Menubar.findNext);
+  $('#menu-item--find-previous').click(Menubar.findPrev);
 
   $('#menu-item--search').click(Menubar.search);
   Mousetrap.bind(['ctrl+f', 'meta+f'], Menubar.search);
@@ -127,6 +138,9 @@ function registerMenubarEventListeners() {
   $('#menu-item--push-changes').click(Menubar.pushChanges);
   $('#menu-item--add-credentials').click(Menubar.addCredentials);
   $('#menu-item--connect-repo').click(Menubar.connectRepo);
+
+  // Prevent the default browser save dialog when pressing ctrl+s or cmd+s.
+  Mousetrap.bind(['ctrl+s', 'meta+s'], (event) => event.preventDefault());
 }
 
 const Menubar = {};
@@ -158,6 +172,18 @@ Menubar.cut = () => {
   getActiveEditor().instance.editor.insert('');
 };
 
+Menubar.toggleComment = () => {
+  getActiveEditor().instance.editor.toggleCommentLines();
+}
+
+Menubar.moveLinesUp = () => {
+  getActiveEditor().instance.editor.moveLinesUp();
+}
+
+Menubar.moveLinesDown = () => {
+  getActiveEditor().instance.editor.moveLinesDown();
+}
+
 Menubar.pasteFromClipboard = () => {
   navigator.clipboard.readText().then((text) => {
     getActiveEditor().instance.editor.insert(text);
@@ -171,6 +197,14 @@ Menubar.indent = () => {
 Menubar.outdent = () => {
   getActiveEditor().instance.editor.blockOutdent();
 };
+
+Menubar.findNext = () => {
+  getActiveEditor().instance.editor.findNext();
+}
+
+Menubar.findPrev = () => {
+  getActiveEditor().instance.editor.findPrevious();
+}
 
 Menubar.search = () => {
   getActiveEditor().instance.editor.execCommand('find');
@@ -279,7 +313,9 @@ Menubar.connectRepo = () => {
     }
   });
 
-  showModal($connectModal);
+  showModal($connectModal).then(() => {
+    $('#ide-connect-repo-modal .repo-link').focus();
+  });
 
   // Change the connect to a disconnect button when the repo link is removed.
   if (initialRepoLink) {
@@ -309,9 +345,12 @@ Menubar.connectRepo = () => {
     } else {
       removeLocalStorageItem('connected-repo');
 
+      showLocalStorageWarning();
+
       // Clear all files after disconnecting.
       VFS.clear();
       createFileTree();
+      setFileTreeTitle('local storage');
     }
 
     hideModal($connectModal);

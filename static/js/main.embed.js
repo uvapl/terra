@@ -50,7 +50,7 @@ function initApp() {
     const proglang = getFileExtension(queryParams.filename);
 
     // Initialise the programming language specific worker API.
-    window._workerApi = new WorkerAPI(proglang);
+    window._langWorkerApi = new WorkerAPI(proglang);
 
     // Get the font-size stored in local storage or use fallback value.
     const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);

@@ -84,6 +84,18 @@ class EditorComponent {
       }
     });
 
+    this.editor.commands.addCommand({
+      name: 'moveLinesUp',
+      bindKey: { win: 'Ctrl+Alt+Up', mac: 'Command+Option+Up' },
+      exec: () => this.editor.moveLinesUp(),
+    });
+
+    this.editor.commands.addCommand({
+      name: 'moveLinesDown',
+      bindKey: { win: 'Ctrl+Alt+Down', mac: 'Command+Option+Down' },
+      exec: () => this.editor.moveLinesDown(),
+    });
+
     if (isIDE) {
       this.bindEditorIDECommands();
     }
@@ -207,7 +219,7 @@ class EditorComponent {
     this.reloadFileContent();
 
     // Spawn a new worker if necessary.
-    createWorkerApi(this.proglang);
+    createLangWorkerApi(this.proglang);
   }
 
   /**
@@ -244,12 +256,13 @@ class EditorComponent {
 
     // Spawn a new worker if necessary.
     if (this.ready) {
-      createWorkerApi(this.proglang);
+      createLangWorkerApi(this.proglang);
     }
   }
 
   reloadFileContent = () => {
     if (window._userIsTyping) return;
+
 
     const file = VFS.findFileById(this.container.getState().fileId);
     if (file) {
@@ -261,9 +274,11 @@ class EditorComponent {
         this.editor.blur();
       } else if (hasLFS() && !file.content) {
         // Load the file content from LFS.
+        const cursorPos = this.editor.getCursorPosition()
         LFS.getFileContent(file.id).then((content) => {
           this.editor.setValue(content);
           this.editor.clearSelection();
+          this.editor.moveCursorToPosition(cursorPos);
         });
       } else if (file.content) {
         this.editor.setValue(file.content);

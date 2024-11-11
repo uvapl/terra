@@ -65,6 +65,10 @@ function createNewFileTreeFile(parentId = null) {
     tree.rootNode.addChildren(newChildProps);
   }
 
+  // Reload tree such that the 'No files or folders found' is removed in case
+  // there were no files, but a new has been created.
+  createFileTree();
+
   sortFileTree();
 
   const newNode = tree.getNodeByKey(id);
@@ -121,6 +125,10 @@ function createNewFileTreeFolder(parentId = null) {
   } else {
     tree.rootNode.addChildren(newChildProps);
   }
+
+  // Reload tree such that the 'No files or folders found' is removed in case
+  // there were no files, but a new has been created.
+  createFileTree();
 
   sortFileTree();
 
@@ -212,6 +220,10 @@ function deleteFileTreeItem(node) {
 
     hideModal($modal);
     window._userModifyingFileTree = false;
+
+    // Reload tree such that the 'No files or folders found' becomes visible
+    // when needed.
+    createFileTree();
   });
 }
 
@@ -255,8 +267,9 @@ function closeFilesInFolderRecursively(folderId) {
 function createFileTreeContextMenuItems($trigger, event) {
   const menu = {};
   const node = $.ui.fancytree.getNode($trigger[0]);
+  const { isFolder, isFile } = node.data;
 
-  if (node.data.isFolder) {
+  if (isFolder) {
     menu.createFile = {
       name: 'New File',
       callback: () => {
@@ -283,7 +296,7 @@ function createFileTreeContextMenuItems($trigger, event) {
     };
   }
 
-  if (node.data.isFile) {
+  if (isFile) {
     menu.downloadFile = {
       name: 'Download',
       callback: () => {
@@ -305,21 +318,27 @@ function createFileTreeContextMenuItems($trigger, event) {
     }
   }
 
-  menu.rename = {
-    name: 'Rename',
-    callback: () => {
-      window._userClickedContextMenuItem = true;
-      node.editStart();
-    },
-  };
+  if (isFile || isFolder) {
+    menu.rename = {
+      name: 'Rename',
+      callback: () => {
+        window._userClickedContextMenuItem = true;
+        node.editStart();
+      },
+    };
 
-  menu.remove = {
-    name: 'Delete',
-    callback: () => {
-      window._userClickedContextMenuItem = true;
-      deleteFileTreeItem(node);
-    }
-  };
+    menu.remove = {
+      name: 'Delete',
+      callback: () => {
+        window._userClickedContextMenuItem = true;
+        deleteFileTreeItem(node);
+      }
+    };
+  }
+
+  if (Object.keys(menu).length === 0) {
+    return false;
+  }
 
   return { items: menu };
 }
@@ -637,7 +656,7 @@ function dragStartCallback(node, data) {
   data.useDefaultImage = false;
 
   // Return true to enable dnd.
-  return true;
+  return node.statusNodeType !== 'nodata';
 }
 
 /**

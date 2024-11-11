@@ -10,14 +10,24 @@ function getActiveEditor() {
 /**
  * Gathers all files from the editor and returns them as an array of objects.
  *
- * @returns {array} List of objects, each containing the filename and content of
- * the corresponding editor tab.
+ * @returns {Promise<array>} List of objects, each containing the filename and
+ * content of the corresponding editor tab.
  */
 function getAllEditorFiles() {
-  return getAllEditorTabs().map((tab) => ({
-    name: tab.config.title,
-    content: tab.container.getState().value,
-  }));
+  return Promise.all(
+    getAllEditorTabs().map(async (tab) => {
+      const containerState = tab.container.getState()
+      let content = containerState.value;
+      if (!content && hasLFS() && LFS.loaded) {
+        content = await LFS.getFileContent(containerState.fileId);
+      }
+
+      return {
+        name: tab.config.title,
+        content,
+      }
+    })
+  );
 }
 
 /**
@@ -101,7 +111,7 @@ function openFile(id, filename) {
   }
 
   const proglang = getFileExtension(filename);
-  createWorkerApi(proglang);
+  createLangWorkerApi(proglang);
 }
 
 function createFolderOptionsHtml(html = '', parentId = null, indent = '--') {
@@ -245,7 +255,7 @@ function saveFile() {
     // Set correct syntax highlighting.
     tab.instance.setProgLang(proglang)
 
-    createWorkerApi(proglang);
+    createLangWorkerApi(proglang);
   });
 }
 
@@ -258,16 +268,16 @@ function saveFile() {
  * @param {boolean} [clearTerm=false] Whether to clear the terminal before
  * printing the output.
  */
-function runCode(fileId = null, clearTerm = false) {
+async function runCode(fileId = null, clearTerm = false) {
   if (clearTerm) term.reset();
 
-  if (window._workerApi) {
-    if (!window._workerApi.isReady) {
+  if (window._langWorkerApi) {
+    if (!window._langWorkerApi.isReady) {
       // Worker API is busy, wait for it to be done.
       return;
-    } else if (window._workerApi.isRunningCode) {
+    } else if (window._langWorkerApi.isRunningCode) {
       // Terminate worker in cases of infinite loops.
-      return window._workerApi.restart(true);
+      return window._langWorkerApi.restart(true);
     }
   }
 
@@ -277,30 +287,38 @@ function runCode(fileId = null, clearTerm = false) {
   let files = null;
 
   if (fileId) {
+    // Run given file id.
     const file = VFS.findFileById(fileId);
     filename = file.name;
     files = [file];
+
+    if (!file.content && hasLFS() && LFS.loaded) {
+      const content = await LFS.getFileContent(file.id);
+      files = [{ ...file, content }];
+    }
+
   } else {
+    // Run the active editor tab.
     filename = getActiveEditor().config.title;
-    files = getAllEditorFiles();
+    files = await getAllEditorFiles();
   }
 
   // Create a new worker instance if needed.
   const proglang = getFileExtension(filename);
-  createWorkerApi(proglang);
+  createLangWorkerApi(proglang);
 
   // Wait for the worker to be ready before running the code.
-  if (window._workerApi && !window._workerApi.isReady) {
+  if (window._langWorkerApi && !window._langWorkerApi.isReady) {
     const runFileIntervalId = setInterval(() => {
-      if (window._workerApi && window._workerApi.isReady) {
-        window._workerApi.runUserCode(filename, files);
+      if (window._langWorkerApi && window._langWorkerApi.isReady) {
+        window._langWorkerApi.runUserCode(filename, files);
         checkForStopCodeButton();
         clearInterval(runFileIntervalId);
       }
     }, 200);
-  } else if (window._workerApi) {
+  } else if (window._langWorkerApi) {
     // If the worker is ready, run the code immediately.
-    window._workerApi.runUserCode(filename, files);
+    window._langWorkerApi.runUserCode(filename, files);
     checkForStopCodeButton();
   }
 }
@@ -327,40 +345,95 @@ function checkForStopCodeButton() {
  * disable it when running and disable it when it's done running.
  * @param {array} cmd - List of commands to execute.
  */
-function runButtonCommand(selector, cmd) {
+async function runButtonCommand(selector, cmd) {
   const $button = $(selector);
   if ($button.prop('disabled')) return;
   $button.prop('disabled', true);
 
   const activeTabName = getActiveEditor().config.title;
-  const files = getAllEditorFiles();
+  const files = await getAllEditorFiles();
 
-  window._workerApi.runButtonCommand(selector, activeTabName, cmd, files);
+  window._langWorkerApi.runButtonCommand(selector, activeTabName, cmd, files);
 }
 
 /**
- * Get default Ace editor completers.
+ * Create local text completer.
+ *
+ * Largely based on text_completer.js from ajaxorg/ace
+ * under the BSD license included in the ace project
+ * https://github.com/ajaxorg/ace/blob/master/LICENSE
  *
  * @returns {array} List of completers.
  */
 function getAceCompleters() {
-  const langTools = ace.require('ace/ext/language_tools');
+  const Range = ace.Range;
 
-  const completers = [];
+  const splitRegex = /[^a-zA-Z_0-9\$\-\u00C0-\u1FFF\u2C00-\uD7FF\w]+/;
 
-  // Only use textCompleter that completes text inside the file.
-  // Alter the results of the textCompleter by removing the 'meta', as it is
-  // always 'local' which isn't useful for the user.
-  completers.push({
-    getCompletions(editor, session, pos, prefix, callback) {
-      langTools.textCompleter.getCompletions(editor, session, pos, prefix, (_, completions) => {
-        callback(null, completions.map((completion) => ({
-          ...completion,
-          meta: ''
-        })));
+  function getWordIndex(doc, pos) {
+    const textBefore = doc.getTextRange(Range.fromPoints({
+      row: 0,
+      column: 0
+    }, pos));
+    return textBefore.split(splitRegex).length - 1;
+  }
+
+  /**
+   * Does a distance analysis of the word `prefix` at position `pos` in `doc`.
+   * @return Map
+   */
+  function wordDistance(doc, pos) {
+    const prefixPos = getWordIndex(doc, pos);
+    const words = [];
+    const wordScores = Object.create(null);
+    const rowCount = doc.getLength();
+
+    // Extract tokens via the ace tokenizer
+    for (let row = 0; row < rowCount; row++) {
+      const tokens = doc.getTokens(row);
+
+      tokens.forEach(token => {
+        // Only include non-comment tokens
+        if (!['string', 'comment'].includes(token.type)) {
+          const tokenWords = token.value.split(splitRegex);
+          words.push(...tokenWords);
+        }
       });
     }
-  });
 
-  return completers;
+    // Create a score list
+    const currentWord = words[prefixPos];
+
+    words.forEach(function(word, idx) {
+      if (!word || word === currentWord) return;
+      if (/^[0-9]/.test(word)) return; // Custom: exclude numbers
+
+      const distance = Math.abs(prefixPos - idx);
+      const score = words.length - distance;
+      if (wordScores[word]) {
+        wordScores[word] = Math.max(score, wordScores[word]);
+      }
+      else {
+        wordScores[word] = score;
+      }
+    });
+    return wordScores;
+  }
+
+  const customCompleter = {
+    getCompletions: function(editor, session, pos, prefix, callback) {
+      const wordScore = wordDistance(session, pos);
+      const wordList = Object.keys(wordScore);
+      callback(null, wordList.map(function(word) {
+        return {
+          caption: word,
+          value: word,
+          score: wordScore[word],
+          meta: "" // note: this used to be "local" but is removed to make UI cleaner
+        };
+      }));
+    }
+  }
+
+  return [customCompleter];
 }

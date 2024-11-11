@@ -57,6 +57,8 @@ class API {
     this._alterXHR(options.username, options.accessToken);
     this._init().then((repoFiles) => {
       options.readyCallback(repoFiles);
+    }).catch(() => {
+      console.info('Failed to initialize git worker');
     });
   }
 
@@ -213,13 +215,18 @@ class API {
    * cloned directory.
    */
   clone() {
-    const exitcode = this.lg.callMain(['clone', this.repoLink, this.repoDir]);
-    if (exitcode !== 0) {
-      this._log('Failed to clone repository');
+    try {
+      const exitcode = this.lg.callMain(['clone', this.repoLink, this.repoDir]);
+      if (exitcode !== 0) {
+        this._log('Failed to clone repository');
+        this.cloneFailCallback();
+      } else {
+        this.fs.chdir(this.repoDir);
+        this.cloneSuccessCallback();
+      }
+    } catch (err) {
+      console.error('Failed to clone repository:', err);
       this.cloneFailCallback();
-    } else {
-      this.fs.chdir(this.repoDir);
-      this.cloneSuccessCallback();
     }
   }
 

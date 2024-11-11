@@ -3,12 +3,17 @@
  * ========================================================================== */
 
 .file-tree-container {
+  position: relative;
   min-width: var(--file-tree-width);
   max-width: var(--file-tree-width);
   overflow: auto;
   user-select: none;
   display: flex;
   flex-direction: column;
+}
+
+.file-tree {
+  flex-grow: 1;
 }
 
 .file-tree-container .info-msg {
@@ -107,7 +112,7 @@
   border-radius: var(--border-radius);
 }
 
-.fancytree-node:not(.fancytree-drop-accept):not(.fancytree-drop-reject):hover {
+.fancytree-node:not(.fancytree-drop-accept):not(.fancytree-drop-reject):not(.fancytree-statusnode-nodata):hover {
   background-color: var(--tab-menu--tab-bg-color);
   cursor: pointer;
 }
@@ -242,4 +247,28 @@
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
   padding: 5px 10px;
   border-radius: var(--border-radius);
+}
+
+/* ==========================================================================
+ *  Local storage warning
+ * ========================================================================== */
+.local-storage-warning {
+  padding: var(--file-tree-padding);
+  border-top: 1px solid var(--border-color);
+  background-color: #ffffeb;
+}
+
+.local-storage-warning .warning-icon {
+  height: 24px;
+  margin-right: 4px;
+}
+
+.local-storage-warning .warning-title {
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+}
+
+.local-storage-warning p {
+  font-size: 12px;
 }

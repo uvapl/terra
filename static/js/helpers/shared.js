@@ -17,7 +17,15 @@ function setLocalStorageItem(key, value) {
  */
 function getLocalStorageItem(key, defaultValue) {
   const value = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}-${key}`);
-  return value === null && typeof defaultValue !== 'undefined' ? defaultValue : value;
+  if (value === null && typeof defaultValue !== 'undefined') {
+    return defaultValue
+  }
+
+  if (['true', 'false'].includes(value)) {
+    return value === 'true';
+  }
+
+  return value;
 }
 
 /**
@@ -287,6 +295,8 @@ function setFileTreeTitle(title) {
  * @param {string} repoLink - Absolute link to the repository.
  */
 function getRepoInfo(repoLink) {
+  if (!repoLink) return null;
+
   const match = repoLink.match(/^https:\/\/(?:www\.)?github.com\/([^/]+)\/([\w-]+)/);
   if (!match) return null;
 
@@ -304,4 +314,32 @@ function getRepoInfo(repoLink) {
  */
 function isValidFilename(filename) {
   return !/[\/\\:*?"<>|]/.test(filename) && !['&lt;', '&gt;'].includes(filename);
+}
+
+/**
+ * Removes the local storage warning from the DOM.
+ */
+function removeLocalStorageWarning() {
+  $('#local-storage-warning').remove();
+}
+
+/**
+ * Add the local storage warning to the DOM.
+ */
+function showLocalStorageWarning() {
+  if ($('#local-storage-warning').length > 0) return;
+
+  const html = `
+    <div id="local-storage-warning" class="local-storage-warning">
+      <div class="warning-title">
+        <img src="static/img/icons/warning.png" alt="warning icon" class="warning-icon" /> Warning
+      </div>
+      <p>
+        You're currently using temporary browser storage. Clearing website data will
+        delete project files and folders permanently.
+      </p>
+    </div>
+  `;
+
+  $('.file-tree-container').append(html);
 }

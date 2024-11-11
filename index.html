@@ -30,24 +30,37 @@
               </ul>
             </li>
             <li>
-              Edit
+              Text
               <ul>
-                <li id="menu-item--undo" data-keystroke="CTRL_META Z">Undo</li>
-                <li id="menu-item--redo" data-keystroke="CTRL_META SHIFT Z">Redo</li>
+                <li id="menu-item--comment" data-keystroke="CTRL_META /">Toggle comment</li>
                 <div class="separator"></div>
-                <li id="menu-item--copy" data-keystroke="CTRL_META C">Copy</li>
-                <li id="menu-item--cut" data-keystroke="CTRL_META X">Cut</li>
-                <li id="menu-item--paste" data-keystroke="CTRL_META V">Paste</li>
+                <li id="menu-item--move-lines-up" data-keystroke="CTRL_META ALT_OPTION UP">Move Lines Up</li>
+                <li id="menu-item--move-lines-down" data-keystroke="CTRL_META ALT_OPTION DOWN">Move Lines Down</li>
                 <div class="separator"></div>
                 <li id="menu-item--indent" data-keystroke="TAB">Indent</li>
                 <li id="menu-item--outdent" data-keystroke="SHIFT TAB">Outdent</li>
               </ul>
             </li>
             <li>
-              Find
+              Edit
               <ul>
-                <li id="menu-item--search" data-keystroke="CTRL_META F">Search</li>
-                <li id="menu-item--replace">Replace</li>
+                <li id="menu-item--undo" data-keystroke="CTRL_META Z">Undo</li>
+                <li id="menu-item--redo" data-keystroke="CTRL_META SHIFT Z">Redo</li>
+                <div class="separator"></div>
+                <li class="has-dropdown">
+                  Find
+                  <ul>
+                    <li id="menu-item--search" data-keystroke="CTRL_META F">Find</li>
+                    <li id="menu-item--find-next" data-keystroke="CTRL G">Find Next</li>
+                    <li id="menu-item--find-previous" data-keystroke="CTRL SHIFT G">Find Previous</li>
+                    <div class="separator"></div>
+                    <li id="menu-item--replace">Replace</li>
+                  </ul>
+                </li>
+                <div class="separator"></div>
+                <li id="menu-item--copy" data-keystroke="CTRL_META C">Copy</li>
+                <li id="menu-item--cut" data-keystroke="CTRL_META X">Cut</li>
+                <li id="menu-item--paste" data-keystroke="CTRL_META V">Paste</li>
               </ul>
             </li>
             <li>
@@ -102,7 +115,7 @@
     <div class="layout-outer-container">
       <div class="file-tree-container">
           <div class="title-container">
-            <span class="title" id="file-tree-title"></span>
+            <span class="title" id="file-tree-title">local storage</span>
             <button type="button" class="add-folder-btn" id="file-tree--add-folder-btn"></button>
             <button type="button" class="add-file-btn" id="file-tree--add-file-btn"></button>
           </div>
@@ -139,7 +152,7 @@
   <script src="static/js/layout/editor.component.js"></script>
   <script src="static/js/layout/layout.js"></script>
   <script src="static/js/layout/layout.ide.js"></script>
-  <script src="static/js/worker-api.js"></script>
+  <script src="static/js/lang-worker-api.js"></script>
   <script src="static/js/gitfs.js"></script>
   <script src="static/js/ide/menubar.js"></script>
   <script src="static/js/ide/file-tree.js"></script>

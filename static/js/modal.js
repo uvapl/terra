@@ -77,9 +77,14 @@ const hideModal = ($modal, remove = true) => {
  * Show a given model element.
  *
  * @param {jQuery} $modal - The modal element reference.
+ * @returns {Promise<void>} Resolves after the model has been shown.
  */
 function showModal($modal) {
-  // Use setTimeout trick to add the class after the modal HTML has been
-  // rendered to the DOM to show the fade-in animation.
-  setTimeout(() => $modal.addClass('show'), 10);
+  return new Promise((resolve) => {
+    // Use setTimeout trick to add the class after the modal HTML has been
+    // rendered to the DOM to show the fade-in animation.
+    setTimeout(() => $modal.addClass('show'), 10);
+
+    setTimeout(() => resolve(), MODAL_ANIM_DURATION);
+  })
 }
