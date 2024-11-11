@@ -162,7 +162,6 @@ class EditorComponent {
    * Callback when the editor is loaded.
    */
   onEditorLoad = () => {
-    console.log('loading editor')
     this.editor.getSession().getUndoMananger().reset();
   }
 
@@ -271,8 +270,6 @@ class EditorComponent {
         // Load the file content from LFS.
         const cursorPos = this.editor.getCursorPosition()
         LFS.getFileContent(file.id).then((content) => {
-          console.log('LOADED!')
-          clearTimeout(this.fileContentLoadingTimeoutId);
           this.editor.setValue(content);
           this.editor.clearSelection();
           this.editor.moveCursorToPosition(cursorPos);
