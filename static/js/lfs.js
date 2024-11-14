@@ -214,10 +214,11 @@ class LocalFileSystem {
    */
   async getFileContent(id) {
     try {
-      const fileHandle = await this.getFileHandle(VFS.getAbsoluteFilePath(id));
+      const path = VFS.getAbsoluteFilePath(id)
+      const fileHandle = await this.getFileHandle(path);
       const file = await fileHandle.handle.getFile();
       const content = await file.text();
-      return content;
+      return content.trim();
     } catch (err) {
       console.error('Failed to get file content:', err);
     }
@@ -538,7 +539,7 @@ class LocalFileSystem {
       }
 
       const writable = await fileHandle.createWritable();
-      await writable.write(content);
+      await writable.write(content.trim() + '\n');
       await writable.close();
     } finally {
       this.busy = false;

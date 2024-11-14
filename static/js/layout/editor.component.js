@@ -216,7 +216,6 @@ class EditorComponent {
    */
   onEditorFocus = () => {
     this.setActiveEditor();
-    this.reloadFileContent();
 
     // Spawn a new worker if necessary.
     createLangWorkerApi(this.proglang);
@@ -249,14 +248,21 @@ class EditorComponent {
       this.setActiveEditor();
     }
 
+    this.reloadFileContent(true);
+
     // Spawn a new worker if necessary.
     if (this.ready) {
       createLangWorkerApi(this.proglang);
     }
   }
 
-  reloadFileContent = () => {
-    if (window._blockLFSPolling) return;
+  /**
+   * Reload the file content either from VFS or LFS.
+   *
+   * @param {boolen} [force] - True to force reload the file content from LFS.
+   */
+  reloadFileContent = (force = false) => {
+    if (window._blockLFSPolling && !force) return;
 
     const file = VFS.findFileById(this.container.getState().fileId);
     if (file) {
