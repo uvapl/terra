@@ -218,7 +218,7 @@ class LocalFileSystem {
       const fileHandle = await this.getFileHandle(path);
       const file = await fileHandle.handle.getFile();
       const content = await file.text();
-      return content.trim();
+      return content;
     } catch (err) {
       console.error('Failed to get file content:', err);
     }
@@ -539,7 +539,7 @@ class LocalFileSystem {
       }
 
       const writable = await fileHandle.createWritable();
-      await writable.write(content.trim() + '\n');
+      await writable.write(content);
       await writable.close();
     } finally {
       this.busy = false;
