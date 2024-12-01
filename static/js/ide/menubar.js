@@ -43,6 +43,34 @@ function setMenubarKeystrokeIcons(element) {
   `);
 }
 
+const closeActiveMenuBarMenu = (event) => {
+  // Focus the active editor tab, except for making new files/folders.
+  // Check if the event.target has neither the id menu-item--new-file and
+  // and menu-item--new-folder.
+  const isInsideMenu = $('.menubar > li.open').find($(event.target)).length > 0;
+  const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
+  const editor = getActiveEditor().instance.editor;
+  if (isInsideMenu && isNotNewFileOrFolderBtn && editor) {
+    // Set window._blockLFSPolling to prevent file contents being reloaded
+    window._blockLFSPolling = true;
+    editor.focus();
+    window._blockLFSPolling = false;
+  }
+
+  // Close the active menu.
+  $('.menubar > li.open').removeClass('open');
+}
+
+// Open the first menu level when clicking the main menubar items.
+$('.menubar > li').click((event) => {
+  // Check if the clicked item is one of the menubar children.
+  const $listItem = $(event.target);
+  if ($listItem.parent().hasClass('menubar')) {
+    $listItem.toggleClass('open').siblings().removeClass('open');
+  }
+});
+
+
 /**
  * Registers onclick handlers for all actions in the menubar as well as global
  * keyboard shortcuts in the document.
@@ -50,50 +78,24 @@ function setMenubarKeystrokeIcons(element) {
 function registerMenubarEventListeners() {
   // Main menu items.
   // ================
-  const closeActiveMenu = (event) => {
-    // Focus the active editor tab, except for making new files/folders.
-    // Check if the event.target has neither the id menu-item--new-file and
-    // and menu-item--new-folder.
-    const isInsideMenu = $('.menubar > li.open').find($(event.target)).length > 0;
-    const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
-    const editor = getActiveEditor().instance.editor;
-    if (isInsideMenu && isNotNewFileOrFolderBtn && editor) {
-      // Set window._blockLFSPolling to prevent file contents being reloaded
-      window._blockLFSPolling = true;
-      editor.focus();
-      window._blockLFSPolling = false;
-    }
-
-    // Close the active menu.
-    $('.menubar > li.open').removeClass('open');
-  }
-
-  // Open the first menu level when clicking the main menubar items.
-  $('.menubar > li').click((event) => {
-    // Check if the clicked item is one of the menubar children.
-    const $listItem = $(event.target);
-    if ($listItem.parent().hasClass('menubar')) {
-      $listItem.toggleClass('open').siblings().removeClass('open');
-    }
-  });
 
   // Close menu when clicking outside of it.
   $(document).click((event) => {
     if (!$(event.target).closest('.menubar').length) {
-      closeActiveMenu(event);
+      closeActiveMenuBarMenu(event);
     }
   });
 
   // Close menu when pressing ESC.
   $(document).keydown((event) => {
     if (event.key === 'Escape') {
-      closeActiveMenu(event);
+      closeActiveMenuBarMenu(event);
     }
   });
 
   // Close menu when clicking on a menu item.
   $('.menubar > li li:not(.disabled)').click((event) => {
-    closeActiveMenu(event);
+    closeActiveMenuBarMenu(event);
   });
 
   // All submenu item event listeners.
@@ -109,8 +111,9 @@ function registerMenubarEventListeners() {
 
   $('#menu-item--comment').click(Menubar.toggleComment);
 
-  $('#menu-item--open-folder').click(() => LFS.openFolderPicker());
-  Mousetrap.bind(['ctrl+shift+o'], () => LFS.openFolderPicker());
+  $('#menu-item--close-folder').click(Menubar.closeLFSFolder);
+  $('#menu-item--open-folder').click(Menubar.openLFSFolder);
+  Mousetrap.bind(['ctrl+shift+o'], Menubar.openLFSFolder);
 
   $('#menu-item--undo').click(Menubar.undo);
   $('#menu-item--redo').click(Menubar.redo);
@@ -147,6 +150,19 @@ const Menubar = {};
 
 Menubar.openNewFile = () => {
   createNewFileTreeFile();
+};
+
+Menubar.openLFSFolder = () => {
+  LFS.openFolderPicker().then(() => {
+    $('#menu-item--close-folder').removeClass('disabled');
+  });
+};
+
+Menubar.closeLFSFolder = (event) => {
+  if ($('#menu-item--close-folder').hasClass('disabled')) return;
+
+  LFS.closeFolder();
+  closeActiveMenuBarMenu(event);
 };
 
 Menubar.undo = () => {
@@ -219,7 +235,7 @@ Menubar.runTab = () => {
 };
 
 Menubar.pushChanges = () => {
-  if (hasGitFSWorker()) {
+  if (hasGitFSWorker() && !$('#menu-item--push-changes').hasClass('disabled')) {
     window._gitFS.push();
   }
 };

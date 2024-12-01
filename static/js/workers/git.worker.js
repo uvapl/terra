@@ -33,7 +33,7 @@ class API {
    * Defines the URL to the proxy server used for local development.
    * @type {string}
    */
-  proxyUrl = 'http://localhost:5000';
+  proxyUrl = 'http://localhost:8888';
 
   /**
    * Whether there are new commits that need to be pushed.

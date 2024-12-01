@@ -62,6 +62,7 @@ class GitFS {
   terminate() {
     console.log('Terminating existing GitFS worker')
     setLocalStorageItem('connected-repo', '');
+    $('#menu-item--push-changes').addClass('disabled');
     this.worker.terminate();
   }
 
@@ -215,5 +216,6 @@ function createGitFSWorker() {
 
     console.log('Creating gitfs worker')
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
+    $('#menu-item--push-changes').removeClass('disabled');
   }
 }
