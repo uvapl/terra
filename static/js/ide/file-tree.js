@@ -286,25 +286,29 @@ function createFileTreeContextMenuItems($trigger, event) {
       },
     };
 
-    menu.downloadFolder = {
-      name: 'Download',
-      callback: () => {
-        window._userClickedContextMenuItem = true;
-        VFS.downloadFolder(node.key);
-        window._blockLFSPolling = false;
-      },
-    };
+    if (!hasLFS() || (hasLFS() && !LFS.loaded)) {
+      menu.downloadFolder = {
+        name: 'Download',
+        callback: () => {
+          window._userClickedContextMenuItem = true;
+          VFS.downloadFolder(node.key);
+          window._blockLFSPolling = false;
+        },
+      };
+    }
   }
 
   if (isFile) {
-    menu.downloadFile = {
-      name: 'Download',
-      callback: () => {
-        window._userClickedContextMenuItem = true;
-        VFS.downloadFile(node.key);
-        window._blockLFSPolling = false;
-      },
-    };
+    if (!hasLFS() || (hasLFS() && !LFS.loaded)) {
+      menu.downloadFile = {
+        name: 'Download',
+        callback: () => {
+          window._userClickedContextMenuItem = true;
+          VFS.downloadFile(node.key);
+          window._blockLFSPolling = false;
+        },
+      };
+    }
 
     if (hasWorker(getFileExtension(node.title))) {
       menu.run = {
