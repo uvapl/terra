@@ -49,17 +49,31 @@ class LocalFileSystem {
 
     await this._importFolderToVFS(rootFolderHandle.handle);
 
+    $('#menu-item--close-folder').removeClass('disabled');
+
     this._watchRootFolder();
   }
 
   /**
    * Disconnect the LFS from the current folder.
    */
-  terminate() {
+  async terminate() {
     this.loaded = false;
     setLocalStorageItem('use-lfs', false);
     clearTimeout(this._watchRootFolderInterval);
-    this._clearStores();
+    await this._clearStores();
+    $('#menu-item--close-folder').addClass('disabled');
+  }
+
+  /**
+   * Close the current folder and clear the VFS.
+   */
+  closeFolder() {
+    this.terminate();
+    VFS.clear();
+    createFileTree(); // show empty file tree
+    showLocalStorageWarning();
+    setFileTreeTitle('local storage');
   }
 
   /**

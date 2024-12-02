@@ -33,7 +33,7 @@ class API {
    * Defines the URL to the proxy server used for local development.
    * @type {string}
    */
-  proxyUrl = 'http://localhost:5000';
+  devProxyUrl = 'http://localhost:8888';
 
   /**
    * Whether there are new commits that need to be pushed.
@@ -68,7 +68,7 @@ class API {
 
   setRepoLink(repoLink) {
     this.repoLink = this.isDev
-      ? repoLink.replace(new URL(repoLink).origin, this.proxyUrl)
+      ? repoLink.replace(new URL(repoLink).origin, this.devProxyUrl)
       : repoLink;
   }
 
