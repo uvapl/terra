@@ -248,7 +248,9 @@ class EditorComponent {
       this.setActiveEditor();
     }
 
-    this.reloadFileContent(true);
+    if (isIDE) {
+      this.reloadFileContent(true);
+    }
 
     // Spawn a new worker if necessary.
     if (this.ready) {
@@ -258,6 +260,7 @@ class EditorComponent {
 
   /**
    * Reload the file content either from VFS or LFS.
+   * This only applies for the IDE.
    *
    * @param {boolen} [force] - True to force reload the file content from LFS.
    */
