@@ -163,8 +163,6 @@ class GitFS {
 
     case 'clone-success':
       $('#file-tree .info-msg').remove();
-
-      // Remove local file storage warning if present.
       removeLocalStorageWarning();
       break;
 

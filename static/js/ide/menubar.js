@@ -156,6 +156,7 @@ Menubar.openNewFile = () => {
 
 Menubar.openLFSFolder = () => {
   VFS._lfs('openFolderPicker').then(() => {
+    $('#file-tree .info-msg').remove();
     $('#menu-item--close-folder').removeClass('disabled');
   });
 };
@@ -163,7 +164,7 @@ Menubar.openLFSFolder = () => {
 Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-folder').hasClass('disabled')) return;
 
-  LFS.closeFolder();
+  VFS._lfs('closeFolder');
   closeActiveMenuBarMenu(event);
 };
 
