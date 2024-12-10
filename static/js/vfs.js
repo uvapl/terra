@@ -1,5 +1,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 // This file contains the virtual filesystem logic for the IDE app.
+//
+// The methods listed below should be called from the layout, which in here
+// determines whether to save it local storage, LFS or GitFS.
 ////////////////////////////////////////////////////////////////////////////////
 
 class VirtualFileSystem {
@@ -30,7 +33,11 @@ class VirtualFileSystem {
    * @returns {*} The return value of the function.
    */
   _lfs = (fn, ...payload) => {
-    if (!hasLFS() || (hasLFS() && !LFS.loaded)) return;
+    // Return early if either:
+    // - The browser doesn't support the LFS class.
+    // - The LFS class is not loaded yet. We make an exception for the
+    //   openFolderPicker, because this function is used to load the LFS class.
+    if (!hasLFS() || (hasLFS() && !LFS.loaded && fn !== 'openFolderPicker')) return;
 
     return LFS[fn](...payload);
   }
@@ -617,6 +624,20 @@ class VirtualFileSystem {
           parentId,
         }, false);
       });
+  }
+
+  /**
+   * Create a new GitFSWorker instance if it doesn't exist yet and terminate the
+   * LFS if it's currently active. This is only allow in the IDE app.
+   */
+  createGitFSWorker = () => {
+    if (!isIDE) return;
+
+    if (hasLFS()) {
+      LFS.terminate();
+    }
+
+    _createGitFSWorker();
   }
 }
 

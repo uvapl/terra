@@ -180,14 +180,10 @@ class GitFS {
  * user provided an ssh-key and repository link that are saved in local storage.
  * Otherwise, a worker will be created automatically when the user adds a new
  * repository.
+ *
+ * This is considered a private function invoked from VFS.createGitFSWorker.
  */
-function createGitFSWorker() {
-  if (!isIDE) return;
-
-  if (hasLFS()) {
-    LFS.terminate();
-  }
-
+function _createGitFSWorker() {
   closeAllFiles();
 
   const username = getLocalStorageItem('git-username');
@@ -214,7 +210,7 @@ function createGitFSWorker() {
       window._fileTree = null;
     }
 
-    console.log('Creating gitfs worker')
+    console.log('Creating gitfs worker');
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
     $('#menu-item--push-changes').removeClass('disabled');
   }

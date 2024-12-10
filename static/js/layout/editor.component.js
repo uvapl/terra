@@ -188,10 +188,7 @@ class EditorComponent {
       // Only commit changes after 2 seconds of inactivity.
       this.gitCommitTimeoutId = setTimeout(() => {
         const filename = this.container.parent.config.title;
-        window._gitFS.commit(
-          filename,
-          this.editor.getValue(),
-        );
+        VFS._git('commit', filename, this.editor.getValue());
 
         const node = getFileTreeInstance().getNodeByKey(fileId);
         addGitDiffIndicator(node);

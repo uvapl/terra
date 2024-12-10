@@ -57,8 +57,10 @@ const closeActiveMenuBarMenu = (event) => {
     window._blockLFSPolling = false;
   }
 
-  // Close the active menu.
-  $('.menubar > li.open').removeClass('open');
+  // Close the active menu only when it is not a disabled menu item.
+  if (!$('.menubar > li.open').find($(event.target)).hasClass('disabled')) {
+    $('.menubar > li.open').removeClass('open');
+  }
 }
 
 // Open the first menu level when clicking the main menubar items.
@@ -94,7 +96,7 @@ function registerMenubarEventListeners() {
   });
 
   // Close menu when clicking on a menu item.
-  $('.menubar > li li:not(.disabled)').click((event) => {
+  $('.menubar > li li').click((event) => {
     closeActiveMenuBarMenu(event);
   });
 
@@ -153,7 +155,7 @@ Menubar.openNewFile = () => {
 };
 
 Menubar.openLFSFolder = () => {
-  LFS.openFolderPicker().then(() => {
+  VFS._lfs('openFolderPicker').then(() => {
     $('#menu-item--close-folder').removeClass('disabled');
   });
 };
@@ -236,7 +238,7 @@ Menubar.runTab = () => {
 
 Menubar.pushChanges = () => {
   if (hasGitFSWorker() && !$('#menu-item--push-changes').hasClass('disabled')) {
-    window._gitFS.push();
+    VFS._git('push');
   }
 };
 
@@ -372,7 +374,7 @@ Menubar.connectRepo = () => {
     hideModal($connectModal);
 
     if (initialRepoLink || VFS.isEmpty()) {
-      createGitFSWorker();
+      VFS.createGitFSWorker();
     } else if (!VFS.isEmpty()) {
       // Confirms with the user whether they want to discard their local files
       // permanently before connecting to a new repository.
@@ -411,7 +413,7 @@ Menubar.connectRepo = () => {
         });
         $confirmModal.find('.confirm-btn').click(() => {
           hideModal($confirmModal);
-          createGitFSWorker();
+          VFS.createGitFSWorker();
         });
 
       }, MODAL_ANIM_DURATION);
