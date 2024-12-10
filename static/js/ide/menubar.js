@@ -7,9 +7,8 @@ $(document).ready(() => {
   registerMenubarEventListeners();
 
   // Disable the connect repo button if no credentials are set yet.
-  const gitUsername = getLocalStorageItem('git-username');
   const gitToken = getLocalStorageItem('git-access-token');
-  if (!(gitUsername && gitToken)) {
+  if (!gitToken) {
     $('#menu-item--connect-repo').addClass('disabled');
   }
 });
@@ -140,7 +139,6 @@ function registerMenubarEventListeners() {
 
   $('#menu-item--run-tab').click(Menubar.runTab);
 
-  $('#menu-item--push-changes').click(Menubar.pushChanges);
   $('#menu-item--add-credentials').click(Menubar.addCredentials);
   $('#menu-item--connect-repo').click(Menubar.connectRepo);
 
@@ -237,23 +235,11 @@ Menubar.runTab = () => {
   getActiveEditor().instance.editor.execCommand('run');
 };
 
-Menubar.pushChanges = () => {
-  if (hasGitFSWorker() && !$('#menu-item--push-changes').hasClass('disabled')) {
-    VFS._git('push');
-  }
-};
-
 Menubar.addCredentials = () => {
-  const username = getLocalStorageItem('git-username', '');
   const accessToken = getLocalStorageItem('git-access-token', '');
   const $modal = createModal({
     title: 'Add GitHub credentials',
     body: `
-      <div class="form-wrapper-full-width">
-        <label>Username:</label>
-        <input type="username" class="text-input full-width-input git-username" value="${username}"placeholder="Fill in your username" />
-      </div>
-
       <div class="form-wrapper-full-width">
         <label>Personal access token:</label>
         <input type="password" class="text-input full-width-input git-access-token" value="${accessToken}" placeholder="Fill in your personal access token" />
@@ -264,10 +250,8 @@ Menubar.addCredentials = () => {
         Make sure to at least check the <em>repo</em> scope such that all its subscopes are checked.
         <br\>
         <br\>
-        In order to clone private repositories or push and pull contents from any
-        repository, your GitHub personal access token and username are required.
-        These credentials will be stored locally in your browser and will not be
-        shared with anyone.
+        In order to clone private repositories or push and pull contents from any repository, your GitHub personal access token is required.
+        Credentials will be stored locally in your browser and will not be shared with anyone.
       </p>
     `,
     footer: `
@@ -284,14 +268,11 @@ Menubar.addCredentials = () => {
 
   $modal.find('.cancel-btn').click(() => hideModal($modal));
   $modal.find('.confirm-btn').click(() => {
-    const username = $modal.find('.git-username').val();
     const accessToken = $modal.find('.git-access-token').val();
-    if (accessToken && username) {
+    if (accessToken) {
       $('#menu-item--connect-repo').removeClass('disabled');
-      setLocalStorageItem('git-username', username);
       setLocalStorageItem('git-access-token', accessToken);
     } else {
-      removeLocalStorageItem('git-username');
       removeLocalStorageItem('git-access-token');
 
       // No credentials set, disable connect repo button.
@@ -318,7 +299,7 @@ Menubar.connectRepo = () => {
     title: 'Connect repository',
     body: `
       <p>Only GitHub repostory links are supported. Leave empty to disconnect from the repository.</p>
-      <input class="text-input full-width-input repo-link" value="${initialRepoLink}" placeholder="Fill in a repository link"></textarea>
+      <input class="text-input full-width-input repo-link" value="${initialRepoLink}" placeholder="https://github.com/{owner}/{repo}"></textarea>
       ${localFilesNotice}
 
     `,
@@ -350,10 +331,10 @@ Menubar.connectRepo = () => {
 
   $connectModal.find('.cancel-btn').click(() => hideModal($connectModal));
   $connectModal.find('.confirm-btn').click(() => {
-    const repoLink = $connectModal.find('.repo-link').val();
+    const repoLink = $connectModal.find('.repo-link').val().trim();
 
     // For now, we only allow GitHub repo links.
-    if (repoLink && !/^https:\/\/github.com\/[\w-]+\/[\w-]+(?:\.git)?/.test(repoLink)) {
+    if (repoLink && !/^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/.test(repoLink)) {
       alert('Invalid GitHub repository');
       return;
     }

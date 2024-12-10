@@ -1,7 +1,6 @@
 /**
- * GitFS worker class that handles all Git operations using wasm-git.
+ * GitFS worker class that handles all Git operations.
  * This is the bridge class between the app and the git.worker.js.
- * @see https://github.com/petersalomonsen/wasm-git
  */
 class GitFS {
   /**
@@ -29,10 +28,9 @@ class GitFS {
   /**
    * Creates a new worker process.
    *
-   * @param {string} username - The username of the user's account.
    * @param {string} accessToken - The user's personal access token.
    */
-  _createWorker(username, accessToken) {
+  _createWorker(accessToken) {
     if (this.worker instanceof Worker) {
       console.error('[GitFS] failed to create a new worker as an instance is already running');
       return;
@@ -48,7 +46,6 @@ class GitFS {
     this.worker.postMessage({
       id: 'constructor',
       data: {
-        username: username,
         accessToken: accessToken,
         repoLink: this._repoLink,
         isDev: isDev,
@@ -90,11 +87,12 @@ class GitFS {
    *
    * @param {string} filepath - The absolute filepath within the git repo.
    * @param {string} filecontents - The new contents to commit.
+   * @param {string} sha - The sha of the file to commit.
    */
-  commit(filepath, filecontents) {
+  commit(filepath, filecontents, sha) {
     this.worker.postMessage({
       id: 'commit',
-      data: { filepath, filecontents },
+      data: { filepath, filecontents, sha },
     });
   }
 
@@ -139,35 +137,27 @@ class GitFS {
     const payload = event.data.data;
 
     switch (event.data.id) {
-      // Ready callback from the worker instance. This will be run after
-      // libgit2 has been initialised successfully.
+      // Ready callback from the worker instance.
       case 'ready':
         this.isReady = true;
-
-        VFS.importFromGit(payload.repoFiles);
-        createFileTree();
-        break;
-
-      case 'pushed':
-        // Clear the git color indicators.
-        const tree = getFileTreeInstance();
-        $('#file-tree .git-added, #file-tree .git-modified').each((index, element) => {
-          const node = tree.getNodeByKey(element.id);
-          if (node) {
-            const classes = node.extraClasses ? node.extraClasses.split(' ') : [];
-            node.extraClasses = classes.filter((c) => !c.startsWith('git-')).join(' ');
-            node.render();
-          }
-        });
         break;
 
     case 'clone-success':
       $('#file-tree .info-msg').remove();
       removeLocalStorageWarning();
+
+      VFS.importFromGit(payload.repoContents);
+      createFileTree();
       break;
 
       case 'clone-fail':
         $('#file-tree').html('<div class="info-msg error">Failed to clone repository</div>');V
+        break;
+
+      case 'commit-success':
+        // Update the file's sha in the VFS.
+        const file = VFS.findFileByPath(payload.filepath);
+        file.sha = payload.sha;
         break;
     }
   }
@@ -184,7 +174,6 @@ class GitFS {
 function _createGitFSWorker() {
   closeAllFiles();
 
-  const username = getLocalStorageItem('git-username');
   const accessToken = getLocalStorageItem('git-access-token');
   const repoLink = getLocalStorageItem('connected-repo');
   const repoInfo = getRepoInfo(repoLink);
@@ -197,10 +186,10 @@ function _createGitFSWorker() {
     window._gitFS = null;
   }
 
-  if (username && accessToken && repoLink) {
+  if (accessToken && repoLink) {
     const gitFS = new GitFS(repoLink);
     window._gitFS = gitFS;
-    gitFS._createWorker(username, accessToken);
+    gitFS._createWorker(accessToken);
 
     const tree = getFileTreeInstance();
     if (tree) {
@@ -210,6 +199,5 @@ function _createGitFSWorker() {
 
     console.log('Creating gitfs worker');
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
-    $('#menu-item--push-changes').removeClass('disabled');
   }
 }
