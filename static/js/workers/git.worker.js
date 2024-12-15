@@ -16,12 +16,6 @@ class API {
   isDev = false;
 
   /**
-   * The absolute link to the repository.
-   * @type {string}
-   */
-  repoLink = null;
-
-  /**
    * The username of the repository. This is the {owner} part in
    * https://github.com/{owner}/{repo}.
    * @type {string}
@@ -36,10 +30,25 @@ class API {
   repoName = null;
 
   /**
+   * The default branch of the repository.
+   * @type {string}
+   */
+  defaultBranch = null;
+
+  /**
    * The personal access token from the user used to authenticate as them for API calls.
-   * @type {[TODO:type]}
+   * @type {string}
    */
   accessToken = null;
+
+  /**
+   * The information about the committer.
+   * @type {object}
+   */
+  committer = {
+    name: 'UvA Programming Lab',
+    email: 'terra@proglab.nl'
+  }
 
   /**
    * Defines the URL to the proxy server used for local development.
@@ -57,6 +66,8 @@ class API {
     this.isDev = options.isDev;
     this.accessToken = options.accessToken;
     this.commitSuccessCallback = options.commitSuccessCallback;
+    this.moveFileSuccessCallback = options.moveFileSuccessCallback;
+    this.moveFolderSuccessCallback = options.moveFolderSuccessCallback;
     this.cloneFailCallback = options.cloneFailCallback;
     this.cloneSuccessCallback = options.cloneSuccessCallback;
 
@@ -71,15 +82,17 @@ class API {
   }
 
   _log() {
-    console.log('[git]', ...arguments);
+    console.log('[Git]', ...arguments);
   }
 
-  // TODO: rename this to setRepo(owner, name)
   setRepoLink(repoLink) {
     if (!GITHUB_REPO_URL_PATTERN.test(repoLink)) return;
-    const [_, repoOwner, repoName] = repoLink.match(GITHUB_REPO_URL_PATTERN);
-    this.repoOwner = repoOwner;
-    this.repoName = repoName;
+
+    const match = repoLink.match(GITHUB_REPO_URL_PATTERN);
+    if (!match) return;
+
+    this.repoOwner = match[1];
+    this.repoName = match[2];
   }
 
   /**
@@ -93,7 +106,8 @@ class API {
   }
 
   /**
-   * Send a request through octokit to the GitHub API.
+   * Send a request through octokit to the GitHub API. By default, the '{owner}'
+   * and '{repo}' variables are available inside the `url`.
    *
    * @param {string} method - The request method.
    * @param {string} url - The relative endpoint URL.
@@ -102,6 +116,8 @@ class API {
    */
   _request(method, url, options = {}) {
     return this.octokit.request(`${method} ${url}`, {
+      owner: this.repoOwner,
+      repo: this.repoName,
       ...options,
       headers: {
         ...options.headers,
@@ -112,51 +128,6 @@ class API {
   }
 
   /**
-   * Check whether a given filepath exists in the filesystem and is a file.
-   *
-   * @param {string} filepath - The filepath to check.
-   * @returns {boolean} True if the given filepath exists, false otherwise.
-   */
-  _isFile(filepath) {
-    try {
-      const stat = this.fs.stat(filepath);
-      return this._pathExists(filepath) && this.fs.isFile(stat.mode);
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Check whether a given folderpath exists in the filesystem and is a directory.
-   *
-   * @param {string} folderpath - The folderpath to check.
-   * @returns {boolean} True if the given folderpath exists, false otherwise.
-   */
-  _isDir(folderpath) {
-    try {
-      const stat = this.fs.stat(folderpath);
-      return this._pathExists(folderpath) && this.fs.isDir(stat.mode);
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Check whether a given path exists in the filesystem.
-   *
-   * @param {string} path - The path to check.
-   * @returns {boolean} True if the given path exists, false otherwise.
-   */
-  _pathExists(path) {
-    try {
-      this.fs.lookupPath(path);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
    * Clone a repository and return the file contents tree
    * in the clone-success callback.
    * @async
@@ -164,16 +135,12 @@ class API {
   async clone() {
     try {
       // Obtain the main branch.
-      const repoInfo = await this._request('GET', '/repos/{owner}/{repo}', {
-        owner: this.repoOwner,
-        repo: this.repoName,
-      });
+      const repoInfo = await this._request('GET', '/repos/{owner}/{repo}');
+      this.defaultBranch = repoInfo.data.default_branch;
 
       // Request a recursive tree of the main branch.
       const repoContents = await this._request('GET', '/repos/{owner}/{repo}/git/trees/{branch}', {
-        owner: this.repoOwner,
-        repo: this.repoName,
-        branch: repoInfo.data.default_branch,
+        branch: this.defaultBranch,
         recursive: true,
       });
 
@@ -181,8 +148,6 @@ class API {
         repoContents.data.tree.map(async (fileOrFolder) => {
           if (fileOrFolder.type === 'blob') {
             const res = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
-              owner: this.repoOwner,
-              repo: this.repoName,
               path: fileOrFolder.path,
             });
 
@@ -197,7 +162,7 @@ class API {
 
       this.cloneSuccessCallback(tree);
     } catch (err) {
-      console.error('Failed to clone repository:', err);
+      this._log('Failed to clone repository:', err);
       this.cloneFailCallback();
     }
   }
@@ -211,17 +176,12 @@ class API {
    * @async
    */
   async commit(filepath, filecontents, sha) {
-    this._log('comitting', filepath);
+    this._log('Committing', filepath);
 
     const response = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
-      owner: this.repoOwner,
-      repo: this.repoName,
       path: filepath,
       message: `Update ${filepath}`,
-      committer: {
-        name: 'UvA Programming Lab',
-        email: 'terra@proglab.nl'
-      },
+      committer: this.committer,
       content: btoa(filecontents),
       sha,
     });
@@ -233,35 +193,99 @@ class API {
    * Remove a filepath from the current repository.
    *
    * @param {string} filepath - The absolute filepath to remove.
+   * @param {string} sha - The sha of the file to delete.
    */
-  rm(filepath) {
-    this._log(`remove ${filepath}`);
-
-    if (this._isFile(filepath)) {
-      // File
-      this.fs.unlink(filepath);
-    } else {
-      // Folder
-      this.fs.rmdir(filepath);
+  async rm(filepath, sha) {
+    try {
+      await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
+        path: filepath,
+        sha,
+        message: `Remove ${filepath}`,
+        branch: this.defaultBranch,
+        committer: this.committer,
+      });
+      this._log(`Removed ${filepath}`);
+    } catch (err) {
+      this._log('Failed to remove', filepath, err);
     }
-
-    this.lg.callMain(['add', filepath]);
-    this.lg.callMain(['commit', '-m', `Remove ${filepath}`]);
   }
 
   /**
    * Move a file from one location to another.
    *
    * @param {string} oldPath - The absolute filepath of the file to move.
+   * @param {string} oldSha - The sha of the file to remove.
    * @param {string} newPath - The absolute filepath to the new file.
+   * @param {string} newContent - The new content of the file.
    */
-  mv(oldPath, newPath) {
-    if (!this._pathExists(oldPath)) return;
+  async moveFile(oldPath, oldSha, newPath, newContent) {
+    // Create the new file with the new content.
+    const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
+      path: newPath,
+      message: `Rename ${oldPath} to ${newPath}`,
+      branch: this.defaultBranch,
+      committer: this.committer,
+      content: btoa(newContent),
+    });
 
-    this._log(`rename ${oldPath} to ${newPath}`);
-    this.fs.rename(oldPath, newPath);
-    this.lg.callMain(['add', oldPath, newPath])
-    this.lg.callMain(['commit', '-m', `Rename ${oldPath} to ${newPath}`]);
+    // Delete the old file.
+    await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
+      path: oldPath,
+      message: `Remove ${oldPath}`,
+      branch: this.defaultBranch,
+      committer: this.committer,
+      sha: oldSha,
+    });
+
+    const newSha = result.data.content.sha;
+    this.moveFileSuccessCallback(newPath, newSha);
+
+    this._log(`Moved file from ${oldPath} to ${newPath}`);
+  }
+
+  /**
+   * Move a file from one location to another.
+   *
+   * @param {array} files - Array of file objects to move.
+   * @param {string} files[].oldPath - The filepath of the file to move.
+   * @param {string} files[].sha - The sha of the file to remove.
+   * @param {string} files[].newPath - The filepath to the new file.
+   * @param {string} files[].content - The new content of the file.
+   */
+  async moveFolder(files) {
+    // Keep track of a list of all new files with their new sha.
+    const updatedFiles = [];
+
+    await Promise.all(
+      files.map(async (file) => {
+        // Create the new file.
+        const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
+          path: file.newPath,
+          message: `Rename ${file.oldPath} to ${file.newPath}`,
+          branch: this.defaultBranch,
+          committer: this.committer,
+          content: btoa(file.content),
+        });
+
+        // Delete the old files.
+        await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
+          path: file.oldPath,
+          message: `Remove ${file.oldPath}`,
+          branch: this.defaultBranch,
+          committer: this.committer,
+          sha: file.sha,
+        });
+
+        updatedFiles.push({
+          filepath: file.newPath,
+          sha: result.data.content.sha,
+        });
+
+        this._log(`Moved file from ${file.oldPath} to ${file.newPath}`);
+      })
+    );
+
+    this.moveFolderSuccessCallback(updatedFiles);
   }
 }
 
@@ -287,6 +311,20 @@ self.onmessage = (event) => {
           postMessage({
             id: 'commit-success',
             data: { filepath, sha }
+          });
+        },
+
+        moveFileSuccessCallback(filepath, sha) {
+          postMessage({
+            id: 'move-file-success',
+            data: { filepath, sha },
+          });
+        },
+
+        moveFolderSuccessCallback(updatedFiles) {
+          postMessage({
+            id: 'move-folder-success',
+            data: { updatedFiles },
           });
         },
 
@@ -320,11 +358,15 @@ self.onmessage = (event) => {
       break;
 
     case 'rm':
-      api.rm(payload.filepath);
+      api.rm(payload.filepath, payload.sha);
       break;
 
-    case 'mv':
-      api.mv(payload.oldPath, payload.newPath);
+    case 'moveFile':
+      api.moveFile(payload.oldPath, payload.oldSha, payload.newPath, payload.newContent);
+      break;
+
+    case 'moveFolder':
+      api.moveFolder(payload.files);
       break;
   }
 };

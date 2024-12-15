@@ -22,7 +22,11 @@ class VirtualFileSystem {
   _git = (fn, ...payload) => {
     if (!hasGitFSWorker()) return;
 
-    window._gitFS[fn](...payload);
+    try {
+      window._gitFS[fn](...payload);
+    } catch (TypeError) {
+      console.error(`GitFS.${fn}() is not a function`);
+    }
   }
 
   /**
@@ -380,7 +384,7 @@ class VirtualFileSystem {
 
       if (isRenamed || isMoved) {
         // Move the file to the new location.
-        this._git('mv', oldPath, newPath);
+        this._git('moveFile', oldPath, file.sha, newPath, file.content);
       }
 
       // Just commit the changes to the file.
@@ -438,12 +442,11 @@ class VirtualFileSystem {
 
       folder.updatedAt = new Date().toISOString();
 
-      const newPath = this.getAbsoluteFolderPath(folder.id);
-
       // Check whether the file is renamed or moved, in either case we
       // just need to move the file to the new location.
       if (isRenamed || isMoved) {
-        this._git('mv', oldPath, newPath);
+        const filesToMove = this.getOldNewFilePathsRecursively(folder.id, oldPath);
+        this._git('moveFolder', filesToMove);
       }
 
       this.saveState();
@@ -460,8 +463,9 @@ class VirtualFileSystem {
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
   deleteFile = (id, deleteInLFS = true) => {
-    if (this.files[id]) {
-      this._git('rm', this.getAbsoluteFilePath(id));
+    const file = this.findFileById(id);
+    if (file) {
+      this._git('rm', this.getAbsoluteFilePath(file.id), file.sha);
 
       if (deleteInLFS) {
         this._lfs('deleteFile', id);
@@ -641,6 +645,35 @@ class VirtualFileSystem {
     }
 
     _createGitFSWorker();
+  }
+
+  /**
+   * Get all file paths recursively from a folder. This function is used when a
+   * folder is being renamed or moved and updated in the Git repository.
+   *
+   * @param {string} folderId - The folder id to get the file paths from.
+   * @returns {array} List of objects with the old and new file paths.
+   */
+  getOldNewFilePathsRecursively(folderId, oldPath) {
+    const files = this.findFilesWhere({ parentId: folderId });
+    const folders = this.findFoldersWhere({ parentId: folderId });
+
+    let paths = files.map((file) => {
+      const newPath = this.getAbsoluteFilePath(file.id);
+      const filename = newPath.split('/').pop();
+      return {
+        oldPath: `${oldPath}/${filename}`,
+        newPath,
+        content: file.content,
+        sha: file.sha,
+      }
+    });
+
+    for (const folder of folders) {
+      paths = [...paths, ...this.getOldNewFilePathsRecursively(folder.id, oldPath)];
+    }
+
+    return paths;
   }
 }
 

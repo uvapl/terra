@@ -107,11 +107,12 @@ class GitFS {
    * Remove a filepath from the current repository.
    *
    * @param {string} filepath - The absolute filepath within the git repo.
+   * @param {string} sha - The sha of the file to delete.
    */
-  rm(filepath) {
+  rm(filepath, sha) {
     this.worker.postMessage({
       id: 'rm',
-      data: { filepath },
+      data: { filepath, sha },
     });
   }
 
@@ -119,12 +120,30 @@ class GitFS {
    * Move a file from one location to another.
    *
    * @param {string} oldPath - The absolute filepath of the file to move.
+   * @param {string} oldSha - The sha of the file to remove.
    * @param {string} newPath - The absolute filepath to the new file.
+   * @param {string} newContent - The new content of the file.
    */
-  mv(oldPath, newPath) {
+  moveFile(oldPath, oldSha, newPath, newContent) {
     this.worker.postMessage({
-      id: 'mv',
-      data: { oldPath, newPath },
+      id: 'moveFile',
+      data: { oldPath, oldSha, newPath, newContent },
+    });
+  }
+
+  /**
+   * Move a folder and its contents from one location to another.
+   *
+   * @param {array} files - Array of file objects to move.
+   * @param {string} files[].oldPath - The filepath of the file to move.
+   * @param {string} files[].sha - The sha of the file to remove.
+   * @param {string} files[].newPath - The filepath to the new file.
+   * @param {string} files[].content - The new content of the file.
+   */
+  moveFolder(files) {
+    this.worker.postMessage({
+      id: 'moveFolder',
+      data: { files },
     });
   }
 
@@ -154,6 +173,15 @@ class GitFS {
         $('#file-tree').html('<div class="info-msg error">Failed to clone repository</div>');V
         break;
 
+      case 'move-folder-success':
+        // Update all sha in the new files in the VFS.
+        payload.updatedFiles.forEach((fileObj) => {
+          const file = VFS.findFileByPath(fileObj.filepath);
+          file.sha = fileObj.sha;
+        });
+        break;
+
+      case 'move-file-success':
       case 'commit-success':
         // Update the file's sha in the VFS.
         const file = VFS.findFileByPath(payload.filepath);
