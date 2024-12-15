@@ -180,32 +180,7 @@ class EditorComponent {
       });
     }
 
-    if (isIDE && hasGitFSWorker() && this.initialized) {
-      if (this.gitCommitTimeoutId) {
-        clearTimeout(this.gitCommitTimeoutId);
-      }
-
-      // Only commit changes after 2 seconds of inactivity.
-      this.gitCommitTimeoutId = setTimeout(() => {
-        const filename = this.container.parent.config.title;
-        window._gitFS.commit(
-          filename,
-          this.editor.getValue(),
-        );
-
-        const node = getFileTreeInstance().getNodeByKey(fileId);
-        addGitDiffIndicator(node);
-      }, seconds(2));
-    }
-
-    if (!this.initialized) {
-      this.initialized = true;
-    }
-
-    if (this.userIsTypingTimeoutId) {
-      clearTimeout(this.userIsTypingTimeoutId);
-    }
-
+    clearTimeout(this.userIsTypingTimeoutId);
     this.userIsTypingTimeoutId = setTimeout(() => {
       window._blockLFSPolling = false;
     }, seconds(2));
@@ -275,7 +250,7 @@ class EditorComponent {
         this.editor.setReadOnly(true);
         this.editor.clearSelection();
         this.editor.blur();
-      } else if (hasLFS() && !file.content) {
+      } else if (hasLFS() && !hasGitFSWorker() && !file.content) {
         // Load the file content from LFS.
         const cursorPos = this.editor.getCursorPosition()
         LFS.getFileContent(file.id).then((content) => {
