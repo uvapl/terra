@@ -107,7 +107,7 @@ class API {
    */
   async _init() {
     this.octokit = new Octokit({
-      // auth: this.accessToken,
+      auth: this.accessToken,
       throttle: {
         // https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#exceeding-the-rate-limit
         onRateLimit: (retryAfter, options, octokit, retryCount) => {
