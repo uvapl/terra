@@ -79,17 +79,27 @@ function closeAllFiles() {
  * @param {string} filename - The name of the file to open.
  */
 function openFile(id, filename) {
-  const tab = getAllEditorTabs().filter((tab) =>
+  const tabs = getAllEditorTabs();
+  const tab = tabs.filter((tab) =>
     id === null
       ? tab.config.title === filename
       : tab.container.getState().fileId === id
-  );
+  )[0];
 
-  if (tab.length > 0) {
+
+  if (tab) {
     // Switch to the active tab.
-    tab[0].parent.setActiveContentItem(tab[0]);
-    tab[0].instance.editor.focus();
+    tab.parent.setActiveContentItem(tab);
+    tab.instance.editor.focus();
   } else {
+    let removeFirstTab = false;
+
+    // Check if the current tab is an untitled tab with no content. If so,
+    // then remove it after we've inserted the new tab.
+    if (tabs.length === 1 && tabs[0].config.title === 'Untitled' && tabs[0].instance.editor.getValue() === '') {
+      removeFirstTab = true;
+    }
+
     const currentTab = getActiveEditor();
     if (currentTab) {
       // Add a new tab next to the current active tab.
@@ -103,9 +113,8 @@ function openFile(id, filename) {
         title: filename,
       });
 
-      // Check if the current tab is an untitled tab with no content.
-      if (currentTab.config.title === 'Untitled' && currentTab.instance.editor.getValue() === '') {
-        currentTab.parent.removeChild(currentTab);
+      if (removeFirstTab) {
+        currentTab.parent.removeChild(tabs[0]);
       }
     }
   }

@@ -1,5 +1,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 // This file contains the virtual filesystem logic for the IDE app.
+//
+// The methods listed below should be called from the layout, which in here
+// determines whether to save it local storage, LFS or GitFS.
 ////////////////////////////////////////////////////////////////////////////////
 
 class VirtualFileSystem {
@@ -19,7 +22,11 @@ class VirtualFileSystem {
   _git = (fn, ...payload) => {
     if (!hasGitFSWorker()) return;
 
-    window._gitFS[fn](...payload);
+    try {
+      window._gitFS[fn](...payload);
+    } catch (TypeError) {
+      console.error(`GitFS.${fn}() is not a function`);
+    }
   }
 
   /**
@@ -30,7 +37,11 @@ class VirtualFileSystem {
    * @returns {*} The return value of the function.
    */
   _lfs = (fn, ...payload) => {
-    if (!hasLFS() || (hasLFS() && !LFS.loaded)) return;
+    // Return early if either:
+    // - The browser doesn't support the LFS class.
+    // - The LFS class is not loaded yet. We make an exception for the
+    //   openFolderPicker, because this function is used to load the LFS class.
+    if (!hasLFS() || (hasLFS() && !LFS.loaded && fn !== 'openFolderPicker')) return;
 
     return LFS[fn](...payload);
   }
@@ -69,17 +80,19 @@ class VirtualFileSystem {
    * Save the virtual filesystem state to localstorage.
    */
   saveState = () => {
-    let files = this.files;
+    let files = {...this.files};
 
-    // Remove the content from all files when LFS is used, because the LFS uses
-    // lazy loading. Furthermore, we never know how large files will be when
-    // loaded from the user's LFS, thus we don't want to save these.
-    if (isIDE && hasLFS() && LFS.loaded) {
+    // Remove the content from all files when LFS or Git is used, because LFS uses
+    // lazy loading and GitFS is being cloned when refreshed anyway.
+    if (isIDE && (hasLFS() && LFS.loaded || hasGitFSWorker())) {
+      const keys = ['sha', 'content'];
       Object.keys(files).forEach((fileId) => {
-        files[fileId] = {
-          ...files[fileId],
-          content: '',
-        }
+        files[fileId] = { ...files[fileId] };
+        keys.forEach((key) => {
+          if (files[fileId].hasOwnProperty(key)) {
+            delete files[fileId][key];
+          }
+        });
       });
     }
 
@@ -294,7 +307,7 @@ class VirtualFileSystem {
     this.files[newFile.id] = newFile;
 
     if (userInvoked) {
-      this._git('commit', this.getAbsoluteFilePath(newFile.id), newFile.content);
+      this._git('commit', this.getAbsoluteFilePath(newFile.id), newFile.content, newFile.sha);
       this._lfs('writeFileToFolder', newFile.parentId, newFile.id, newFile.name, newFile.content);
     }
 
@@ -371,19 +384,20 @@ class VirtualFileSystem {
 
       if (isRenamed || isMoved) {
         // Move the file to the new location.
-        this._git('mv', oldPath, newPath);
+        this._git('moveFile', oldPath, file.sha, newPath, file.content);
       }
 
-
+      // Just commit the changes to the file.
       if (isContentChanged && userInvoked) {
-        // Just commit the changes to the file.
-        this._git('commit', newPath, file.content);
+        // Only commit changes after 2 seconds of inactivity.
+        registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
+          this._git('commit', newPath, file.content, file.sha);
+        });
 
         // Update the file content in the LFS after a second of inactivity.
-        clearTimeout(window._lfsUpdateFileTimeoutId);
-        window._lfsUpdateFileTimeoutId = setTimeout(() => {
+        registerTimeoutHandler(`lfs-sync-${file.id}`, seconds(1), () => {
           this._lfs('writeFileToFolder', file.parentId, file.id, file.name, file.content);
-        }, seconds(1));
+        });
       }
 
       this.saveState();
@@ -428,12 +442,11 @@ class VirtualFileSystem {
 
       folder.updatedAt = new Date().toISOString();
 
-      const newPath = this.getAbsoluteFolderPath(folder.id);
-
       // Check whether the file is renamed or moved, in either case we
       // just need to move the file to the new location.
       if (isRenamed || isMoved) {
-        this._git('mv', oldPath, newPath);
+        const filesToMove = this.getOldNewFilePathsRecursively(folder.id, oldPath);
+        this._git('moveFolder', filesToMove);
       }
 
       this.saveState();
@@ -450,8 +463,9 @@ class VirtualFileSystem {
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
   deleteFile = (id, deleteInLFS = true) => {
-    if (this.files[id]) {
-      this._git('rm', this.getAbsoluteFilePath(id));
+    const file = this.findFileById(id);
+    if (file) {
+      this._git('rm', this.getAbsoluteFilePath(file.id), file.sha);
 
       if (deleteInLFS) {
         this._lfs('deleteFile', id);
@@ -572,51 +586,94 @@ class VirtualFileSystem {
   /**
    * Import files and folders from a git repository into the virtual filesystem.
    *
-   * A directory contains the path inside the `file.name`, e.g.
-   *   { name: 'folder1/folder2/file.txt', content: '...' }
-   * whereas a file solely contains the file name, e.g.:
-   *   { name: 'file.txt', content: '...' }
+   * Each entry in the repoContents has a path property which contains the whole
+   * relative path from the root of the repository.
    *
-   * @param {array} repoFiles - List of files from the repository.
+   * @param {array} repoContents - List of files from the repository.
+   * @async
    */
-  importFromGit = (repoFiles) => {
+  importFromGit = async (repoContents) => {
     // Remove all files from the virtual filesystem.
     this.clear();
 
-    // Filter on all files and create them in the this.
-    repoFiles
-      .filter((fileOrFolder) => !fileOrFolder.name.includes('/'))
-      .forEach((file) => this.createFile(file, false));
-
-    // Filter on all folders and create them in the this.
-    // Example: /folder1/folder2/file.txt
-    repoFiles
-      .filter((fileOrFolder) => fileOrFolder.name.includes('/'))
-      .forEach((file) => {
-        // Create all parent folders first.
-        const parentDirs = file.name.split('/').slice(0, -1);
-        let parentId = null;
-        for (const dirname of parentDirs) {
-          const currFolder = this.findFolderWhere({ name: dirname, parentId });
-          if (!currFolder) {
-            const newFolder = this.createFolder({
-              name: dirname,
-              parentId,
-            });
-            parentId = newFolder.id;
-          } else {
-            parentId = currFolder.id;
-          }
-        }
-
-        // Create the file in the last folder.
-        const filename = file.name.split('/').pop();
+    // First create all root files.
+    repoContents
+      .filter((fileOrFolder) => fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/'))
+      .forEach(async (fileOrFolder) => {
         this.createFile({
-          ...file,
-          name: filename,
-          parentId,
+          name: fileOrFolder.path.split('/').pop(),
+          sha: fileOrFolder.sha,
+          isNew: false,
+          content: fileOrFolder.content,
         }, false);
       });
+
+    // Then create all root folders and their nested files.
+    repoContents
+      .filter((fileOrFolder) => !(fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/')))
+      .forEach((fileOrFolder) => {
+        const { sha } = fileOrFolder;
+        const path = fileOrFolder.path.split('/')
+        const name = path.pop();
+
+        const parentId = path.length > 0 ? VFS.findFolderByPath(path.join('/')).id : null;
+
+        if (fileOrFolder.type === 'tree') {
+          this.createFolder({ name, parentId, sha });
+        } else if (fileOrFolder.type === 'blob') {
+          this.createFile({
+            name,
+            parentId,
+            sha,
+            content: fileOrFolder.content,
+          }, false);
+        }
+      });
+
+    this.saveState();
+  }
+
+  /**
+   * Create a new GitFSWorker instance if it doesn't exist yet and terminate the
+   * LFS if it's currently active. This is only allow in the IDE app.
+   */
+  createGitFSWorker = () => {
+    if (!isIDE) return;
+
+    if (hasLFS()) {
+      LFS.terminate();
+    }
+
+    _createGitFSWorker();
+  }
+
+  /**
+   * Get all file paths recursively from a folder. This function is used when a
+   * folder is being renamed or moved and updated in the Git repository.
+   *
+   * @param {string} folderId - The folder id to get the file paths from.
+   * @returns {array} List of objects with the old and new file paths.
+   */
+  getOldNewFilePathsRecursively(folderId, oldPath) {
+    const files = this.findFilesWhere({ parentId: folderId });
+    const folders = this.findFoldersWhere({ parentId: folderId });
+
+    let paths = files.map((file) => {
+      const newPath = this.getAbsoluteFilePath(file.id);
+      const filename = newPath.split('/').pop();
+      return {
+        oldPath: `${oldPath}/${filename}`,
+        newPath,
+        content: file.content,
+        sha: file.sha,
+      }
+    });
+
+    for (const folder of folders) {
+      paths = [...paths, ...this.getOldNewFilePathsRecursively(folder.id, oldPath)];
+    }
+
+    return paths;
   }
 }
 

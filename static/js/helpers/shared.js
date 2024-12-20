@@ -344,3 +344,30 @@ function showLocalStorageWarning() {
 
   $('.file-tree-container').addClass('localstorage-mode').append(html);
 }
+
+/**
+ * Register a timeout handler based on an ID. This is mainly used for
+ * files/folders where a user could potentially trigger another file onchange
+ * event, while the previous file change of another file hasn't been synced. In
+ * that case, it shouldn't overwrite the previous file it's timeout. Therefore,
+ * we use this function to register a timeout handler per file/folder.
+ *
+ * @param {string} id - Some unique identifier, like uuidv4.
+ * @param {number} timeout - The amount of time in milliseconds to wait.
+ * @param {function} callback - Callback function that will be invoked.
+ */
+function registerTimeoutHandler(id, timeout, callback) {
+  if (!isObject(window._timeoutHandlers)) {
+    window._timeoutHandlers = {};
+  }
+
+  if (typeof window._timeoutHandlers[id] !== 'undefined') {
+    clearTimeout(window._timeoutHandlers[id]);
+  }
+
+  window._timeoutHandlers[id] = setTimeout(() => {
+    callback();
+    clearTimeout(window._timeoutHandlers[id]);
+    delete window._timeoutHandlers[id];
+  }, timeout);
+}

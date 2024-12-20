@@ -50,10 +50,6 @@ function createNewFileTreeFile(parentId = null) {
     },
   };
 
-  if (hasGitFSWorker()) {
-    newChildProps.extraClasses = 'git-added';
-  }
-
   // Append to the parent node if it exists, otherwise append to the root.
   const tree = getFileTreeInstance();
   if (parentId) {
@@ -110,10 +106,6 @@ function createNewFileTreeFolder(parentId = null) {
       isFolder: true,
     },
   };
-
-  if (hasGitFSWorker()) {
-    newChildProps.extraClasses = 'git-added';
-  }
 
   // Append to the parent node if it exists, otherwise append to the root.
   const tree = getFileTreeInstance();
@@ -447,29 +439,6 @@ function createFileTree() {
 }
 
 /**
- * Add a visual indicator to the file tree for files and folder whether they are
- * added or modified in Git.
- *
- * @param {FancytreeNode} node - The node to add the indicator to.
- */
-function addGitDiffIndicator(node) {
-  const classes = node.extraClasses ? node.extraClasses.split(' ') : []
-  const parentClasses = node.parent.extraClasses ? node.parent.extraClasses.split(' ') : [];
-
-  // Add modified classes for visual indicators.
-  if (!classes.includes('git-added')) {
-    node.extraClasses = classes.concat('git-added').join(' ');
-    node.render();
-  }
-
-  // Add modified classes to parent folders.
-  if (node.data.isFile && !node.parent.title === 'root' && !parentClasses.includes('git-added')) {
-    node.parent.extraClasses = parentClasses.concat('git-modified').join(' ');
-    node.parent.render();
-  }
-}
-
-/**
  * Callback after the inline editor was removed.
  */
 function afterCloseEditNodeCallback() {
@@ -526,10 +495,6 @@ function beforeCloseEditNodeCallback(event, data) {
 
   fn(data.node.key, { name });
 
-  if (hasGitFSWorker()) {
-    addGitDiffIndicator(data.node);
-  }
-
   const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.key);
   if (tab) {
     tab.container.setTitle(name);
@@ -552,11 +517,7 @@ function beforeCloseEditNodeCallback(event, data) {
  */
 function onStartEditNodeCallback(event, data) {
   window._blockLFSPolling = true;
-
-  if (window._fileTreeToggleTimeout) {
-    clearTimeout(window._fileTreeToggleTimeout);
-  }
-
+  clearTimeout(window._fileTreeToggleTimeout);
   data.input.select();
 }
 
@@ -568,9 +529,7 @@ function onClickNodeCallback(event, data) {
   if (data.node.data.isFile) {
     openFile(data.node.key, data.node.title);
   } else if (data.node.data.isFolder) {
-    if (window._fileTreeToggleTimeout) {
-      clearTimeout(window._fileTreeToggleTimeout);
-    }
+    clearTimeout(window._fileTreeToggleTimeout);
 
     // Only toggle with a debounce of 200ms when clicked on the title
     // to prevent double-clicks.
@@ -707,10 +666,6 @@ function dragStopCallback(targetNode, data) {
     : VFS.updateFile;
 
   fn(id, { parentId });
-
-  if (hasGitFSWorker()) {
-    addGitDiffIndicator(sourceNode);
-  }
 
   // Move the node in the tree, but when files or files are dropped onto other
   // files, prevent a new folder being created and just insert the source file

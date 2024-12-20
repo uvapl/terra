@@ -1,21 +1,13 @@
+import { Octokit } from 'https://esm.sh/octokit';
+
+const GITHUB_REPO_URL_PATTERN = /^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/;
+
 class API {
   /**
-   * Contains a reference to the libgit2 filesystem.
-   * @type {FS}
+   * Reference to the octokit instance used to interact with the GitHub API.
+   * @type {Octokit}
    */
-  fs = null;
-
-  /**
-   * Contains a reference to the libgit2 module.
-   * @type {Module}
-   */
-  lg = null;
-
-  /**
-   * The name of the directory where to clone the repo in.
-   * @type {string}
-   */
-  repoDir = 'project';
+  octokit = null;
 
   /**
    * Whether to app is running development mode.
@@ -24,10 +16,39 @@ class API {
   isDev = false;
 
   /**
-   * The absolute link to the repository.
+   * The username of the repository. This is the {owner} part in
+   * https://github.com/{owner}/{repo}.
    * @type {string}
    */
-  repoLink = null;
+  repoOwner = null;
+
+  /**
+   * The name of the repository. This is the {repo} part in
+   * https://github.com/{owner}/{repo}.
+   * @type {string}
+   */
+  repoName = null;
+
+  /**
+   * The default branch of the repository.
+   * @type {string}
+   */
+  defaultBranch = null;
+
+  /**
+   * The personal access token from the user used to authenticate as them for API calls.
+   * @type {string}
+   */
+  accessToken = null;
+
+  /**
+   * The information about the committer.
+   * @type {object}
+   */
+  committer = {
+    name: 'UvA Programming Lab',
+    email: 'terra@proglab.nl'
+  }
 
   /**
    * Defines the URL to the proxy server used for local development.
@@ -36,197 +57,138 @@ class API {
   devProxyUrl = 'http://localhost:8888';
 
   /**
-   * Whether there are new commits that need to be pushed.
-   * @type {boolean}
-   */
-  hasNewCommits = false;
-
-  /**
    * List of folders that should be ignored when traversing the repo contents.
    * @type {array}
    */
-  blacklisted_folders = ['.', '..', '.git'];
+  blacklistedFolders = ['.', '..', '.git'];
 
   constructor(options) {
     this.isDev = options.isDev;
-    this.pushedCallback = options.pushedCallback;
+    this.accessToken = options.accessToken;
+    this.commitSuccessCallback = options.commitSuccessCallback;
+    this.moveFileSuccessCallback = options.moveFileSuccessCallback;
+    this.moveFolderSuccessCallback = options.moveFolderSuccessCallback;
     this.cloneFailCallback = options.cloneFailCallback;
     this.cloneSuccessCallback = options.cloneSuccessCallback;
+    this.onRateLimit = options.onRateLimit;
 
     this.setRepoLink(options.repoLink);
-    this._alterXHR(options.username, options.accessToken);
-    this._init().then((repoFiles) => {
-      options.readyCallback(repoFiles);
-    }).catch(() => {
-      console.info('Failed to initialize git worker');
-    });
+
+    this._init()
+      .then(() => {
+        options.readyCallback();
+      }).catch(() => {
+        console.info('Failed to initialize git worker');
+      });
   }
 
   _log() {
-    console.log('[git]', ...arguments);
+    console.log('[Git]', ...arguments);
+  }
+
+  _error() {
+    console.error('[Git]', ...arguments);
   }
 
   setRepoLink(repoLink) {
-    this.repoLink = this.isDev
-      ? repoLink.replace(new URL(repoLink).origin, this.devProxyUrl)
-      : repoLink;
+    if (!GITHUB_REPO_URL_PATTERN.test(repoLink)) return;
+
+    const match = repoLink.match(GITHUB_REPO_URL_PATTERN);
+    if (!match) return;
+
+    this.repoOwner = match[1];
+    this.repoName = match[2];
   }
 
   /**
-   * Initializes the libgit2 module and filesystem.
+   * Initializes octokit and clone the repository immediately.
    *
    * @async
    */
   async _init() {
-    const lg2mod = await import(new URL('../vendor/lg2.js', import.meta.url));
-    this.lg = await lg2mod.default();
-    this.fs = this.lg.FS;
-    this.fs.writeFile('/home/web_user/.gitconfig',
-      [
-        '[user]',
-        'email = noreply@proglab.nl',
-        'name = UvA Programming Lab',
-      ].join('\n')
-    );
+    this.octokit = new Octokit({
+      auth: this.accessToken,
+      throttle: {
+        // https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#exceeding-the-rate-limit
+        onRateLimit: (retryAfter, options, octokit, retryCount) => {
+          this.onRateLimit(retryAfter);
+        },
+        onSecondaryRateLimit: (retryAfter, options, octokit) => {
+          this.onRateLimit(retryAfter);
+        },
+      }
 
-    // Setup a timer that triggers a push once per minute.
-    this.pushIntervalId = setInterval(() => {
-      this.push();
-    }, 30 * 1000);
-
-    // Clone the repo as soon as the worker is ready.
+    });
     this.clone();
-
-    return this._getNestedDirContents('.');
   }
 
   /**
-   * Get the nested files of a directory and all its subdirectories.
+   * Send a request through octokit to the GitHub API. By default, the '{owner}'
+   * and '{repo}' variables are available inside the `url`.
    *
-   * @param {string} dirPath - The path to the directory to list contents for.
-   * @returns {array} All nested file objects.
+   * @param {string} method - The request method.
+   * @param {string} url - The relative endpoint URL.
+   * @param {object} [options] - Data object to pass along with the request.
+   * @returns {Promise<*>} Response object.
    */
-  _getNestedDirContents(dirPath) {
-    const files = [];
-
-    this.fs.readdir(dirPath).forEach((filename) => {
-      const filepath = `${dirPath}/${filename}`.replace('./', '');
-      const stat = this.fs.stat(filepath);
-      if (this.fs.isDir(stat.mode) && !this.blacklisted_folders.includes(filename)) {
-        files.push(...this._getNestedDirContents(filepath));
-      } else if (this.fs.isFile(stat.mode)) {
-        files.push({
-          name: filepath,
-          content: this.fs.readFile(filepath, { encoding: 'utf8' }),
-          createdAt: new Date(stat.ctime).toISOString(),
-          updatedAt: new Date(stat.mtime).toISOString(),
-        });
-      }
-    });
-
-    return files;
-  }
-
-  /**
-   * Modifies the XMLHttpRequest object to include the user's GitHub credentials
-   * essential for cloning/pushing repositories.
-   *
-   * @param {string} username - The username of the user's account.
-   * @param {string} accessToken - The user's personal access token.
-   */
-  _alterXHR(username, accessToken) {
-    XMLHttpRequest.prototype._open = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
-      this._open(method, url, async, user, password);
-      const base64string = btoa(`${username}:${accessToken}`);
-      this.setRequestHeader('Authorization', `Basic ${base64string}`);
-    }
-  }
-
-  /**
-   * Create all the directories in a given filepath.
-   *
-   * @example _makeDirs('path/to/dir')
-   *
-   * @param {string} filepath - The filepath to create directories for.
-   */
-  _makeDirs(filepath) {
-    const dirs = filepath.split('/');
-
-    let path = ['.'];
-    dirs.forEach((dirname) => {
-      path.push(dirname);
-      const path_str = path.join('/');
-      try {
-        this.fs.lookupPath(path_str)
-      } catch {
-        this.fs.mkdir(path_str);
-      }
-    });
-  }
-
-  /**
-   * Check whether a given filepath exists in the filesystem and is a file.
-   *
-   * @param {string} filepath - The filepath to check.
-   * @returns {boolean} True if the given filepath exists, false otherwise.
-   */
-  _isFile(filepath) {
+  async _request(method, url, options = {}) {
     try {
-      const stat = this.fs.stat(filepath);
-      return this._pathExists(filepath) && this.fs.isFile(stat.mode);
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Check whether a given folderpath exists in the filesystem and is a directory.
-   *
-   * @param {string} folderpath - The folderpath to check.
-   * @returns {boolean} True if the given folderpath exists, false otherwise.
-   */
-  _isDir(folderpath) {
-    try {
-      const stat = this.fs.stat(folderpath);
-      return this._pathExists(folderpath) && this.fs.isDir(stat.mode);
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Check whether a given path exists in the filesystem.
-   *
-   * @param {string} path - The path to check.
-   * @returns {boolean} True if the given path exists, false otherwise.
-   */
-  _pathExists(path) {
-    try {
-      this.fs.lookupPath(path);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Clone a repository to the local wasm-git filesystem and `cd` into the
-   * cloned directory.
-   */
-  clone() {
-    try {
-      const exitcode = this.lg.callMain(['clone', this.repoLink, this.repoDir]);
-      if (exitcode !== 0) {
-        this._log('Failed to clone repository');
-        this.cloneFailCallback();
-      } else {
-        this.fs.chdir(this.repoDir);
-        this.cloneSuccessCallback();
-      }
+      return await this.octokit.request(`${method} ${url}`, {
+        owner: this.repoOwner,
+        repo: this.repoName,
+        ...options,
+        headers: {
+          ...options.headers,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        }
+      });
     } catch (err) {
-      console.error('Failed to clone repository:', err);
-      this.cloneFailCallback();
+      this._error('GitHub API rate limit exceeded');
+      this._error(err);
+      throw err;
+    }
+  }
+
+  /**
+   * Clone a repository and return the file contents tree
+   * in the clone-success callback.
+   * @async
+   */
+  async clone() {
+    try {
+      // Obtain the main branch.
+      const repoInfo = await this._request('GET', '/repos/{owner}/{repo}');
+      this.defaultBranch = repoInfo.data.default_branch;
+
+      // Request a recursive tree of the main branch.
+      const repoContents = await this._request('GET', '/repos/{owner}/{repo}/git/trees/{branch}', {
+        branch: this.defaultBranch,
+        recursive: true,
+      });
+
+      const tree = await Promise.all(
+        repoContents.data.tree.map(async (fileOrFolder) => {
+          if (fileOrFolder.type === 'blob') {
+            const res = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
+              path: fileOrFolder.path,
+            });
+
+            const content = atob(res.data.content);
+            if (content) {
+              fileOrFolder.content = content;
+            }
+          }
+          return fileOrFolder;
+        })
+      );
+
+      this.cloneSuccessCallback(tree);
+    } catch (err) {
+      if (![403, 429].includes(err.status)) {
+        this._log('Failed to clone repository:', err);
+        this.cloneFailCallback();
+      }
     }
   }
 
@@ -235,68 +197,120 @@ class API {
    * it to the staging area and committing it.
    * @param {string} filepath - The absolute filepath to commit.
    * @param {string} filecontents - The contents of the file to commit.
+   * @param {string} sha - The sha of the file to commit.
+   * @async
    */
-  commit(filepath, filecontents) {
-    this._log('comitting', filepath);
+  async commit(filepath, filecontents, sha) {
+    this._log('Committing', filepath);
 
-    if (filepath.includes('/')) {
-      const parentDirs = filepath.split('/').slice(0, -1).join('/');
-      this._makeDirs(parentDirs);
-    }
+    const response = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
+      path: filepath,
+      message: `Update ${filepath}`,
+      committer: this.committer,
+      content: btoa(filecontents),
+      sha,
+    });
 
-    const commitPrefix = !this._isFile(filepath) ? 'Add' : 'Update';
-    this.fs.writeFile(filepath, filecontents);
-    this.lg.callMain(['add', filepath]);
-    this.lg.callMain(['commit', '-m', `${commitPrefix} ${filepath}`]);
-    this.hasNewCommits = true;
-  }
-
-  /**
-   * Trigger a push to the remote repository.
-   */
-  push() {
-    if (this.hasNewCommits) {
-      this.lg.callMain(['push'])
-      this.hasNewCommits = false;
-      this.pushedCallback();
-    }
+    this.commitSuccessCallback(filepath, response.data.content.sha);
   }
 
   /**
    * Remove a filepath from the current repository.
    *
    * @param {string} filepath - The absolute filepath to remove.
+   * @param {string} sha - The sha of the file to delete.
    */
-  rm(filepath) {
-    this._log(`remove ${filepath}`);
-
-    if (this._isFile(filepath)) {
-      // File
-      this.fs.unlink(filepath);
-    } else {
-      // Folder
-      this.fs.rmdir(filepath);
+  async rm(filepath, sha) {
+    try {
+      await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
+        path: filepath,
+        sha,
+        message: `Remove ${filepath}`,
+        branch: this.defaultBranch,
+        committer: this.committer,
+      });
+      this._log(`Removed ${filepath}`);
+    } catch (err) {
+      this._log('Failed to remove', filepath, err);
     }
-
-    this.lg.callMain(['add', filepath]);
-    this.lg.callMain(['commit', '-m', `Remove ${filepath}`]);
-    this.hasNewCommits = true;
   }
 
   /**
    * Move a file from one location to another.
    *
    * @param {string} oldPath - The absolute filepath of the file to move.
+   * @param {string} oldSha - The sha of the file to remove.
    * @param {string} newPath - The absolute filepath to the new file.
+   * @param {string} newContent - The new content of the file.
    */
-  mv(oldPath, newPath) {
-    if (!this._pathExists(oldPath)) return;
+  async moveFile(oldPath, oldSha, newPath, newContent) {
+    // Create the new file with the new content.
+    const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
+      path: newPath,
+      message: `Rename ${oldPath} to ${newPath}`,
+      branch: this.defaultBranch,
+      committer: this.committer,
+      content: btoa(newContent),
+    });
 
-    this._log(`rename ${oldPath} to ${newPath}`);
-    this.fs.rename(oldPath, newPath);
-    this.lg.callMain(['add', oldPath, newPath])
-    this.lg.callMain(['commit', '-m', `Rename ${oldPath} to ${newPath}`]);
-    this.hasNewCommits = true;
+    // Delete the old file.
+    await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
+      path: oldPath,
+      message: `Remove ${oldPath}`,
+      branch: this.defaultBranch,
+      committer: this.committer,
+      sha: oldSha,
+    });
+
+    const newSha = result.data.content.sha;
+    this.moveFileSuccessCallback(newPath, newSha);
+
+    this._log(`Moved file from ${oldPath} to ${newPath}`);
+  }
+
+  /**
+   * Move a file from one location to another.
+   *
+   * @param {array} files - Array of file objects to move.
+   * @param {string} files[].oldPath - The filepath of the file to move.
+   * @param {string} files[].sha - The sha of the file to remove.
+   * @param {string} files[].newPath - The filepath to the new file.
+   * @param {string} files[].content - The new content of the file.
+   */
+  async moveFolder(files) {
+    // Keep track of a list of all new files with their new sha.
+    const updatedFiles = [];
+
+    await Promise.all(
+      files.map(async (file) => {
+        // Create the new file.
+        const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
+          path: file.newPath,
+          message: `Rename ${file.oldPath} to ${file.newPath}`,
+          branch: this.defaultBranch,
+          committer: this.committer,
+          content: btoa(file.content),
+        });
+
+        // Delete the old files.
+        await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
+          path: file.oldPath,
+          message: `Remove ${file.oldPath}`,
+          branch: this.defaultBranch,
+          committer: this.committer,
+          sha: file.sha,
+        });
+
+        updatedFiles.push({
+          filepath: file.newPath,
+          sha: result.data.content.sha,
+        });
+
+        this._log(`Moved file from ${file.oldPath} to ${file.newPath}`);
+      })
+    );
+
+    this.moveFolderSuccessCallback(updatedFiles);
   }
 }
 
@@ -314,23 +328,47 @@ self.onmessage = (event) => {
       api = new API({
         ...payload,
 
-        readyCallback(repoFiles) {
+        readyCallback() {
+          postMessage({ id: 'ready' });
+        },
+
+        onRateLimit(retryAfter) {
           postMessage({
-            id: 'ready',
-            data: { repoFiles }
+            id: 'rate-limit',
+            data: { retryAfter }
           });
         },
 
-        pushedCallback() {
-          postMessage({ id: 'pushed' });
+        commitSuccessCallback(filepath, sha) {
+          postMessage({
+            id: 'commit-success',
+            data: { filepath, sha }
+          });
+        },
+
+        moveFileSuccessCallback(filepath, sha) {
+          postMessage({
+            id: 'move-file-success',
+            data: { filepath, sha },
+          });
+        },
+
+        moveFolderSuccessCallback(updatedFiles) {
+          postMessage({
+            id: 'move-folder-success',
+            data: { updatedFiles },
+          });
         },
 
         cloneFailCallback() {
           postMessage({ id: 'clone-fail' })
         },
 
-        cloneSuccessCallback() {
-          postMessage({ id: 'clone-success' })
+        cloneSuccessCallback(repoContents) {
+          postMessage({
+            id: 'clone-success',
+            data: { repoContents }
+          })
         },
       });
       break;
@@ -344,11 +382,7 @@ self.onmessage = (event) => {
       break;
 
     case 'commit':
-      api.commit(payload.filepath, payload.filecontents);
-      break;
-
-    case 'push':
-      api.push();
+      api.commit(payload.filepath, payload.filecontents, payload.sha);
       break;
 
     case 'newFolder':
@@ -356,11 +390,15 @@ self.onmessage = (event) => {
       break;
 
     case 'rm':
-      api.rm(payload.filepath);
+      api.rm(payload.filepath, payload.sha);
       break;
 
-    case 'mv':
-      api.mv(payload.oldPath, payload.newPath);
+    case 'moveFile':
+      api.moveFile(payload.oldPath, payload.oldSha, payload.newPath, payload.newContent);
+      break;
+
+    case 'moveFolder':
+      api.moveFolder(payload.files);
       break;
   }
 };

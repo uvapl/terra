@@ -1,7 +1,6 @@
 /**
- * GitFS worker class that handles all Git operations using wasm-git.
+ * GitFS worker class that handles all Git operations.
  * This is the bridge class between the app and the git.worker.js.
- * @see https://github.com/petersalomonsen/wasm-git
  */
 class GitFS {
   /**
@@ -29,10 +28,9 @@ class GitFS {
   /**
    * Creates a new worker process.
    *
-   * @param {string} username - The username of the user's account.
    * @param {string} accessToken - The user's personal access token.
    */
-  _createWorker(username, accessToken) {
+  _createWorker(accessToken) {
     if (this.worker instanceof Worker) {
       console.error('[GitFS] failed to create a new worker as an instance is already running');
       return;
@@ -48,7 +46,6 @@ class GitFS {
     this.worker.postMessage({
       id: 'constructor',
       data: {
-        username: username,
         accessToken: accessToken,
         repoLink: this._repoLink,
         isDev: isDev,
@@ -90,11 +87,12 @@ class GitFS {
    *
    * @param {string} filepath - The absolute filepath within the git repo.
    * @param {string} filecontents - The new contents to commit.
+   * @param {string} sha - The sha of the file to commit.
    */
-  commit(filepath, filecontents) {
+  commit(filepath, filecontents, sha) {
     this.worker.postMessage({
       id: 'commit',
-      data: { filepath, filecontents },
+      data: { filepath, filecontents, sha },
     });
   }
 
@@ -109,11 +107,12 @@ class GitFS {
    * Remove a filepath from the current repository.
    *
    * @param {string} filepath - The absolute filepath within the git repo.
+   * @param {string} sha - The sha of the file to delete.
    */
-  rm(filepath) {
+  rm(filepath, sha) {
     this.worker.postMessage({
       id: 'rm',
-      data: { filepath },
+      data: { filepath, sha },
     });
   }
 
@@ -121,12 +120,30 @@ class GitFS {
    * Move a file from one location to another.
    *
    * @param {string} oldPath - The absolute filepath of the file to move.
+   * @param {string} oldSha - The sha of the file to remove.
    * @param {string} newPath - The absolute filepath to the new file.
+   * @param {string} newContent - The new content of the file.
    */
-  mv(oldPath, newPath) {
+  moveFile(oldPath, oldSha, newPath, newContent) {
     this.worker.postMessage({
-      id: 'mv',
-      data: { oldPath, newPath },
+      id: 'moveFile',
+      data: { oldPath, oldSha, newPath, newContent },
+    });
+  }
+
+  /**
+   * Move a folder and its contents from one location to another.
+   *
+   * @param {array} files - Array of file objects to move.
+   * @param {string} files[].oldPath - The filepath of the file to move.
+   * @param {string} files[].sha - The sha of the file to remove.
+   * @param {string} files[].newPath - The filepath to the new file.
+   * @param {string} files[].content - The new content of the file.
+   */
+  moveFolder(files) {
+    this.worker.postMessage({
+      id: 'moveFolder',
+      data: { files },
     });
   }
 
@@ -139,37 +156,64 @@ class GitFS {
     const payload = event.data.data;
 
     switch (event.data.id) {
-      // Ready callback from the worker instance. This will be run after
-      // libgit2 has been initialised successfully.
+      // Ready callback from the worker instance.
       case 'ready':
         this.isReady = true;
-
-        VFS.importFromGit(payload.repoFiles);
-        createFileTree();
         break;
 
-      case 'pushed':
-        // Clear the git color indicators.
-        const tree = getFileTreeInstance();
-        $('#file-tree .git-added, #file-tree .git-modified').each((index, element) => {
-          const node = tree.getNodeByKey(element.id);
-          if (node) {
-            const classes = node.extraClasses ? node.extraClasses.split(' ') : [];
-            node.extraClasses = classes.filter((c) => !c.startsWith('git-')).join(' ');
-            node.render();
+      // Triggered for primary and secondary rate limit.
+      case 'rate-limit':
+        const retryAfter = Math.ceil(payload.retryAfter / 60);
+        $('#file-tree').html('<div class="info-msg error">Exceeded GitHub API limit.</div>');
+
+        const $modal = createModal({
+          title: 'Exceeded GitHub API limit',
+          body: `
+            <p>
+              You have exceeded your GitHub API limit.<br/>
+              Please try again after ${retryAfter} minutes.
+            </p>
+          `,
+          footer: `
+            <button type="button" class="button primary-btn">Got it</button>
+          `,
+          footerClass: 'flex-end',
+          attrs: {
+            id: 'ide-git-exceeded-quota-modal',
+            class: 'modal-width-small',
           }
         });
+
+        showModal($modal);
+
+        $modal.find('.primary-btn').click(() => hideModal($modal));
         break;
 
     case 'clone-success':
       $('#file-tree .info-msg').remove();
-
-      // Remove local file storage warning if present.
       removeLocalStorageWarning();
+
+      VFS.importFromGit(payload.repoContents);
+      createFileTree();
       break;
 
       case 'clone-fail':
         $('#file-tree').html('<div class="info-msg error">Failed to clone repository</div>');V
+        break;
+
+      case 'move-folder-success':
+        // Update all sha in the new files in the VFS.
+        payload.updatedFiles.forEach((fileObj) => {
+          const file = VFS.findFileByPath(fileObj.filepath);
+          file.sha = fileObj.sha;
+        });
+        break;
+
+      case 'move-file-success':
+      case 'commit-success':
+        // Update the file's sha in the VFS.
+        const file = VFS.findFileByPath(payload.filepath);
+        file.sha = payload.sha;
         break;
     }
   }
@@ -180,17 +224,12 @@ class GitFS {
  * user provided an ssh-key and repository link that are saved in local storage.
  * Otherwise, a worker will be created automatically when the user adds a new
  * repository.
+ *
+ * This is considered a private function invoked from VFS.createGitFSWorker.
  */
-function createGitFSWorker() {
-  if (!isIDE) return;
-
-  if (hasLFS()) {
-    LFS.terminate();
-  }
-
+function _createGitFSWorker() {
   closeAllFiles();
 
-  const username = getLocalStorageItem('git-username');
   const accessToken = getLocalStorageItem('git-access-token');
   const repoLink = getLocalStorageItem('connected-repo');
   const repoInfo = getRepoInfo(repoLink);
@@ -203,10 +242,10 @@ function createGitFSWorker() {
     window._gitFS = null;
   }
 
-  if (username && accessToken && repoLink) {
+  if (accessToken && repoLink) {
     const gitFS = new GitFS(repoLink);
     window._gitFS = gitFS;
-    gitFS._createWorker(username, accessToken);
+    gitFS._createWorker(accessToken);
 
     const tree = getFileTreeInstance();
     if (tree) {
@@ -214,8 +253,7 @@ function createGitFSWorker() {
       window._fileTree = null;
     }
 
-    console.log('Creating gitfs worker')
+    console.log('Creating gitfs worker');
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
-    $('#menu-item--push-changes').removeClass('disabled');
   }
 }
