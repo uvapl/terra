@@ -161,6 +161,34 @@ class GitFS {
         this.isReady = true;
         break;
 
+      // Triggered for primary and secondary rate limit.
+      case 'rate-limit':
+        const retryAfter = Math.ceil(payload.retryAfter / 60);
+        $('#file-tree').html('<div class="info-msg error">Exceeded GitHub API limit.</div>');
+
+        const $modal = createModal({
+          title: 'Exceeded GitHub API limit',
+          body: `
+            <p>
+              You have exceeded your GitHub API limit.<br/>
+              Please try again after ${retryAfter} minutes.
+            </p>
+          `,
+          footer: `
+            <button type="button" class="button primary-btn">Got it</button>
+          `,
+          footerClass: 'flex-end',
+          attrs: {
+            id: 'ide-git-exceeded-quota-modal',
+            class: 'modal-width-small',
+          }
+        });
+
+        showModal($modal);
+
+        $modal.find('.primary-btn').click(() => hideModal($modal));
+        break;
+
     case 'clone-success':
       $('#file-tree .info-msg').remove();
       removeLocalStorageWarning();

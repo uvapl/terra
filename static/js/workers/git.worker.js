@@ -70,6 +70,7 @@ class API {
     this.moveFolderSuccessCallback = options.moveFolderSuccessCallback;
     this.cloneFailCallback = options.cloneFailCallback;
     this.cloneSuccessCallback = options.cloneSuccessCallback;
+    this.onRateLimit = options.onRateLimit;
 
     this.setRepoLink(options.repoLink);
 
@@ -83,6 +84,10 @@ class API {
 
   _log() {
     console.log('[Git]', ...arguments);
+  }
+
+  _error() {
+    console.error('[Git]', ...arguments);
   }
 
   setRepoLink(repoLink) {
@@ -101,7 +106,19 @@ class API {
    * @async
    */
   async _init() {
-    this.octokit = new Octokit({ auth: this.accessToken });
+    this.octokit = new Octokit({
+      // auth: this.accessToken,
+      throttle: {
+        // https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#exceeding-the-rate-limit
+        onRateLimit: (retryAfter, options, octokit, retryCount) => {
+          this.onRateLimit(retryAfter);
+        },
+        onSecondaryRateLimit: (retryAfter, options, octokit) => {
+          this.onRateLimit(retryAfter);
+        },
+      }
+
+    });
     this.clone();
   }
 
@@ -114,17 +131,23 @@ class API {
    * @param {object} [options] - Data object to pass along with the request.
    * @returns {Promise<*>} Response object.
    */
-  _request(method, url, options = {}) {
-    return this.octokit.request(`${method} ${url}`, {
-      owner: this.repoOwner,
-      repo: this.repoName,
-      ...options,
-      headers: {
-        ...options.headers,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      }
-    });
+  async _request(method, url, options = {}) {
+    try {
+      return await this.octokit.request(`${method} ${url}`, {
+        owner: this.repoOwner,
+        repo: this.repoName,
+        ...options,
+        headers: {
+          ...options.headers,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        }
+      });
+    } catch (err) {
+      this._error('GitHub API rate limit exceeded');
+      this._error(err);
+      throw err;
+    }
   }
 
   /**
@@ -162,8 +185,10 @@ class API {
 
       this.cloneSuccessCallback(tree);
     } catch (err) {
-      this._log('Failed to clone repository:', err);
-      this.cloneFailCallback();
+      if (![403, 429].includes(err.status)) {
+        this._log('Failed to clone repository:', err);
+        this.cloneFailCallback();
+      }
     }
   }
 
@@ -305,6 +330,13 @@ self.onmessage = (event) => {
 
         readyCallback() {
           postMessage({ id: 'ready' });
+        },
+
+        onRateLimit(retryAfter) {
+          postMessage({
+            id: 'rate-limit',
+            data: { retryAfter }
+          });
         },
 
         commitSuccessCallback(filepath, sha) {
