@@ -36,6 +36,10 @@ html {
   overflow-y: hidden;
 }
 
+a:visited {
+  color: blue;
+}
+
 body {
   margin: 0;
   font-size: var(--font-size);

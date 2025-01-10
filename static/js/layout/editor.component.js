@@ -206,7 +206,7 @@ class EditorComponent {
     // a file ID, or the file ID is not the same, then we should sync the
     // filesystem ID with this tab state's file ID. We can only do this for
     // non-IDE versions, because the ID always uses IDs properly and can have
-    // multiple filenames. It can be assumed that both the exam and iframe wil
+    // multiple filenames. It can be assumed that both the exam and iframe will
     // not have duplicate filenames.
     if (!isIDE) {
       const file = VFS.findFileWhere({ name: this.container.parent.config.title });
@@ -224,6 +224,7 @@ class EditorComponent {
     }
 
     if (isIDE) {
+      console.log('open container')
       this.reloadFileContent(true);
     }
 

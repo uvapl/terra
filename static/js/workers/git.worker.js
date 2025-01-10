@@ -30,6 +30,12 @@ class API {
   repoName = null;
 
   /**
+   * The branch of the repository the user is working in.
+   * @type {string}
+   */
+  repoBranch = null;
+
+  /**
    * The default branch of the repository.
    * @type {string}
    */
@@ -62,9 +68,11 @@ class API {
    */
   blacklistedFolders = ['.', '..', '.git'];
 
-  constructor(options) {
+  constructor(options, branch) {
     this.isDev = options.isDev;
+    this.repoBranch = options.branch;
     this.accessToken = options.accessToken;
+    this.fetchBranchesSuccessCallback = options.fetchBranchesSuccessCallback;
     this.commitSuccessCallback = options.commitSuccessCallback;
     this.moveFileSuccessCallback = options.moveFileSuccessCallback;
     this.moveFolderSuccessCallback = options.moveFolderSuccessCallback;
@@ -100,6 +108,10 @@ class API {
     this.repoName = match[2];
   }
 
+  setRepoBranch(branch) {
+    this.repoBranch = branch;
+  }
+
   /**
    * Initializes octokit and clone the repository immediately.
    *
@@ -119,7 +131,10 @@ class API {
       }
 
     });
-    this.clone();
+    if (await this.repoExists()) {
+      this.fetchBranches();
+      this.clone(true);
+    }
   }
 
   /**
@@ -141,13 +156,60 @@ class API {
           ...options.headers,
           'Accept': 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
-        }
+
+          // This header disables GitHub cache.
+          // See https://octokit.github.io/routes/cache/api.github.com/v3/index.html#conditional-requests
+          'If-None-Match': ''
+        },
       });
     } catch (err) {
-      this._error('GitHub API rate limit exceeded');
-      this._error(err);
+      this._error('Failed to send GitHub request >>>>', err);
       throw err;
     }
+  }
+
+  /**
+   * Check whether the repository exists.
+   *
+   * @async
+   * @returns {Promise<bool>} True if repository exists, false otherwise.
+   */
+  async repoExists() {
+    try {
+      await this._request('GET', '/repos/{owner}/{repo}');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Fetch the branches of the repository.
+   *
+   * @async
+   */
+  async fetchBranches() {
+    // Obtain the main branch.
+    const repoInfo = await this._request('GET', '/repos/{owner}/{repo}');
+    this.defaultBranch = repoInfo.data.default_branch;
+    if (!this.repoBranch) {
+      this.repoBranch = this.defaultBranch;
+    }
+
+    // Get other branches.
+    const branchInfo = await this._request('GET', '/repos/{owner}/{repo}/branches');
+    const branches = branchInfo.data
+      .map(branch => ({
+        name: branch.name,
+        current: branch.name === this.repoBranch,
+        default: branch.name === this.defaultBranch,
+      }))
+      .sort((a, b) => (
+        // Put the default branch on top.
+        b.default ? 1 : 0
+      ));
+
+    this.fetchBranchesSuccessCallback(branches);
   }
 
   /**
@@ -155,21 +217,29 @@ class API {
    * in the clone-success callback.
    * @async
    */
-  async clone() {
-    try {
-      // Obtain the main branch.
-      const repoInfo = await this._request('GET', '/repos/{owner}/{repo}');
-      this.defaultBranch = repoInfo.data.default_branch;
+  async clone(init = false) {
+    if (!init && !(await this.repoExists())) {
+      return this.cloneFailCallback();
+    }
 
+    let tree = [];
+    let repoContents = null;
+
+    try {
       // Request a recursive tree of the main branch.
-      const repoContents = await this._request('GET', '/repos/{owner}/{repo}/git/trees/{branch}', {
-        branch: this.defaultBranch,
+      repoContents = await this._request('GET', '/repos/{owner}/{repo}/git/trees/{branch}', {
+        branch: this.repoBranch,
         recursive: true,
       });
+    } catch {
+      // If this request fails, then the repo is empty, which is fine.
+      this._log('Repository is most likely empty.')
+    }
 
-      const tree = await Promise.all(
-        repoContents.data.tree.map(async (fileOrFolder) => {
-          if (fileOrFolder.type === 'blob') {
+    tree = await Promise.all(
+      repoContents.data.tree.map(async (fileOrFolder) => {
+        if (fileOrFolder.type === 'blob') {
+          try {
             const res = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
               path: fileOrFolder.path,
             });
@@ -178,18 +248,15 @@ class API {
             if (content) {
               fileOrFolder.content = content;
             }
+          } catch {
+            this._log('Possibly empty file:', fileOrFolder.path)
           }
-          return fileOrFolder;
-        })
-      );
+        }
+        return fileOrFolder;
+      })
+    );
 
-      this.cloneSuccessCallback(tree);
-    } catch (err) {
-      if (![403, 429].includes(err.status)) {
-        this._log('Failed to clone repository:', err);
-        this.cloneFailCallback();
-      }
-    }
+    this.cloneSuccessCallback(tree);
   }
 
   /**
@@ -226,7 +293,7 @@ class API {
         path: filepath,
         sha,
         message: `Remove ${filepath}`,
-        branch: this.defaultBranch,
+        branch: this.repoBranch,
         committer: this.committer,
       });
       this._log(`Removed ${filepath}`);
@@ -248,7 +315,7 @@ class API {
     const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
       path: newPath,
       message: `Rename ${oldPath} to ${newPath}`,
-      branch: this.defaultBranch,
+      branch: this.repoBranch,
       committer: this.committer,
       content: btoa(newContent),
     });
@@ -257,7 +324,7 @@ class API {
     await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
       path: oldPath,
       message: `Remove ${oldPath}`,
-      branch: this.defaultBranch,
+      branch: this.repoBranch,
       committer: this.committer,
       sha: oldSha,
     });
@@ -287,7 +354,7 @@ class API {
         const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
           path: file.newPath,
           message: `Rename ${file.oldPath} to ${file.newPath}`,
-          branch: this.defaultBranch,
+          branch: this.repoBranch,
           committer: this.committer,
           content: btoa(file.content),
         });
@@ -296,7 +363,7 @@ class API {
         await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
           path: file.oldPath,
           message: `Remove ${file.oldPath}`,
-          branch: this.defaultBranch,
+          branch: this.repoBranch,
           committer: this.committer,
           sha: file.sha,
         });
@@ -339,6 +406,13 @@ self.onmessage = (event) => {
           });
         },
 
+        fetchBranchesSuccessCallback(branches) {
+          postMessage({
+            id: 'fetch-branches-success',
+            data: { branches }
+          });
+        },
+
         commitSuccessCallback(filepath, sha) {
           postMessage({
             id: 'commit-success',
@@ -371,6 +445,10 @@ self.onmessage = (event) => {
           })
         },
       });
+      break;
+
+    case 'setRepoBranch':
+      api.setRepoBranch(payload.branch);
       break;
 
     case 'setRepoLink':

@@ -49,6 +49,7 @@ class GitFS {
         accessToken: accessToken,
         repoLink: this._repoLink,
         isDev: isDev,
+        branch: getLocalStorageItem('git-branch'),
       },
     });
   }
@@ -72,6 +73,13 @@ class GitFS {
       data: {
         repoLink: this._repoLink,
       },
+    });
+  }
+
+  setRepoBranch(branch) {
+    this.worker.postMessage({
+      id: 'setRepoBranch',
+      data: { branch },
     });
   }
 
@@ -189,12 +197,17 @@ class GitFS {
         $modal.find('.primary-btn').click(() => hideModal($modal));
         break;
 
+    case 'fetch-branches-success':
+      renderGitRepoBranches(payload.branches);
+      break;
+
     case 'clone-success':
       $('#file-tree .info-msg').remove();
       removeLocalStorageWarning();
 
-      VFS.importFromGit(payload.repoContents);
-      createFileTree();
+      VFS.importFromGit(payload.repoContents).then(() => {
+        createFileTree();
+      });
       break;
 
       case 'clone-fail':

@@ -17,6 +17,41 @@ $(document).ready(() => {
 // Functions
 // ===========================================================================
 
+function renderGitRepoBranches(branches) {
+  $('#menu-item--branch').addClass('has-dropdown');
+  $('#menu-item--branch ul').remove();
+
+  const branchesHtml = branches.map(branch => {
+    if (branch.current) {
+      return `<li class="active" data-val="${branch.name}">${branch.name}</li>`;
+    } else {
+      return `<li data-val="${branch.name}">${branch.name}</li>`;
+    }
+  }).join('');
+
+  $('#menu-item--branch').append(`<ul id="git-branches">${branchesHtml}</ul>`);
+
+  $('#git-branches').find('li').click((event) => {
+    const $element = $(event.target);
+    if ($element.hasClass('active')) return;
+
+    const newBranch = $element.data('val');
+    setLocalStorageItem('git-branch', newBranch);
+    $element.addClass('active').siblings().removeClass('active');
+
+    VFS._git('setRepoBranch', newBranch);
+
+    const tree = getFileTreeInstance();
+    if (tree) {
+      $('#file-tree').fancytree('destroy');
+      window._fileTree = null;
+    }
+
+    $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
+    VFS._git('clone');
+  });
+}
+
 /**
  * Replaces the `data-keystroke` attribute with the appropriate symbols for a
  * single list-item in the menubar.
@@ -339,10 +374,15 @@ Menubar.connectRepo = () => {
       return;
     }
 
+    // Remove previously selected branch such that the clone will use the
+    // default branch for the new repo.
+    removeLocalStorageItem('git-branch');
+
     if (repoLink) {
       setLocalStorageItem('connected-repo', repoLink);
       console.log('Connecting to repository:', repoLink);
     } else {
+      // Disconnect
       removeLocalStorageItem('connected-repo');
 
       showLocalStorageWarning();
