@@ -23,12 +23,12 @@ class EditorComponent {
   /**
    * Whether the onContainerOpen event has been triggered falsely.
    * This happens when there is a single empty Untitled tab where the user
-   * clicks on the left-sidebar to open another file and it propogates a new
-   * file creation. At this moment, the Untitled tab is closed, but the
-   * GoldenLayout switches to the Untitled tab, closes it and then switches back
-   * to the current tab, which triggers another 'show' event, which leads to
-   * code being run twice and thus leading in an unexpected onfilechange event
-   * triggered, while the only thing that the user did was open file.
+   * clicks on the left-sidebar to open another file. At this moment, the
+   * Untitled tab will be closed, however, GoldenLayout switches to the Untitled
+   * tab, closes it and then switches back to the newly inserted tab, which
+   * triggers another 'show' event, which leads to code being run twice and thus
+   * leading in an unexpected onfilechange event triggered, while the only thing
+   * that the user did was open file.
    */
   fakeOnContainerOpenEvent = false;
 
