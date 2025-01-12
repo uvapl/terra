@@ -8,7 +8,7 @@
 
 initApp().then(({ layout }) => {
   // Fetch the repo files or the local storage files (vfs) otherwise.
-  const repoLink = getLocalStorageItem('connected-repo');
+  const repoLink = getLocalStorageItem('git-repo');
   if (repoLink) {
     VFS.createGitFSWorker();
   } else {

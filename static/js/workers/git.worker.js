@@ -132,8 +132,9 @@ class API {
 
     });
     if (await this.repoExists()) {
-      this.fetchBranches();
-      this.clone(true);
+      this.fetchBranches().then(() => {
+        this.clone(true);
+      });
     }
   }
 
@@ -236,25 +237,28 @@ class API {
       this._log('Repository is most likely empty.')
     }
 
-    tree = await Promise.all(
-      repoContents.data.tree.map(async (fileOrFolder) => {
-        if (fileOrFolder.type === 'blob') {
-          try {
-            const res = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
-              path: fileOrFolder.path,
-            });
+    if (repoContents) {
+      tree = await Promise.all(
+        repoContents.data.tree.map(async (fileOrFolder) => {
+          if (fileOrFolder.type === 'blob') {
+            try {
+              const res = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
+                branch: this.repoBranch,
+                path: fileOrFolder.path,
+              });
 
-            const content = atob(res.data.content);
-            if (content) {
-              fileOrFolder.content = content;
+              const content = atob(res.data.content);
+              if (content) {
+                fileOrFolder.content = content;
+              }
+            } catch {
+              this._log('Possibly empty file:', fileOrFolder.path)
             }
-          } catch {
-            this._log('Possibly empty file:', fileOrFolder.path)
           }
-        }
-        return fileOrFolder;
-      })
-    );
+          return fileOrFolder;
+        })
+      );
+    }
 
     this.cloneSuccessCallback(tree);
   }
@@ -275,6 +279,7 @@ class API {
       message: `Update ${filepath}`,
       committer: this.committer,
       content: btoa(filecontents),
+      branch: this.repoBranch,
       sha,
     });
 

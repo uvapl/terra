@@ -59,8 +59,11 @@ class GitFS {
    */
   terminate() {
     console.log('Terminating existing GitFS worker')
-    setLocalStorageItem('connected-repo', '');
-    $('#menu-item--push-changes').addClass('disabled');
+    setLocalStorageItem('git-repo', '');
+    setLocalStorageItem('git-branch', '');
+    $('#menu-item--branch')
+      .removeClass('has-dropdown').addClass('disabled')
+      .find('ul').remove();
     this.worker.terminate();
   }
 
@@ -244,7 +247,7 @@ function _createGitFSWorker() {
   closeAllFiles();
 
   const accessToken = getLocalStorageItem('git-access-token');
-  const repoLink = getLocalStorageItem('connected-repo');
+  const repoLink = getLocalStorageItem('git-repo');
   const repoInfo = getRepoInfo(repoLink);
   if (repoInfo) {
     setFileTreeTitle(`${repoInfo.user}/${repoInfo.repo}`)

@@ -30,6 +30,7 @@ function renderGitRepoBranches(branches) {
   }).join('');
 
   $('#menu-item--branch').append(`<ul id="git-branches">${branchesHtml}</ul>`);
+  $('#menu-item--branch').removeClass('disabled');
 
   $('#git-branches').find('li').click((event) => {
     const $element = $(event.target);
@@ -319,7 +320,7 @@ Menubar.addCredentials = () => {
 };
 
 Menubar.connectRepo = () => {
-  const initialRepoLink = getLocalStorageItem('connected-repo', '');
+  const initialRepoLink = getLocalStorageItem('git-repo', '');
 
   const localFilesNotice = initialRepoLink
     ? '<p class="text-small">Leave empty to disconnect from the repository.</p>'
@@ -379,11 +380,11 @@ Menubar.connectRepo = () => {
     removeLocalStorageItem('git-branch');
 
     if (repoLink) {
-      setLocalStorageItem('connected-repo', repoLink);
+      setLocalStorageItem('git-repo', repoLink);
       console.log('Connecting to repository:', repoLink);
     } else {
       // Disconnect
-      removeLocalStorageItem('connected-repo');
+      removeLocalStorageItem('git-repo');
 
       showLocalStorageWarning();
 
@@ -429,7 +430,7 @@ Menubar.connectRepo = () => {
           // Remove the connected repo link from local storage, because if the
           // user would (accidentally) refresh, then it would automatically
           // clone, which we want to prevent.
-          removeLocalStorageItem('connected-repo');
+          removeLocalStorageItem('git-repo');
 
           hideModal($confirmModal);
         });

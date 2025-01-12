@@ -23,7 +23,7 @@ class LocalFileSystem {
 
   constructor() {
     // Only initialize if the user is not connected to git.
-    const gitRepoLink = getLocalStorageItem('connected-repo');
+    const gitRepoLink = getLocalStorageItem('git-repo');
     if (!gitRepoLink) {
       this._init();
     }
