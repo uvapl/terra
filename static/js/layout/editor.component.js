@@ -20,6 +20,18 @@ class EditorComponent {
    */
   editor = null;
 
+  /**
+   * Whether the onContainerOpen event has been triggered falsely.
+   * This happens when there is a single empty Untitled tab where the user
+   * clicks on the left-sidebar to open another file and it propogates a new
+   * file creation. At this moment, the Untitled tab is closed, but the
+   * GoldenLayout switches to the Untitled tab, closes it and then switches back
+   * to the current tab, which triggers another 'show' event, which leads to
+   * code being run twice and thus leading in an unexpected onfilechange event
+   * triggered, while the only thing that the user did was open file.
+   */
+  fakeOnContainerOpenEvent = false;
+
   constructor(container, state) {
     this.container = container;
     this.state = state;
@@ -200,6 +212,11 @@ class EditorComponent {
    * Callback when the editor container is opened.
    */
   onContainerOpen = () => {
+    if (this.fakeOnContainerOpenEvent) {
+      this.fakeOnContainerOpenEvent = false;
+      return;
+    }
+
     this.editor.focus();
 
     // If we ran into a layout state from localStorage that doesn't have
@@ -224,7 +241,6 @@ class EditorComponent {
     }
 
     if (isIDE) {
-      console.log('open container')
       this.reloadFileContent(true);
     }
 

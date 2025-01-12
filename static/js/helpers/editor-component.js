@@ -114,6 +114,7 @@ function openFile(id, filename) {
       });
 
       if (removeFirstTab) {
+        getAllEditorTabs()[1].instance.fakeOnContainerOpenEvent = true;
         currentTab.parent.removeChild(tabs[0]);
       }
     }
