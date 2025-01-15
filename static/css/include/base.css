@@ -76,6 +76,10 @@ body {
   color: #d34d4d;
 }
 
+.success {
+  color: #099509;
+}
+
 .component-container.locked {
   position: relative;
   pointer-events: none;

@@ -206,6 +206,14 @@ class EditorComponent {
 
     // Spawn a new worker if necessary.
     createLangWorkerApi(this.proglang);
+
+    if (isIDE) {
+      if (this.proglang === 'c' && $('#run-check50-btn:disabled.loading').length == 0) {
+        $('#run-check50-btn').prop('disabled', false);
+      } else {
+        $('#run-check50-btn').prop('disabled', true);
+      }
+    }
   }
 
   /**
