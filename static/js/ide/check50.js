@@ -1,6 +1,5 @@
 (() => {
   const BASE_URL = 'https://agile008.science.uva.nl'
-  // const BASE_URL = 'http://localhost:8888';
   init();
 
   // ===========================================================================
@@ -32,16 +31,14 @@
     const filename = tab.config.title;
     const code = tab.instance.editor.getValue();
 
-    console.log('filename', filename);
-
     const zip = new JSZip();
     zip.file(filename, code);
     zip.generateAsync({
       type: 'blob',
-      // compression: "DEFLATE",
-      // compressionOptions: {
-      //     level: 9
-      // }
+      compression: "DEFLATE",
+      compressionOptions: {
+          level: 9
+      }
     }).then((content) => {
       disableCheck50Button();
       const formData = new FormData();
@@ -49,26 +46,52 @@
       formData.append('slug', 'minprog/checks/2022/mario/less');
       formData.append('password', 'bwCRJhxzYU5pI7G3iqahFA');
 
+      $('.right-sidebar').html(`
+        <div class="check50-results-container">
+          <div class="check50-close-btn"></div>
+          <div class="check50-title">Check50 results</div>
+          <p class="connecting">Connecting....</p>
+        </div>
+      `);
+
+      // Trigger a resize such that the content is updated.
+      $(window).resize();
+
+      // Add small connecting animation that adds a dot every 500ms, delayed by 1 second.
+      for (let i = 0; i < 6; i++) {
+        setTimeout(() => {
+          $('.right-sidebar .connecting').append('.');
+        }, seconds(.5) * i + seconds(.5));
+      }
+
+      // Add close button handler.
+      $('.check50-close-btn').click(() => {
+        $('.right-sidebar').html('');
+        clearInterval(window.check50PollingIntervalId);
+        enableCheck50Button();
+        $(window).resize();
+      });
+
       fetch(`${BASE_URL}/check50`, {
         method: 'POST',
         body: formData,
       })
         .then((response) => response.json())
         .then((response) => {
-            pollCheck50Results(response.id);
-        }).catch((error) => {
+          pollCheck50Results(response.id);
+        }).catch(() => {
           enableCheck50Button();
         });
     });
   }
 
   function pollCheck50Results(id) {
-    this.check50PollingIntervalId = setInterval(() => {
+    window.check50PollingIntervalId = setInterval(() => {
       fetch(`${BASE_URL}/get/${id}`)
         .then((response) => response.json())
         .then((response) => {
           if (response.status === 'finished') {
-            clearInterval(this.check50PollingIntervalId);
+            clearInterval(window.check50PollingIntervalId);
             enableCheck50Button();
             showCheck50Results(response.result.check50);
           }
@@ -80,7 +103,7 @@
   }
 
   function showCheck50Results(response) {
-    let html = '<div class="check50-title">Check50 results</div>';
+    let html = '';
 
     if (response.error) {
       const traceback = response.error.traceback.join('').replace('\n', '<br>');
@@ -107,20 +130,8 @@
       }
     }
 
-    $('.right-sidebar').html(`
-      <div class="check50-results-container">
-        <div class="check50-close-btn"></div>
-        ${html}
-      </div>
-    `);
-
-    $('.check50-close-btn').click(() => {
-      $('.right-sidebar').html('');
-      $(window).resize();
-    });
-
-    // Trigger a resize such that the content is updated.
-    $(window).resize();
+    $('.right-sidebar .connecting').remove();
+    $('.check50-results-container').append(html);
   }
 
 })();
