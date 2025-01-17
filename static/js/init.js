@@ -1,5 +1,5 @@
 // Create the main terra object.
-Terra = {
+const Terra = {
   // Contains constants that are used throughout all apps where 'c' is an
   // abbrevation for 'constants'.
   c: {},
