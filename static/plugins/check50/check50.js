@@ -1,33 +1,23 @@
 (() => {
   const BASE_URL = 'https://agile008.science.uva.nl'
 
-  Terra.pluginManager.register({
-    name: 'check50',
-    css: 'static/plugins/check50/check50.css',
-    onLayoutLoaded: () => {
-      createCheck50Button();
-    },
+  class Check50Plugin extends TerraPlugin {
+    css = ['static/plugins/check50/check50.css'];
 
-    onEditorFocus: (editorComponent) => {
+    onLayoutLoaded() {
+      createCheck50Button();
+    }
+
+    onEditorFocus(editorComponent) {
       if (editorComponent.proglang === 'c' && $('#run-check50-btn:disabled.loading').length == 0) {
         $('#run-check50-btn').prop('disabled', false);
       } else {
         $('#run-check50-btn').prop('disabled', true);
       }
-    },
+    }
+  }
 
-    // onEditorContainerLoaded: (editorComponent) => {},
-    // onEditorContainerChange: (editorComponent) => {},
-    // onEditorContainerOpen: (editorComponent) => {},
-    // onEditorContainerLock: (editorComponent) => {},
-    // onEditorContainerSetCustomAutoCompleter: (completions, editorComponent) => {},
-    // onEditorContainerUnlock: (editorComponent) => {},
-    // setEditoContainerTheme: (theme, editorComponent) => {},
-    // setEditoContainerFontSize: (fontSize, editorComponent) => {},
-    // onEditorContainerResize: (editorComponent) => {},
-    // onEditorContainerDestroy: (editorComponent) => {},
-    // onEditorContainerReloadContent: (editorComponent) => {},
-  });
+  Terra.pluginManager.register(new Check50Plugin());
 
   // ===========================================================================
   // Functions
