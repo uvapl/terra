@@ -38,7 +38,7 @@ class LayoutIDE extends Layout {
     // Exclude the content from all editors for the IDE when LFS is enabled,
     // because for LFS we use lazy loading, i.e. only load the content when
     // opening the file.
-    if (Terra.f.hasLFS() && LFS.loaded) {
+    if (Terra.f.hasLFS() && Terra.lfs.loaded) {
       config = this._removeEditorValue(config);
     }
 

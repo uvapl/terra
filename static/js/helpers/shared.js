@@ -264,7 +264,7 @@ Terra.f.hasLFSApi = () => {
  * @returns {boolean} True when LFS has been initialized, false otherwise.
  */
 Terra.f.hasLFS = () => {
-  return typeof LFS !== 'undefined' && LFS instanceof LocalFileSystem;
+  return typeof Terra.lfs !== 'undefined' && Terra.lfs instanceof LocalFileSystem;
 }
 
 /**

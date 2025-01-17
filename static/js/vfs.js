@@ -41,9 +41,9 @@ class VirtualFileSystem {
     // - The browser doesn't support the LFS class.
     // - The LFS class is not loaded yet. We make an exception for the
     //   openFolderPicker, because this function is used to load the LFS class.
-    if (!Terra.f.hasLFS() || (Terra.f.hasLFS() && !LFS.loaded && fn !== 'openFolderPicker')) return;
+    if (!Terra.f.hasLFS() || (Terra.f.hasLFS() && !Terra.lfs.loaded && fn !== 'openFolderPicker')) return;
 
-    return LFS[fn](...payload);
+    return Terra.lfs[fn](...payload);
   }
 
   /**
@@ -84,7 +84,7 @@ class VirtualFileSystem {
 
     // Remove the content from all files when LFS or Git is used, because LFS uses
     // lazy loading and GitFS is being cloned when refreshed anyway.
-    if (Terra.c.IS_IDE && (Terra.f.hasLFS() && LFS.loaded || Terra.f.hasGitFSWorker())) {
+    if (Terra.c.IS_IDE && (Terra.f.hasLFS() && Terra.lfs.loaded || Terra.f.hasGitFSWorker())) {
       const keys = ['sha', 'content'];
       Object.keys(files).forEach((fileId) => {
         files[fileId] = { ...files[fileId] };
@@ -362,7 +362,7 @@ class VirtualFileSystem {
 
     if (file) {
       // Move the file to the new location before updating the file object,
-      // because the LFS.moveFile needs to use the absolute paths from VFS.
+      // because the Terra.lfs.moveFile needs to use the absolute paths from VFS.
       if (isRenamed || isMoved) {
         await this._lfs(
           'moveFile',
@@ -424,7 +424,7 @@ class VirtualFileSystem {
 
     if (folder) {
       // Move the folder to the new location before updating the folder object,
-      // because the LFS.moveFolder needs to use the absolute paths from VFS.
+      // because the Terra.lfs.moveFolder needs to use the absolute paths from VFS.
       if (isRenamed || isMoved) {
         await this._lfs(
           'moveFolder',
@@ -641,7 +641,7 @@ class VirtualFileSystem {
     if (!Terra.c.IS_IDE) return;
 
     if (Terra.f.hasLFS()) {
-      LFS.terminate();
+      Terra.lfs.terminate();
     }
 
     _createGitFSWorker();

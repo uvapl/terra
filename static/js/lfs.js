@@ -769,4 +769,4 @@ class LocalFileSystem {
   }
 }
 
-const LFS = new LocalFileSystem();
+Terra.lfs = new LocalFileSystem();

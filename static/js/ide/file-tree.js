@@ -28,7 +28,7 @@ function incrementString(string) {
  * @param {string|null} [parentId] - The parent folder id.
  */
 function createNewFileTreeFile(parentId = null) {
-  if (Terra.f.hasLFS() && LFS.busy) return;
+  if (Terra.f.hasLFS() && Terra.lfs.busy) return;
 
   // Create a new unique filename.
   let filename = 'Untitled';
@@ -85,7 +85,7 @@ function createNewFileTreeFile(parentId = null) {
  * @param {string|null} [parentId] - The parent id of the new folder.
  */
 function createNewFileTreeFolder(parentId = null) {
-  if (Terra.f.hasLFS() && LFS.busy) return;
+  if (Terra.f.hasLFS() && Terra.lfs.busy) return;
 
   // Create a new unique foldername.
   let foldername = 'Untitled';
@@ -278,7 +278,7 @@ function createFileTreeContextMenuItems($trigger, event) {
       },
     };
 
-    if (!Terra.f.hasLFS() || (Terra.f.hasLFS() && !LFS.loaded)) {
+    if (!Terra.f.hasLFS() || (Terra.f.hasLFS() && !Terra.lfs.loaded)) {
       menu.downloadFolder = {
         name: 'Download',
         callback: () => {
@@ -291,7 +291,7 @@ function createFileTreeContextMenuItems($trigger, event) {
   }
 
   if (isFile) {
-    if (!Terra.f.hasLFS() || (Terra.f.hasLFS() && !LFS.loaded)) {
+    if (!Terra.f.hasLFS() || (Terra.f.hasLFS() && !Terra.lfs.loaded)) {
       menu.downloadFile = {
         name: 'Download',
         callback: () => {

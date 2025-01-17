@@ -145,7 +145,7 @@ class EditorComponent {
    */
   bindEditorLFSCommands = () => {
     this.editor.commands.on('exec', (e) => {
-      if (Terra.f.hasLFS() && LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
+      if (Terra.f.hasLFS() && Terra.lfs.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
         const inputText = e.args.text || '';
         const filesize = new Blob([this.editor.getValue() + inputText]).size;
         if (filesize >= Terra.c.LFS_MAX_FILE_SIZE) {
@@ -262,7 +262,7 @@ class EditorComponent {
 
     const file = Terra.vfs.findFileById(this.container.getState().fileId);
     if (file) {
-      if (Terra.f.hasLFS() && LFS.loaded && typeof file.size === 'number' && file.size > Terra.c.LFS_MAX_FILE_SIZE) {
+      if (Terra.f.hasLFS() && Terra.lfs.loaded && typeof file.size === 'number' && file.size > Terra.c.LFS_MAX_FILE_SIZE) {
         // Disable the editor if the file is too large.
         this.editor.container.classList.add('exceeded-filesize');
         this.editor.setReadOnly(true);
@@ -271,7 +271,7 @@ class EditorComponent {
       } else if (Terra.f.hasLFS() && !Terra.f.hasGitFSWorker() && !file.content) {
         // Load the file content from LFS.
         const cursorPos = this.editor.getCursorPosition()
-        LFS.getFileContent(file.id).then((content) => {
+        Terra.lfs.getFileContent(file.id).then((content) => {
           // Only update the content if it has changed.
           if (this.editor.getValue() !== content) {
             this.editor.setValue(content);

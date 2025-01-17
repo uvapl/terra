@@ -18,8 +18,8 @@ Terra.f.getAllEditorFiles = () => {
     Terra.f.getAllEditorTabs().map(async (tab) => {
       const containerState = tab.container.getState()
       let content = containerState.value;
-      if (!content && Terra.f.hasLFS() && LFS.loaded) {
-        content = await LFS.getFileContent(containerState.fileId);
+      if (!content && Terra.f.hasLFS() && Terra.lfs.loaded) {
+        content = await Terra.lfs.getFileContent(containerState.fileId);
       }
 
       return {
@@ -302,8 +302,8 @@ Terra.f.runCode = async (fileId = null, clearTerm = false) => {
     filename = file.name;
     files = [file];
 
-    if (!file.content && Terra.f.hasLFS() && LFS.loaded) {
-      const content = await LFS.getFileContent(file.id);
+    if (!file.content && Terra.f.hasLFS() && Terra.lfs.loaded) {
+      const content = await Terra.lfs.getFileContent(file.id);
       files = [{ ...file, content }];
     }
 

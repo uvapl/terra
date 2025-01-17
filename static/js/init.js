@@ -23,7 +23,10 @@ Terra.langWorkerApi = null;
 // IDE-only properties.
 // ===========================================================================
 
-// Reference to the virtual file system if loaded.
+// Reference to the local filesystem if loaded.
+Terra.lfs = null;
+
+// Reference to the virtual filesystem if loaded.
 Terra.vfs = null;
 
 // Reference to the git filesystem class instance if loaded.
