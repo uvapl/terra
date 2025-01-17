@@ -68,7 +68,7 @@ class API {
    */
   blacklistedFolders = ['.', '..', '.git'];
 
-  constructor(options, branch) {
+  constructor(options) {
     this.isDev = options.isDev;
     this.repoBranch = options.branch;
     this.accessToken = options.accessToken;

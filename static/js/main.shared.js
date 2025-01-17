@@ -17,7 +17,7 @@ function generateConfigContent(tabs, fontSize) {
     componentState: {
       fontSize: fontSize,
       value: tabs[filename],
-      fileId: uuidv4(),
+      fileId: Terra.f.uuidv4(),
     },
     title: filename,
     isClosable: false,
@@ -46,7 +46,7 @@ function createLayout(content, fontSize, options = {}) {
     },
     dimensions: {
       headerHeight: 30,
-      borderWidth: isIframe ? 0 : 10,
+      borderWidth: Terra.c.IS_FRAME ? 0 : 10,
     },
     content: [
       {

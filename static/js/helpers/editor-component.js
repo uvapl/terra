@@ -3,8 +3,8 @@
  *
  * @returns {object} The active editor instance.
  */
-function getActiveEditor() {
-  return window._layout._lastActiveEditor;
+Terra.f.getActiveEditor = () => {
+  return Terra.layout._lastActiveEditor;
 }
 
 /**
@@ -13,12 +13,12 @@ function getActiveEditor() {
  * @returns {Promise<array>} List of objects, each containing the filename and
  * content of the corresponding editor tab.
  */
-function getAllEditorFiles() {
+Terra.f.getAllEditorFiles = () => {
   return Promise.all(
-    getAllEditorTabs().map(async (tab) => {
+    Terra.f.getAllEditorTabs().map(async (tab) => {
       const containerState = tab.container.getState()
       let content = containerState.value;
-      if (!content && hasLFS() && LFS.loaded) {
+      if (!content && Terra.f.hasLFS() && LFS.loaded) {
         content = await LFS.getFileContent(containerState.fileId);
       }
 
@@ -37,7 +37,7 @@ function getAllEditorFiles() {
  * the recursive search will start.
  * @returns {array} List of all the editor tabs.
  */
-function getAllEditorTabs(contentItem = window._layout.root) {
+Terra.f.getAllEditorTabs = (contentItem = Terra.layout.root) => {
   if (contentItem.isComponent) {
     return contentItem;
   }
@@ -45,7 +45,7 @@ function getAllEditorTabs(contentItem = window._layout.root) {
   let files = [];
   contentItem.contentItems.forEach((childContentItem) => {
     if (!childContentItem.isTerminal) {
-      files = files.concat(getAllEditorTabs(childContentItem));
+      files = files.concat(Terra.f.getAllEditorTabs(childContentItem));
     }
   });
 
@@ -56,8 +56,8 @@ function getAllEditorTabs(contentItem = window._layout.root) {
 /**
  * Close the active tab in the editor, except when it is an untitled tab.
  */
-function closeFile() {
-  const currentTab = getActiveEditor();
+Terra.f.closeFile = () => {
+  const currentTab = Terra.f.getActiveEditor();
   if (currentTab) {
     currentTab.parent.removeChild(currentTab);
   }
@@ -66,8 +66,8 @@ function closeFile() {
 /**
  * Close all tabs in the editor.
  */
-function closeAllFiles() {
-  const tabs = getAllEditorTabs();
+Terra.f.closeAllFiles = () => {
+  const tabs = Terra.f.getAllEditorTabs();
   tabs.forEach((tab) => tab.parent.removeChild(tab));
 }
 
@@ -78,8 +78,8 @@ function closeAllFiles() {
  * @param {string} id - The file id. Leave empty to create new file.
  * @param {string} filename - The name of the file to open.
  */
-function openFile(id, filename) {
-  const tabs = getAllEditorTabs();
+Terra.f.openFile = (id, filename) => {
+  const tabs = Terra.f.getAllEditorTabs();
   const tab = tabs.filter((tab) =>
     id === null
       ? tab.config.title === filename
@@ -100,34 +100,34 @@ function openFile(id, filename) {
       removeFirstTab = true;
     }
 
-    const currentTab = getActiveEditor();
+    const currentTab = Terra.f.getActiveEditor();
     if (currentTab) {
       // Add a new tab next to the current active tab.
       currentTab.parent.addChild({
         type: 'component',
         componentName: 'editor',
         componentState: {
-          fontSize: BASE_FONT_SIZE,
+          fontSize: Terra.c.BASE_FONT_SIZE,
           fileId: id,
         },
         title: filename,
       });
 
       if (removeFirstTab) {
-        getAllEditorTabs()[1].instance.fakeOnContainerOpenEvent = true;
+        Terra.f.getAllEditorTabs()[1].instance.fakeOnContainerOpenEvent = true;
         currentTab.parent.removeChild(tabs[0]);
       }
     }
   }
 
-  const proglang = getFileExtension(filename);
+  const proglang = Terra.f.getFileExtension(filename);
   createLangWorkerApi(proglang);
 }
 
-function createFolderOptionsHtml(html = '', parentId = null, indent = '--') {
-  VFS.findFoldersWhere({ parentId }).forEach((folder, index) => {
+Terra.f.createFolderOptionsHtml = (html = '', parentId = null, indent = '--') => {
+  Terra.vfs.findFoldersWhere({ parentId }).forEach((folder, index) => {
     html += `<option value="${folder.id}">${indent} ${folder.name}</option>`;
-    html += createFolderOptionsHtml('', folder.id, indent + '--');
+    html += Terra.f.createFolderOptionsHtml('', folder.id, indent + '--');
   });
 
   return html;
@@ -142,8 +142,8 @@ function createFolderOptionsHtml(html = '', parentId = null, indent = '--') {
  *
  * This function get's triggered on each 'save' keystroke, i.e. <cmd/ctrl + s>.
  */
-function saveFile() {
-  const tab = getActiveEditor();
+Terra.f.saveFile = () => {
+  const tab = Terra.f.getActiveEditor();
 
   if (!tab) return;
 
@@ -151,11 +151,11 @@ function saveFile() {
   // auto-saved already in another part of the codebase.
   const existingFileId = tab.container.getState().fileId;
   if (existingFileId) {
-    const file = VFS.findFileById(existingFileId);
+    const file = Terra.vfs.findFileById(existingFileId);
     if (file) return;
   }
 
-  const folderOptions = createFolderOptionsHtml();
+  const folderOptions = Terra.f.createFolderOptionsHtml();
 
   const $modal = createModal({
     title: 'Save file',
@@ -192,9 +192,9 @@ function saveFile() {
   $modal.find('.text-input').focus().select();
 
   $modal.find('.cancel-btn').click(() => {
-    if (window._saveFileTippy) {
-      window._saveFileTippy.destroy();
-      window._saveFileTippy = null;
+    if (Terra.v.saveFileTippy) {
+      Terra.v.saveFileTippy.destroy();
+      Terra.v.saveFileTippy = null;
     }
 
     hideModal($modal);
@@ -209,20 +209,20 @@ function saveFile() {
     }
 
     let errorMsg;
-    if (!isValidFilename(filename)) {
+    if (!Terra.f.isValidFilename(filename)) {
       errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
-    } else if (VFS.existsWhere({ parentId: folderId, name: filename })) {
+    } else if (Terra.vfs.existsWhere({ parentId: folderId, name: filename })) {
       errorMsg = `There already exists a "${filename}" file or folder`;
     }
 
     if (errorMsg) {
-      if (isObject(window._saveFileTippy)) {
-        window._saveFileTippy.destroy();
-        window._saveFileTippy = null;
+      if (Terra.f.isObject(Terra.v.saveFileTippy)) {
+        Terra.v.saveFileTippy.destroy();
+        Terra.v.saveFileTippy = null;
       }
 
       // Create new tooltip.
-      window._saveFileTippy = tippy($modal.find('input').parent()[0], {
+      Terra.v.saveFileTippy = tippy($modal.find('input').parent()[0], {
         content: errorMsg,
         animation: false,
         showOnCreate: true,
@@ -236,13 +236,13 @@ function saveFile() {
     }
 
     // Remove the tooltip if it exists.
-    if (isObject(window._saveFileTippy)) {
-      window._saveFileTippy.destroy();
-      window._saveFileTippy = null;
+    if (Terra.f.isObject(Terra.v.saveFileTippy)) {
+      Terra.v.saveFileTippy.destroy();
+      Terra.v.saveFileTippy = null;
     }
 
     // Create a new file in the VFS and then refresh the file tree.
-    const { id: nodeId } = VFS.createFile({
+    const { id: nodeId } = Terra.vfs.createFile({
       parentId: folderId,
       name: filename,
       content: tab.instance.editor.getValue(),
@@ -256,11 +256,11 @@ function saveFile() {
     tab.container.setState({ fileId: nodeId });
 
     // For some reason no layout update is triggered, so we trigger an update.
-    window._layout.emit('stateChanged');
+    Terra.layout.emit('stateChanged');
 
     hideModal($modal);
 
-    const proglang = getFileExtension(filename);
+    const proglang = Terra.f.getFileExtension(filename);
 
     // Set correct syntax highlighting.
     tab.instance.setProgLang(proglang)
@@ -278,16 +278,16 @@ function saveFile() {
  * @param {boolean} [clearTerm=false] Whether to clear the terminal before
  * printing the output.
  */
-async function runCode(fileId = null, clearTerm = false) {
+Terra.f.runCode = async (fileId = null, clearTerm = false) => {
   if (clearTerm) term.reset();
 
-  if (window._langWorkerApi) {
-    if (!window._langWorkerApi.isReady) {
+  if (Terra.langWorkerApi) {
+    if (!Terra.langWorkerApi.isReady) {
       // Worker API is busy, wait for it to be done.
       return;
-    } else if (window._langWorkerApi.isRunningCode) {
+    } else if (Terra.langWorkerApi.isRunningCode) {
       // Terminate worker in cases of infinite loops.
-      return window._langWorkerApi.restart(true);
+      return Terra.langWorkerApi.restart(true);
     }
   }
 
@@ -298,38 +298,38 @@ async function runCode(fileId = null, clearTerm = false) {
 
   if (fileId) {
     // Run given file id.
-    const file = VFS.findFileById(fileId);
+    const file = Terra.vfs.findFileById(fileId);
     filename = file.name;
     files = [file];
 
-    if (!file.content && hasLFS() && LFS.loaded) {
+    if (!file.content && Terra.f.hasLFS() && LFS.loaded) {
       const content = await LFS.getFileContent(file.id);
       files = [{ ...file, content }];
     }
 
   } else {
     // Run the active editor tab.
-    filename = getActiveEditor().config.title;
-    files = await getAllEditorFiles();
+    filename = Terra.f.getActiveEditor().config.title;
+    files = await Terra.f.getAllEditorFiles();
   }
 
   // Create a new worker instance if needed.
-  const proglang = getFileExtension(filename);
+  const proglang = Terra.f.getFileExtension(filename);
   createLangWorkerApi(proglang);
 
   // Wait for the worker to be ready before running the code.
-  if (window._langWorkerApi && !window._langWorkerApi.isReady) {
+  if (Terra.langWorkerApi && !Terra.langWorkerApi.isReady) {
     const runFileIntervalId = setInterval(() => {
-      if (window._langWorkerApi && window._langWorkerApi.isReady) {
-        window._langWorkerApi.runUserCode(filename, files);
-        checkForStopCodeButton();
+      if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {
+        Terra.langWorkerApi.runUserCode(filename, files);
+        Terra.f.checkForStopCodeButton();
         clearInterval(runFileIntervalId);
       }
     }, 200);
-  } else if (window._langWorkerApi) {
+  } else if (Terra.langWorkerApi) {
     // If the worker is ready, run the code immediately.
-    window._langWorkerApi.runUserCode(filename, files);
-    checkForStopCodeButton();
+    Terra.langWorkerApi.runUserCode(filename, files);
+    Terra.f.checkForStopCodeButton();
   }
 }
 
@@ -337,8 +337,8 @@ async function runCode(fileId = null, clearTerm = false) {
  * Change the run-code button to a stop-code button if after 1 second the code
  * has not finished running (potentially infinite loop scenario).
  */
-function checkForStopCodeButton() {
-  window._showStopCodeButtonTimeoutId = setTimeout(() => {
+Terra.f.checkForStopCodeButton = () => {
+  Terra.v.showStopCodeButtonTimeoutId = setTimeout(() => {
     const $button = $('#run-code');
     const newText = $button.text().replace('Run', 'Stop');
     $button.text(newText)
@@ -355,15 +355,17 @@ function checkForStopCodeButton() {
  * disable it when running and disable it when it's done running.
  * @param {array} cmd - List of commands to execute.
  */
-async function runButtonCommand(selector, cmd) {
+Terra.f.runButtonCommand = async (selector, cmd) => {
   const $button = $(selector);
   if ($button.prop('disabled')) return;
   $button.prop('disabled', true);
 
-  const activeTabName = getActiveEditor().config.title;
-  const files = await getAllEditorFiles();
+  const activeTabName = Terra.f.getActiveEditor().config.title;
+  const files = await Terra.f.getAllEditorFiles();
 
-  window._langWorkerApi.runButtonCommand(selector, activeTabName, cmd, files);
+  if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {
+    Terra.langWorkerApi.runButtonCommand(selector, activeTabName, cmd, files);
+  }
 }
 
 /**
@@ -375,7 +377,7 @@ async function runButtonCommand(selector, cmd) {
  *
  * @returns {array} List of completers.
  */
-function getAceCompleters() {
+Terra.f.getAceCompleters = () => {
   const Range = ace.Range;
 
   const splitRegex = /[^a-zA-Z_0-9\$\-\u00C0-\u1FFF\u2C00-\uD7FF\w]+/;

@@ -45,12 +45,12 @@ class EditorComponent {
     this.bindEditorCommands();
     this.bindEditorEvents();
 
-    this.setTheme(getLocalStorageItem('theme') || 'light');
-    this.setFontSize(this.state.fontSize || BASE_FONT_SIZE);
+    this.setTheme(Terra.f.getLocalStorageItem('theme') || 'light');
+    this.setFontSize(this.state.fontSize || Terra.c.BASE_FONT_SIZE);
 
     // Set the proglang, or use 'text' as the filetype if there's no file ext.
     const filename = this.container.parent.config.title;
-    const proglang = filename.includes('.') ? getFileExtension(filename) : 'text';
+    const proglang = filename.includes('.') ? Terra.f.getFileExtension(filename) : 'text';
     this.setProgLang(proglang);
   }
 
@@ -73,7 +73,7 @@ class EditorComponent {
     this.editor.setOption('enableLiveAutocompletion', true);
     this.editor.setValue(this.state.value || '');
     this.editor.clearSelection();
-    this.editor.completers = getAceCompleters();
+    this.editor.completers = Terra.f.getAceCompleters();
   }
 
   /**
@@ -83,15 +83,15 @@ class EditorComponent {
     this.editor.commands.addCommand({
       name: 'run',
       bindKey: { win: 'Ctrl+Enter', mac: 'Command+Enter' },
-      exec: () => runCode(),
+      exec: () => Terra.f.runCode(),
     });
 
     this.editor.commands.addCommand({
       name: 'save',
       bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
       exec: () => {
-        if (isIDE) {
-          saveFile();
+        if (Terra.c.IS_IDE) {
+          Terra.f.saveFile();
         }
       }
     });
@@ -108,11 +108,11 @@ class EditorComponent {
       exec: () => this.editor.moveLinesDown(),
     });
 
-    if (isIDE) {
+    if (Terra.c.IS_IDE) {
       this.bindEditorIDECommands();
     }
 
-    if (hasLFSApi()) {
+    if (Terra.f.hasLFSApi()) {
       this.bindEditorLFSCommands();
     }
   }
@@ -124,7 +124,7 @@ class EditorComponent {
     this.editor.commands.addCommand({
       name: 'closeFile',
       bindKey: 'Ctrl+W',
-      exec: () => closeFile(),
+      exec: () => Terra.f.closeFile(),
     });
 
     this.editor.commands.addCommand({
@@ -145,10 +145,10 @@ class EditorComponent {
    */
   bindEditorLFSCommands = () => {
     this.editor.commands.on('exec', (e) => {
-      if (hasLFS() && LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
+      if (Terra.f.hasLFS() && LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
         const inputText = e.args.text || '';
         const filesize = new Blob([this.editor.getValue() + inputText]).size;
-        if (filesize >= LFS_MAX_FILE_SIZE) {
+        if (filesize >= Terra.c.LFS_MAX_FILE_SIZE) {
           // Prevent the event from happening.
           e.preventDefault();
 
@@ -181,21 +181,21 @@ class EditorComponent {
    * Callback when the editor content changes, triggered per keystroke.
    */
   onEditorChange = () => {
-    window._blockLFSPolling = true;
-    window._editorIsDirty = true;
+    Terra.v.blockLFSPolling = true;
+    Terra.v.editorIsDirty = true;
     this.container.extendState({ value: this.editor.getValue() });
 
     const { fileId } = this.container.getState();
-    if (fileId && !isIframe) {
-      VFS.updateFile(fileId, {
+    if (fileId && !Terra.c.IS_FRAME) {
+      Terra.vfs.updateFile(fileId, {
         content: this.editor.getValue(),
       });
     }
 
     clearTimeout(this.userIsTypingTimeoutId);
     this.userIsTypingTimeoutId = setTimeout(() => {
-      window._blockLFSPolling = false;
-    }, seconds(2));
+      Terra.v.blockLFSPolling = false;
+    }, Terra.f.seconds(2));
   }
 
   /**
@@ -207,7 +207,7 @@ class EditorComponent {
     // Spawn a new worker if necessary.
     createLangWorkerApi(this.proglang);
 
-    if (isIDE) {
+    if (Terra.c.IS_IDE) {
       if (this.proglang === 'c' && $('#run-check50-btn:disabled.loading').length == 0) {
         $('#run-check50-btn').prop('disabled', false);
       } else {
@@ -233,8 +233,8 @@ class EditorComponent {
     // non-IDE versions, because the ID always uses IDs properly and can have
     // multiple filenames. It can be assumed that both the exam and iframe will
     // not have duplicate filenames.
-    if (!isIDE) {
-      const file = VFS.findFileWhere({ name: this.container.parent.config.title });
+    if (!Terra.c.IS_IDE) {
+      const file = Terra.vfs.findFileWhere({ name: this.container.parent.config.title });
       const { fileId } = this.container.getState();
       if (!fileId || (file && fileId !== file.id)) {
         this.container.extendState({ fileId: file.id });
@@ -244,11 +244,11 @@ class EditorComponent {
     // Add custom class for styling purposes.
     this.getParentComponentElement().classList.add('component-container', 'editor-component-container');
 
-    if (!getActiveEditor()) {
+    if (!Terra.f.getActiveEditor()) {
       this.setActiveEditor();
     }
 
-    if (isIDE) {
+    if (Terra.c.IS_IDE) {
       this.reloadFileContent(true);
     }
 
@@ -265,17 +265,17 @@ class EditorComponent {
    * @param {boolen} [force] - True to force reload the file content from LFS.
    */
   reloadFileContent = (force = false) => {
-    if (window._blockLFSPolling && !force) return;
+    if (Terra.v.blockLFSPolling && !force) return;
 
-    const file = VFS.findFileById(this.container.getState().fileId);
+    const file = Terra.vfs.findFileById(this.container.getState().fileId);
     if (file) {
-      if (hasLFS() && LFS.loaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
+      if (Terra.f.hasLFS() && LFS.loaded && typeof file.size === 'number' && file.size > Terra.c.LFS_MAX_FILE_SIZE) {
         // Disable the editor if the file is too large.
         this.editor.container.classList.add('exceeded-filesize');
         this.editor.setReadOnly(true);
         this.editor.clearSelection();
         this.editor.blur();
-      } else if (hasLFS() && !hasGitFSWorker() && !file.content) {
+      } else if (Terra.f.hasLFS() && !Terra.f.hasGitFSWorker() && !file.content) {
         // Load the file content from LFS.
         const cursorPos = this.editor.getCursorPosition()
         LFS.getFileContent(file.id).then((content) => {
@@ -347,7 +347,7 @@ class EditorComponent {
   onContainerDestroy = () => {
     // If it's the last tab being closed, then we insert another 'Untitled' tab,
     // because we always need at least one tab open.
-    const tabs = getAllEditorTabs();
+    const tabs = Terra.f.getAllEditorTabs();
     const totalTabs = tabs.length;
 
     if (totalTabs >= 2) {
@@ -361,7 +361,7 @@ class EditorComponent {
         type: 'component',
         componentName: 'editor',
         componentState: {
-          fontSize: BASE_FONT_SIZE,
+          fontSize: Terra.c.BASE_FONT_SIZE,
         },
         title: 'Untitled',
       });
@@ -386,7 +386,7 @@ class EditorComponent {
    * @param {*} value - The editor instance to set as active.
    */
   setActiveEditor = (value) => {
-    window._layout._lastActiveEditor = (typeof value !== 'undefined')
+    Terra.layout._lastActiveEditor = (typeof value !== 'undefined')
       ? value
       : this.container.parent;
   }

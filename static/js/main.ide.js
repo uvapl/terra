@@ -8,14 +8,14 @@
 
 initApp().then(({ layout }) => {
   // Fetch the repo files or the local storage files (vfs) otherwise.
-  const repoLink = getLocalStorageItem('git-repo');
+  const repoLink = Terra.f.getLocalStorageItem('git-repo');
   if (repoLink) {
-    VFS.createGitFSWorker();
+    Terra.vfs.createGitFSWorker();
   } else {
     createFileTree();
   }
 
-  if (hasLFSApi()) {
+  if (Terra.f.hasLFSApi()) {
     // Enable code for local filesystem.
     $('body').append('<script src="static/js/lfs.js"></script>');
   } else {
@@ -23,8 +23,8 @@ initApp().then(({ layout }) => {
     $('#menu-item--open-folder').remove();
   }
 
-  if (!repoLink && !hasLFSApi()) {
-    showLocalStorageWarning();
+  if (!repoLink && !Terra.f.hasLFSApi()) {
+    Terra.f.showLocalStorageWarning();
   }
 
   $(window).resize();
@@ -50,7 +50,7 @@ function initApp() {
     layout.init();
 
     // Make layout instance available at all times.
-    window._layout = layout;
+    Terra.layout = layout;
 
     // Use timeout trick to make sure layout.root exists.
     setTimeout(() => {
@@ -88,7 +88,7 @@ function createLayout() {
                 type: 'component',
                 componentName: 'editor',
                 componentState: {
-                  fontSize: BASE_FONT_SIZE,
+                  fontSize: Terra.c.BASE_FONT_SIZE,
                 },
                 title: 'Untitled',
               },
@@ -97,7 +97,7 @@ function createLayout() {
           {
             type: 'component',
             componentName: 'terminal',
-            componentState: { fontSize: BASE_FONT_SIZE },
+            componentState: { fontSize: Terra.c.BASE_FONT_SIZE },
             isClosable: false,
           }
         ]

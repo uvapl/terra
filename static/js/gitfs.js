@@ -48,8 +48,8 @@ class GitFS {
       data: {
         accessToken: accessToken,
         repoLink: this._repoLink,
-        isDev: isDev,
-        branch: getLocalStorageItem('git-branch'),
+        isDev: Terra.c.IS_DEV,
+        branch: Terra.f.getLocalStorageItem('git-branch'),
       },
     });
   }
@@ -59,8 +59,8 @@ class GitFS {
    */
   terminate() {
     console.log('Terminating existing GitFS worker')
-    setLocalStorageItem('git-repo', '');
-    setLocalStorageItem('git-branch', '');
+    Terra.f.setLocalStorageItem('git-repo', '');
+    Terra.f.setLocalStorageItem('git-branch', '');
     $('#menu-item--branch')
       .removeClass('has-dropdown').addClass('disabled')
       .find('ul').remove();
@@ -206,9 +206,9 @@ class GitFS {
 
     case 'clone-success':
       $('#file-tree .info-msg').remove();
-      removeLocalStorageWarning();
+      Terra.f.removeLocalStorageWarning();
 
-      VFS.importFromGit(payload.repoContents).then(() => {
+      Terra.vfs.importFromGit(payload.repoContents).then(() => {
         createFileTree();
       });
       break;
@@ -220,7 +220,7 @@ class GitFS {
       case 'move-folder-success':
         // Update all sha in the new files in the VFS.
         payload.updatedFiles.forEach((fileObj) => {
-          const file = VFS.findFileByPath(fileObj.filepath);
+          const file = Terra.vfs.findFileByPath(fileObj.filepath);
           file.sha = fileObj.sha;
         });
         break;
@@ -228,7 +228,7 @@ class GitFS {
       case 'move-file-success':
       case 'commit-success':
         // Update the file's sha in the VFS.
-        const file = VFS.findFileByPath(payload.filepath);
+        const file = Terra.vfs.findFileByPath(payload.filepath);
         file.sha = payload.sha;
         break;
     }
@@ -241,32 +241,32 @@ class GitFS {
  * Otherwise, a worker will be created automatically when the user adds a new
  * repository.
  *
- * This is considered a private function invoked from VFS.createGitFSWorker.
+ * This is considered a private function invoked from Terra.vfs.createGitFSWorker.
  */
 function _createGitFSWorker() {
-  closeAllFiles();
+  Terra.f.closeAllFiles();
 
-  const accessToken = getLocalStorageItem('git-access-token');
-  const repoLink = getLocalStorageItem('git-repo');
-  const repoInfo = getRepoInfo(repoLink);
+  const accessToken = Terra.f.getLocalStorageItem('git-access-token');
+  const repoLink = Terra.f.getLocalStorageItem('git-repo');
+  const repoInfo = Terra.f.getRepoInfo(repoLink);
   if (repoInfo) {
-    setFileTreeTitle(`${repoInfo.user}/${repoInfo.repo}`)
+    Terra.f.setFileTreeTitle(`${repoInfo.user}/${repoInfo.repo}`)
   }
 
-  if (hasGitFSWorker()) {
-    window._gitFS.terminate();
-    window._gitFS = null;
+  if (Terra.f.hasGitFSWorker()) {
+    Terra.gitfs.terminate();
+    Terra.gitfs = null;
   }
 
   if (accessToken && repoLink) {
     const gitFS = new GitFS(repoLink);
-    window._gitFS = gitFS;
+    Terra.gitfs = gitFS;
     gitFS._createWorker(accessToken);
 
     const tree = getFileTreeInstance();
     if (tree) {
       $('#file-tree').fancytree('destroy');
-      window._fileTree = null;
+      Terra.filetree = null;
     }
 
     console.log('Creating gitfs worker');

@@ -1,3 +1,9 @@
+Terra.plugins.check50 = {
+  onLayoutLoaded: () => {
+
+  },
+}
+
 (() => {
   const BASE_URL = 'https://agile008.science.uva.nl'
   init();
@@ -12,7 +18,6 @@
 
   function createCheck50Button() {
     const button = `<button id="run-check50-btn" class="button primary-btn" disabled>Run check50</button>`;
-    $('.navbar-right ul').append(button);
     $('#run-check50-btn').click(runCheck50);
   }
 
@@ -27,7 +32,7 @@
   function runCheck50() {
     if ($('#run-check50-btn:disabled').length > 0) return;
 
-    const tab = getActiveEditor();
+    const tab = Terra.f.getActiveEditor();
     const filename = tab.config.title;
     const code = tab.instance.editor.getValue();
 
@@ -61,7 +66,7 @@
       for (let i = 0; i < 6; i++) {
         setTimeout(() => {
           $('.right-sidebar .connecting').append('.');
-        }, seconds(.5) * i + seconds(.5));
+        }, Terra.f.seconds(.5) * i + Terra.f.seconds(.5));
       }
 
       // Add close button handler.
@@ -99,7 +104,7 @@
         .catch((error) => {
           enableCheck50Button();
         });
-    }, seconds(2));
+    }, Terra.f.seconds(2));
   }
 
   function showCheck50Results(response) {

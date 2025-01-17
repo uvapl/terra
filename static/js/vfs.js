@@ -20,10 +20,10 @@ class VirtualFileSystem {
    * @param {array} payload - Arguments to pass to the function.
    */
   _git = (fn, ...payload) => {
-    if (!hasGitFSWorker()) return;
+    if (!Terra.f.hasGitFSWorker()) return;
 
     try {
-      window._gitFS[fn](...payload);
+      Terra.gitfs[fn](...payload);
     } catch (TypeError) {
       console.error(`GitFS.${fn}() is not a function`);
     }
@@ -41,7 +41,7 @@ class VirtualFileSystem {
     // - The browser doesn't support the LFS class.
     // - The LFS class is not loaded yet. We make an exception for the
     //   openFolderPicker, because this function is used to load the LFS class.
-    if (!hasLFS() || (hasLFS() && !LFS.loaded && fn !== 'openFolderPicker')) return;
+    if (!Terra.f.hasLFS() || (Terra.f.hasLFS() && !LFS.loaded && fn !== 'openFolderPicker')) return;
 
     return LFS[fn](...payload);
   }
@@ -64,7 +64,7 @@ class VirtualFileSystem {
    * Load the saved virtual filesystem state from local storage.
    */
   loadFromLocalStorage = () => {
-    const savedState = getLocalStorageItem('vfs');
+    const savedState = Terra.f.getLocalStorageItem('vfs');
     if (typeof savedState === 'string') {
       const json = JSON.parse(savedState);
 
@@ -84,7 +84,7 @@ class VirtualFileSystem {
 
     // Remove the content from all files when LFS or Git is used, because LFS uses
     // lazy loading and GitFS is being cloned when refreshed anyway.
-    if (isIDE && (hasLFS() && LFS.loaded || hasGitFSWorker())) {
+    if (Terra.c.IS_IDE && (Terra.f.hasLFS() && LFS.loaded || Terra.f.hasGitFSWorker())) {
       const keys = ['sha', 'content'];
       Object.keys(files).forEach((fileId) => {
         files[fileId] = { ...files[fileId] };
@@ -96,7 +96,7 @@ class VirtualFileSystem {
       });
     }
 
-    setLocalStorageItem('vfs', JSON.stringify({
+    Terra.f.setLocalStorageItem('vfs', JSON.stringify({
       files,
       folders: this.folders,
     }));
@@ -295,7 +295,7 @@ class VirtualFileSystem {
    */
   createFile = (fileObj, userInvoked = true) => {
     const newFile = {
-      id: uuidv4(),
+      id: Terra.f.uuidv4(),
       name: 'Untitled',
       parentId: null,
       content: '',
@@ -324,7 +324,7 @@ class VirtualFileSystem {
    */
   createFolder = (folderObj, userInvoked = true) => {
     const newFolder = {
-      id: uuidv4(),
+      id: Terra.f.uuidv4(),
       name: 'Untitled',
       parentId: null,
       createdAt: new Date().toISOString(),
@@ -390,12 +390,12 @@ class VirtualFileSystem {
       // Just commit the changes to the file.
       if (isContentChanged && userInvoked) {
         // Only commit changes after 2 seconds of inactivity.
-        registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
+        Terra.f.registerTimeoutHandler(`git-commit-${file.id}`, Terra.f.seconds(2), () => {
           this._git('commit', newPath, file.content, file.sha);
         });
 
         // Update the file content in the LFS after a second of inactivity.
-        registerTimeoutHandler(`lfs-sync-${file.id}`, seconds(1), () => {
+        Terra.f.registerTimeoutHandler(`lfs-sync-${file.id}`, Terra.f.seconds(1), () => {
           this._lfs('writeFileToFolder', file.parentId, file.id, file.name, file.content);
         });
       }
@@ -536,7 +536,7 @@ class VirtualFileSystem {
     if (!file) return;
 
     const fileBlob = new Blob(
-      [addNewLineCharacter(file.content)],
+      [Terra.f.addNewLineCharacter(file.content)],
       { type: 'text/plain;charset=utf-8' }
     );
     saveAs(fileBlob, file.name);
@@ -552,7 +552,7 @@ class VirtualFileSystem {
     // Put all direct files into the zip file.
     const files = this.findFilesWhere({ parentId: folderId });
     for (const file of files) {
-      zip.file(file.name, addNewLineCharacter(file.content));
+      zip.file(file.name, Terra.f.addNewLineCharacter(file.content));
     }
 
     // Get all the nested folders and files.
@@ -616,7 +616,7 @@ class VirtualFileSystem {
         const path = fileOrFolder.path.split('/')
         const name = path.pop();
 
-        const parentId = path.length > 0 ? VFS.findFolderByPath(path.join('/')).id : null;
+        const parentId = path.length > 0 ? Terra.vfs.findFolderByPath(path.join('/')).id : null;
 
         if (fileOrFolder.type === 'tree') {
           this.createFolder({ name, parentId, sha });
@@ -638,9 +638,9 @@ class VirtualFileSystem {
    * LFS if it's currently active. This is only allow in the IDE app.
    */
   createGitFSWorker = () => {
-    if (!isIDE) return;
+    if (!Terra.c.IS_IDE) return;
 
-    if (hasLFS()) {
+    if (Terra.f.hasLFS()) {
       LFS.terminate();
     }
 
@@ -677,4 +677,4 @@ class VirtualFileSystem {
   }
 }
 
-const VFS = new VirtualFileSystem();
+Terra.vfs = new VirtualFileSystem();

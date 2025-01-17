@@ -1,7 +1,7 @@
 /**
  * Bridge class between the main app and the currently loaded language worker.
  */
-class WorkerAPI {
+class LangWorkerAPI {
   /**
    * The current programming language that is being used.
    * @type {string}
@@ -87,15 +87,15 @@ class WorkerAPI {
     // once it has been loaded.
     $('#run-code').prop('disabled', true);
 
-    hideTermCursor();
-    clearTermWriteBuffer();
+    Terra.f.hideTermCursor();
+    Terra.f.clearTermWriteBuffer();
 
     if (showTerminateMsg) {
       term.writeln('\x1b[1;31mProcess terminated\x1b[0m');
     }
 
     // Dispose any active user input.
-    disposeUserInput();
+    Terra.f.disposeUserInput();
   }
 
   /**
@@ -208,9 +208,9 @@ class WorkerAPI {
     // Only disable the button again if the current tab has a worker,
     // because users can still run code through the contextmenu in the
     // file-tree in the IDE app.
-    const tab = getActiveEditor();
+    const tab = Terra.f.getActiveEditor();
     let disableRunBtn = false;
-    if (!hasWorker(getFileExtension(tab.config.title))) {
+    if (!hasWorker(Terra.f.getFileExtension(tab.config.title))) {
       disableRunBtn = true;
     }
 
@@ -223,9 +223,9 @@ class WorkerAPI {
       .addClass('primary-btn')
       .removeClass('danger-btn');
 
-    if (window._showStopCodeButtonTimeoutId) {
-      clearTimeout(window._showStopCodeButtonTimeoutId);
-      window._showStopCodeButtonTimeoutId = null;
+    if (Terra.v.showStopCodeButtonTimeoutId) {
+      clearTimeout(Terra.v.showStopCodeButtonTimeoutId);
+      Terra.v.showStopCodeButtonTimeoutId = null;
     }
   }
 
@@ -256,7 +256,7 @@ class WorkerAPI {
             term.write(event.data.data);
           }
         } catch (e) {
-          clearTermWriteBuffer();
+          Terra.f.clearTermWriteBuffer();
         }
         break;
 
@@ -264,7 +264,7 @@ class WorkerAPI {
       // input, this event will be triggered. The user input will be requested
       // and sent back to the worker through the usage of shared memory.
       case 'readStdin':
-        waitForInput().then((value) => {
+        Terra.f.waitForInput().then((value) => {
           const view = new Uint8Array(this.sharedMem.buffer);
           for (let i = 0; i < value.length; i++) {
             // To the shared memory.
@@ -313,18 +313,18 @@ function hasWorker(proglang) {
  */
 function createLangWorkerApi(proglang) {
   // Situation 1: no worker, thus spawn a new one.
-  if (!window._langWorkerApi && hasWorker(proglang)) {
-    window._langWorkerApi = new WorkerAPI(proglang);
-  } else if (window._langWorkerApi && window._langWorkerApi.proglang !== proglang) {
-    window._langWorkerApi.proglang = proglang;
+  if (!Terra.langWorkerApi && hasWorker(proglang)) {
+    Terra.langWorkerApi = new LangWorkerAPI(proglang);
+  } else if (Terra.langWorkerApi && Terra.langWorkerApi.proglang !== proglang) {
+    Terra.langWorkerApi.proglang = proglang;
 
     // Situation 2: existing worker but new proglang is invalid.
     if (!hasWorker(proglang)) {
-      window._langWorkerApi.terminate();
-      window._langWorkerApi = null;
+      Terra.langWorkerApi.terminate();
+      Terra.langWorkerApi = null;
     } else {
       // Situation 3: existing worker and new proglang is valid.
-      window._langWorkerApi.restart();
+      Terra.langWorkerApi.restart();
     }
   }
 }
