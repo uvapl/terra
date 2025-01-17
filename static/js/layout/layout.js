@@ -41,6 +41,7 @@ class Layout extends GoldenLayout {
           this.setTheme(Terra.f.getLocalStorageItem('theme') || 'light');
           this.createControls();
           this.showTermStartupMessage();
+          Terra.pluginManager.triggerEvent('onLayoutLoaded');
 
           if (Array.isArray(options.autocomplete) && options.autocomplete.every(Terra.f.isObject)) {
             this.emitToEditorComponents('setCustomAutocompleter', options.autocomplete);
@@ -117,7 +118,7 @@ class Layout extends GoldenLayout {
 
   getRunCodeButtonHtml = () => {
     const runCodeShortcut = Terra.f.isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
-    return `<button id="run-code" class="button primary-btn" disabled>Run (${runCodeShortcut})</button>`;
+    return `<button id="run-code" class="button primary-btn run-user-code-btn" disabled>Run (${runCodeShortcut})</button>`;
   };
 
   getClearTermButtonHtml = () => '<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>';
@@ -185,7 +186,7 @@ class Layout extends GoldenLayout {
         }
 
         $('.terminal-component-container .lm_header')
-          .append(`<button id="${id}" class="button ${id}-btn" disabled>${name}</button>`);
+          .append(`<button id="${id}" class="button config-btn ${id}-btn" disabled>${name}</button>`);
 
         $(selector).click(() => Terra.f.runButtonCommand(selector, cmd));
       });

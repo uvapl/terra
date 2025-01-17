@@ -175,6 +175,7 @@ class EditorComponent {
    */
   onEditorLoad = () => {
     this.editor.getSession().getUndoMananger().reset();
+    Terra.pluginManager.call('onEditorLoad', this.editor);
   }
 
   /**
@@ -206,14 +207,6 @@ class EditorComponent {
 
     // Spawn a new worker if necessary.
     createLangWorkerApi(this.proglang);
-
-    if (Terra.c.IS_IDE) {
-      if (this.proglang === 'c' && $('#run-check50-btn:disabled.loading').length == 0) {
-        $('#run-check50-btn').prop('disabled', false);
-      } else {
-        $('#run-check50-btn').prop('disabled', true);
-      }
-    }
   }
 
   /**
@@ -476,24 +469,72 @@ class EditorComponent {
    * Bind all editor events with callbacks.
    */
   bindEditorEvents = () => {
-    this.editor.on('load', this.onEditorLoad);
-    this.editor.on('change', this.onEditorChange);
-    this.editor.on('focus', this.onEditorFocus);
+    this.editor.on('load', () => {
+      this.onEditorLoad();
+      Terra.pluginManager.triggerEvent('onEditorLoad', this);
+    });
+
+    this.editor.on('change', () => {
+      Terra.pluginManager.triggerEvent('onEditorChange', this);
+      this.onEditorChange();
+    });
+
+    this.editor.on('focus', () => {
+      Terra.pluginManager.triggerEvent('onEditorFocus', this);
+      this.onEditorFocus();
+    });
   }
 
   /**
    * Bind all container events with callbacks.
    */
   bindContainerEvents = () => {
-    this.container.on('show', this.onContainerOpen);
-    this.container.on('lock', this.onContainerLock);
-    this.container.on('setCustomAutocompleter', this.onContainerSetCustomAutoCompleter);
-    this.container.on('unlock', this.onContainerUnlock);
-    this.container.on('themeChanged', this.setTheme);
-    this.container.on('fontSizeChanged', this.setFontSize);
-    this.container.on('resize', this.onContainerResize);
+    // Do not trigger the plugin manager here, this is handeld elsewhere.
     this.container.on('afterFirstRender', this.onContainerAfterFirstRender);
-    this.container.on('destroy', this.onContainerDestroy);
-    this.container.on('reloadContent', this.reloadFileContent);
+
+    this.container.on('show', () => {
+      this.onContainerOpen();
+      Terra.pluginManager.triggerEvent('onEditorContainerOpen', this);
+    });
+
+    this.container.on('lock', () => {
+      this.onContainerLock();
+      Terra.pluginManager.triggerEvent('onEditorContainerLock', this);
+    });
+
+    this.container.on('setCustomAutocompleter', (completions) => {
+      this.onContainerSetCustomAutoCompleter(completions);
+      Terra.pluginManager.triggerEvent('onEditorContainerSetCustomAutoCompleter', completions, this);
+    });
+
+    this.container.on('unlock', () => {
+      this.onContainerUnlock();
+      Terra.pluginManager.triggerEvent('onEditorContainerUnlock', this);
+    });
+
+    this.container.on('themeChanged', (theme) => {
+      this.setTheme(theme);
+      Terra.pluginManager.triggerEvent('setEditorTheme', theme, this);
+    });
+
+    this.container.on('fontSizeChanged', (fontSize) => {
+      this.setFontSize(fontSize);
+      Terra.pluginManager.triggerEvent('setEditorFontSize', fontSize, this);
+    });
+
+    this.container.on('resize', () => {
+      this.onContainerResize();
+      Terra.pluginManager.triggerEvent('onEditorContainerResize', this);
+    });
+
+    this.container.on('destroy', () => {
+      this.onContainerDestroy();
+      Terra.pluginManager.triggerEvent('onEditorContainerDestroy', this);
+    });
+
+    this.container.on('reloadContent', () => {
+      this.reloadFileContent();
+      Terra.pluginManager.triggerEvent('onEditorContainerReloadContent', this);
+    });
   }
 }

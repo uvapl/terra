@@ -1,23 +1,40 @@
-Terra.plugins.check50 = {
-  onLayoutLoaded: () => {
-
-  },
-}
-
 (() => {
   const BASE_URL = 'https://agile008.science.uva.nl'
-  init();
+
+  Terra.pluginManager.register({
+    name: 'check50',
+    onLayoutLoaded: () => {
+      createCheck50Button();
+    },
+
+    onEditorFocus: (editorComponent) => {
+      if (editorComponent.proglang === 'c' && $('#run-check50-btn:disabled.loading').length == 0) {
+        $('#run-check50-btn').prop('disabled', false);
+      } else {
+        $('#run-check50-btn').prop('disabled', true);
+      }
+    },
+
+    // onEditorContainerLoaded: (editorComponent) => {},
+    // onEditorContainerChange: (editorComponent) => {},
+    // onEditorContainerOpen: (editorComponent) => {},
+    // onEditorContainerLock: (editorComponent) => {},
+    // onEditorContainerSetCustomAutoCompleter: (completions, editorComponent) => {},
+    // onEditorContainerUnlock: (editorComponent) => {},
+    // setEditoContainerTheme: (theme, editorComponent) => {},
+    // setEditoContainerFontSize: (fontSize, editorComponent) => {},
+    // onEditorContainerResize: (editorComponent) => {},
+    // onEditorContainerDestroy: (editorComponent) => {},
+    // onEditorContainerReloadContent: (editorComponent) => {},
+  });
 
   // ===========================================================================
   // Functions
   // ===========================================================================
 
-  function init() {
-    createCheck50Button();
-  }
-
   function createCheck50Button() {
     const button = `<button id="run-check50-btn" class="button primary-btn" disabled>Run check50</button>`;
+    $('.terminal-component-container .lm_header').append(button);
     $('#run-check50-btn').click(runCheck50);
   }
 

@@ -241,8 +241,9 @@ class LangWorkerAPI {
       // everything has been initialised and ready to run some code.
       case 'ready':
         this.isReady = true;
-        $('.lm_header .button').prop('disabled', false);
-        $('#run-code').removeClass('loading');
+        $('.lm_header .run-user-code-btn').prop('disabled', false).removeClass('loading');
+        $('.lm_header .clear-term-btn').prop('disabled', false);
+        $('.lm_header .config-btn').prop('disabled', false);
         break;
 
       // Write callback from the worker instance. When the worker wants to write
