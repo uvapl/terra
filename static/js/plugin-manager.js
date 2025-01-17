@@ -12,6 +12,22 @@ class TerraPluginManager {
    */
   register(plugin) {
     this.plugins[plugin.name] = plugin;
+
+    if (plugin.css) {
+      if (!Array.isArray(plugin.css)) plugin.css = [plugin.css];
+      this.loadCSS(plugin.css)
+    }
+  }
+
+  /**
+   * Load a given CSS path.
+   *
+   * @param {string} path - The CSS path to load.
+   */
+  loadCSS(path) {
+    for (const cssPath of path) {
+      $('head').append(`<link rel="stylesheet" type="text/css" href="${cssPath}">`);
+    }
   }
 
   /**

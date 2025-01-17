@@ -3,6 +3,7 @@
 
   Terra.pluginManager.register({
     name: 'check50',
+    css: 'static/plugins/check50/check50.css',
     onLayoutLoaded: () => {
       createCheck50Button();
     },
@@ -89,7 +90,7 @@
       // Add close button handler.
       $('.check50-close-btn').click(() => {
         $('.right-sidebar').html('');
-        clearInterval(window.check50PollingIntervalId);
+        clearInterval(Terra.v.check50PollingIntervalId);
         enableCheck50Button();
         $(window).resize();
       });
@@ -108,12 +109,12 @@
   }
 
   function pollCheck50Results(id) {
-    window.check50PollingIntervalId = setInterval(() => {
+    Terra.v.check50PollingIntervalId = setInterval(() => {
       fetch(`${BASE_URL}/get/${id}`)
         .then((response) => response.json())
         .then((response) => {
           if (response.status === 'finished') {
-            clearInterval(window.check50PollingIntervalId);
+            clearInterval(Terra.v.check50PollingIntervalId);
             enableCheck50Button();
             showCheck50Results(response.result.check50);
           }
