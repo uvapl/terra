@@ -6,19 +6,19 @@ class TerraPlugin {
    */
   css;
 
-  onLayoutLoaded() {}
-  onEditorContainerLoaded(editorComponent) {}
-  onEditorContainerChange(editorComponent) {}
-  onEditorFocus(editorComponent) {}
-  onEditorContainerOpen(editorComponent) {}
-  onEditorContainerLock(editorComponent) {}
-  onEditorContainerSetCustomAutoCompleter(completions, editorComponent) {}
-  onEditorContainerUnlock(editorComponent) {}
-  setEditoContainerTheme(theme, editorComponent) {}
-  setEditoContainerFontSize(fontSize, editorComponent) {}
-  onEditorContainerResize(editorComponent) {}
-  onEditorContainerDestroy(editorComponent) {}
-  onEditorContainerReloadContent(editorComponent) {}
+  onLayoutLoaded() { }
+  onEditorContainerLoaded(editorComponent) { }
+  onEditorContainerChange(editorComponent) { }
+  onEditorFocus(editorComponent) { }
+  onEditorContainerOpen(editorComponent) { }
+  onEditorContainerLock(editorComponent) { }
+  onEditorContainerSetCustomAutoCompleter(completions, editorComponent) { }
+  onEditorContainerUnlock(editorComponent) { }
+  setEditoContainerTheme(theme, editorComponent) { }
+  setEditoContainerFontSize(fontSize, editorComponent) { }
+  onEditorContainerResize(editorComponent) { }
+  onEditorContainerDestroy(editorComponent) { }
+  onEditorContainerReloadContent(editorComponent) { }
 }
 
 class TerraPluginManager {
@@ -39,9 +39,9 @@ class TerraPluginManager {
    */
   register(plugin) {
     if (plugin instanceof TerraPlugin) {
-        this.plugins.push(plugin);
+      this.plugins.push(plugin);
     } else {
-        throw new Error("Plugin must be an instance of the TerraPlugin class.");
+      throw new Error("Plugin must be an instance of the TerraPlugin class.");
     }
 
     if (plugin.css) {
