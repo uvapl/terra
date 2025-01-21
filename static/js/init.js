@@ -29,7 +29,7 @@ Terra.lfs = null;
 // Reference to the virtual filesystem if loaded.
 Terra.vfs = null;
 
-// Reference to the git filesystem class instance if loaded.
+// Reference to the git filesystem if loaded.
 Terra.gitfs = null;
 
 // Reference to the filetree instance if loaded.
