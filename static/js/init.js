@@ -23,20 +23,23 @@ Terra.langWorkerApi = null;
 // IDE-only properties.
 // ===========================================================================
 
-// Reference to the local filesystem if loaded.
-Terra.lfs = null;
+if ($('body').hasClass('terra-ide')) {
+  // Reference to the local filesystem if loaded.
+  Terra.lfs = null;
 
-// Reference to the virtual filesystem if loaded.
-Terra.vfs = null;
+  // Reference to the virtual filesystem if loaded.
+  Terra.vfs = null;
 
-// Reference to the git filesystem if loaded.
-Terra.gitfs = null;
+  // Reference to the git filesystem if loaded.
+  Terra.gitfs = null;
 
-// Reference to the filetree instance if loaded.
-Terra.filetree = null;
+  // Reference to the filetree instance if loaded.
+  Terra.filetree = null;
 
-// Contains timeout handlers.
-Terra.timeoutHandlers = {};
+  // Contains timeout handlers.
+  Terra.timeoutHandlers = {};
 
-// Contains a reference to the plugin manager.
-Terra.pluginManager = null;
+  // Contains a reference to the plugin manager.
+  Terra.pluginManager = null;
+
+}
