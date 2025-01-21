@@ -475,13 +475,13 @@ class EditorComponent {
     });
 
     this.editor.on('change', () => {
-      Terra.pluginManager.triggerEvent('onEditorChange', this);
       this.onEditorChange();
+      Terra.pluginManager.triggerEvent('onEditorChange', this);
     });
 
     this.editor.on('focus', () => {
-      Terra.pluginManager.triggerEvent('onEditorFocus', this);
       this.onEditorFocus();
+      Terra.pluginManager.triggerEvent('onEditorFocus', this);
     });
   }
 
