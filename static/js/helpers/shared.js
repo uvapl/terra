@@ -177,11 +177,14 @@ Terra.f.makeHtmlAttrs = (attrs) => {
  * Converts a string to be a local storage suitable key by replacing
  * non-suitable characters with a hyphen.
  *
+ * @example makeLocalStorageKey('https://example.com') -> 'https-example-com'
+ * @example makeLocalStorageKey('FooBar') -> 'foo-bar'
+ *
  * @param {string} key - The key to convert.
  * @returns {string} A local storage suitable key.
  */
 Terra.f.makeLocalStorageKey = (key) => {
-  return key.replace(/[^0-9a-z]+/g, '-');
+  return key.toLowerCase().replace(/[^a-z0-9]/g, '-');
 }
 
 /**

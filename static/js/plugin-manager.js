@@ -9,6 +9,28 @@ class TerraPlugin {
    */
   css = null;
 
+  /**
+   * Specifies the default state that will be peristed in local storage.
+   * Only when the value contains an object type, the state is automatically
+   * persisted in local storage after refresh. Set to null to not use local
+   * storage persistance explicitly.
+   * @type {null|object}
+   */
+  defaultState = null;
+
+  /**
+   * Contains the loaded local storage state that is persisted after refresh.
+   * @type {object}
+   */
+  state = this.loadFromLocalStorage();
+
+  /**
+   * Create a button that is placed on top of the terminal component.
+   *
+   * @param {object} button - Button configuration object.
+   * @throws {Error} - When the button configuration is missing required properties.
+   * @returns {jQuery.Element} jQuery object reference to the newly created button.
+   */
   createTermButton(button) {
     if (!button.text || !button.id || !button.onClick) {
       throw new Error("Button configuration must at least contain text, id, and onClick properties.", button);
@@ -30,19 +52,72 @@ class TerraPlugin {
     return $button;
   }
 
-  // onLayoutLoaded() { }
-  // onEditorContainerLoaded(editorComponent) { }
-  // onEditorContainerChange(editorComponent) { }
-  // onEditorFocus(editorComponent) { }
-  // onEditorContainerOpen(editorComponent) { }
-  // onEditorContainerLock(editorComponent) { }
-  // onEditorContainerSetCustomAutoCompleter(completions, editorComponent) { }
-  // onEditorContainerUnlock(editorComponent) { }
-  // setEditoContainerTheme(theme, editorComponent) { }
-  // setEditoContainerFontSize(fontSize, editorComponent) { }
-  // onEditorContainerResize(editorComponent) { }
-  // onEditorContainerDestroy(editorComponent) { }
-  // onEditorContainerReloadContent(editorComponent) { }
+  /**
+   * Load the state from local storage
+   *
+   * @returns {object|null} The state object from local storage or the default state.
+   */
+  loadFromLocalStorage() {
+    const className = this.constructor.name;
+    const storageKey = Terra.f.makeLocalStorageKey(className);
+    const state = Terra.f.getLocalStorageItem(storageKey, this.defaultState);
+
+    if (state) {
+      return JSON.parse(state);
+    }
+
+    return {};
+  }
+
+  /**
+   * Get the state value by key.
+   *
+   * @param {string} key - The key of the state value.
+   * @returns {*} The value of the state.
+   */
+  getState(key) {
+    if (this.state.hasOwnProperty(key)) {
+      return this.state[key];
+    }
+
+    return this.defaultState[key];
+  }
+
+  /**
+   * Set the state value by name and automatically save it in local storage.
+   *
+   * @param {string} key - The key of the state value.
+   * @param {string} value - The value to assign under the specified name.
+   */
+  setState(key, value) {
+    this.state[key] = value;
+    this.saveState();
+  }
+
+  /**
+   * Save the current state in local storage.
+   */
+  saveState() {
+    const className = this.constructor.name;
+    const storageKey = Terra.f.makeLocalStorageKey(className);
+    Terra.f.setLocalStorageItem(storageKey, JSON.stringify(this.state));
+  }
+
+  // EVENT LISTENERS THAT CAN BE IMPLEMENTED FOR EACH PLUGIN.
+  // ========================================================
+  // onLayoutLoaded = () => { }
+  // onEditorContainerLoaded = (editorComponent) => { }
+  // onEditorContainerChange = (editorComponent) => { }
+  // onEditorFocus = (editorComponent) => { }
+  // onEditorContainerOpen = (editorComponent) => { }
+  // onEditorContainerLock = (editorComponent) => { }
+  // onEditorContainerSetCustomAutoCompleter = (completions, editorComponent) => { }
+  // onEditorContainerUnlock = (editorComponent) => { }
+  // setEditoContainerTheme = (theme, editorComponent) => { }
+  // setEditoContainerFontSize = (fontSize, editorComponent) => { }
+  // onEditorContainerResize = (editorComponent) => { }
+  // onEditorContainerDestroy = (editorComponent) => { }
+  // onEditorContainerReloadContent = (editorComponent) => { }
 }
 
 class TerraPluginManager {
