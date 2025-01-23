@@ -2,9 +2,33 @@
 class TerraPlugin {
   /**
    * Array of strings containing the path to the CSS file(s) to load.
+   *
+   * @example ['static/plugins/check50/check50.css']
+   *
    * @type {array[string]}
    */
-  css;
+  css = null;
+
+  createTermButton(button) {
+    if (!button.text || !button.id || !button.onClick) {
+      throw new Error("Button configuration must at least contain text, id, and onClick properties.", button);
+    }
+
+    const attrs = {};
+    attrs.class = ['button'].concat(button.class || []).join(' ');
+    attrs.id = button.id;
+
+    if (button.disabled) {
+      attrs.disabled = 'disabled';
+    }
+
+    const buttonHtml = `<button ${Terra.f.makeHtmlAttrs(attrs)}>${button.text}</button>`;
+    $('.terminal-component-container .lm_header').append(buttonHtml);
+    const $button = $(`#${button.id}`);
+    $button.click(button.onClick);
+
+    return $button;
+  }
 
   // onLayoutLoaded() { }
   // onEditorContainerLoaded(editorComponent) { }
@@ -32,6 +56,7 @@ class TerraPluginManager {
     this.plugins = [];
   }
 
+
   /**
    * Register a plugin.
    *
@@ -44,7 +69,7 @@ class TerraPluginManager {
       throw new Error("Plugin must be an instance of the TerraPlugin class.");
     }
 
-    if (plugin.css) {
+    if (Array.isArray(plugin.css)) {
       this.loadCSS(plugin.css)
     }
   }

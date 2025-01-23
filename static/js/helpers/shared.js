@@ -161,6 +161,19 @@ Terra.f.makeUrl = (url, queryParams) => {
 }
 
 /**
+ * Generate a string of HTML attributes.
+ *
+ * @example makeHtmlAttrs({ id: 'my-id', class: 'my-class' }) -> 'id="my-id" class="my-class"'
+ *
+ * @param {object} attrs - The attributes to be converted to a string.
+ */
+Terra.f.makeHtmlAttrs = (attrs) => {
+  return Object.keys(attrs)
+    .map(key => `${key}="${attrs[key]}"`)
+    .join(' ');
+}
+
+/**
  * Converts a string to be a local storage suitable key by replacing
  * non-suitable characters with a hyphen.
  *
