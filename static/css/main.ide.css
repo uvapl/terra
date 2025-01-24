@@ -23,6 +23,17 @@
   overflow: hidden;
 }
 
+.right-sidebar {
+  max-width: 35%;
+}
+
+.right-sidebar > div {
+  /* This is needed because when a check50 error occurs, the container is way
+   * too wide. Seems like a weird flex layout behavior.
+   */
+  max-width: 0;
+}
+
 .layout-container {
   width: calc(100% - var(--file-tree-width)) !important;
 }
