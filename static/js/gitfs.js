@@ -243,7 +243,7 @@ class GitFS {
  *
  * This is considered a private function invoked from Terra.vfs.createGitFSWorker.
  */
-function _createGitFSWorker() {
+Terra.f._createGitFSWorker = () => {
   Terra.f.closeAllFiles();
 
   const accessToken = Terra.f.getLocalStorageItem('git-access-token');
@@ -259,9 +259,9 @@ function _createGitFSWorker() {
   }
 
   if (accessToken && repoLink) {
-    const gitFS = new GitFS(repoLink);
-    Terra.gitfs = gitFS;
-    gitFS._createWorker(accessToken);
+    const gitfs = new GitFS(repoLink);
+    Terra.gitfs = gitfs;
+    gitfs._createWorker(accessToken);
 
     const tree = getFileTreeInstance();
     if (tree) {
@@ -271,5 +271,6 @@ function _createGitFSWorker() {
 
     console.log('Creating gitfs worker');
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
+    Terra.pluginManager.triggerEvent('onStorageChange', 'git');
   }
 }

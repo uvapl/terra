@@ -36,6 +36,10 @@
       }
     }
 
+    onStorageChange = (newStorageName) => {
+      this.clearState();
+    }
+
     enableCheck50Button = () => {
       this.$button.prop('disabled', false).removeClass('loading');
     }

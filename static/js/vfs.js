@@ -644,7 +644,7 @@ class VirtualFileSystem {
       Terra.lfs.terminate();
     }
 
-    _createGitFSWorker();
+    Terra.f._createGitFSWorker();
   }
 
   /**

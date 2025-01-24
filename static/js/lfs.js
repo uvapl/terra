@@ -74,6 +74,7 @@ class LocalFileSystem {
     createFileTree(); // show empty file tree
     Terra.f.showLocalStorageWarning();
     Terra.f.setFileTreeTitle('local storage');
+    Terra.pluginManager.triggerEvent('onStorageChange', 'local');
   }
 
   /**
@@ -172,6 +173,7 @@ class LocalFileSystem {
       Terra.f.closeAllFiles();
       await this._importFolderToVFS(rootFolderHandle);
       this._watchRootFolder();
+      Terra.pluginManager.triggerEvent('onStorageChange', 'lfs');
     }
   }
 

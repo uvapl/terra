@@ -95,6 +95,14 @@ class TerraPlugin {
   }
 
   /**
+   * Clear the current state.
+   */
+  clearState() {
+    this.state = structuredClone(this.defaultState);
+    this.saveState();
+  }
+
+  /**
    * Save the current state in local storage.
    */
   saveState() {
@@ -118,6 +126,7 @@ class TerraPlugin {
   // onEditorContainerResize = (editorComponent) => { }
   // onEditorContainerDestroy = (editorComponent) => { }
   // onEditorContainerReloadContent = (editorComponent) => { }
+  // onStorageChange = (newStorageName) => { }
 }
 
 class TerraPluginManager {
