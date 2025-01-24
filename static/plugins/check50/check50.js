@@ -54,10 +54,12 @@
       // Check if the file has a slug and the check50 password is set.
       // Otherwise, if one of them is not set, prompt the user to fill in the
       // remaining missing values.
-      if (!this.getState('fileslugs').hasOwnProperty(filepath) || !this.getState('password')) {
+      let hasSlug = this.getState('fileslugs').hasOwnProperty(filepath);
+      let hasPassword = this.getState('password');
+      if (!hasSlug || !hasPassword) {
         let body = '';
 
-        if (!this.getState('fileslugs').hasOwnProperty(filepath)) {
+        if (!hasSlug) {
           body += `
             <div class="form-wrapper-full-width">
               <label>Slug:</label>
@@ -66,7 +68,7 @@
           `
         }
 
-        if (!this.getState('password')) {
+        if (!hasPassword) {
           body += `
           <div class="form-wrapper-full-width">
             <label>Password:</label>
@@ -92,9 +94,6 @@
 
         $modal.find('.cancel-btn').click(() => hideModal($modal));
         $modal.find('.primary-btn').click(() => {
-          let hasPassword = $modal.find('.password').length === 0;
-          let hasSlug = $modal.find('.slug').length === 0;
-
           if ($modal.find('.password').length > 0) {
             const password = $modal.find('.password').val().trim();
             if (password) {
