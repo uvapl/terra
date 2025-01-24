@@ -498,6 +498,8 @@ function beforeCloseEditNodeCallback(event, data) {
   const tab = Terra.f.getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.key);
   if (tab) {
     tab.container.setTitle(name);
+    const proglang = name.includes('.') ? Terra.f.getFileExtension(name) : 'text';
+    tab.instance.setProgLang(proglang);
 
     // For some reason no update is triggered, so we trigger an update.
     Terra.layout.emit('stateChanged');
