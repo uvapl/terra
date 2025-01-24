@@ -521,6 +521,13 @@ function onStartEditNodeCallback(event, data) {
   Terra.v.blockLFSPolling = true;
   clearTimeout(Terra.v.fileTreeToggleTimeout);
   data.input.select();
+
+  $(data.input).attr({
+    autocorrect: 'off',     // Disable auto-correction
+    autocapitalize: 'none', // Prevents automatic capitalization of the first letter
+    spellcheck: 'false',    // Disable the spell-check feature
+
+  });
 }
 
 /**
