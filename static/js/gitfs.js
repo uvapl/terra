@@ -108,13 +108,6 @@ class GitFS {
   }
 
   /**
-   * Push any unpushed commits to the remote repository.
-   */
-  push() {
-    this.worker.postMessage({ id: 'push' });
-  }
-
-  /**
    * Remove a filepath from the current repository.
    *
    * @param {string} filepath - The absolute filepath within the git repo.

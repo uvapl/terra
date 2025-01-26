@@ -175,7 +175,9 @@ class EditorComponent {
    */
   onEditorLoad = () => {
     this.editor.getSession().getUndoMananger().reset();
-    Terra.pluginManager.call('onEditorLoad', this.editor);
+    if (Terra.c.IS_IDE) {
+      Terra.pluginManager.call('onEditorLoad', this.editor);
+    }
   }
 
   /**
@@ -273,7 +275,7 @@ class EditorComponent {
         const cursorPos = this.editor.getCursorPosition()
         Terra.lfs.getFileContent(file.id).then((content) => {
           // Only update the content if it has changed.
-          if (this.editor.getValue() !== content) {
+          if (this.editor && this.editor.getValue() !== content) {
             this.editor.setValue(content);
             this.editor.clearSelection();
             this.editor.moveCursorToPosition(cursorPos);
@@ -471,17 +473,23 @@ class EditorComponent {
   bindEditorEvents = () => {
     this.editor.on('load', () => {
       this.onEditorLoad();
-      Terra.pluginManager.triggerEvent('onEditorLoad', this);
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('onEditorLoad', this);
+      }
     });
 
     this.editor.on('change', () => {
       this.onEditorChange();
-      Terra.pluginManager.triggerEvent('onEditorChange', this);
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('onEditorChange', this);
+      }
     });
 
     this.editor.on('focus', () => {
       this.onEditorFocus();
-      Terra.pluginManager.triggerEvent('onEditorFocus', this);
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('onEditorFocus', this);
+      }
     });
   }
 
@@ -494,47 +502,65 @@ class EditorComponent {
 
     this.container.on('show', () => {
       this.onContainerOpen();
-      Terra.pluginManager.triggerEvent('onEditorContainerOpen', this);
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('onEditorContainerOpen', this);
+      }
     });
 
     this.container.on('lock', () => {
       this.onContainerLock();
-      Terra.pluginManager.triggerEvent('onEditorContainerLock', this);
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('onEditorContainerLock', this);
+      }
     });
 
     this.container.on('setCustomAutocompleter', (completions) => {
       this.onContainerSetCustomAutoCompleter(completions);
-      Terra.pluginManager.triggerEvent('onEditorContainerSetCustomAutoCompleter', completions, this);
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('onEditorContainerSetCustomAutoCompleter', completions, this);
+      }
     });
 
     this.container.on('unlock', () => {
       this.onContainerUnlock();
-      Terra.pluginManager.triggerEvent('onEditorContainerUnlock', this);
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('onEditorContainerUnlock', this);
+      }
     });
 
     this.container.on('themeChanged', (theme) => {
       this.setTheme(theme);
-      Terra.pluginManager.triggerEvent('setEditorTheme', theme, this);
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('setEditorTheme', theme, this);
+      }
     });
 
     this.container.on('fontSizeChanged', (fontSize) => {
       this.setFontSize(fontSize);
-      Terra.pluginManager.triggerEvent('setEditorFontSize', fontSize, this);
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('setEditorFontSize', fontSize, this);
+      }
     });
 
     this.container.on('resize', () => {
       this.onContainerResize();
-      Terra.pluginManager.triggerEvent('onEditorContainerResize', this);
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('onEditorContainerResize', this);
+      }
     });
 
     this.container.on('destroy', () => {
       this.onContainerDestroy();
-      Terra.pluginManager.triggerEvent('onEditorContainerDestroy', this);
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('onEditorContainerDestroy', this);
+      }
     });
 
     this.container.on('reloadContent', () => {
       this.reloadFileContent();
-      Terra.pluginManager.triggerEvent('onEditorContainerReloadContent', this);
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('onEditorContainerReloadContent', this);
+      }
     });
   }
 }

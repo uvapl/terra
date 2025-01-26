@@ -2,6 +2,7 @@
   const BASE_URL = 'https://agile008.science.uva.nl'
 
   class Check50Plugin extends TerraPlugin {
+    name = 'check50';
     css = ['static/plugins/check50/check50.css'];
 
     /**
@@ -10,13 +11,31 @@
      */
     $button = jQuery.noop();
 
+    /**
+     * Reference to the right sidebar plugin.
+     * @type {TerraPlugin}
+     */
+    rightSidebarPlugin = null;
+
+    /**
+     * A one-time flag to determine if the page is loaded for the first time.
+     * @type {boolean}
+     */
+    gitfsIsPageLoad = true;
+
     defaultState = {
       // The password to use for the check50 endpoint.
       password: null,
 
       // Example key-value pairs:
-      // 'absolute/folder/path/to/mario.c': 'minprog/checks/2022/marioless'
-      fileslugs: {}
+      // 'absolute/folder/path/to/mario.c': 'minprog/checks/2022/mario/less'
+      fileslugs: {},
+    }
+
+    onPluginRegistered = (plugin) => {
+      if (plugin.name === 'rightSidebar') {
+        this.rightSidebarPlugin = Terra.f.getPlugin('rightSidebar');
+      }
     }
 
     onLayoutLoaded = () => {
@@ -25,6 +44,7 @@
         id: 'run-check50-btn',
         class: 'primary-btn',
         onClick: this.onButtonClick,
+        disabled: true,
       });
     }
 
@@ -36,8 +56,14 @@
       }
     }
 
-    onStorageChange = (newStorageName) => {
-      this.clearState();
+    onStorageChange = (storageName, prevStorageName) => {
+      // We don't want to clear the storage when the user reload the page and
+      // was already using a certain filesystem (gitfs/LFS) before reloading.
+      // The state should only be cleared when switching storages after reload
+      // the page.
+      if (prevStorageName && storageName !== prevStorageName) {
+        this.clearState('fileslugs');
+      }
     }
 
     enableCheck50Button = () => {
@@ -101,7 +127,7 @@
           if ($modal.find('.password').length > 0) {
             const password = $modal.find('.password').val().trim();
             if (password) {
-              hasPassword = true
+              hasPassword = true;
               this.setState('password', password);
             } else {
               hasPassword = false;
@@ -111,11 +137,11 @@
           if ($modal.find('.slug').length > 0) {
             const slug = $modal.find('.slug').val().trim();
             if (slug) {
+              hasSlug = true;
               this.setState('fileslugs', {
                 ...this.getState('fileslugs'),
                 [filepath]: slug
               });
-              hasSlug = true;
             } else {
               hasSlug = false;
             }
@@ -155,7 +181,7 @@
         formData.append('slug', slug);
         formData.append('password', this.getState('password'));
 
-        $('.right-sidebar').html(`
+        this.rightSidebarPlugin.setContent(`
           <div class="check50-results-container">
             <div class="check50-close-btn"></div>
             <div class="check50-title">Check50 results</div>
@@ -163,22 +189,18 @@
           </div>
         `);
 
-        // Trigger a resize such that the content is updated.
-        $(window).resize();
-
         // Add small connecting animation that adds a dot every 500ms, delayed by 1 second.
         for (let i = 0; i < 6; i++) {
           setTimeout(() => {
-            $('.right-sidebar .connecting').append('.');
+            this.rightSidebarPlugin.$container.find('.connecting').append('.');
           }, Terra.f.seconds(.5) * i + Terra.f.seconds(.5));
         }
 
         // Add close button handler.
         $('.check50-close-btn').click(() => {
-          $('.right-sidebar').html('');
           clearInterval(Terra.v.check50PollingIntervalId);
           this.enableCheck50Button();
-          $(window).resize();
+          this.rightSidebarPlugin.destroy();
         });
 
         fetch(`${BASE_URL}/check50`, {
@@ -188,10 +210,12 @@
           .then((response) => response.json())
           .then((response) => {
             this.pollCheck50Results(response.id);
-          }).catch(() => {
+          }).catch((error) => {
             this.enableCheck50Button();
+            this.rightSidebarPlugin.$container.find('.connecting').remove();
+            this.rightSidebarPlugin.$container.find('.check50-results-container').append(`<p class="error">Failed to submit check50</p>`)
           });
-      });
+      })
     }
 
     pollCheck50Results = (id) => {
@@ -239,8 +263,8 @@
         }
       }
 
-      $('.right-sidebar .connecting').remove();
-      $('.check50-results-container').append(html);
+      this.rightSidebarPlugin.$container.find('.connecting').remove();
+      this.rightSidebarPlugin.$container.find('.check50-results-container').append(html);
     }
   }
 

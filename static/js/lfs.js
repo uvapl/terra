@@ -52,6 +52,7 @@ class LocalFileSystem {
     $('#menu-item--close-folder').removeClass('disabled');
 
     this._watchRootFolder();
+    Terra.pluginManager.triggerEvent('onStorageChange', 'lfs');
   }
 
   /**

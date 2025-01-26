@@ -1,6 +1,14 @@
 // Base plugin class that all plugins should extend.
 class TerraPlugin {
   /**
+   * Unique name of the plugin without spaces, required.
+   * The name will be used to identify the plugin in the plugin manager.
+   * Example: 'foo' can then be referenced as `Terra.pluginManager.plugins.foo`.
+   * @type {string}
+   */
+  name = null;
+
+  /**
    * Array of strings containing the path to the CSS file(s) to load.
    *
    * @example ['static/plugins/check50/check50.css']
@@ -96,9 +104,23 @@ class TerraPlugin {
 
   /**
    * Clear the current state.
+   *
+   * @param {string|array} [keys] - The name of the state to clear. If not specified, the
+   * entire state will be cleared.
    */
-  clearState() {
-    this.state = structuredClone(this.defaultState);
+  clearState(keys) {
+    if (!Array.isArray(keys)) {
+      keys = [keys];
+    }
+
+    if (keys.length > 0) {
+      for (const key of keys) {
+        this.state[key] = structuredClone(this.defaultState[key]);
+      }
+    } else {
+      this.state = structuredClone(this.defaultState);
+    }
+
     this.saveState();
   }
 
@@ -126,7 +148,8 @@ class TerraPlugin {
   // onEditorContainerResize = (editorComponent) => { }
   // onEditorContainerDestroy = (editorComponent) => { }
   // onEditorContainerReloadContent = (editorComponent) => { }
-  // onStorageChange = (newStorageName) => { }
+  // onStorageChange = (storageName, prevStorageName) => { }
+  // onPluginRegistered = (plugin) => { }
 }
 
 class TerraPluginManager {
@@ -137,7 +160,7 @@ class TerraPluginManager {
   plugins;
 
   constructor() {
-    this.plugins = [];
+    this.plugins = {};
   }
 
 
@@ -146,16 +169,18 @@ class TerraPluginManager {
    *
    * @param {object} plugin - A valid plugin object.
    */
-  register(plugin) {
+  register = (plugin) => {
     if (plugin instanceof TerraPlugin) {
-      this.plugins.push(plugin);
+      this.plugins[plugin.name] = plugin;
     } else {
       throw new Error("Plugin must be an instance of the TerraPlugin class.");
     }
 
     if (Array.isArray(plugin.css)) {
-      this.loadCSS(plugin.css)
+      this.loadCSS(plugin.css);
     }
+
+    this.triggerEvent('onPluginRegistered', plugin);
   }
 
   /**
@@ -163,10 +188,27 @@ class TerraPluginManager {
    *
    * @param {string} path - The CSS path to load.
    */
-  loadCSS(path) {
+  loadCSS = (path) => {
     for (const cssPath of path) {
       $('head').append(`<link rel="stylesheet" type="text/css" href="${cssPath}">`);
     }
+  }
+
+  /**
+   * Custom behavior for the storage change event. This is necessary because
+   * we need to keep track automatically of the current storage name and
+   * previous storage name that are required as arguments for the event.
+   *
+   * @param {string} pluginName - The name of the plugin to trigger the event for.
+   * @param {string} storageName - The new storage name.
+   */
+  triggerStorageChange = (pluginName, storageName) => {
+    Terra.v.prevStorageName = Terra.v.storageName;
+    Terra.v.storageName = storageName;
+    this.plugins[pluginName]['onStorageChange'](
+      Terra.v.storageName,
+      Terra.v.prevStorageName
+    );
   }
 
   /**
@@ -175,13 +217,30 @@ class TerraPluginManager {
    * @param {string} eventName - The name of the event.
    * @param {array} ...args - The arguments to pass to the event handler.
    */
-  triggerEvent(eventName, ...args) {
-    this.plugins.forEach(plugin => {
-      if (typeof plugin[eventName] === 'function') {
-        plugin[eventName](...args);
+  triggerEvent = (eventName, ...args) => {
+    Object.keys(this.plugins).forEach((pluginName) => {
+      if (typeof this.plugins[pluginName][eventName] === 'function') {
+        if (eventName === 'onStorageChange') {
+          this.triggerStorageChange(pluginName, ...args);
+        } else {
+          this.plugins[pluginName][eventName](...args);
+        }
       }
     });
   }
 }
 
+/**
+ * Get a plugin by name.
+ *
+ * @param {string} name - The name of the plugin to retrieve.
+ * @throws {Error} - When the plugin does not exist.
+ */
+Terra.f.getPlugin = (name) => {
+  if (!Terra.pluginManager.plugins.hasOwnProperty(name)) {
+    throw new Error(`Plugin with name "${name}" does not exist.`);
+  }
+
+  return Terra.pluginManager.plugins[name];
+}
 Terra.pluginManager = new TerraPluginManager();
