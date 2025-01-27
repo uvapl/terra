@@ -280,7 +280,7 @@ Terra.f.hasLFSApi = () => {
  * @returns {boolean} True when LFS has been initialized, false otherwise.
  */
 Terra.f.hasLFS = () => {
-  return !['undefined', null].includes(Terra.lfs);
+  return ![undefined, null].includes(Terra.lfs);
 }
 
 /**
