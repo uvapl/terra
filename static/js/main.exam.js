@@ -9,7 +9,7 @@
 // After the app has initialized (config loaded, components loaded) we want to
 // call additional functions.
 initApp().then(({ layout, config }) => {
-  window._editorIsDirty = false;
+  Terra.v.editorIsDirty = false;
 
   if (config.course_name && config.exam_name) {
     $('.page-title').html(`
@@ -21,7 +21,7 @@ initApp().then(({ layout, config }) => {
   // Register the auto-save after a certain auto-save offset time to prevent
   // the server receives many requests at once. This helps to spread them out
   // over a minute of time.
-  const startTimeout = getRandNumBetween(0, AUTOSAVE_START_OFFSET);
+  const startTimeout = Terra.f.getRandNumBetween(0, Terra.c.AUTOSAVE_START_OFFSET);
   setTimeout(() => {
     registerAutoSave(config.postback, config.code);
   }, startTimeout);
@@ -72,20 +72,20 @@ function initApp() {
         }
 
         // Get the programming language based on tabs filename.
-        const proglang = getFileExtension(Object.keys(config.tabs)[0]);
+        const proglang = Terra.f.getFileExtension(Object.keys(config.tabs)[0]);
 
         // Initialise the programming language specific worker API.
-        window._langWorkerApi = new WorkerAPI(proglang);
+        Terra.langWorkerApi = new LangWorkerAPI(proglang);
 
         // Get the font-size stored in local storage or use fallback value.
-        const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
+        const fontSize = Terra.f.getLocalStorageItem('font-size', Terra.c.BASE_FONT_SIZE);
 
         // Create the content objects that represent each tab in the editor.
         const content = generateConfigContent(config.tabs, fontSize);
 
         // Create the files inside the virtual file system.
         content.forEach((file) => {
-          VFS.createFile({
+          Terra.vfs.createFile({
             id: file.componentState.fileId,
             name: file.title,
             content: file.componentState.value,
@@ -100,7 +100,7 @@ function initApp() {
         });
 
         // Make layout instance available at all times.
-        window._layout = layout;
+        Terra.layout = layout;
 
         // Call the init function that creates all components.
         layout.init();
@@ -127,17 +127,17 @@ function loadConfig() {
     // First, check if there are query params given. If so, validate them.
     // Next, get the config data and when fetched succesfully, save it into
     // local storage and remove the query params from the URL.
-    const queryParams = parseQueryParams();
+    const queryParams = Terra.f.parseQueryParams();
     if (validateQueryParams(queryParams)) {
       try {
-        config = await getConfig(makeUrl(queryParams.url, { code: queryParams.code }));
+        config = await getConfig(Terra.f.makeUrl(queryParams.url, { code: queryParams.code }));
         config.code = queryParams.code;
         config.configUrl = queryParams.url;
 
-        const currentStorageKey = makeLocalStorageKey(config.configUrl);
-        setLocalStorageItem('last-used', currentStorageKey);
-        updateLocalStoragePrefix(currentStorageKey);
-        setLocalStorageItem('config', JSON.stringify(config));
+        const currentStorageKey = Terra.f.makeLocalStorageKey(config.configUrl);
+        Terra.f.setLocalStorageItem('last-used', currentStorageKey);
+        Terra.f.updateLocalStoragePrefix(currentStorageKey);
+        Terra.f.setLocalStorageItem('config', JSON.stringify(config));
 
         // Remove query params from the URL.
         history.replaceState({}, null, window.location.origin + window.location.pathname);
@@ -153,28 +153,28 @@ function loadConfig() {
 
       // This function should only update the local storage prefix if it's
       // not the default prefix.
-      if (LOCAL_STORAGE_PREFIX === DEFAULT_LOCAL_STORAGE_PREFIX) {
-        const currentStorageKey = getLocalStorageItem('last-used');
+      if (Terra.c.LOCAL_STORAGE_PREFIX === Terra.c.DEFAULT_LOCAL_STORAGE_PREFIX) {
+        const currentStorageKey = Terra.f.getLocalStorageItem('last-used');
 
         if (currentStorageKey) {
-          updateLocalStoragePrefix(currentStorageKey);
+          Terra.f.updateLocalStoragePrefix(currentStorageKey);
         } else if (!migrateOldLocalStorageKeys()) {
           reject('Last-used local storage key not available and failed to migrate old keys.');
         }
       }
 
-      const localConfig = JSON.parse(getLocalStorageItem('config'));
+      const localConfig = JSON.parse(Terra.f.getLocalStorageItem('config'));
 
       // Check immediately if the server is reachable by retrieving the
       // config again. If it is reachable, use the localConfig as the actual
       // config, otherwise notify the user that we failed to connect.
       try {
-        const newConfig = await getConfig(makeUrl(localConfig.configUrl, { code: localConfig.code }))
+        const newConfig = await getConfig(Terra.f.makeUrl(localConfig.configUrl, { code: localConfig.code }))
 
         // While we fallback on localstorage, we still need to check whether
         // the exam is locked, so we have to update the `locked` property.
         localConfig.locked = newConfig.locked;
-        setLocalStorageItem('config', JSON.stringify(localConfig));
+        Terra.f.setLocalStorageItem('config', JSON.stringify(localConfig));
 
         config = localConfig;
         notify('Connected to server', { fadeOutAfterMs: 10 * 1000 });
@@ -200,7 +200,7 @@ function loadConfig() {
  * @returns {boolean} True when the given object is a valid config object.
  */
 function isValidConfig(config) {
-  return isObject(config) && objectHasKeys(config, ['tabs', 'postback']);
+  return Terra.f.isObject(config) && Terra.f.objectHasKeys(config, ['tabs', 'postback']);
 }
 
 /**
@@ -210,13 +210,13 @@ function isValidConfig(config) {
  * @returns {boolean} True when the query params passes all validation checks.
  */
 function validateQueryParams(queryParams) {
-  if (!isObject(queryParams) || !objectHasKeys(queryParams, ['url', 'code'])) {
+  if (!Terra.f.isObject(queryParams) || !Terra.f.objectHasKeys(queryParams, ['url', 'code'])) {
     return false;
   }
 
   // At this point, we know we have a 'url' and 'code' param.
   const configUrl = window.decodeURI(queryParams.url);
-  if (!isValidUrl(configUrl)) {
+  if (!Terra.f.isValidUrl(configUrl)) {
     console.error('Invalid config URL');
     return false;
   }
@@ -253,26 +253,26 @@ async function getConfig(url) {
  * @returns {boolean} True when the migration was successful.
  */
 function migrateOldLocalStorageKeys() {
-  const configRaw = getLocalStorageItem('config', false);
+  const configRaw = Terra.f.getLocalStorageItem('config', false);
   if (!configRaw) return false;
 
   const config = JSON.parse(configRaw);
 
-  const newKeyPrefix = makeLocalStorageKey(config.configUrl);
+  const newKeyPrefix = Terra.f.makeLocalStorageKey(config.configUrl);
 
   for (const oldKey of ['config', 'font-size', 'theme', 'layout']) {
-    const value = getLocalStorageItem(oldKey, false);
+    const value = Terra.f.getLocalStorageItem(oldKey, false);
     const newKey = `${newKeyPrefix}-${oldKey}`;
 
     // Ignore this key if it has no value or the new key already exists.
-    if (!value || getLocalStorageItem(newKey)) continue;
+    if (!value || Terra.f.getLocalStorageItem(newKey)) continue;
 
-    setLocalStorageItem(newKey, value);
-    removeLocalStorageItem(oldKey);
+    Terra.f.setLocalStorageItem(newKey, value);
+    Terra.f.removeLocalStorageItem(oldKey);
   }
 
-  setLocalStorageItem('last-used', newKeyPrefix);
-  updateLocalStoragePrefix(newKeyPrefix);
+  Terra.f.setLocalStorageItem('last-used', newKeyPrefix);
+  Terra.f.updateLocalStoragePrefix(newKeyPrefix);
 
   return true;
 }
@@ -288,14 +288,14 @@ function migrateOldLocalStorageKeys() {
  * done.
  */
 function registerAutoSave(url, uuid, force, saveCallback) {
-  if (window._autoSaveIntervalId) {
+  if (Terra.v.autoSaveIntervalId) {
     clearInterval(_autoSaveIntervalId);
   }
 
   const run = async () => {
     // Explicitly use a try-catch to make sure this auto-save never stops.
     try {
-      if (window._editorIsDirty || force) {
+      if (Terra.v.editorIsDirty || force) {
         // Save the editor content.
         const res = await doAutoSave(url, uuid);
 
@@ -306,7 +306,7 @@ function registerAutoSave(url, uuid, force, saveCallback) {
         // Check if the response returns a "423 Locked" status, indicating
         // that the user the submission has been closed.
         if (res.status === 423) {
-          clearInterval(window._autoSaveIntervalId);
+          clearInterval(Terra.v.autoSaveIntervalId);
           lockApp();
           return;
         }
@@ -317,7 +317,7 @@ function registerAutoSave(url, uuid, force, saveCallback) {
         }
 
         // Reset the dirty flag as the response is successful at this point.
-        window._editorIsDirty = false;
+        Terra.v.editorIsDirty = false;
 
         // Update the last saved timestamp in the UI.
         updateLastSaved();
@@ -329,7 +329,7 @@ function registerAutoSave(url, uuid, force, saveCallback) {
     }
   };
 
-  window._autoSaveIntervalId = setInterval(run, AUTOSAVE_INTERVAL);
+  Terra.v.autoSaveIntervalId = setInterval(run, Terra.c.AUTOSAVE_INTERVAL);
 
   if (force) run();
 }
@@ -339,18 +339,18 @@ function registerAutoSave(url, uuid, force, saveCallback) {
  */
 function updateLastSaved(showPrevAutoSaveTime) {
   const currDate = new Date();
-  const autoSaveTime = formatDate(currDate);
+  const autoSaveTime = Terra.f.formatDate(currDate);
 
   if (showPrevAutoSaveTime) {
     const msg = `Could not save at ${autoSaveTime}`;
-    if (window._prevAutoSaveTime instanceof Date) {
-      msg += ` (last save at ${formatDate(window._prevAutoSaveTime)})`
+    if (Terra.v.prevAutoSaveTime instanceof Date) {
+      msg += ` (last save at ${Terra.f.formatDate(Terra.v.prevAutoSaveTime)})`
     }
 
     notifyError(msg);
   } else {
     notify(`Last save at ${autoSaveTime}`);
-    window._prevAutoSaveTime = currDate;
+    Terra.v.prevAutoSaveTime = currDate;
 
     const $modal = $('#submit-exam-model');
     if ($modal.length > 0) {
@@ -378,7 +378,7 @@ function doAutoSave(url, uuid) {
   const formData = new FormData();
   formData.append('code', uuid);
 
-  const editorComponent = window._layout.root.contentItems[0].contentItems[0];
+  const editorComponent = Terra.layout.root.contentItems[0].contentItems[0];
 
   // Go through each tab and create a Blob with the file contents of that tab
   // and append it to the form data.
@@ -415,8 +415,8 @@ function hideSubmitExamModal() {
  */
 function showSubmitExamModal() {
   let lastSaveText = '';
-  if (window._prevAutoSaveTime instanceof Date) {
-    lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${formatDate(window._prevAutoSaveTime)}</span>.<br/>`;
+  if (Terra.v.prevAutoSaveTime instanceof Date) {
+    lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${Terra.f.formatDate(Terra.v.prevAutoSaveTime)}</span>.<br/>`;
   }
 
   const modalHtml = `
@@ -480,7 +480,7 @@ function lockApp() {
   notify('Your code is now locked and cannot be edited anymore.');
 
   // Lock all components, making them read-only.
-  window._layout.root.contentItems[0].contentItems.forEach((contentItem) => {
+  Terra.layout.root.contentItems[0].contentItems.forEach((contentItem) => {
     contentItem.contentItems.forEach((component) => {
       component.container.emit('lock');
     });
@@ -500,8 +500,8 @@ function lockApp() {
   $submitModal = $('#submit-exam-model');
   if ($submitModal.length > 0) {
     let lastSubmissionText = '';
-    if (window._prevAutoSaveTime instanceof Date) {
-      lastSubmissionText = `<br/><br/>✅ The last successful submit was at ${formatDate(window._prevAutoSaveTime)}.`;
+    if (Terra.v.prevAutoSaveTime instanceof Date) {
+      lastSubmissionText = `<br/><br/>✅ The last successful submit was at ${Terra.f.formatDate(Terra.v.prevAutoSaveTime)}.`;
     }
 
     $submitModal.find('.modal-body').html(`❌ The submission was locked since the last submit. ${lastSubmissionText}`);

@@ -10,8 +10,8 @@ initApp().then(({ layout }) => {
 
   // Listen for the content of the file to be received.
   window.addEventListener('message', function(event) {
-    const editor = getActiveEditor().instance.editor;
-    editor.setValue(removeIndent(event.data));
+    const editor = Terra.f.getActiveEditor().instance.editor;
+    editor.setValue(Terra.f.removeIndent(event.data));
     editor.clearSelection();
   });
 
@@ -30,7 +30,7 @@ initApp().then(({ layout }) => {
  */
 function initApp() {
   return new Promise((resolve, reject) => {
-    const queryParams = parseQueryParams();
+    const queryParams = Terra.f.parseQueryParams();
     if (!isValidQueryParams(queryParams)) {
       return reject('No filename provided in query params');
     }
@@ -39,21 +39,21 @@ function initApp() {
     const isVertical = !isHorizontal;
 
     // Update local storage key.
-    const currentStorageKey = makeLocalStorageKey(window.location.href);
-    updateLocalStoragePrefix(currentStorageKey);
+    const currentStorageKey = Terra.f.makeLocalStorageKey(window.location.href);
+    Terra.f.updateLocalStoragePrefix(currentStorageKey);
 
     // Create tabs with the filename as key and empty string as the content.
     const tabs = {}
     tabs[queryParams.filename] = '';
 
     // Get the programming language based on the filename.
-    const proglang = getFileExtension(queryParams.filename);
+    const proglang = Terra.f.getFileExtension(queryParams.filename);
 
     // Initialise the programming language specific worker API.
-    window._langWorkerApi = new WorkerAPI(proglang);
+    Terra.langWorkerApi = new LangWorkerAPI(proglang);
 
     // Get the font-size stored in local storage or use fallback value.
-    const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
+    const fontSize = Terra.f.getLocalStorageItem('font-size', Terra.c.BASE_FONT_SIZE);
 
     // Create the content objects that represent each tab in the editor.
     const content = generateConfigContent(tabs, fontSize);
@@ -67,7 +67,7 @@ function initApp() {
     $('body').addClass(isVertical ? 'vertical' : 'horizontal');
 
     // Make layout instance available at all times.
-    window._layout = layout;
+    Terra.layout = layout;
 
     // Call the init function that creates all components.
     layout.init();

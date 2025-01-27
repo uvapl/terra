@@ -23,16 +23,16 @@ class LocalFileSystem {
 
   constructor() {
     // Only initialize if the user is not connected to git.
-    const gitRepoLink = getLocalStorageItem('connected-repo');
+    const gitRepoLink = Terra.f.getLocalStorageItem('git-repo');
     if (!gitRepoLink) {
       this._init();
     }
   }
 
   async _init() {
-    const lastTimeUsedLFS = getLocalStorageItem('use-lfs', false);
+    const lastTimeUsedLFS = Terra.f.getLocalStorageItem('use-lfs', false);
     if (!lastTimeUsedLFS) {
-      showLocalStorageWarning();
+      Terra.f.showLocalStorageWarning();
     };
 
     const rootFolderHandle = await this.getFolderHandle('root');
@@ -41,7 +41,7 @@ class LocalFileSystem {
     const hasPermission = await this._verifyPermission(rootFolderHandle.handle);
     if (!hasPermission) {
       // If we have no permission, clear VFS and the indexedDB stores.
-      VFS.clear();
+      Terra.vfs.clear();
       createFileTree(); // show empty file tree
       await this._clearStores();
       return;
@@ -52,6 +52,7 @@ class LocalFileSystem {
     $('#menu-item--close-folder').removeClass('disabled');
 
     this._watchRootFolder();
+    Terra.pluginManager.triggerEvent('onStorageChange', 'lfs');
   }
 
   /**
@@ -59,7 +60,7 @@ class LocalFileSystem {
    */
   async terminate() {
     this.loaded = false;
-    setLocalStorageItem('use-lfs', false);
+    Terra.f.setLocalStorageItem('use-lfs', false);
     clearTimeout(this._watchRootFolderInterval);
     await this._clearStores();
     $('#menu-item--close-folder').addClass('disabled');
@@ -70,10 +71,11 @@ class LocalFileSystem {
    */
   closeFolder() {
     this.terminate();
-    VFS.clear();
+    Terra.vfs.clear();
     createFileTree(); // show empty file tree
-    showLocalStorageWarning();
-    setFileTreeTitle('local storage');
+    Terra.f.showLocalStorageWarning();
+    Terra.f.setFileTreeTitle('local storage');
+    Terra.pluginManager.triggerEvent('onStorageChange', 'local');
   }
 
   /**
@@ -92,7 +94,7 @@ class LocalFileSystem {
     }
 
     this._watchRootFolderInterval = setInterval(async () => {
-      if (window._blockLFSPolling) return;
+      if (Terra.v.blockLFSPolling) return;
 
       // Iterate through all nodes in the tree and obtain all expanded folder
       // nodes their absolute path.
@@ -100,7 +102,7 @@ class LocalFileSystem {
 
       getFileTreeInstance().visit((node) => {
         if (node.data.isFolder && node.expanded) {
-          prevExpandedFolderPaths.push(VFS.getAbsoluteFolderPath(node.key));
+          prevExpandedFolderPaths.push(Terra.vfs.getAbsoluteFolderPath(node.key));
         }
       });
 
@@ -110,11 +112,11 @@ class LocalFileSystem {
 
       // Expand all folder nodes again that were open (if they still exist).
       getFileTreeInstance().visit((node) => {
-        if (node.data.isFolder && prevExpandedFolderPaths.includes(VFS.getAbsoluteFolderPath(node.key))) {
+        if (node.data.isFolder && prevExpandedFolderPaths.includes(Terra.vfs.getAbsoluteFolderPath(node.key))) {
           node.setExpanded(true, { noAnimation: true });
         }
       });
-    }, seconds(5));
+    }, Terra.f.seconds(5));
   }
 
   /**
@@ -161,17 +163,18 @@ class LocalFileSystem {
     const hasPermission = await this._verifyPermission(rootFolderHandle);
     if (hasPermission) {
       // Make sure GitFS is stopped.
-      if (hasGitFSWorker()) {
-        window._gitFS.terminate();
-        window._gitFS = null;
+      if (Terra.f.hasGitFSWorker()) {
+        Terra.gitfs.terminate();
+        Terra.gitfs = null;
       }
 
       // Remove local file storage warning if present.
-      removeLocalStorageWarning();
+      Terra.f.removeLocalStorageWarning();
 
-      closeAllFiles();
+      Terra.f.closeAllFiles();
       await this._importFolderToVFS(rootFolderHandle);
       this._watchRootFolder();
+      Terra.pluginManager.triggerEvent('onStorageChange', 'lfs');
     }
   }
 
@@ -183,22 +186,22 @@ class LocalFileSystem {
    * @returns {Promise<void>}
    */
   async _importFolderToVFS(rootFolderHandle) {
-    const tabs = getAllEditorTabs();
+    const tabs = Terra.f.getAllEditorTabs();
     const prevOpenTabs = tabs.map((tab) => {
       const fileId = tab.container.getState().fileId;
       return {
-        path: VFS.getAbsoluteFilePath(fileId),
+        path: Terra.vfs.getAbsoluteFilePath(fileId),
         tab: tabs.find((tab) => tab.container.getState().fileId === fileId),
       };
     });
 
-    VFS.clear();
+    Terra.vfs.clear();
     await this._clearStores();
 
     // Save rootFolderHandle under the 'root' key for reference.
     await this.saveFolderHandle('root', null, rootFolderHandle);
 
-    setFileTreeTitle(rootFolderHandle.name);
+    Terra.f.setFileTreeTitle(rootFolderHandle.name);
 
     // Read all contents and create the items in the VFS if they don't exist.
     await this._readFolder(rootFolderHandle, null);
@@ -208,15 +211,15 @@ class LocalFileSystem {
 
     // Sync the new imported VFS IDs with the currently open tabs.
     prevOpenTabs.forEach(({ path, tab }) => {
-      const file = VFS.findFileByPath(path);
+      const file = Terra.vfs.findFileByPath(path);
       if (file) {
         tab.container.setState({ fileId: file.id });
       }
     });
-    window._layout.emitToAllComponents('reloadContent');
+    Terra.layout.emitToAllComponents('reloadContent');
 
     this.loaded = true;
-    setLocalStorageItem('use-lfs', true);
+    Terra.f.setLocalStorageItem('use-lfs', true);
   }
 
   /**
@@ -228,7 +231,7 @@ class LocalFileSystem {
    */
   async getFileContent(id) {
     try {
-      const path = VFS.getAbsoluteFilePath(id)
+      const path = Terra.vfs.getAbsoluteFilePath(id)
       const fileHandle = await this.getFileHandle(path);
       const file = await fileHandle.handle.getFile();
       const content = await file.text();
@@ -262,15 +265,15 @@ class LocalFileSystem {
     for await (const [name, handle] of dirHandle) {
       if (handle.kind === 'file' && !blacklistedPaths.includes(name)) {
         const file = await handle.getFile();
-        const { id: fileId } = VFS.createFile({
+        const { id: fileId } = Terra.vfs.createFile({
           name: file.name,
           parentId,
           size: file.size
         }, false);
-        await this.saveFileHandle(VFS.getAbsoluteFilePath(fileId), fileId, handle);
+        await this.saveFileHandle(Terra.vfs.getAbsoluteFilePath(fileId), fileId, handle);
       } else if (handle.kind === 'directory' && !blacklistedPaths.includes(name)) {
-        const folder = VFS.createFolder({ name, parentId }, false);
-        await this.saveFolderHandle(VFS.getAbsoluteFolderPath(folder.id), folder.id, handle);
+        const folder = Terra.vfs.createFolder({ name, parentId }, false);
+        await this.saveFolderHandle(Terra.vfs.getAbsoluteFolderPath(folder.id), folder.id, handle);
         await this._readFolder(handle, folder.id);
       }
     }
@@ -303,11 +306,11 @@ class LocalFileSystem {
     for await (const [name, handle] of dirHandle) {
       if (handle.kind === 'file') {
         const fileKey = pathPrefix ? `${pathPrefix}/${name}` : name;
-        const file = VFS.findFileByPath(fileKey);
+        const file = Terra.vfs.findFileByPath(fileKey);
         await this.saveFileHandle(fileKey, file.id, handle);
       } else if (handle.kind === 'directory') {
         const folderKey = pathPrefix ? `${pathPrefix}/${name}` : name;
-        const folder = VFS.findFolderByPath(folderKey);
+        const folder = Terra.vfs.findFolderByPath(folderKey);
         await this.saveFolderHandle(folderKey, folder.id, handle);
         await this._rebuildIndexedDB(handle, folderKey);
       }
@@ -539,9 +542,9 @@ class LocalFileSystem {
   async writeFileToFolder(folderId, fileId, filename, content) {
     try {
       this.busy = true;
-      const fileKey = VFS.getAbsoluteFilePath(fileId);
+      const fileKey = Terra.vfs.getAbsoluteFilePath(fileId);
 
-      const folderHandle = await this.getFolderHandle(folderId ? VFS.getAbsoluteFolderPath(folderId) : 'root');
+      const folderHandle = await this.getFolderHandle(folderId ? Terra.vfs.getAbsoluteFolderPath(folderId) : 'root');
 
       let fileHandle = await this.getFileHandle(fileKey);
       if (!fileHandle) {
@@ -575,9 +578,9 @@ class LocalFileSystem {
     try {
       this.busy = true;
 
-      const parentFolder = await this.getFolderHandle(parentId ? VFS.getAbsoluteFolderPath(parentId) : 'root');
+      const parentFolder = await this.getFolderHandle(parentId ? Terra.vfs.getAbsoluteFolderPath(parentId) : 'root');
       const folderHandle = await parentFolder.handle.getDirectoryHandle(folderName, { create: true });
-      await this.saveFolderHandle(VFS.getAbsoluteFolderPath(folderId), folderId, folderHandle);
+      await this.saveFolderHandle(Terra.vfs.getAbsoluteFolderPath(folderId), folderId, folderHandle);
     } finally {
       this.busy = false;
     }
@@ -594,7 +597,7 @@ class LocalFileSystem {
     try {
       this.busy = true;
 
-      const fileKey = VFS.getAbsoluteFilePath(id);
+      const fileKey = Terra.vfs.getAbsoluteFilePath(id);
       const fileHandle = await this.getFileHandle(fileKey);
       if (fileHandle) {
         await fileHandle.handle.remove();
@@ -620,7 +623,7 @@ class LocalFileSystem {
   async deleteFolder(id) {
     try {
       this.busy = true;
-      const folderKey = VFS.getAbsoluteFolderPath(id);
+      const folderKey = Terra.vfs.getAbsoluteFolderPath(id);
       const folderHandle = await this.getFolderHandle(folderKey);
       await this._recursivelyDeleteFolder(folderHandle.handle);
       await this.removeFolderHandle(folderKey);
@@ -668,14 +671,14 @@ class LocalFileSystem {
     try {
       this.busy = true;
 
-      const fileKey = VFS.getAbsoluteFilePath(id);
+      const fileKey = Terra.vfs.getAbsoluteFilePath(id);
 
       // Remove current file.
       const currentFileHandle = await this.getFileHandle(fileKey);
       await currentFileHandle.handle.remove();
 
       // Make new file and store handle under the same id.
-      const folderHandle = await this.getFolderHandle(newParentId ? VFS.getAbsoluteFolderPath(newParentId) : 'root');
+      const folderHandle = await this.getFolderHandle(newParentId ? Terra.vfs.getAbsoluteFolderPath(newParentId) : 'root');
       const fileHandle = await folderHandle.handle.getFileHandle(newName, { create: true });
       await this.saveFileHandle(fileKey, id, fileHandle);
     } finally {
@@ -695,7 +698,7 @@ class LocalFileSystem {
   async moveFolder(id, newName, newParentId) {
     try {
       this.busy = true;
-      const folder = VFS.findFolderById(id);
+      const folder = Terra.vfs.findFolderById(id);
 
       // Now move the folders in the LFS.
       await this._moveFolderRecursively(id, newParentId, newName);
@@ -703,7 +706,7 @@ class LocalFileSystem {
       // After moving everything, delete the folder itself on the LFS.
       const parentFolderHandle = await this.getFolderHandle(
         folder.parentId
-          ? VFS.getAbsoluteFolderPath(folder.parentId)
+          ? Terra.vfs.getAbsoluteFolderPath(folder.parentId)
           : 'root'
       );
       await parentFolderHandle.handle.removeEntry(folder.name, { recursive: true });
@@ -727,11 +730,11 @@ class LocalFileSystem {
    * @returns {Promise<void>}
    */
   async _moveFolderRecursively(folderId, parentFolderId, newName) {
-    const folderKey = VFS.getAbsoluteFolderPath(folderId);
+    const folderKey = Terra.vfs.getAbsoluteFolderPath(folderId);
     const folderHandle = await this.getFolderHandle(folderKey);
     const parentFolderHandle = await this.getFolderHandle(
       parentFolderId
-        ? VFS.getAbsoluteFolderPath(parentFolderId)
+        ? Terra.vfs.getAbsoluteFolderPath(parentFolderId)
         : 'root'
     );
 
@@ -744,14 +747,14 @@ class LocalFileSystem {
 
     // Create the subfolders and files in the new folder.
     await Promise.all(
-      VFS.findFoldersWhere({ parentId: folderId }).map(
+      Terra.vfs.findFoldersWhere({ parentId: folderId }).map(
         (subfolder) => this._moveFolderRecursively(subfolder.id, folderId)
       )
     )
 
     await Promise.all(
-      VFS.findFilesWhere({ parentId: folderId }).map(async (subfile) => {
-        const subfileKey = VFS.getAbsoluteFilePath(subfile.id);
+      Terra.vfs.findFilesWhere({ parentId: folderId }).map(async (subfile) => {
+        const subfileKey = Terra.vfs.getAbsoluteFilePath(subfile.id);
         const currentFileHandle = await this.getFileHandle(subfileKey);
         await currentFileHandle.handle.remove();
 
@@ -769,4 +772,4 @@ class LocalFileSystem {
   }
 }
 
-const LFS = new LocalFileSystem();
+Terra.lfs = new LocalFileSystem();

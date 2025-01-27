@@ -1,6 +1,6 @@
 $(window).on('resize', () => {
-  if (window._layout) {
-    window._layout.updateSize(window.innerWidth, window.innerHeight);
+  if (Terra.layout) {
+    Terra.layout.updateSize(window.innerWidth, window.innerHeight);
   }
 });
 
@@ -12,7 +12,7 @@ class Layout extends GoldenLayout {
   iframe = false;
 
   constructor(defaultLayoutConfig, options = {}) {
-    let layoutConfig = getLocalStorageItem('layout');
+    let layoutConfig = Terra.f.getLocalStorageItem('layout');
     if (layoutConfig) {
       layoutConfig = JSON.parse(layoutConfig);
     } else {
@@ -25,7 +25,7 @@ class Layout extends GoldenLayout {
     this.iframe = $('body').hasClass('terra-embed');
     this.vertical = options.vertical;
 
-    if (isObject(options.buttonConfig)) {
+    if (Terra.f.isObject(options.buttonConfig)) {
       this.buttonConfig = options.buttonConfig;
     }
 
@@ -38,11 +38,12 @@ class Layout extends GoldenLayout {
         // through the registerComponent() function, prior to calling this part.
         setTimeout(() => {
           this.emitToAllComponents('afterFirstRender');
-          this.setTheme(getLocalStorageItem('theme') || 'light');
+          this.setTheme(Terra.f.getLocalStorageItem('theme') || 'light');
           this.createControls();
           this.showTermStartupMessage();
+          Terra.pluginManager.triggerEvent('onLayoutLoaded');
 
-          if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
+          if (Array.isArray(options.autocomplete) && options.autocomplete.every(Terra.f.isObject)) {
             this.emitToEditorComponents('setCustomAutocompleter', options.autocomplete);
           }
 
@@ -83,13 +84,13 @@ class Layout extends GoldenLayout {
   }
 
   emitToAllComponents = (event, data) => {
-    window._layout.root.contentItems[0].contentItems.forEach((contentItem) => {
+    Terra.layout.root.contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data);
     });
   }
 
   emitToEditorComponents = (event, data) => {
-    window._layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
+    Terra.layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data);
     });
   }
@@ -97,7 +98,7 @@ class Layout extends GoldenLayout {
   onStateChanged = () => {
     const config = this.toConfig();
     const state = JSON.stringify(config);
-    setLocalStorageItem('layout', state);
+    Terra.f.setLocalStorageItem('layout', state);
   }
 
   setTheme = (theme) => {
@@ -112,12 +113,12 @@ class Layout extends GoldenLayout {
     }
 
     this.emitToAllComponents('themeChanged', theme);
-    setLocalStorageItem('theme', theme);
+    Terra.f.setLocalStorageItem('theme', theme);
   }
 
   getRunCodeButtonHtml = () => {
-    const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
-    return `<button id="run-code" class="button primary-btn" disabled>Run (${runCodeShortcut})</button>`;
+    const runCodeShortcut = Terra.f.isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
+    return `<button id="run-code" class="button primary-btn run-user-code-btn" disabled>Run (${runCodeShortcut})</button>`;
   };
 
   getClearTermButtonHtml = () => '<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>';
@@ -174,7 +175,7 @@ class Layout extends GoldenLayout {
     }
 
     // Add custom buttons to the header.
-    if (this.proglang === 'py' && isObject(this.buttonConfig)) {
+    if (this.proglang === 'py' && Terra.f.isObject(this.buttonConfig)) {
       Object.keys(this.buttonConfig).forEach((name) => {
         const id = name.replace(/\s/g, '-').toLowerCase();
         const selector = `#${id}`;
@@ -185,19 +186,19 @@ class Layout extends GoldenLayout {
         }
 
         $('.terminal-component-container .lm_header')
-          .append(`<button id="${id}" class="button ${id}-btn" disabled>${name}</button>`);
+          .append(`<button id="${id}" class="button config-btn ${id}-btn" disabled>${name}</button>`);
 
-        $(selector).click(() => runButtonCommand(selector, cmd));
+        $(selector).click(() => Terra.f.runButtonCommand(selector, cmd));
       });
     }
 
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');
-    const currentFontSize = getLocalStorageItem('font-size') || BASE_FONT_SIZE;
+    const currentFontSize = Terra.f.getLocalStorageItem('font-size') || Terra.c.BASE_FONT_SIZE;
     $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
 
     // Add active state to theme dropdown.
-    const currentTheme = getLocalStorageItem('theme') || 'light';
+    const currentTheme = Terra.f.getLocalStorageItem('theme') || 'light';
     const $editorThemeMenu = $('#editor-theme-menu');
     $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
 
@@ -213,7 +214,7 @@ class Layout extends GoldenLayout {
   }
 
   addControlsEventListeners = () => {
-    $('#run-code').click(() => runCode(null, this.iframe));
+    $('#run-code').click(() => Terra.f.runCode(null, this.iframe));
     $('#clear-term').click(() => term.reset());
 
     // Update font-size for all components on change.
@@ -221,7 +222,7 @@ class Layout extends GoldenLayout {
       const $element = $(event.target);
       const newFontSize = parseInt($element.data('val'));
       this.emitToAllComponents('fontSizeChanged', newFontSize);
-      setLocalStorageItem('font-size', newFontSize);
+      Terra.f.setLocalStorageItem('font-size', newFontSize);
       $element.addClass('active').siblings().removeClass('active');
     });
 

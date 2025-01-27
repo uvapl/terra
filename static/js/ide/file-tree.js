@@ -28,16 +28,16 @@ function incrementString(string) {
  * @param {string|null} [parentId] - The parent folder id.
  */
 function createNewFileTreeFile(parentId = null) {
-  if (hasLFS() && LFS.busy) return;
+  if (Terra.f.hasLFS() && Terra.lfs.busy) return;
 
   // Create a new unique filename.
   let filename = 'Untitled';
-  while (VFS.existsWhere({ parentId, name: filename })) {
+  while (Terra.vfs.existsWhere({ parentId, name: filename })) {
     filename = incrementString(filename)
   }
 
   // Create the new file in the filesystem.
-  const { id } = VFS.createFile({ name: filename, parentId });
+  const { id } = Terra.vfs.createFile({ name: filename, parentId });
 
   // Create the new node in the file tree.
   const newChildProps = {
@@ -85,16 +85,16 @@ function createNewFileTreeFile(parentId = null) {
  * @param {string|null} [parentId] - The parent id of the new folder.
  */
 function createNewFileTreeFolder(parentId = null) {
-  if (hasLFS() && LFS.busy) return;
+  if (Terra.f.hasLFS() && Terra.lfs.busy) return;
 
   // Create a new unique foldername.
   let foldername = 'Untitled';
-  while (VFS.existsWhere({ parentId, name: foldername })) {
+  while (Terra.vfs.existsWhere({ parentId, name: foldername })) {
     foldername = incrementString(foldername)
   }
 
   // Create the new folder in the filesystem.
-  const { id } = VFS.createFolder({ name: foldername, parentId });
+  const { id } = Terra.vfs.createFolder({ name: foldername, parentId });
 
   // Create the new node in the file tree.
   const newChildProps = {
@@ -143,7 +143,7 @@ function createNewFileTreeFolder(parentId = null) {
  * @returns {array} List with file tree objects.
  */
 function createFileTreeFromVFS(parentId = null) {
-  const folders = VFS.findFoldersWhere({ parentId }).map((folder) => ({
+  const folders = Terra.vfs.findFoldersWhere({ parentId }).map((folder) => ({
     key: folder.id,
     title: folder.name,
     folder: true,
@@ -154,7 +154,7 @@ function createFileTreeFromVFS(parentId = null) {
     children: createFileTreeFromVFS(folder.id),
   }));
 
-  const files = VFS.findFilesWhere({ parentId }).map((file) => ({
+  const files = Terra.vfs.findFilesWhere({ parentId }).map((file) => ({
     key: file.id,
     title: file.name,
     folder: false,
@@ -189,29 +189,29 @@ function deleteFileTreeItem(node) {
   showModal($modal);
 
   $modal.find('.cancel-btn').click(() => {
-    window._blockLFSPolling = false;
+    Terra.v.blockLFSPolling = false;
     hideModal($modal);
   });
 
   $modal.find('.confirm-btn').click(() => {
     if (node.data.isFile) {
       closeFileTab(node.key);
-      VFS.deleteFile(node.key);
+      Terra.vfs.deleteFile(node.key);
     } else if (node.data.isFolder) {
       closeFilesInFolderRecursively(node.key);
     }
 
     // Delete from the VFS.
     const fn = node.data.isFolder
-      ? VFS.deleteFolder
-      : VFS.deleteFile;
+      ? Terra.vfs.deleteFolder
+      : Terra.vfs.deleteFile;
     fn(node.key);
 
     // Delete from the file tree.
     node.remove();
 
     hideModal($modal);
-    window._blockLFSPolling = false;
+    Terra.v.blockLFSPolling = false;
 
     // Reload tree such that the 'No files or folders found' becomes visible
     // when needed.
@@ -225,7 +225,7 @@ function deleteFileTreeItem(node) {
  * @param {string} fileId - The file ID to close.
  */
 function closeFileTab(fileId) {
-  const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === fileId);
+  const tab = Terra.f.getAllEditorTabs().find((tab) => tab.container.getState().fileId === fileId);
   if (tab) {
     tab.parent.removeChild(tab);
   }
@@ -237,12 +237,12 @@ function closeFileTab(fileId) {
  * @param {string} folderId - The folder ID to close all files from.
  */
 function closeFilesInFolderRecursively(folderId) {
-  const files = VFS.findFilesWhere({ parentId: folderId });
+  const files = Terra.vfs.findFilesWhere({ parentId: folderId });
   for (const file of files) {
     closeFileTab(file.id);
   }
 
-  const folders = VFS.findFoldersWhere({ parentId: folderId });
+  const folders = Terra.vfs.findFoldersWhere({ parentId: folderId });
   for (const folder of folders) {
     closeFilesInFolderRecursively(folder.id);
   }
@@ -265,7 +265,7 @@ function createFileTreeContextMenuItems($trigger, event) {
     menu.createFile = {
       name: 'New File',
       callback: () => {
-        window._userClickedContextMenuItem = true;
+        Terra.v.userClickedContextMenuItem = true;
         createNewFileTreeFile(node.key);
       },
     };
@@ -273,42 +273,42 @@ function createFileTreeContextMenuItems($trigger, event) {
     menu.createFolder = {
       name: 'New Folder',
       callback: () => {
-        window._userClickedContextMenuItem = true;
+        Terra.v.userClickedContextMenuItem = true;
         createNewFileTreeFolder(node.key);
       },
     };
 
-    if (!hasLFS() || (hasLFS() && !LFS.loaded)) {
+    if (!Terra.f.hasLFS() || (Terra.f.hasLFS() && !Terra.lfs.loaded)) {
       menu.downloadFolder = {
         name: 'Download',
         callback: () => {
-          window._userClickedContextMenuItem = true;
-          VFS.downloadFolder(node.key);
-          window._blockLFSPolling = false;
+          Terra.v.userClickedContextMenuItem = true;
+          Terra.vfs.downloadFolder(node.key);
+          Terra.v.blockLFSPolling = false;
         },
       };
     }
   }
 
   if (isFile) {
-    if (!hasLFS() || (hasLFS() && !LFS.loaded)) {
+    if (!Terra.f.hasLFS() || (Terra.f.hasLFS() && !Terra.lfs.loaded)) {
       menu.downloadFile = {
         name: 'Download',
         callback: () => {
-          window._userClickedContextMenuItem = true;
-          VFS.downloadFile(node.key);
-          window._blockLFSPolling = false;
+          Terra.v.userClickedContextMenuItem = true;
+          Terra.vfs.downloadFile(node.key);
+          Terra.v.blockLFSPolling = false;
         },
       };
     }
 
-    if (hasWorker(getFileExtension(node.title))) {
+    if (hasWorker(Terra.f.getFileExtension(node.title))) {
       menu.run = {
         name: 'Run',
         callback: () => {
-          window._userClickedContextMenuItem = true;
-          runCode(node.key);
-          window._blockLFSPolling = false;
+          Terra.v.userClickedContextMenuItem = true;
+          Terra.f.runCode(node.key);
+          Terra.v.blockLFSPolling = false;
         }
       };
     }
@@ -318,7 +318,7 @@ function createFileTreeContextMenuItems($trigger, event) {
     menu.rename = {
       name: 'Rename',
       callback: () => {
-        window._userClickedContextMenuItem = true;
+        Terra.v.userClickedContextMenuItem = true;
         node.editStart();
       },
     };
@@ -326,7 +326,7 @@ function createFileTreeContextMenuItems($trigger, event) {
     menu.remove = {
       name: 'Delete',
       callback: () => {
-        window._userClickedContextMenuItem = true;
+        Terra.v.userClickedContextMenuItem = true;
         deleteFileTreeItem(node);
       }
     };
@@ -368,7 +368,7 @@ function getFileTreeInstance() {
  */
 function createFileTree() {
   // Reload the tree if it already exists by re-importing from VFS.
-  if (window._fileTree) {
+  if (Terra.filetree) {
     getFileTreeInstance().reload(createFileTreeFromVFS());
     return;
   }
@@ -378,7 +378,7 @@ function createFileTree() {
   $('#file-tree--add-file-btn').off('click').on('click', () => createNewFileTreeFile());
 
   // Otherwise, instantiate a new tree.
-  window._fileTree = $("#file-tree").fancytree({
+  Terra.filetree = $("#file-tree").fancytree({
     selectMode: 1,
     debugLevel: 0,
     strings: {
@@ -427,11 +427,11 @@ function createFileTree() {
     build: createFileTreeContextMenuItems,
     events: {
       show: () => {
-        window._blockLFSPolling = true;
+        Terra.v.blockLFSPolling = true;
       },
       hide: () => {
-        if (!window._userClickedContextMenuItem) {
-          window._blockLFSPolling = false;
+        if (!Terra.v.userClickedContextMenuItem) {
+          Terra.v.blockLFSPolling = false;
         }
       }
     }
@@ -443,7 +443,7 @@ function createFileTree() {
  */
 function afterCloseEditNodeCallback() {
   sortFileTree(),
-  window._blockLFSPolling = false;
+  Terra.v.blockLFSPolling = false;
 }
 
 /**
@@ -464,21 +464,21 @@ function beforeCloseEditNodeCallback(event, data) {
 
   // Check if the name already exists in the parent folder.
   // If so, trigger edit mode again and show error tooltip.
-  if (!isValidFilename(name)) {
+  if (!Terra.f.isValidFilename(name)) {
     errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
-  } else if (VFS.existsWhere({ parentId, name }, { ignoreIds: data.node.key })) {
+  } else if (Terra.vfs.existsWhere({ parentId, name }, { ignoreIds: data.node.key })) {
     errorMsg = `There already exists a "${name}" file or folder`;
   }
 
   if (errorMsg) {
     // Delete previous tooltip.
-    if (isObject(window._renameNodeTippy)) {
-      window._renameNodeTippy.destroy();
-      window._renameNodeTippy = null;
+    if (Terra.f.isObject(Terra.v.renameNodeTippy)) {
+      Terra.v.renameNodeTippy.destroy();
+      Terra.v.renameNodeTippy = null;
     }
 
     // Create new tooltip.
-    window._renameNodeTippy = tippy(data.node.span, {
+    Terra.v.renameNodeTippy = tippy(data.node.span, {
       content: errorMsg,
       animation: false,
       showOnCreate: true,
@@ -490,23 +490,25 @@ function beforeCloseEditNodeCallback(event, data) {
   }
 
   const fn = data.node.data.isFolder
-    ? VFS.updateFolder
-    : VFS.updateFile;
+    ? Terra.vfs.updateFolder
+    : Terra.vfs.updateFile;
 
   fn(data.node.key, { name });
 
-  const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.key);
+  const tab = Terra.f.getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.key);
   if (tab) {
     tab.container.setTitle(name);
+    const proglang = name.includes('.') ? Terra.f.getFileExtension(name) : 'text';
+    tab.instance.setProgLang(proglang);
 
     // For some reason no update is triggered, so we trigger an update.
-    window._layout.emit('stateChanged');
+    Terra.layout.emit('stateChanged');
   }
 
   // Destroy the leftover tooltip if it exists.
-  if (isObject(window._renameNodeTippy)) {
-    window._renameNodeTippy.destroy();
-    window._renameNodeTippy = null;
+  if (Terra.f.isObject(Terra.v.renameNodeTippy)) {
+    Terra.v.renameNodeTippy.destroy();
+    Terra.v.renameNodeTippy = null;
   }
 
   return true;
@@ -516,9 +518,16 @@ function beforeCloseEditNodeCallback(event, data) {
  * Callback when the user starts editing a node in the file tree.
  */
 function onStartEditNodeCallback(event, data) {
-  window._blockLFSPolling = true;
-  clearTimeout(window._fileTreeToggleTimeout);
+  Terra.v.blockLFSPolling = true;
+  clearTimeout(Terra.v.fileTreeToggleTimeout);
   data.input.select();
+
+  $(data.input).attr({
+    autocorrect: 'off',     // Disable auto-correction
+    autocapitalize: 'none', // Prevents automatic capitalization of the first letter
+    spellcheck: 'false',    // Disable the spell-check feature
+
+  });
 }
 
 /**
@@ -527,20 +536,20 @@ function onStartEditNodeCallback(event, data) {
 function onClickNodeCallback(event, data) {
   // Prevent default behavior for folders.
   if (data.node.data.isFile) {
-    openFile(data.node.key, data.node.title);
+    Terra.f.openFile(data.node.key, data.node.title);
   } else if (data.node.data.isFolder) {
-    clearTimeout(window._fileTreeToggleTimeout);
+    clearTimeout(Terra.v.fileTreeToggleTimeout);
 
     // Only toggle with a debounce of 200ms when clicked on the title
     // to prevent double-clicks.
     if (event.originalEvent.target.classList.contains('fancytree-title')) {
-      window._fileTreeToggleTimeout = setTimeout(() => {
-        window._blockLFSPolling = true;
+      Terra.v.fileTreeToggleTimeout = setTimeout(() => {
+        Terra.v.blockLFSPolling = true;
         data.node.toggleExpanded();
 
         // Unblock LFS polling after the animation has completed.
         setTimeout(() => {
-          window._blockLFSPolling = false;
+          Terra.v.blockLFSPolling = false;
         }, 400);
       }, 200);
     } else {
@@ -558,16 +567,16 @@ function onClickNodeCallback(event, data) {
 function dragEnterCallback(targetNode, data) {
   // Add a visual drag area indicator.
 
-  $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
+  $(`.${Terra.c.DROP_AREA_INDICATOR_CLASS}`).removeClass(Terra.c.DROP_AREA_INDICATOR_CLASS);
 
   if ((targetNode.parent.title === 'root' && targetNode.data.isFile) || targetNode.title === 'root') {
-    $('#file-tree').addClass(DROP_AREA_INDICATOR_CLASS);
+    $('#file-tree').addClass(Terra.c.DROP_AREA_INDICATOR_CLASS);
   }
   else if (targetNode.data.isFile) {
-    $(targetNode.parent.li).addClass(DROP_AREA_INDICATOR_CLASS);
+    $(targetNode.parent.li).addClass(Terra.c.DROP_AREA_INDICATOR_CLASS);
   }
   else if (targetNode.data.isFolder) {
-    $(targetNode.li).addClass(DROP_AREA_INDICATOR_CLASS);
+    $(targetNode.li).addClass(Terra.c.DROP_AREA_INDICATOR_CLASS);
   }
 
   // Check if there exists already a file with the same name on the
@@ -576,7 +585,7 @@ function dragEnterCallback(targetNode, data) {
   const containsDuplicate = (
     (
       targetNode.data.isFile &&
-      VFS.existsWhere({
+      Terra.vfs.existsWhere({
         parentId: targetNode.parent.title === 'root' ? null : targetNode.parent.key,
         name: sourceNode.title
       }, { ignoreIds: sourceNode.key })
@@ -584,16 +593,16 @@ function dragEnterCallback(targetNode, data) {
       ||
     (
       targetNode.data.isFolder &&
-      VFS.existsWhere({
+      Terra.vfs.existsWhere({
         parentId: targetNode.key,
         name: sourceNode.title
       }, { ignoreIds: sourceNode.key })
     )
   );
 
-  if (isObject(window._dndDuplicateTippy)) {
-    window._dndDuplicateTippy.destroy();
-    window._dndDuplicateTippy = null;
+  if (Terra.f.isObject(Terra.v.dndDuplicateTippy)) {
+    Terra.v.dndDuplicateTippy.destroy();
+    Terra.v.dndDuplicateTippy = null;
   }
 
   if (containsDuplicate) {
@@ -602,7 +611,7 @@ function dragEnterCallback(targetNode, data) {
       ? $('.file-tree-container .title')[0]
       : (targetNode.data.isFile ? targetNode.parent.span : targetNode.span);
 
-    window._dndDuplicateTippy = tippy(tooltipElement, {
+    Terra.v.dndDuplicateTippy = tippy(tooltipElement, {
       content: `There already exists a "${sourceNode.title}" file or folder`,
       animation: false,
       showOnCreate: true,
@@ -620,7 +629,7 @@ function dragEnterCallback(targetNode, data) {
  * Callback when the user starts dragging a node in the file tree.
  */
 function dragStartCallback(node, data) {
-  window._blockLFSPolling = true;
+  Terra.v.blockLFSPolling = true;
 
   // Set custom drag image.
   data.dataTransfer.setDragImage($(`<div class="custom-drag-helper">${node.title}</div>`).appendTo("body")[0], -10, -10);
@@ -635,15 +644,15 @@ function dragStartCallback(node, data) {
  */
 function dragEndCallback() {
   // Remove the visual drag area indicator.
-  $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
+  $(`.${Terra.c.DROP_AREA_INDICATOR_CLASS}`).removeClass(Terra.c.DROP_AREA_INDICATOR_CLASS);
 
-  if (isObject(window._dndDuplicateTippy)) {
-    window._dndDuplicateTippy.destroy();
-    window._dndDuplicateTippy = null;
+  if (Terra.f.isObject(Terra.v.dndDuplicateTippy)) {
+    Terra.v.dndDuplicateTippy.destroy();
+    Terra.v.dndDuplicateTippy = null;
   }
 
   sortFileTree()
-  window._blockLFSPolling = false;
+  Terra.v.blockLFSPolling = false;
 }
 
 /**
@@ -662,8 +671,8 @@ function dragStopCallback(targetNode, data) {
 
   const id = sourceNode.key;
   const fn = sourceNode.data.isFolder
-    ? VFS.updateFolder
-    : VFS.updateFile;
+    ? Terra.vfs.updateFolder
+    : Terra.vfs.updateFile;
 
   fn(id, { parentId });
 

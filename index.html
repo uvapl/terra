@@ -100,14 +100,14 @@
               <ul>
                 <li id="menu-item--add-credentials">Add credentials</li>
                 <li id="menu-item--connect-repo">Connect repository</li>
+                <li id="menu-item--branch" class="disabled">Branch</li>
               </ul>
             </li>
           </ul>
       </div>
       <div class="msg-container"></div>
-      <div class="navbar-right hidden">
+      <div class="navbar-right">
         <ul>
-            <li>RUN</li>
         </ul>
       </div>
     </nav>
@@ -140,11 +140,13 @@
   <script src="static/js/vendor/tooltip/tippy-6.3.7.min.js"></script>
 
   <!-- Load custom scripts -->
+  <script src="static/js/init.js"></script>
   <script src="static/js/constants.js"></script>
   <script src="static/js/ide/constants.js"></script>
   <script src="static/js/helpers/shared.js"></script>
   <script src="static/js/helpers/editor-component.js"></script>
   <script src="static/js/helpers/term-component.js"></script>
+  <script src="static/js/plugin-manager.js"></script>
   <script src="static/js/modal.js"></script>
   <script src="static/js/vfs.js"></script>
   <script src="static/js/layout/term.component.js"></script>
@@ -156,6 +158,10 @@
   <script src="static/js/ide/menubar.js"></script>
   <script src="static/js/ide/file-tree.js"></script>
   <script src="static/js/main.ide.js"></script>
+
+  <!-- Custom plugins -->
+  <script src="static/plugins/check50/check50.js"></script>
+  <script src="static/plugins/right-sidebar/right-sidebar.js"></script>
 </body>
 
 </html>

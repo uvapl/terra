@@ -2,24 +2,24 @@
  * Disposes the user input when active. This is actived once user input is
  * requested through the `waitForInput` function.
  */
-function disposeUserInput() {
-  if (isObject(window._userInputDisposable) && typeof window._userInputDisposable.dispose === 'function') {
-    window._userInputDisposable.dispose();
-    window._userInputDisposable = null;
+Terra.f.disposeUserInput = () => {
+  if (Terra.f.isObject(Terra.v.userInputDisposable) && typeof Terra.v.userInputDisposable.dispose === 'function') {
+    Terra.v.userInputDisposable.dispose();
+    Terra.v.userInputDisposable = null;
   }
 }
 
 /**
  * Hide the cursor inside the terminal component.
  */
-function hideTermCursor() {
+Terra.f.hideTermCursor = () => {
   term.write('\x1b[?25l');
 }
 
 /**
  * Show the cursor inside the terminal component.
  */
-function showTermCursor() {
+Terra.f.showTermCursor = () => {
   term.write('\x1b[?25h');
 }
 
@@ -29,10 +29,10 @@ function showTermCursor() {
  *
  * @returns {Promise<string>} The user's input.
  */
-function waitForInput() {
+Terra.f.waitForInput = () => {
   return new Promise(resolve => {
     // Immediately focus the terminal when user input is requested.
-    showTermCursor();
+    Terra.f.showTermCursor();
     term.focus();
 
     // Disable some special characters.
@@ -45,7 +45,7 @@ function waitForInput() {
 
     // Keep track of the value that is typed by the user.
     let value = '';
-    window._userInputDisposable = term.onKey(e => {
+    Terra.v.userInputDisposable = term.onKey(e => {
       // Only append allowed characters.
       if (!blacklistedKeys.includes(e.key)) {
         term.write(e.key);
@@ -68,7 +68,7 @@ function waitForInput() {
         term.write('\n');
         value += '\n';
 
-        hideTermCursor();
+        Terra.f.hideTermCursor();
         resolve(value);
       }
     });
@@ -87,7 +87,7 @@ function waitForInput() {
  *
  *   'Error: write data discarded, use flow control to avoid losing data'
  */
-function clearTermWriteBuffer() {
+Terra.f.clearTermWriteBuffer = () => {
   if (term) {
     term._core._writeBuffer._writeBuffer = [];
   }

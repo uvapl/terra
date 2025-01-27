@@ -13,11 +13,11 @@ class LayoutIDE extends Layout {
 
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');
-    const currentFontSize = getLocalStorageItem('font-size') || BASE_FONT_SIZE;
+    const currentFontSize = Terra.f.getLocalStorageItem('font-size') || Terra.c.BASE_FONT_SIZE;
     $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
 
     // Add active state to theme dropdown.
-    const currentTheme = getLocalStorageItem('theme') || 'light';
+    const currentTheme = Terra.f.getLocalStorageItem('theme') || 'light';
     const $editorThemeMenu = $('#editor-theme-menu');
     $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
 
@@ -38,13 +38,13 @@ class LayoutIDE extends Layout {
     // Exclude the content from all editors for the IDE when LFS is enabled,
     // because for LFS we use lazy loading, i.e. only load the content when
     // opening the file.
-    if (hasLFS() && LFS.loaded) {
+    if (Terra.f.hasLFS() && Terra.lfs.loaded) {
       config = this._removeEditorValue(config);
     }
 
 
     const state = JSON.stringify(config);
-    setLocalStorageItem('layout', state);
+    Terra.f.setLocalStorageItem('layout', state);
   }
 
   _removeEditorValue = (config) => {

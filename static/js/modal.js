@@ -12,7 +12,7 @@
  * @returns {jQuery} The modal element.
  */
 function createModal(modalOptions = {}) {
-  if (!isObject(modalOptions.attrs)) {
+  if (!Terra.f.isObject(modalOptions.attrs)) {
     modalOptions.attrs = {}
   }
 
@@ -69,7 +69,7 @@ const hideModal = ($modal, remove = true) => {
     // Wait for animation to be completed.
     setTimeout(() => {
       $modal.remove();
-    }, MODAL_ANIM_DURATION);
+    }, Terra.c.MODAL_ANIM_DURATION);
   }
 };
 
@@ -85,6 +85,6 @@ function showModal($modal) {
     // rendered to the DOM to show the fade-in animation.
     setTimeout(() => $modal.addClass('show'), 10);
 
-    setTimeout(() => resolve(), MODAL_ANIM_DURATION);
+    setTimeout(() => resolve(), Terra.c.MODAL_ANIM_DURATION);
   })
 }

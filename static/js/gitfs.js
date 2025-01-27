@@ -48,7 +48,8 @@ class GitFS {
       data: {
         accessToken: accessToken,
         repoLink: this._repoLink,
-        isDev: isDev,
+        isDev: Terra.c.IS_DEV,
+        branch: Terra.f.getLocalStorageItem('git-branch'),
       },
     });
   }
@@ -58,8 +59,11 @@ class GitFS {
    */
   terminate() {
     console.log('Terminating existing GitFS worker')
-    setLocalStorageItem('connected-repo', '');
-    $('#menu-item--push-changes').addClass('disabled');
+    Terra.f.setLocalStorageItem('git-repo', '');
+    Terra.f.setLocalStorageItem('git-branch', '');
+    $('#menu-item--branch')
+      .removeClass('has-dropdown').addClass('disabled')
+      .find('ul').remove();
     this.worker.terminate();
   }
 
@@ -72,6 +76,13 @@ class GitFS {
       data: {
         repoLink: this._repoLink,
       },
+    });
+  }
+
+  setRepoBranch(branch) {
+    this.worker.postMessage({
+      id: 'setRepoBranch',
+      data: { branch },
     });
   }
 
@@ -94,13 +105,6 @@ class GitFS {
       id: 'commit',
       data: { filepath, filecontents, sha },
     });
-  }
-
-  /**
-   * Push any unpushed commits to the remote repository.
-   */
-  push() {
-    this.worker.postMessage({ id: 'push' });
   }
 
   /**
@@ -189,12 +193,17 @@ class GitFS {
         $modal.find('.primary-btn').click(() => hideModal($modal));
         break;
 
+    case 'fetch-branches-success':
+      renderGitRepoBranches(payload.branches);
+      break;
+
     case 'clone-success':
       $('#file-tree .info-msg').remove();
-      removeLocalStorageWarning();
+      Terra.f.removeLocalStorageWarning();
 
-      VFS.importFromGit(payload.repoContents);
-      createFileTree();
+      Terra.vfs.importFromGit(payload.repoContents).then(() => {
+        createFileTree();
+      });
       break;
 
       case 'clone-fail':
@@ -204,7 +213,7 @@ class GitFS {
       case 'move-folder-success':
         // Update all sha in the new files in the VFS.
         payload.updatedFiles.forEach((fileObj) => {
-          const file = VFS.findFileByPath(fileObj.filepath);
+          const file = Terra.vfs.findFileByPath(fileObj.filepath);
           file.sha = fileObj.sha;
         });
         break;
@@ -212,7 +221,7 @@ class GitFS {
       case 'move-file-success':
       case 'commit-success':
         // Update the file's sha in the VFS.
-        const file = VFS.findFileByPath(payload.filepath);
+        const file = Terra.vfs.findFileByPath(payload.filepath);
         file.sha = payload.sha;
         break;
     }
@@ -225,35 +234,36 @@ class GitFS {
  * Otherwise, a worker will be created automatically when the user adds a new
  * repository.
  *
- * This is considered a private function invoked from VFS.createGitFSWorker.
+ * This is considered a private function invoked from Terra.vfs.createGitFSWorker.
  */
-function _createGitFSWorker() {
-  closeAllFiles();
+Terra.f._createGitFSWorker = () => {
+  Terra.f.closeAllFiles();
 
-  const accessToken = getLocalStorageItem('git-access-token');
-  const repoLink = getLocalStorageItem('connected-repo');
-  const repoInfo = getRepoInfo(repoLink);
+  const accessToken = Terra.f.getLocalStorageItem('git-access-token');
+  const repoLink = Terra.f.getLocalStorageItem('git-repo');
+  const repoInfo = Terra.f.getRepoInfo(repoLink);
   if (repoInfo) {
-    setFileTreeTitle(`${repoInfo.user}/${repoInfo.repo}`)
+    Terra.f.setFileTreeTitle(`${repoInfo.user}/${repoInfo.repo}`)
   }
 
-  if (hasGitFSWorker()) {
-    window._gitFS.terminate();
-    window._gitFS = null;
+  if (Terra.f.hasGitFSWorker()) {
+    Terra.gitfs.terminate();
+    Terra.gitfs = null;
   }
 
   if (accessToken && repoLink) {
-    const gitFS = new GitFS(repoLink);
-    window._gitFS = gitFS;
-    gitFS._createWorker(accessToken);
+    const gitfs = new GitFS(repoLink);
+    Terra.gitfs = gitfs;
+    gitfs._createWorker(accessToken);
 
     const tree = getFileTreeInstance();
     if (tree) {
       $('#file-tree').fancytree('destroy');
-      window._fileTree = null;
+      Terra.filetree = null;
     }
 
     console.log('Creating gitfs worker');
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
+    Terra.pluginManager.triggerEvent('onStorageChange', 'git');
   }
 }

@@ -34,7 +34,7 @@ class TerminalComponent {
     // Add custom class for styling purposes.
     this.getParentComponentElement().classList.add('component-container', 'terminal-component-container');
 
-    const fontSize = this.state.fontSize || BASE_FONT_SIZE;
+    const fontSize = this.state.fontSize || Terra.c.BASE_FONT_SIZE;
 
     term = new Terminal({
       convertEol: true,
@@ -55,7 +55,7 @@ class TerminalComponent {
 
 
     this.setFontSize(fontSize);
-    hideTermCursor();
+    Terra.f.hideTermCursor();
   }
 
   /**

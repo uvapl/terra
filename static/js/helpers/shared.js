@@ -4,8 +4,8 @@
  * @param {string} key - The key to be used.
  * @param {string} value - The value to set under the given key.
  */
-function setLocalStorageItem(key, value) {
-  localStorage.setItem(`${LOCAL_STORAGE_PREFIX}-${key}`, value);
+Terra.f.setLocalStorageItem = (key, value) => {
+  localStorage.setItem(`${Terra.c.LOCAL_STORAGE_PREFIX}-${key}`, value);
 }
 
 /**
@@ -15,8 +15,8 @@ function setLocalStorageItem(key, value) {
  * @param {string} defaultValue - The default value to return if the key is not found.
  * @returns {*} The value from the local storage or the default value.
  */
-function getLocalStorageItem(key, defaultValue) {
-  const value = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}-${key}`);
+Terra.f.getLocalStorageItem = (key, defaultValue) => {
+  const value = localStorage.getItem(`${Terra.c.LOCAL_STORAGE_PREFIX}-${key}`);
   if (value === null && typeof defaultValue !== 'undefined') {
     return defaultValue
   }
@@ -33,8 +33,8 @@ function getLocalStorageItem(key, defaultValue) {
  *
  * @param {string} key - The key to remove.
  */
-function removeLocalStorageItem(key) {
-  localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}-${key}`);
+Terra.f.removeLocalStorageItem = (key) => {
+  localStorage.removeItem(`${Terra.c.LOCAL_STORAGE_PREFIX}-${key}`);
 }
 
 /**
@@ -43,8 +43,8 @@ function removeLocalStorageItem(key) {
  * @param {string} additionalKey - An additional prefix that will be appended to
  * the current local storage prefix.
  */
-function updateLocalStoragePrefix(additionalKey) {
-  LOCAL_STORAGE_PREFIX = `${DEFAULT_LOCAL_STORAGE_PREFIX}-${additionalKey}`;
+Terra.f.updateLocalStoragePrefix = (additionalKey) => {
+  Terra.c.LOCAL_STORAGE_PREFIX = `${Terra.c.LOCAL_STORAGE_PREFIX}-${additionalKey}`;
 }
 
 /**
@@ -54,7 +54,7 @@ function updateLocalStoragePrefix(additionalKey) {
  * @param {object} obj - The object to validate.
  * @returns {boolean} True if the given object is a real object.
  */
-function isObject(obj) {
+Terra.f.isObject = (obj) => {
   return obj !== null && typeof obj === 'object' && !Array.isArray(obj);
 }
 
@@ -65,7 +65,7 @@ function isObject(obj) {
  * @returns {string|number} Returns the original if above 10, otherwise it will
  * return a string prefixed with a zero.
  */
-function prefixZero(num) {
+Terra.f.prefixZero = (num) => {
   return num < 10 ? '0' + num : num;
 }
 
@@ -75,9 +75,9 @@ function prefixZero(num) {
  * @param {Date} date - The date object to use.
  * @returns {string} Formatted string in human-readable format.
  */
-function formatDate(date) {
-  const hours = prefixZero(date.getHours());
-  const minutes = prefixZero(date.getMinutes());
+Terra.f.formatDate = (date) => {
+  const hours = Terra.f.prefixZero(date.getHours());
+  const minutes = Terra.f.prefixZero(date.getMinutes());
   return hours + ':' + minutes;
 }
 
@@ -86,7 +86,7 @@ function formatDate(date) {
  *
  * @returns {object} A key-value object with all the query params.
  */
-function parseQueryParams() {
+Terra.f.parseQueryParams = () => {
   const queryString = window.location.search.substring(1);
   if (!queryString) return {};
 
@@ -106,7 +106,7 @@ function parseQueryParams() {
  * @param {array} keys - A list of keys the object is required to have.
  * @returns {boolean} True when the object contains all keys specified.
  */
-function objectHasKeys(obj, keys) {
+Terra.f.objectHasKeys = (obj, keys) => {
   for (let key of keys) {
     if (typeof obj[key] === 'undefined') return false;
   }
@@ -121,7 +121,7 @@ function objectHasKeys(obj, keys) {
  * @param {string} url - The URL to be checked.
  * @returns {boolean} True when the url is valid.
  */
-function isValidUrl(url) {
+Terra.f.isValidUrl = (url) => {
   return /^https:?\/\//g.test(url);
 }
 
@@ -132,7 +132,7 @@ function isValidUrl(url) {
  * @param {number} upper - The uppper bound.
  * @returns {number} Random integer between the specified bounds.
  */
-function getRandNumBetween(lower, upper) {
+Terra.f.getRandNumBetween = (lower, upper) => {
   return Math.floor(Math.random() * (upper - lower + 1)) + lower;
 }
 
@@ -141,7 +141,7 @@ function getRandNumBetween(lower, upper) {
  *
  * @returns {boolean} True when the system is detected as a Mac-like system.
  */
-function isMac() {
+Terra.f.isMac = () => {
   return /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform);
 }
 
@@ -152,7 +152,7 @@ function isMac() {
  * @param {object} queryParams - The params that will be converted to the URL.
  * @returns {string} A concatenation of the URL and query params.
  */
-function makeUrl(url, queryParams) {
+Terra.f.makeUrl = (url, queryParams) => {
   const query = Object.keys(queryParams)
     .reduce((query, key) => query.concat(`${key}=${queryParams[key]}`), [])
     .join('&');
@@ -161,14 +161,30 @@ function makeUrl(url, queryParams) {
 }
 
 /**
+ * Generate a string of HTML attributes.
+ *
+ * @example makeHtmlAttrs({ id: 'my-id', class: 'my-class' }) -> 'id="my-id" class="my-class"'
+ *
+ * @param {object} attrs - The attributes to be converted to a string.
+ */
+Terra.f.makeHtmlAttrs = (attrs) => {
+  return Object.keys(attrs)
+    .map(key => `${key}="${attrs[key]}"`)
+    .join(' ');
+}
+
+/**
  * Converts a string to be a local storage suitable key by replacing
  * non-suitable characters with a hyphen.
+ *
+ * @example makeLocalStorageKey('https://example.com') -> 'https-example-com'
+ * @example makeLocalStorageKey('FooBar') -> 'foo-bar'
  *
  * @param {string} key - The key to convert.
  * @returns {string} A local storage suitable key.
  */
-function makeLocalStorageKey(key) {
-  return key.replace(/[^0-9a-z]+/g, '-');
+Terra.f.makeLocalStorageKey = (key) => {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, '-');
 }
 
 /**
@@ -177,7 +193,7 @@ function makeLocalStorageKey(key) {
  * @param {string} text - The input string.
  * @returns {str} Modified string with minimum indent removed.
  */
-function removeIndent(text) {
+Terra.f.removeIndent = (text) => {
   // Remove leading newlines.
   while (text.startsWith('\n')) {
     text = text.slice(1);
@@ -201,7 +217,7 @@ function removeIndent(text) {
  *
  * @returns {string} The UUID.
  */
-function uuidv4() {
+Terra.f.uuidv4 = () => {
   return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c =>
     (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> +c / 4).toString(16)
   );
@@ -214,7 +230,7 @@ function uuidv4() {
  * @returns {string|null} The file extension without the dot, or null if there
  * is no file extension.
  */
-function getFileExtension(filename) {
+Terra.f.getFileExtension = (filename) => {
   return typeof filename === 'string' && filename.includes('.')
     ? filename.split('.').pop()
     : null;
@@ -226,7 +242,7 @@ function getFileExtension(filename) {
  * @param {string} text - The text to add the new line character to.
  * @returns {string} Updated text with a new line character at the end.
  */
-function addNewLineCharacter(text) {
+Terra.f.addNewLineCharacter = (text) => {
   return text.replace(/\n?$/g, '\n');
 }
 
@@ -236,18 +252,8 @@ function addNewLineCharacter(text) {
  * @param {number} secs - The amount of seconds to convert.
  * @returns {number} The amount of seconds in milliseconds.
  */
-function seconds(secs) {
+Terra.f.seconds = (secs) => {
   return 1000 * secs;
-}
-
-/**
- * Convert a given number of minutes to milliseconds.
- *
- * @param {number} mins - The amount of minutes to convert.
- * @returns {number} The amount of minutes in milliseconds.
- */
-function minutes(mins) {
-  return seconds(60) * mins;
 }
 
 /**
@@ -255,8 +261,8 @@ function minutes(mins) {
  *
  * @returns {boolean} True if the worker has been initialised, false otherwise.
  */
-function hasGitFSWorker() {
-  return isIDE && window._gitFS instanceof GitFS;
+Terra.f.hasGitFSWorker = () => {
+  return Terra.c.IS_IDE && Terra.gitfs instanceof GitFS;
 }
 
 /**
@@ -264,7 +270,7 @@ function hasGitFSWorker() {
  *
  * @returns {boolean} True if the browser supports the api.
  */
-function hasLFSApi() {
+Terra.f.hasLFSApi = () => {
   return 'showOpenFilePicker' in window;
 }
 
@@ -273,8 +279,8 @@ function hasLFSApi() {
  *
  * @returns {boolean} True when LFS has been initialized, false otherwise.
  */
-function hasLFS() {
-  return typeof LFS !== 'undefined' && LFS instanceof LocalFileSystem;
+Terra.f.hasLFS = () => {
+  return !['undefined', null].includes(Terra.lfs);
 }
 
 /**
@@ -282,7 +288,7 @@ function hasLFS() {
  *
  * @param {string} title - The title to set.
  */
-function setFileTreeTitle(title) {
+Terra.f.setFileTreeTitle = (title) => {
   $('#file-tree-title').text(title);
 }
 
@@ -294,7 +300,7 @@ function setFileTreeTitle(title) {
  *
  * @param {string} repoLink - Absolute link to the repository.
  */
-function getRepoInfo(repoLink) {
+Terra.f.getRepoInfo = (repoLink) => {
   if (!repoLink) return null;
 
   const match = repoLink.match(/^https:\/\/(?:www\.)?github.com\/([^/]+)\/([\w-]+)/);
@@ -312,14 +318,14 @@ function getRepoInfo(repoLink) {
  * @param {string} filename - The filename to check.
  * @returns {boolean} True if the filename is valid, false otherwise.
  */
-function isValidFilename(filename) {
+Terra.f.isValidFilename = (filename) => {
   return !/[\/\\:*?"<>|]/.test(filename) && !['&lt;', '&gt;'].includes(filename);
 }
 
 /**
  * Removes the local storage warning from the DOM.
  */
-function removeLocalStorageWarning() {
+Terra.f.removeLocalStorageWarning = () => {
   $('.file-tree-container').removeClass('localstorage-mode')
   $('#local-storage-warning').remove();
 }
@@ -327,7 +333,7 @@ function removeLocalStorageWarning() {
 /**
  * Add the local storage warning to the DOM.
  */
-function showLocalStorageWarning() {
+Terra.f.showLocalStorageWarning = () => {
   if ($('#local-storage-warning').length > 0) return;
 
   const html = `
@@ -356,18 +362,18 @@ function showLocalStorageWarning() {
  * @param {number} timeout - The amount of time in milliseconds to wait.
  * @param {function} callback - Callback function that will be invoked.
  */
-function registerTimeoutHandler(id, timeout, callback) {
-  if (!isObject(window._timeoutHandlers)) {
-    window._timeoutHandlers = {};
+Terra.f.registerTimeoutHandler = (id, timeout, callback) => {
+  if (!Terra.f.isObject(Terra.timeoutHandlers)) {
+    Terra.timeoutHandlers = {};
   }
 
-  if (typeof window._timeoutHandlers[id] !== 'undefined') {
-    clearTimeout(window._timeoutHandlers[id]);
+  if (typeof Terra.timeoutHandlers[id] !== 'undefined') {
+    clearTimeout(Terra.timeoutHandlers[id]);
   }
 
-  window._timeoutHandlers[id] = setTimeout(() => {
+  Terra.timeoutHandlers[id] = setTimeout(() => {
     callback();
-    clearTimeout(window._timeoutHandlers[id]);
-    delete window._timeoutHandlers[id];
+    clearTimeout(Terra.timeoutHandlers[id]);
+    delete Terra.timeoutHandlers[id];
   }, timeout);
 }
