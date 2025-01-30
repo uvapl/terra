@@ -50,6 +50,7 @@ function renderGitRepoBranches(branches) {
 
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
     Terra.vfs._git('clone');
+    Terra.f.closeAllFiles();
   });
 }
 
