@@ -49,6 +49,8 @@
     }
 
     onEditorFocus = (editorComponent) => {
+      if (!this.$button) return;
+
       if (editorComponent.proglang === 'c' && !this.$button.is(':disabled.loading')) {
         this.$button.prop('disabled', false);
       } else {
