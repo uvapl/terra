@@ -95,6 +95,10 @@ class API {
     console.log('[Git]', ...arguments);
   }
 
+  _info() {
+    console.info('[Git]', ...arguments);
+  }
+
   _error() {
     console.error('[Git]', ...arguments);
   }
@@ -130,13 +134,31 @@ class API {
           this.onRateLimit(retryAfter);
         },
       }
-
     });
+
     if (await this.repoExists()) {
-      this.fetchBranches().then(() => {
-        this.clone(true);
-      });
+      await this.fetchUserInfo();
+      await this.fetchBranches();
+      await this.clone(true);
     }
+  }
+
+  async fetchUserInfo() {
+    const userInfo = await this._request('GET', '/user');
+
+    if (userInfo.data.name) {
+      this.committer.name = userInfo.data.name;
+    } else {
+      this._info(`User has no name set in their GitHub, using default: ${this.committer.name}`);
+    }
+
+    if (userInfo.data.email) {
+      this.committer.email = userInfo.data.email;
+    } else {
+      this._info(`User has no email set in their GitHub, using default: ${this.committer.email}`);
+    }
+
+    this._info(`Committing as: ${this.committer.name} <${this.committer.email}>`);
   }
 
   /**
