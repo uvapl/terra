@@ -79,6 +79,7 @@ class API {
     this.cloneFailCallback = options.cloneFailCallback;
     this.cloneSuccessCallback = options.cloneSuccessCallback;
     this.onRateLimit = options.onRateLimit;
+    this.onRequestError = options.onRequestError;
 
     this.setRepoLink(options.repoLink);
 
@@ -165,6 +166,7 @@ class API {
       });
     } catch (err) {
       this._error('Failed to send GitHub request >>>>', err);
+      this.onRequestError(err);
       throw err;
     }
   }
@@ -409,6 +411,13 @@ self.onmessage = (event) => {
             id: 'rate-limit',
             data: { retryAfter }
           });
+        },
+
+        onRequestError(error) {
+          postMessage({
+            id: 'request-error',
+            data: { error },
+          })
         },
 
         fetchBranchesSuccessCallback(branches) {
