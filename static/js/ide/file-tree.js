@@ -382,7 +382,7 @@ function createFileTree() {
     selectMode: 1,
     debugLevel: 0,
     strings: {
-      noData: 'No files or folders found.'
+      noData: 'Create a file to get started'
     },
     source: createFileTreeFromVFS(),
     click: onClickNodeCallback,
