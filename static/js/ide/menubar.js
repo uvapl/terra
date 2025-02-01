@@ -322,6 +322,8 @@ Menubar.addCredentials = () => {
 };
 
 Menubar.connectRepo = () => {
+  if (!Terra.f.getLocalStorageItem('git-access-token')) return;
+
   const initialRepoLink = Terra.f.getLocalStorageItem('git-repo', '');
 
   const localFilesNotice = initialRepoLink
