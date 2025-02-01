@@ -228,6 +228,17 @@ class API {
         b.default ? 1 : 0
       ));
 
+    // When the repo is new with no contents, the /repos/{owner}/{repo}/branches
+    // endpoint will not return anything, so have we to add the default branch
+    // still, since this always exist.
+    if (branches.length === 0) {
+      branches.push({
+        name: this.defaultBranch,
+        current: true,
+        default: true,
+      });
+    }
+
     this.fetchBranchesSuccessCallback(branches);
   }
 
