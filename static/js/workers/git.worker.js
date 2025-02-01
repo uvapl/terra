@@ -1,4 +1,4 @@
-import { Octokit } from 'https://esm.sh/octokit';
+import { Octokit } from "https://esm.sh/@octokit/core";
 
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/;
 
@@ -8,12 +8,6 @@ class API {
    * @type {Octokit}
    */
   octokit = null;
-
-  /**
-   * Whether to app is running development mode.
-   * @type {boolean}
-   */
-  isDev = false;
 
   /**
    * The username of the repository. This is the {owner} part in
@@ -69,7 +63,6 @@ class API {
   blacklistedFolders = ['.', '..', '.git'];
 
   constructor(options) {
-    this.isDev = options.isDev;
     this.repoBranch = options.branch;
     this.accessToken = options.accessToken;
     this.fetchBranchesSuccessCallback = options.fetchBranchesSuccessCallback;
@@ -86,8 +79,9 @@ class API {
     this._init()
       .then(() => {
         options.readyCallback();
-      }).catch(() => {
+      }).catch((err) => {
         console.info('Failed to initialize git worker');
+        console.error(err);
       });
   }
 

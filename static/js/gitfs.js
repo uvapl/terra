@@ -48,7 +48,6 @@ class GitFS {
       data: {
         accessToken: accessToken,
         repoLink: this._repoLink,
-        isDev: Terra.c.IS_DEV,
         branch: Terra.f.getLocalStorageItem('git-branch'),
       },
     });
