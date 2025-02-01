@@ -200,6 +200,7 @@ Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-folder').hasClass('disabled')) return;
 
   Terra.vfs._lfs('closeFolder');
+  Terra.f.closeAllFiles();
   closeActiveMenuBarMenu(event);
 };
 
