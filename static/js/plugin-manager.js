@@ -243,4 +243,5 @@ Terra.f.getPlugin = (name) => {
 
   return Terra.pluginManager.plugins[name];
 }
+
 Terra.pluginManager = new TerraPluginManager();

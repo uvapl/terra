@@ -41,7 +41,9 @@ class Layout extends GoldenLayout {
           this.setTheme(Terra.f.getLocalStorageItem('theme') || 'light');
           this.createControls();
           this.showTermStartupMessage();
-          Terra.pluginManager.triggerEvent('onLayoutLoaded');
+          if (Terra.c.IS_IDE) {
+            Terra.pluginManager.triggerEvent('onLayoutLoaded');
+          }
 
           if (Array.isArray(options.autocomplete) && options.autocomplete.every(Terra.f.isObject)) {
             this.emitToEditorComponents('setCustomAutocompleter', options.autocomplete);

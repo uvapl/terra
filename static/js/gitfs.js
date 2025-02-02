@@ -48,7 +48,6 @@ class GitFS {
       data: {
         accessToken: accessToken,
         repoLink: this._repoLink,
-        isDev: Terra.c.IS_DEV,
         branch: Terra.f.getLocalStorageItem('git-branch'),
       },
     });
@@ -193,21 +192,25 @@ class GitFS {
         $modal.find('.primary-btn').click(() => hideModal($modal));
         break;
 
-    case 'fetch-branches-success':
-      renderGitRepoBranches(payload.branches);
-      break;
+      case 'fetch-branches-success':
+        renderGitRepoBranches(payload.branches);
+        break;
 
-    case 'clone-success':
-      $('#file-tree .info-msg').remove();
-      Terra.f.removeLocalStorageWarning();
+      case 'clone-success':
+        $('#file-tree .info-msg').remove();
+        Terra.f.removeLocalStorageWarning();
 
-      Terra.vfs.importFromGit(payload.repoContents).then(() => {
-        createFileTree();
-      });
-      break;
+        Terra.vfs.importFromGit(payload.repoContents).then(() => {
+          createFileTree();
+        });
+        break;
+
+      case 'request-error':
+        $('#file-tree').html(`<div class="info-msg error">Failed to clone repository<br/><br/>${payload.error}</div>`);
+        break;
 
       case 'clone-fail':
-        $('#file-tree').html('<div class="info-msg error">Failed to clone repository</div>');V
+        $('#file-tree').html('<div class="info-msg error">Failed to clone repository</div>');
         break;
 
       case 'move-folder-success':

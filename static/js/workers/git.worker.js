@@ -1,4 +1,4 @@
-import { Octokit } from 'https://esm.sh/octokit';
+import { Octokit } from "https://esm.sh/@octokit/core";
 
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/;
 
@@ -8,12 +8,6 @@ class API {
    * @type {Octokit}
    */
   octokit = null;
-
-  /**
-   * Whether to app is running development mode.
-   * @type {boolean}
-   */
-  isDev = false;
 
   /**
    * The username of the repository. This is the {owner} part in
@@ -69,7 +63,6 @@ class API {
   blacklistedFolders = ['.', '..', '.git'];
 
   constructor(options) {
-    this.isDev = options.isDev;
     this.repoBranch = options.branch;
     this.accessToken = options.accessToken;
     this.fetchBranchesSuccessCallback = options.fetchBranchesSuccessCallback;
@@ -79,19 +72,25 @@ class API {
     this.cloneFailCallback = options.cloneFailCallback;
     this.cloneSuccessCallback = options.cloneSuccessCallback;
     this.onRateLimit = options.onRateLimit;
+    this.onRequestError = options.onRequestError;
 
     this.setRepoLink(options.repoLink);
 
     this._init()
       .then(() => {
         options.readyCallback();
-      }).catch(() => {
+      }).catch((err) => {
         console.info('Failed to initialize git worker');
+        console.error(err);
       });
   }
 
   _log() {
     console.log('[Git]', ...arguments);
+  }
+
+  _info() {
+    console.info('[Git]', ...arguments);
   }
 
   _error() {
@@ -129,13 +128,31 @@ class API {
           this.onRateLimit(retryAfter);
         },
       }
-
     });
+
     if (await this.repoExists()) {
-      this.fetchBranches().then(() => {
-        this.clone(true);
-      });
+      await this.fetchUserInfo();
+      await this.fetchBranches();
+      await this.clone(true);
     }
+  }
+
+  async fetchUserInfo() {
+    const userInfo = await this._request('GET', '/user');
+
+    if (userInfo.data.name) {
+      this.committer.name = userInfo.data.name;
+    } else {
+      this._info(`User has no name set in their GitHub, using default: ${this.committer.name}`);
+    }
+
+    if (userInfo.data.email) {
+      this.committer.email = userInfo.data.email;
+    } else {
+      this._info(`User has no email set in their GitHub, using default: ${this.committer.email}`);
+    }
+
+    this._info(`Committing as: ${this.committer.name} <${this.committer.email}>`);
   }
 
   /**
@@ -165,6 +182,7 @@ class API {
       });
     } catch (err) {
       this._error('Failed to send GitHub request >>>>', err);
+      this.onRequestError(err);
       throw err;
     }
   }
@@ -209,6 +227,17 @@ class API {
         // Put the default branch on top.
         b.default ? 1 : 0
       ));
+
+    // When the repo is new with no contents, the /repos/{owner}/{repo}/branches
+    // endpoint will not return anything, so have we to add the default branch
+    // still, since this always exist.
+    if (branches.length === 0) {
+      branches.push({
+        name: this.defaultBranch,
+        current: true,
+        default: true,
+      });
+    }
 
     this.fetchBranchesSuccessCallback(branches);
   }
@@ -409,6 +438,13 @@ self.onmessage = (event) => {
             id: 'rate-limit',
             data: { retryAfter }
           });
+        },
+
+        onRequestError(error) {
+          postMessage({
+            id: 'request-error',
+            data: { error },
+          })
         },
 
         fetchBranchesSuccessCallback(branches) {

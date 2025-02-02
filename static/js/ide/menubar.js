@@ -50,6 +50,7 @@ function renderGitRepoBranches(branches) {
 
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
     Terra.vfs._git('clone');
+    Terra.f.closeAllFiles();
   });
 }
 
@@ -199,6 +200,7 @@ Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-folder').hasClass('disabled')) return;
 
   Terra.vfs._lfs('closeFolder');
+  Terra.f.closeAllFiles();
   closeActiveMenuBarMenu(event);
 };
 
@@ -320,6 +322,8 @@ Menubar.addCredentials = () => {
 };
 
 Menubar.connectRepo = () => {
+  if (!Terra.f.getLocalStorageItem('git-access-token')) return;
+
   const initialRepoLink = Terra.f.getLocalStorageItem('git-repo', '');
 
   const localFilesNotice = initialRepoLink
