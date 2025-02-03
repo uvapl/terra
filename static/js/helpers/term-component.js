@@ -62,7 +62,7 @@ Terra.f.waitForInput = () => {
 
       // If the user presses enter, resolve the promise.
       if (e.key === '\r') {
-        disposeUserInput();
+        Terra.f.disposeUserInput();
 
         // Trigger a real enter in the terminal.
         term.write('\n');
