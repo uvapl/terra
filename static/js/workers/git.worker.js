@@ -166,9 +166,8 @@ class API {
    */
   async _request(method, url, options = {}) {
     try {
-      return await this.octokit.request(`${method} ${url}`, {
-        owner: this.repoOwner,
-        repo: this.repoName,
+      const shouldOmitRepoParams = url.startsWith('/user');
+      const requestOptions = {
         ...options,
         headers: {
           ...options.headers,
@@ -179,7 +178,13 @@ class API {
           // See https://octokit.github.io/routes/cache/api.github.com/v3/index.html#conditional-requests
           'If-None-Match': ''
         },
-      });
+      }
+      if (!shouldOmitRepoParams) {
+        requestOptions.owner = this.repoOwner;
+        requestOptions.repo = this.repoName;
+      }
+
+      return await this.octokit.request(`${method} ${url}`, requestOptions);
     } catch (err) {
       this._error('Failed to send GitHub request >>>>', err);
       this.onRequestError(err);
