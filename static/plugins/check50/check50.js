@@ -1,5 +1,5 @@
 (() => {
-  const BASE_URL = 'https://agile008.science.uva.nl'
+  const BASE_URL = 'https://checkz.proglab.nl'
 
   class Check50Plugin extends TerraPlugin {
     name = 'check50';
