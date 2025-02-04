@@ -179,6 +179,7 @@ class API {
           'If-None-Match': ''
         },
       }
+
       if (!shouldOmitRepoParams) {
         requestOptions.owner = this.repoOwner;
         requestOptions.repo = this.repoName;

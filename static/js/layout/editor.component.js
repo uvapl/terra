@@ -215,6 +215,8 @@ class EditorComponent {
    * Callback when the editor container is opened.
    */
   onContainerOpen = () => {
+    if (!this.editor) return;
+
     if (this.fakeOnContainerOpenEvent) {
       this.fakeOnContainerOpenEvent = false;
       return;
@@ -340,6 +342,8 @@ class EditorComponent {
    * Callback before the container is destroyed.
    */
   onContainerDestroy = () => {
+    if (!this.editor) return;
+
     // If it's the last tab being closed, then we insert another 'Untitled' tab,
     // because we always need at least one tab open.
     const tabs = Terra.f.getAllEditorTabs();
@@ -348,7 +352,9 @@ class EditorComponent {
     if (totalTabs >= 2) {
       // Switch to the first tab.
       tabs[0].parent.setActiveContentItem(tabs[0]);
-      tabs[0].instance.editor.focus();
+      if (tabs[0].instance.editor) {
+        tabs[0].instance.editor.focus();
+      }
     }
     else if (totalTabs === 1) {
       const currentTab = tabs[0];

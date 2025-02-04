@@ -69,10 +69,11 @@ class TerminalComponent {
    * Callback when the container is destroyed.
    */
   onContainerDestroy = () => {
-    if (term) {
+    if (term && typeof term.destroy === 'function') {
       term.destroy();
-      term = null;
     }
+
+    term = null;
   }
 
   /**

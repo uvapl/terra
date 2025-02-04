@@ -10,10 +10,11 @@ class Layout extends GoldenLayout {
   buttonConfig = null;
   vertical = false;
   iframe = false;
+  defaultLayoutConfig = null;
 
   constructor(defaultLayoutConfig, options = {}) {
     let layoutConfig = Terra.f.getLocalStorageItem('layout');
-    if (layoutConfig) {
+    if (layoutConfig && !options.forceDefaultLayout) {
       layoutConfig = JSON.parse(layoutConfig);
     } else {
       layoutConfig = defaultLayoutConfig;
@@ -21,6 +22,7 @@ class Layout extends GoldenLayout {
 
     super(layoutConfig, $('#layout'));
 
+    this.defaultLayoutConfig = defaultLayoutConfig;
     this.proglang = options.proglang;
     this.iframe = $('body').hasClass('terra-embed');
     this.vertical = options.vertical;

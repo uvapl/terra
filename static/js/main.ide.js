@@ -63,9 +63,22 @@ function initApp() {
 /**
  * Create the layout object with the given content objects and font-size.
  *
+ * @param {boolean} [forceDefaultLayout=false] Whether to force the default layout.
+ * @param {Array} [contentConfig=[]] The content configuration for the layout.
  * @returns {Layout} The layout instance.
  */
-function createLayout() {
+function createLayout(forceDefaultLayout = false, contentConfig = []) {
+  const defaultContentConfig = contentConfig.map((tab) => ({
+    type: 'component',
+    componentName: 'editor',
+    componentState: {
+      fontSize: Terra.c.BASE_FONT_SIZE,
+      ...tab.componentState,
+    },
+    title: 'Untitled',
+    ...tab,
+  }))
+
   const defaultLayoutConfig = {
     settings: {
       showCloseIcon: false,
@@ -83,7 +96,7 @@ function createLayout() {
         content: [
           {
             type: 'stack',
-            content: [
+            content: defaultContentConfig.length > 0 ? defaultContentConfig : [
               {
                 type: 'component',
                 componentName: 'editor',
@@ -105,5 +118,5 @@ function createLayout() {
     ]
   };
 
-  return new LayoutIDE(defaultLayoutConfig);
+  return new LayoutIDE(defaultLayoutConfig, { forceDefaultLayout });
 }

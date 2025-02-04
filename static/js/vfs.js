@@ -84,7 +84,7 @@ class VirtualFileSystem {
 
     // Remove the content from all files when LFS or Git is used, because LFS uses
     // lazy loading and GitFS is being cloned when refreshed anyway.
-    if (Terra.c.IS_IDE && (Terra.f.hasLFS() && Terra.lfs.loaded || Terra.f.hasGitFSWorker())) {
+    if (Terra.c.IS_IDE && ((Terra.f.hasLFS() && Terra.lfs.loaded) || Terra.f.hasGitFSWorker())) {
       const keys = ['sha', 'content'];
       Object.keys(files).forEach((fileId) => {
         files[fileId] = { ...files[fileId] };
