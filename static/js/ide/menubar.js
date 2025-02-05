@@ -398,6 +398,7 @@ Menubar.connectRepo = () => {
       Terra.vfs.clear();
       createFileTree();
       Terra.f.setFileTreeTitle('local storage');
+      $('#file-tree .info-msg').remove();
 
       Terra.pluginManager.triggerEvent('onStorageChange', 'local');
     }

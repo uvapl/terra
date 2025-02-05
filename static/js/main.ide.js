@@ -112,6 +112,7 @@ function createLayout(forceDefaultLayout = false, contentConfig = []) {
             componentName: 'terminal',
             componentState: { fontSize: Terra.c.BASE_FONT_SIZE },
             isClosable: false,
+            reorderEnabled: false,
           }
         ]
       }
