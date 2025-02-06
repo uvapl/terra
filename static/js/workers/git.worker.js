@@ -1,4 +1,4 @@
-import { Octokit } from "https://esm.sh/@octokit/core";
+import { Octokit } from "../vendor/octokit-core-6.1.3.min.js";
 
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/;
 
