@@ -364,13 +364,20 @@ function getFileTreeInstance() {
  * Instantiates the file tree with the files in the VFS using TreeJS.
  * If an existing instance already exists, only the data is updated and redrawn.
  *
+ * @param {boolean} [forceRecreate=false] Enforce recreation of the file tree.
+ *
  * @see https://wwwendt.de/tech/fancytree/doc/jsdoc/global.html#FancytreeOptions
  */
-function createFileTree() {
+function createFileTree(forceRecreate = false) {
   // Reload the tree if it already exists by re-importing from VFS.
   if (Terra.filetree) {
-    getFileTreeInstance().reload(createFileTreeFromVFS());
-    return;
+    if (!forceRecreate) {
+      getFileTreeInstance().reload(createFileTreeFromVFS());
+      return;
+    } else {
+      $('#file-tree .info-msg').remove();
+      getFileTreeInstance().destroy();
+    }
   }
 
   // Bind buttons for creating new folders/files.
