@@ -205,6 +205,14 @@ class GitFS {
         });
         break;
 
+      case 'request-success':
+        // If there was an error message, the file tree is gone, thus we have to
+        // recreate the file tree.
+        if ($('#file-tree .info-msg').length > 0) {
+          createFileTree(true);
+        }
+        break;
+
       case 'request-error':
         $('#file-tree').html(`<div class="info-msg error">Failed to clone repository<br/><br/>${payload.error}</div>`);
         break;

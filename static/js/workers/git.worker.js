@@ -73,6 +73,7 @@ class API {
     this.cloneSuccessCallback = options.cloneSuccessCallback;
     this.onRateLimit = options.onRateLimit;
     this.onRequestError = options.onRequestError;
+    this.onRequestSuccess = options.onRequestSuccess;
 
     this.setRepoLink(options.repoLink);
 
@@ -185,7 +186,9 @@ class API {
         requestOptions.repo = this.repoName;
       }
 
-      return await this.octokit.request(`${method} ${url}`, requestOptions);
+      const res = await this.octokit.request(`${method} ${url}`, requestOptions);
+      this.onRequestSuccess();
+      return res;
     } catch (err) {
       this._error('Failed to send GitHub request >>>>', err);
       this.onRequestError(err);
@@ -444,6 +447,10 @@ self.onmessage = (event) => {
             id: 'rate-limit',
             data: { retryAfter }
           });
+        },
+
+        onRequestSuccess() {
+          postMessage({ id: 'request-success' })
         },
 
         onRequestError(error) {
