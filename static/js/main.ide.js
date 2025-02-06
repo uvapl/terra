@@ -53,9 +53,9 @@ function initApp() {
     Terra.layout = layout;
 
     // Use timeout trick to make sure layout.root exists.
-    setTimeout(() => {
+    layout.on('initialised', () => {
       resolve({ layout });
-    }, 10);
+    });
   });
 }
 
