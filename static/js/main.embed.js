@@ -7,7 +7,6 @@
 // ===========================================================================
 
 initApp().then(({ layout }) => {
-
   // Listen for the content of the file to be received.
   window.addEventListener('message', function(event) {
     const editor = Terra.f.getActiveEditor().instance.editor;
@@ -73,9 +72,9 @@ function initApp() {
     layout.init();
 
     // Use timeout trick to make sure layout.root exists.
-    setTimeout(() => {
+    layout.on('initialised', () => {
       resolve({ layout });
-    }, 10);
+    });
   });
 }
 

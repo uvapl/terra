@@ -106,9 +106,9 @@ function initApp() {
         layout.init();
 
         // Use timeout trick to make sure layout.root exists.
-        setTimeout(() => {
+        layout.on('initialised', () => {
           resolve({ layout, config });
-        }, 10);
+        });
       })
       .catch((err) => reject(err));
   });
