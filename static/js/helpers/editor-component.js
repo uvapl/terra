@@ -247,7 +247,7 @@ Terra.f.saveFile = () => {
       name: filename,
       content: tab.instance.editor.getValue(),
     });
-    createFileTree();
+    Terra.f.createFileTree();
 
     // Change the Untitled tab to the new filename.
     tab.container.setTitle(filename);

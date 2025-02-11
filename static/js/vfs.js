@@ -505,8 +505,6 @@ class VirtualFileSystem {
     }
 
     if (this.folders[id]) {
-      this._git('rm', this.getAbsoluteFolderPath(id));
-
       // The deleteInLFS is only true on the first call to this function.
       // Inside the LFS class we'll delete everything properly including the
       // root folder handle.

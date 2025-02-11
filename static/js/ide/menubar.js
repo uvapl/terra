@@ -42,7 +42,7 @@ function renderGitRepoBranches(branches) {
 
     Terra.vfs._git('setRepoBranch', newBranch);
 
-    const tree = getFileTreeInstance();
+    const tree = Terra.f.getFileTreeInstance();
     if (tree) {
       $('#file-tree').fancytree('destroy');
       Terra.filetree = null;
@@ -138,11 +138,11 @@ function registerMenubarEventListeners() {
 
   // All submenu item event listeners.
   // =================================
-  $('#menu-item--new-file').click(() => createNewFileTreeFile());
-  Mousetrap.bind(['ctrl+t'], () => createNewFileTreeFile());
+  $('#menu-item--new-file').click(() => Terra.f.createNewFileTreeFile());
+  Mousetrap.bind(['ctrl+t'], () => Terra.f.createNewFileTreeFile());
 
-  $('#menu-item--new-folder').click(() => createNewFileTreeFolder());
-  Mousetrap.bind(['ctrl+shift+t'], () => createNewFileTreeFolder());
+  $('#menu-item--new-folder').click(() => Terra.f.createNewFileTreeFolder());
+  Mousetrap.bind(['ctrl+shift+t'], () => Terra.f.createNewFileTreeFolder());
 
   $('#menu-item--close-file').click(Terra.f.closeFile);
   Mousetrap.bind(['ctrl+w'], Terra.f.closeFile);
@@ -188,7 +188,7 @@ function registerMenubarEventListeners() {
 const Menubar = {};
 
 Menubar.openNewFile = () => {
-  createNewFileTreeFile();
+  Terra.f.createNewFileTreeFile();
 };
 
 Menubar.openLFSFolder = () => {
@@ -396,7 +396,7 @@ Menubar.connectRepo = () => {
 
       // Clear all files after disconnecting.
       Terra.vfs.clear();
-      createFileTree();
+      Terra.f.createFileTree();
       Terra.f.setFileTreeTitle('local storage');
       $('#file-tree .info-msg').remove();
 
