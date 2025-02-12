@@ -12,7 +12,7 @@ initApp().then(({ layout }) => {
   if (repoLink) {
     Terra.vfs.createGitFSWorker();
   } else {
-    createFileTree();
+    Terra.f.createFileTree();
   }
 
   if (Terra.f.hasLFSApi()) {

@@ -130,13 +130,13 @@ class EditorComponent {
     this.editor.commands.addCommand({
       name: 'createNewFileTreeFile',
       bindKey: 'Ctrl+T',
-      exec: () => createNewFileTreeFile(),
+      exec: () => Terra.f.createNewFileTreeFile(),
     });
 
     this.editor.commands.addCommand({
       name: 'createNewFileTreeFolder',
       bindKey: 'Ctrl+Shift+T',
-      exec: () => createNewFileTreeFolder(),
+      exec: () => Terra.f.createNewFileTreeFolder(),
     });
   }
 

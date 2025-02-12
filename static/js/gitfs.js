@@ -201,7 +201,7 @@ class GitFS {
         Terra.f.removeLocalStorageWarning();
 
         Terra.vfs.importFromGit(payload.repoContents).then(() => {
-          createFileTree();
+          Terra.f.createFileTree();
         });
         break;
 
@@ -210,7 +210,7 @@ class GitFS {
         // recreate the file tree.
         if ($('#file-tree .info-msg').length > 0) {
           $('#file-tree .info-msg').remove();
-          createFileTree(true);
+          Terra.f.createFileTree(true);
         }
         break;
 
@@ -268,7 +268,7 @@ Terra.f._createGitFSWorker = () => {
     Terra.gitfs = gitfs;
     gitfs._createWorker(accessToken);
 
-    const tree = getFileTreeInstance();
+    const tree = Terra.f.getFileTreeInstance();
     if (tree) {
       $('#file-tree').fancytree('destroy');
       Terra.filetree = null;

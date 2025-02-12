@@ -42,7 +42,7 @@ class LocalFileSystem {
     if (!hasPermission) {
       // If we have no permission, clear VFS and the indexedDB stores.
       Terra.vfs.clear();
-      createFileTree(); // show empty file tree
+      Terra.f.createFileTree(); // show empty file tree
       await this._clearStores();
       return;
     }
@@ -72,7 +72,7 @@ class LocalFileSystem {
   closeFolder() {
     this.terminate();
     Terra.vfs.clear();
-    createFileTree(); // show empty file tree
+    Terra.f.createFileTree(); // show empty file tree
     Terra.f.showLocalStorageWarning();
     Terra.f.setFileTreeTitle('local storage');
     Terra.pluginManager.triggerEvent('onStorageChange', 'local');
@@ -96,26 +96,12 @@ class LocalFileSystem {
     this._watchRootFolderInterval = setInterval(async () => {
       if (Terra.v.blockLFSPolling) return;
 
-      // Iterate through all nodes in the tree and obtain all expanded folder
-      // nodes their absolute path.
-      const prevExpandedFolderPaths = [];
-
-      getFileTreeInstance().visit((node) => {
-        if (node.data.isFolder && node.expanded) {
-          prevExpandedFolderPaths.push(Terra.vfs.getAbsoluteFolderPath(node.key));
-        }
+      await Terra.f.persistFileTreeState(async () => {
+        // Import again from the VFS.
+        const rootFolderHandle = await this.getFolderHandle('root');
+        await this._importFolderToVFS(rootFolderHandle.handle);
       });
 
-      // Import again from the VFS.
-      const rootFolderHandle = await this.getFolderHandle('root');
-      await this._importFolderToVFS(rootFolderHandle.handle);
-
-      // Expand all folder nodes again that were open (if they still exist).
-      getFileTreeInstance().visit((node) => {
-        if (node.data.isFolder && prevExpandedFolderPaths.includes(Terra.vfs.getAbsoluteFolderPath(node.key))) {
-          node.setExpanded(true, { noAnimation: true });
-        }
-      });
     }, Terra.f.seconds(5));
   }
 
@@ -207,7 +193,7 @@ class LocalFileSystem {
     await this._readFolder(rootFolderHandle, null);
 
     // Recreate the file tree.
-    createFileTree();
+    Terra.f.createFileTree();
 
     // Sync the new imported VFS IDs with the currently open tabs.
     prevOpenTabs.forEach(({ path, tab }) => {

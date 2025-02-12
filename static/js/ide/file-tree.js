@@ -11,7 +11,7 @@
  * @param {string} string - The string to update.
  * @returns {string} The updated string containing the number.
  */
-function incrementString(string) {
+Terra.f.incrementString = (string) => {
   const match = /\((\d+)\)$/g.exec(string);
 
   if (match) {
@@ -27,13 +27,13 @@ function incrementString(string) {
  *
  * @param {string|null} [parentId] - The parent folder id.
  */
-function createNewFileTreeFile(parentId = null) {
+Terra.f.createNewFileTreeFile = (parentId = null) => {
   if (Terra.f.hasLFS() && Terra.lfs.busy) return;
 
   // Create a new unique filename.
   let filename = 'Untitled';
   while (Terra.vfs.existsWhere({ parentId, name: filename })) {
-    filename = incrementString(filename)
+    filename = Terra.f.incrementString(filename)
   }
 
   // Create the new file in the filesystem.
@@ -51,7 +51,7 @@ function createNewFileTreeFile(parentId = null) {
   };
 
   // Append to the parent node if it exists, otherwise append to the root.
-  const tree = getFileTreeInstance();
+  const tree = Terra.f.getFileTreeInstance();
   if (parentId) {
     const parentNode = tree.getNodeByKey(parentId);
     parentNode.setExpanded();
@@ -63,9 +63,9 @@ function createNewFileTreeFile(parentId = null) {
 
   // Reload tree such that the 'No files or folders found' is removed in case
   // there were no files, but a new has been created.
-  createFileTree();
+  Terra.f.createFileTree();
 
-  sortFileTree();
+  Terra.f.sortFileTree();
 
   const newNode = tree.getNodeByKey(id);
 
@@ -84,13 +84,13 @@ function createNewFileTreeFile(parentId = null) {
  *
  * @param {string|null} [parentId] - The parent id of the new folder.
  */
-function createNewFileTreeFolder(parentId = null) {
+Terra.f.createNewFileTreeFolder = (parentId = null) => {
   if (Terra.f.hasLFS() && Terra.lfs.busy) return;
 
   // Create a new unique foldername.
   let foldername = 'Untitled';
   while (Terra.vfs.existsWhere({ parentId, name: foldername })) {
-    foldername = incrementString(foldername)
+    foldername = Terra.f.incrementString(foldername)
   }
 
   // Create the new folder in the filesystem.
@@ -108,7 +108,7 @@ function createNewFileTreeFolder(parentId = null) {
   };
 
   // Append to the parent node if it exists, otherwise append to the root.
-  const tree = getFileTreeInstance();
+  const tree = Terra.f.getFileTreeInstance();
   if (parentId) {
     const parentNode = tree.getNodeByKey(parentId);
     parentNode.setExpanded();
@@ -120,9 +120,9 @@ function createNewFileTreeFolder(parentId = null) {
 
   // Reload tree such that the 'No files or folders found' is removed in case
   // there were no files, but a new has been created.
-  createFileTree();
+  Terra.f.createFileTree();
 
-  sortFileTree();
+  Terra.f.sortFileTree();
 
   // Trigger edit mode for the new node.
   const newNode = tree.getNodeByKey(id);
@@ -142,7 +142,7 @@ function createNewFileTreeFolder(parentId = null) {
  * @param {string} [parentId] - The parent folder id.
  * @returns {array} List with file tree objects.
  */
-function createFileTreeFromVFS(parentId = null) {
+Terra.f.createFileTreeFromVFS = (parentId = null) => {
   const folders = Terra.vfs.findFoldersWhere({ parentId }).map((folder) => ({
     key: folder.id,
     title: folder.name,
@@ -151,7 +151,7 @@ function createFileTreeFromVFS(parentId = null) {
       type: 'folder',
       isFolder: true,
     },
-    children: createFileTreeFromVFS(folder.id),
+    children: Terra.f.createFileTreeFromVFS(folder.id),
   }));
 
   const files = Terra.vfs.findFilesWhere({ parentId }).map((file) => ({
@@ -166,13 +166,14 @@ function createFileTreeFromVFS(parentId = null) {
 
   return folders.concat(files);
 }
+
 /**
  * Delete a file tree item from the VFS and the file tree. When the node is a
  * file and its corresponding tab is open, then it'll be closed.
  *
  * @param {FancytreeNode} node - The node to delete.
  */
-function deleteFileTreeItem(node) {
+Terra.f.deleteFileTreeItem = (node) => {
   const $modal = createModal({
     title: 'Confirmation required',
     body: `<p>You are about to delete the ${node.data.type} <strong>${node.title}</strong> permanently, are you sure? This action can't be undone.</p>`,
@@ -195,10 +196,10 @@ function deleteFileTreeItem(node) {
 
   $modal.find('.confirm-btn').click(() => {
     if (node.data.isFile) {
-      closeFileTab(node.key);
+      Terra.f.closeFileTab(node.key);
       Terra.vfs.deleteFile(node.key);
     } else if (node.data.isFolder) {
-      closeFilesInFolderRecursively(node.key);
+      Terra.f.closeFilesInFolderRecursively(node.key);
     }
 
     // Delete from the VFS.
@@ -215,7 +216,7 @@ function deleteFileTreeItem(node) {
 
     // Reload tree such that the 'No files or folders found' becomes visible
     // when needed.
-    createFileTree();
+    Terra.f.createFileTree();
   });
 }
 
@@ -224,7 +225,7 @@ function deleteFileTreeItem(node) {
  *
  * @param {string} fileId - The file ID to close.
  */
-function closeFileTab(fileId) {
+Terra.f.closeFileTab = (fileId) => {
   const tab = Terra.f.getAllEditorTabs().find((tab) => tab.container.getState().fileId === fileId);
   if (tab) {
     tab.parent.removeChild(tab);
@@ -236,15 +237,15 @@ function closeFileTab(fileId) {
  *
  * @param {string} folderId - The folder ID to close all files from.
  */
-function closeFilesInFolderRecursively(folderId) {
+Terra.f.closeFilesInFolderRecursively = (folderId) => {
   const files = Terra.vfs.findFilesWhere({ parentId: folderId });
   for (const file of files) {
-    closeFileTab(file.id);
+    Terra.f.closeFileTab(file.id);
   }
 
   const folders = Terra.vfs.findFoldersWhere({ parentId: folderId });
   for (const folder of folders) {
-    closeFilesInFolderRecursively(folder.id);
+    Terra.f.closeFilesInFolderRecursively(folder.id);
   }
 }
 
@@ -256,7 +257,7 @@ function closeFilesInFolderRecursively(folderId) {
  *
  * @returns {object} The contextmenu object.
  */
-function createFileTreeContextMenuItems($trigger, event) {
+Terra.f.createFileTreeContextMenuItems = ($trigger, event) => {
   const menu = {};
   const node = $.ui.fancytree.getNode($trigger[0]);
   const { isFolder, isFile } = node.data;
@@ -266,7 +267,7 @@ function createFileTreeContextMenuItems($trigger, event) {
       name: 'New File',
       callback: () => {
         Terra.v.userClickedContextMenuItem = true;
-        createNewFileTreeFile(node.key);
+        Terra.f.createNewFileTreeFile(node.key);
       },
     };
 
@@ -274,7 +275,7 @@ function createFileTreeContextMenuItems($trigger, event) {
       name: 'New Folder',
       callback: () => {
         Terra.v.userClickedContextMenuItem = true;
-        createNewFileTreeFolder(node.key);
+        Terra.f.createNewFileTreeFolder(node.key);
       },
     };
 
@@ -327,7 +328,7 @@ function createFileTreeContextMenuItems($trigger, event) {
       name: 'Delete',
       callback: () => {
         Terra.v.userClickedContextMenuItem = true;
-        deleteFileTreeItem(node);
+        Terra.f.deleteFileTreeItem(node);
       }
     };
   }
@@ -342,8 +343,8 @@ function createFileTreeContextMenuItems($trigger, event) {
 /**
  * Sort folders before files and then alphabetically.
  */
-function sortFileTree() {
-  const tree = getFileTreeInstance();
+Terra.f.sortFileTree = () => {
+  const tree = Terra.f.getFileTreeInstance();
 
   tree.rootNode.sortChildren((a, b) => {
     if (a.data.type === b.data.type) {
@@ -356,7 +357,7 @@ function sortFileTree() {
 /**
  * Get the file tree instance.
  */
-function getFileTreeInstance() {
+Terra.f.getFileTreeInstance = () => {
   return $.ui.fancytree.getTree("#file-tree");
 }
 
@@ -368,21 +369,24 @@ function getFileTreeInstance() {
  *
  * @see https://wwwendt.de/tech/fancytree/doc/jsdoc/global.html#FancytreeOptions
  */
-function createFileTree(forceRecreate = false) {
+Terra.f.createFileTree = (forceRecreate = false) => {
   // Reload the tree if it already exists by re-importing from VFS.
   if (Terra.filetree) {
     if (!forceRecreate) {
-      getFileTreeInstance().reload(createFileTreeFromVFS());
+      // Always persist the tree state to prevent folders from being closed.
+      Terra.f.persistFileTreeState(async () => {
+        Terra.f.getFileTreeInstance().reload(Terra.f.createFileTreeFromVFS());
+      })
       return;
     } else {
       $('#file-tree .info-msg').remove();
-      getFileTreeInstance().destroy();
+      Terra.f.getFileTreeInstance().destroy();
     }
   }
 
   // Bind buttons for creating new folders/files.
-  $('#file-tree--add-folder-btn').off('click').on('click', () => createNewFileTreeFolder());
-  $('#file-tree--add-file-btn').off('click').on('click', () => createNewFileTreeFile());
+  $('#file-tree--add-folder-btn').off('click').on('click', () => Terra.f.createNewFileTreeFolder());
+  $('#file-tree--add-file-btn').off('click').on('click', () => Terra.f.createNewFileTreeFile());
 
   // Otherwise, instantiate a new tree.
   Terra.filetree = $("#file-tree").fancytree({
@@ -391,9 +395,9 @@ function createFileTree(forceRecreate = false) {
     strings: {
       noData: 'Create a file to get started'
     },
-    source: createFileTreeFromVFS(),
-    click: onClickNodeCallback,
-    init: () => sortFileTree(),
+    source: Terra.f.createFileTreeFromVFS(),
+    click: Terra.f.onClickNodeCallback,
+    init: () => Terra.f.sortFileTree(),
 
     // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtensionIndex
     extensions: ['glyph', 'edit', 'dnd5'],
@@ -412,18 +416,18 @@ function createFileTree(forceRecreate = false) {
     // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtDnd
     dnd5: {
       autoExpandMS: 400,
-      dragStart: dragStartCallback,
-      dragEnter: dragEnterCallback,
-      dragDrop: dragStopCallback,
-      dragEnd: dragEndCallback,
+      dragStart: Terra.f.dragStartCallback,
+      dragEnter: Terra.f.dragEnterCallback,
+      dragDrop: Terra.f.dragStopCallback,
+      dragEnd: Terra.f.dragEndCallback,
     },
 
     // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtEdit
     edit: {
       triggerStart: ['dblclick'],
-      edit: onStartEditNodeCallback,
-      beforeClose: beforeCloseEditNodeCallback,
-      close: afterCloseEditNodeCallback,
+      edit: Terra.f.onStartEditNodeCallback,
+      beforeClose: Terra.f.beforeCloseEditNodeCallback,
+      close: Terra.f.afterCloseEditNodeCallback,
     },
   });
 
@@ -431,7 +435,7 @@ function createFileTree(forceRecreate = false) {
   $.contextMenu({
     zIndex: 10,
     selector: '#file-tree span.fancytree-title',
-    build: createFileTreeContextMenuItems,
+    build: Terra.f.createFileTreeContextMenuItems,
     events: {
       show: () => {
         Terra.v.blockLFSPolling = true;
@@ -448,15 +452,15 @@ function createFileTree(forceRecreate = false) {
 /**
  * Callback after the inline editor was removed.
  */
-function afterCloseEditNodeCallback() {
-  sortFileTree(),
+Terra.f.afterCloseEditNodeCallback = () => {
+  Terra.f.sortFileTree(),
   Terra.v.blockLFSPolling = false;
 }
 
 /**
  * Callback before the user closes the edit mode of a node in the file tree.
  */
-function beforeCloseEditNodeCallback(event, data) {
+Terra.f.beforeCloseEditNodeCallback = (event, data) => {
   // Check if user pressed cancel or text is unchanged.
   if (!data.save) return;
 
@@ -524,7 +528,7 @@ function beforeCloseEditNodeCallback(event, data) {
 /**
  * Callback when the user starts editing a node in the file tree.
  */
-function onStartEditNodeCallback(event, data) {
+Terra.f.onStartEditNodeCallback = (event, data) => {
   Terra.v.blockLFSPolling = true;
   clearTimeout(Terra.v.fileTreeToggleTimeout);
   data.input.select();
@@ -540,7 +544,7 @@ function onStartEditNodeCallback(event, data) {
 /**
  * Callback when the user clicks on a node in the file tree.
  */
-function onClickNodeCallback(event, data) {
+Terra.f.onClickNodeCallback = (event, data) => {
   // Prevent default behavior for folders.
   if (data.node.data.isFile) {
     Terra.f.openFile(data.node.key, data.node.title);
@@ -571,7 +575,7 @@ function onClickNodeCallback(event, data) {
  *
  * @returns {boolean} True if the user is allowed to drag onto the node.
  */
-function dragEnterCallback(targetNode, data) {
+Terra.f.dragEnterCallback = (targetNode, data) => {
   // Add a visual drag area indicator.
 
   $(`.${Terra.c.DROP_AREA_INDICATOR_CLASS}`).removeClass(Terra.c.DROP_AREA_INDICATOR_CLASS);
@@ -635,7 +639,7 @@ function dragEnterCallback(targetNode, data) {
 /**
  * Callback when the user starts dragging a node in the file tree.
  */
-function dragStartCallback(node, data) {
+Terra.f.dragStartCallback = (node, data) => {
   Terra.v.blockLFSPolling = true;
 
   // Set custom drag image.
@@ -649,7 +653,7 @@ function dragStartCallback(node, data) {
 /**
  * Callback when the user stops dragging a node in the file tree.
  */
-function dragEndCallback() {
+Terra.f.dragEndCallback = () => {
   // Remove the visual drag area indicator.
   $(`.${Terra.c.DROP_AREA_INDICATOR_CLASS}`).removeClass(Terra.c.DROP_AREA_INDICATOR_CLASS);
 
@@ -658,7 +662,7 @@ function dragEndCallback() {
     Terra.v.dndDuplicateTippy = null;
   }
 
-  sortFileTree()
+  Terra.f.sortFileTree()
   Terra.v.blockLFSPolling = false;
 }
 
@@ -668,7 +672,7 @@ function dragEndCallback() {
  * @param {FancytreeNode} targetNode - The node where the other node was dropped
  * @param {object} data - The data object containing the source node.
  */
-function dragStopCallback(targetNode, data) {
+Terra.f.dragStopCallback = (targetNode, data) => {
   const sourceNode = data.otherNode;
 
   // If the dropped node became a root node, unset parentId.
@@ -692,4 +696,37 @@ function dragStopCallback(targetNode, data) {
     sourceNode.moveTo(targetNode, data.hitMode);
     targetNode.setExpanded();
   }
+}
+
+/**
+ * Runs a given function while preserving the expanded state of folder nodes.
+ *
+ * @async
+ * @param {Function} fn - Callable async function reference.
+ * @returns {Promise<void>}
+ */
+Terra.f.persistFileTreeState = async (fn) => {
+  const tree = Terra.f.getFileTreeInstance();
+  if (!tree) {
+    return await fn();
+  }
+
+  // Iterate through all nodes in the tree and obtain all expanded folder
+  // nodes their absolute path.
+  const prevExpandedFolderPaths = [];
+
+  tree.visit((node) => {
+    if (node.data.isFolder && node.expanded) {
+      prevExpandedFolderPaths.push(Terra.vfs.getAbsoluteFolderPath(node.key));
+    }
+  });
+
+  await fn();
+
+  // Expand all folder nodes again that were open (if they still exist).
+  Terra.f.getFileTreeInstance().visit((node) => {
+    if (node.data.isFolder && prevExpandedFolderPaths.includes(Terra.vfs.getAbsoluteFolderPath(node.key))) {
+      node.setExpanded(true, { noAnimation: true });
+    }
+  });
 }
