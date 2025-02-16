@@ -74,6 +74,8 @@
       if (this.$button.is(':disabled')) return;
 
       const tab = Terra.f.getActiveEditor();
+      if (!tab || tab.instance.proglang !== 'c') return;
+
       const fileId = tab.container.getState().fileId;
       const filepath = Terra.vfs.getAbsoluteFilePath(fileId);
 
