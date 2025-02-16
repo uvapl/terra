@@ -208,7 +208,7 @@ class GitFS {
       case 'request-success':
         // If there was an error message, the file tree is gone, thus we have to
         // recreate the file tree.
-        if ($('#file-tree .info-msg').length > 0) {
+        if (this.isReady && $('#file-tree .info-msg').length > 0) {
           $('#file-tree .info-msg').remove();
           Terra.f.createFileTree(true);
         }
