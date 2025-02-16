@@ -277,7 +277,7 @@ class EditorComponent {
         const cursorPos = this.editor.getCursorPosition()
         Terra.lfs.getFileContent(file.id).then((content) => {
           // Only update the content if it has changed.
-          if (this.editor && this.editor.getValue() !== content) {
+          if (this.editor && typeof content === 'string' && this.editor.getValue() !== content) {
             this.editor.setValue(content);
             this.editor.clearSelection();
             this.editor.moveCursorToPosition(cursorPos);
