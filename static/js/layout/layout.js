@@ -33,6 +33,24 @@ class Layout extends GoldenLayout {
 
     this.on('stateChanged', () => this.onStateChanged());
 
+    this.on('tabCreated', (tab) => {
+      // Add a custom 'dragStart' event, since GoldenLayout doesn't have this.
+      const $tab = $(tab.element);
+      $tab.on('mousedown', (event) => {
+        this.emitToEditorComponents('onTabDragStart', { event, tab });
+      });
+
+      if (tab._dragListener) {
+        tab._dragListener.on('dragStop', (event) => {
+          // Use set-timeout to make sure the tab is rendered again such that
+          // the onTabDragStop event can be triggered.
+          setTimeout(() => {
+            this.emitToEditorComponents('onTabDragStop', { event, tab });
+          }, 0);
+        });
+      }
+    });
+
     this.on('stackCreated', (stack) => {
       if (!this.initialised) {
         this.initialised = true;

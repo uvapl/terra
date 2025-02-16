@@ -485,6 +485,11 @@ class EditorComponent {
     });
 
     this.editor.on('change', () => {
+      // GoldenLayout removes and re-inserts texts when dragging tabs, which
+      // in the end didn't change any of the contents, so we should ignore
+      // the change event in this case.
+      if (this.isDraggingTab) return;
+
       this.onEditorChange();
       if (Terra.c.IS_IDE) {
         Terra.pluginManager.triggerEvent('onEditorChange', this);
@@ -499,12 +504,34 @@ class EditorComponent {
     });
   }
 
+  onTabDragStart = () => {
+    this.isDraggingTab = true;
+  }
+
+  onTabDragStop = () => {
+    this.isDraggingTab = false;
+  }
+
   /**
    * Bind all container events with callbacks.
    */
   bindContainerEvents = () => {
     // Do not trigger the plugin manager here, this is handeld elsewhere.
     this.container.on('afterFirstRender', this.onContainerAfterFirstRender);
+
+    this.container.on('onTabDragStart', ({ event, tab }) => {
+      this.onTabDragStart();
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('onTabDragStart', event, tab);
+      }
+    });
+
+    this.container.on('onTabDragStop', ({ event, tab }) => {
+      this.onTabDragStop();
+      if (Terra.c.IS_IDE) {
+        Terra.pluginManager.triggerEvent('onTabDragStop', event, tab);
+      }
+    });
 
     this.container.on('show', () => {
       this.onContainerOpen();

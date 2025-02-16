@@ -150,6 +150,8 @@ class TerraPlugin {
   // onEditorContainerReloadContent = (editorComponent) => { }
   // onStorageChange = (storageName, prevStorageName) => { }
   // onPluginRegistered = (plugin) => { }
+  // onTabDragStart = (event, tab) => { }
+  // onTabDragStop = (event, tab) => { }
 }
 
 class TerraPluginManager {
