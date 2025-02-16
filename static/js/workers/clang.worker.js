@@ -459,7 +459,7 @@ class API extends BaseAPI {
     this.cflags = [
       '-O0', '-std=c11', '-O0', '-Wall', '-Werror', '-Wextra',
       '-Wno-unused-variable', '-Wno-sign-compare', '-Wno-unused-parameter',
-      '-Wshadow'
+      '-Wshadow', '-D_XOPEN_SOURCE'
     ];
 
     this.ldflags = ['-lc', '-lcs50'];
