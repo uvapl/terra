@@ -317,18 +317,29 @@ Terra.f.runCode = async (fileId = null, clearTerm = false) => {
   const proglang = Terra.f.getFileExtension(filename);
   createLangWorkerApi(proglang);
 
+  // Get file args (IDE only).
+  let args = [];
+  if (Terra.c.IS_IDE) {
+    const filepath = Terra.vfs.getAbsoluteFilePath(fileId);
+    const fileArgsPlugin = Terra.f.getPlugin('file-args').getState('fileargs');
+    const fileArgs = fileArgsPlugin[filepath];
+
+    const parseArgsRegex = /("[^"]*"|'[^']*'|\S+)/g;
+    args = fileArgs.match(parseArgsRegex) || [];
+  }
+
   // Wait for the worker to be ready before running the code.
   if (Terra.langWorkerApi && !Terra.langWorkerApi.isReady) {
     const runFileIntervalId = setInterval(() => {
       if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {
-        Terra.langWorkerApi.runUserCode(filename, files);
+        Terra.langWorkerApi.runUserCode(filename, files, args);
         Terra.f.checkForStopCodeButton();
         clearInterval(runFileIntervalId);
       }
     }, 200);
   } else if (Terra.langWorkerApi) {
     // If the worker is ready, run the code immediately.
-    Terra.langWorkerApi.runUserCode(filename, files);
+    Terra.langWorkerApi.runUserCode(filename, files, args);
     Terra.f.checkForStopCodeButton();
   }
 }

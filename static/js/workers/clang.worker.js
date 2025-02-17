@@ -344,11 +344,24 @@ class App {
 
   args_get(argv_ptrs, argv_buf) {
     this.mem.check();
-    for (let arg of this.argv) {
+    for (let i = 0; i < this.argv.length; i++) {
+      // Make sure the first argument is the program name with .c extension
+      // instead of .wasm since students have no idea what a wasm file is.
+      let arg = (i === 0 && /\.wasm/.test(this.argv[i]))
+        ? this.argv[i].replace(/\.wasm/, '.c')
+        : this.argv[i];
+
+      // Remove quotes around the argument just like in a real shell.
+      // '"FOO BAR"' with 'FOO BAR' or "'FOO BAR'" with "FOO BAR"
+      if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
+        arg = arg.slice(1, -1);
+      }
+
       this.mem.write32(argv_ptrs, argv_buf);
       argv_ptrs += 4;
       argv_buf += this.mem.writeStr(argv_buf, arg);
     }
+
     this.mem.write32(argv_ptrs, 0);
     return ESUCCESS;
   }
@@ -544,24 +557,32 @@ class API extends BaseAPI {
     return await this.run([
       lld, 'wasm-ld', '--no-threads',
       '--export-dynamic',
-      '-z', `stack-size=${stackSize}`, `-L${libdir}`, crt1, obj, ...this.ldflags,
-      '-o', wasm
+      '-z', `stack-size=${stackSize}`,
+      `-L${libdir}`, crt1, obj, ...this.ldflags,
+      '-o', wasm,
     ]);
   }
 
   async run(cmd) {
     const [module, ...args] = cmd;
     const app = new App(module, this.memfs, ...args);
+    // app.argv = ["program_name", "test1", "test2"];
+    // app.argc = app.argv.length;
     const stillRunning = await app.run();
     return stillRunning ? app : null;
   }
 
-  async runUserCode({ activeTabName, files }) {
+  async runUserCode({ activeTabName, files, args }) {
     const { name: filename, content } = files.find(file => file.name === activeTabName);
     const basename = filename.replace(/\.c$/, '');
     const input = `${basename}.cc`;
     const obj = `${basename}.o`;
     const wasm = `${basename}.wasm`;
+
+    if (!Array.isArray(args)) {
+      args = [];
+    }
+
 
     this.hostWriteCmd(`make ${basename}`);
 
@@ -580,7 +601,7 @@ class API extends BaseAPI {
       const buffer = this.memfs.getFileContents(wasm);
       const testMod = await WebAssembly.compile(buffer)
       this.hostWriteCmd(`./${basename}`);
-      return await this.run([testMod, wasm]);
+      return await this.run([testMod, wasm, ...args]);
     } finally {
       this.runUserCodeCallback();
     }

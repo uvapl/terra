@@ -17,12 +17,6 @@
      */
     rightSidebarPlugin = null;
 
-    /**
-     * A one-time flag to determine if the page is loaded for the first time.
-     * @type {boolean}
-     */
-    gitfsIsPageLoad = true;
-
     defaultState = {
       // The password to use for the check50 endpoint.
       password: null,
@@ -39,7 +33,7 @@
     }
 
     onLayoutLoaded = () => {
-      this.$button = this.createTermButton({
+      this.$button = this.createTermButtonRight({
         text: 'Run Check50',
         id: 'run-check50-btn',
         class: 'primary-btn',
@@ -59,10 +53,10 @@
     }
 
     onStorageChange = (storageName, prevStorageName) => {
-      // We don't want to clear the storage when the user reload the page and
+      // We don't want to clear the storage when the user reloads the page and
       // was already using a certain filesystem (gitfs/LFS) before reloading.
-      // The state should only be cleared when switching storages after reload
-      // the page.
+      // The state should only be cleared when switching storages after
+      // reloading the page.
       if (prevStorageName && storageName !== prevStorageName) {
         this.clearState('fileslugs');
       }
@@ -80,6 +74,8 @@
       if (this.$button.is(':disabled')) return;
 
       const tab = Terra.f.getActiveEditor();
+      if (!tab || tab.instance.proglang !== 'c') return;
+
       const fileId = tab.container.getState().fileId;
       const filepath = Terra.vfs.getAbsoluteFilePath(fileId);
 
