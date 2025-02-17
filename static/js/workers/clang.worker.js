@@ -361,7 +361,22 @@ class App {
   }
 
   clock_time_get(clock_id, precision, time_out) {
-    throw new NotImplemented('wasi_unstable', 'clock_time_get');
+    this.mem.check();
+  
+    let time;
+    if (clock_id === 0) {
+      // CLOCK_REALTIME: Get current timestamp in nanoseconds
+      time = BigInt(Date.now()) * 1_000_000n;
+    } else if (clock_id === 1) {
+      // CLOCK_MONOTONIC: High-resolution timer since some fixed point
+      time = BigInt(Math.floor(performance.now() * 1_000_000));
+    } else {
+      throw new NotImplemented('wasi_unstable', 'clock_time_get');
+    }
+
+    // Store the timestamp in memory
+    this.mem.write64(time_out, Number(time & 0xFFFFFFFFn), Number(time >> 32n));
+    return ESUCCESS;
   }
 
   poll_oneoff(in_ptr, out_ptr, nsubscriptions, nevents_out) {
