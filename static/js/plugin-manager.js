@@ -33,31 +33,62 @@ class TerraPlugin {
   state = this.loadFromLocalStorage();
 
   /**
-   * Create a button that is placed on top of the terminal component.
+   * Create a button that is placed on top of the terminal component on the
+   * left side.
    *
-   * @param {object} button - Button configuration object.
+   * @param {object} buttonConfig - Button configuration object.
    * @throws {Error} - When the button configuration is missing required properties.
    * @returns {jQuery.Element} jQuery object reference to the newly created button.
    */
-  createTermButton(button) {
-    if (!button.text || !button.id || !button.onClick) {
-      throw new Error("Button configuration must at least contain text, id, and onClick properties.", button);
+  createTermButtonLeft(buttonConfig) {
+    const buttonHtml = this.createTermButtonHtml(buttonConfig);
+    $('.terminal-component-container .lm_header').append(buttonHtml);
+
+    const $button = $(`#${buttonConfig.id}`);
+    $button.click(buttonConfig.onClick);
+
+    return $button;
+  }
+
+  /**
+   * Create a button that is placed on top of the terminal component on the
+   * right side.
+   *
+   * @param {object} buttonConfig - Button configuration object.
+   * @throws {Error} - When the button configuration is missing required properties.
+   * @returns {jQuery.Element} jQuery object reference to the newly created button.
+   */
+  createTermButtonRight(buttonConfig) {
+    const buttonHtml = this.createTermButtonHtml(buttonConfig);
+    $('.terminal-component-container .lm_header > .lm_controls').prepend(buttonHtml);
+
+    const $button = $(`#${buttonConfig.id}`);
+    $button.click(buttonConfig.onClick);
+
+    return $button;
+  }
+
+  /**
+   * Create the button HTML that is placed on top of the terminal component.
+   *
+   * @param {object} buttonConfig - Button configuration object.
+   * @throws {Error} - When the button configuration is missing required properties.
+   * @returns {jQuery.Element} jQuery object reference to the newly created button.
+   */
+  createTermButtonHtml(buttonConfig) {
+    if (!buttonConfig.text || !buttonConfig.id || !buttonConfig.onClick) {
+      throw new Error("Button configuration must at least contain text, id, and onClick properties.", buttonConfig);
     }
 
     const attrs = {};
-    attrs.class = ['button'].concat(button.class || []).join(' ');
-    attrs.id = button.id;
+    attrs.class = ['button'].concat(buttonConfig.class || []).join(' ');
+    attrs.id = buttonConfig.id;
 
-    if (button.disabled) {
+    if (buttonConfig.disabled) {
       attrs.disabled = 'disabled';
     }
 
-    const buttonHtml = `<button ${Terra.f.makeHtmlAttrs(attrs)}>${button.text}</button>`;
-    $('.terminal-component-container .lm_header').append(buttonHtml);
-    const $button = $(`#${button.id}`);
-    $button.click(button.onClick);
-
-    return $button;
+    return `<button ${Terra.f.makeHtmlAttrs(attrs)}>${buttonConfig.text}</button>`;
   }
 
   /**

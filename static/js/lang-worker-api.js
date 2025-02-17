@@ -143,13 +143,14 @@ class LangWorkerAPI {
    * @param {string} activeTabName - The name of the currently active tab.
    * @param {array} files - List of objects, each containing the filename
    * and content of the corresponding editor tab.
+   * @param {array} args - List of arguments to pass to the file.
    */
-  runUserCode(activeTabName, files) {
+  runUserCode(activeTabName, files, args) {
     this.isRunningCode = true;
 
     this.port.postMessage({
       id: 'runUserCode',
-      data: { activeTabName, files },
+      data: { activeTabName, files, args },
     });
   }
 
