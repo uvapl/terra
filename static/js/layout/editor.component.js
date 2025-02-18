@@ -284,8 +284,10 @@ class EditorComponent {
           }
         });
       } else if (file.content) {
-        this.editor.setValue(file.content);
-        this.editor.clearSelection();
+        if (this.editor.getValue() !== file.content) {
+          this.editor.setValue(file.content);
+          this.editor.clearSelection();
+        }
       }
     }
   }
