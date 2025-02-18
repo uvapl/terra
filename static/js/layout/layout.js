@@ -36,16 +36,25 @@ class Layout extends GoldenLayout {
     this.on('tabCreated', (tab) => {
       // Add a custom 'dragStart' event, since GoldenLayout doesn't have this.
       const $tab = $(tab.element);
+      const fileId = tab.contentItem.container.getState().fileId;
+
       $tab.on('mousedown', (event) => {
-        this.emitToEditorComponents('onTabDragStart', { event, tab });
+        Terra.v.isDraggingTab = true;
+        if (fileId) {
+          this.emitToEditorComponentWithFileId('onTabDragStart', fileId, { event, tab });
+        }
       });
 
       if (tab._dragListener) {
         tab._dragListener.on('dragStop', (event) => {
+          Terra.v.isDraggingTab = true;
+
           // Use set-timeout to make sure the tab is rendered again such that
           // the onTabDragStop event can be triggered.
           setTimeout(() => {
-            this.emitToEditorComponents('onTabDragStop', { event, tab });
+            if (fileId) {
+              this.emitToEditorComponentWithFileId('onTabDragStop', fileId, { event, tab });
+            }
           }, 0);
         });
       }
@@ -94,10 +103,15 @@ class Layout extends GoldenLayout {
     term.write('\n');
   }
 
-  // Emit an event recursively to all components.
-  _emit = (contentItem, event, data) => {
+  // Emit an event recursively to all components. Optionally the `fileId` can
+  // be set to filter on only components with the given file ID.
+  _emit = (contentItem, event, data, fileId) => {
     if (contentItem.isComponent) {
-      contentItem.container.emit(event, data);
+      if (fileId && contentItem.container.getState().fileId === fileId) {
+        contentItem.container.emit(event, data);
+      } else if (!fileId) {
+        contentItem.container.emit(event, data);
+      }
     } else {
       contentItem.contentItems.forEach((childContentItem) => {
         this._emit(childContentItem, event, data);
@@ -114,6 +128,12 @@ class Layout extends GoldenLayout {
   emitToEditorComponents = (event, data) => {
     Terra.layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data);
+    });
+  }
+
+  emitToEditorComponentWithFileId = (event, fileId, data) => {
+    Terra.layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
+      this._emit(contentItem, event, data, fileId);
     });
   }
 
