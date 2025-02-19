@@ -3,13 +3,16 @@ class LayoutIDE extends Layout {
     super(defaultLayoutConfig, options);
   }
 
+  getClearTermButtonHtml = () => '<button id="clear-term" class="button clear-term-btn">Clear terminal</button>';
+
   createControls = () => {
     const runCodeButtonHtml = this.getRunCodeButtonHtml();
     const clearTermButtonHtml = this.getClearTermButtonHtml();
 
     const $terminalContainer = $('.terminal-component-container');
 
-    $terminalContainer.find('.lm_header').append(runCodeButtonHtml).append(clearTermButtonHtml)
+    $terminalContainer.find('.lm_header').append(runCodeButtonHtml);
+    $terminalContainer.find('.lm_header > .lm_controls').prepend(clearTermButtonHtml)
 
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');

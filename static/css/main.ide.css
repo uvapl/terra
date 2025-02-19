@@ -58,3 +58,11 @@
 .dark-mode .lm_tab.lm_active .lm_close_tab {
   background-image: url('../img/icons/close-white.png');
 }
+
+.lm_header .lm_controls > li {
+  float: none;
+}
+
+.lm_header .lm_controls > li + li {
+  margin-left: 5px;
+}
