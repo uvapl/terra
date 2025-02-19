@@ -40,24 +40,11 @@ class Layout extends GoldenLayout {
 
       $tab.on('mousedown', (event) => {
         Terra.v.isDraggingTab = true;
-        if (fileId) {
-          this.emitToEditorComponentWithFileId('onTabDragStart', fileId, { event, tab });
-        }
       });
 
-      if (tab._dragListener) {
-        tab._dragListener.on('dragStop', (event) => {
-          Terra.v.isDraggingTab = true;
-
-          // Use set-timeout to make sure the tab is rendered again such that
-          // the onTabDragStop event can be triggered.
-          setTimeout(() => {
-            if (fileId) {
-              this.emitToEditorComponentWithFileId('onTabDragStop', fileId, { event, tab });
-            }
-          }, 0);
-        });
-      }
+      $(document).off('mouseup').on('mouseup', (event) => {
+        Terra.v.isDraggingTab = false;
+      });
     });
 
     this.on('stackCreated', (stack) => {
