@@ -323,7 +323,7 @@ Terra.f.runCode = async (fileId = null, clearTerm = false) => {
     const fileArgs = fileArgsPlugin[filepath];
 
     const parseArgsRegex = /("[^"]*"|'[^']*'|\S+)/g;
-    args = fileArgs.match(parseArgsRegex) || [];
+    args = (fileArgs !== undefined && fileArgs.match(parseArgsRegex)) || [];
   }
 
   // Wait for the worker to be ready before running the code.
