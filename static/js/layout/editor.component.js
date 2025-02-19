@@ -511,12 +511,6 @@ class EditorComponent {
     // Do not trigger the plugin manager here, this is handeld elsewhere.
     this.container.on('afterFirstRender', this.onContainerAfterFirstRender);
 
-    this.container.on('onTabDragStart', ({ event, tab }) => {
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onTabDragStart', event, tab);
-      }
-    });
-
     this.container.on('onTabDragStop', ({ event, tab }) => {
       if (Terra.c.IS_IDE) {
         Terra.pluginManager.triggerEvent('onTabDragStop', event, tab);
