@@ -600,7 +600,7 @@ class API extends BaseAPI {
       await this.link(obj, wasm);
       const buffer = this.memfs.getFileContents(wasm);
       const testMod = await WebAssembly.compile(buffer)
-      this.hostWriteCmd(`./${basename}`);
+      this.hostWriteCmd(`./${basename} ${args.join(' ')}`)
       return await this.run([testMod, wasm, ...args]);
     } finally {
       this.runUserCodeCallback();
