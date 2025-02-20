@@ -343,7 +343,7 @@ function updateLastSaved(showPrevAutoSaveTime) {
   const autoSaveTime = Terra.f.formatDate(currDate);
 
   if (showPrevAutoSaveTime) {
-    const msg = `Could not save at ${autoSaveTime}`;
+    let msg = `Could not save at ${autoSaveTime}`;
     if (Terra.v.prevAutoSaveTime instanceof Date) {
       msg += ` (last save at ${Terra.f.formatDate(Terra.v.prevAutoSaveTime)})`
     }
