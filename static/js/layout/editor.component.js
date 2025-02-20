@@ -31,6 +31,7 @@ class EditorComponent {
    * that the user did was open file.
    */
   fakeOnContainerOpenEvent = false;
+  fakeOnEditorFocusEvent = false;
 
   constructor(container, state) {
     this.container = container;
@@ -205,6 +206,11 @@ class EditorComponent {
    * Callback when the user's cursor is focused on the editor.
    */
   onEditorFocus = () => {
+    if (this.fakeOnEditorFocusEvent) {
+      this.fakeOnEditorFocusEvent = false;
+      return;
+    }
+
     this.setActiveEditor();
 
     // Spawn a new worker if necessary.
@@ -484,12 +490,7 @@ class EditorComponent {
       }
     });
 
-    this.editor.on('change', () => {
-      // GoldenLayout removes and re-inserts texts when dragging tabs, which
-      // in the end didn't change any of the contents, so we should ignore
-      // the change event in this case.
-      if (Terra.v.isDraggingTab) return;
-
+    this.editor.session.on('change', () => {
       this.onEditorChange();
       if (Terra.c.IS_IDE) {
         Terra.pluginManager.triggerEvent('onEditorChange', this);
@@ -518,8 +519,6 @@ class EditorComponent {
     });
 
     this.container.on('show', () => {
-      if (Terra.v.isDraggingTab) return;
-
       this.onContainerOpen();
       if (Terra.c.IS_IDE) {
         Terra.pluginManager.triggerEvent('onEditorContainerOpen', this);
