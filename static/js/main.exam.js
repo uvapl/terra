@@ -106,9 +106,10 @@ function initApp() {
         layout.init();
 
         // Use timeout trick to make sure layout.root exists.
-        layout.on('initialised', () => {
+        // TODO: removed this to make it work
+        //layout.on('initialised', () => {
           resolve({ layout, config });
-        });
+        //});
       })
       .catch((err) => reject(err));
   });
@@ -289,7 +290,7 @@ function migrateOldLocalStorageKeys() {
  */
 function registerAutoSave(url, uuid, force, saveCallback) {
   if (Terra.v.autoSaveIntervalId) {
-    clearInterval(_autoSaveIntervalId);
+    clearInterval(Terra.v.autoSaveIntervalId);
   }
 
   const run = async () => {
