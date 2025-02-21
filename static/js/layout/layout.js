@@ -33,20 +33,6 @@ class Layout extends GoldenLayout {
 
     this.on('stateChanged', () => this.onStateChanged());
 
-    this.on('tabCreated', (tab) => {
-      // Add a custom 'dragStart' event, since GoldenLayout doesn't have this.
-      const $tab = $(tab.element);
-      const fileId = tab.contentItem.container.getState().fileId;
-
-      $tab.on('mousedown', (event) => {
-        Terra.v.isDraggingTab = true;
-      });
-
-      $(document).off('mouseup').on('mouseup', (event) => {
-        Terra.v.isDraggingTab = false;
-      });
-    });
-
     this.on('stackCreated', (stack) => {
       if (!this.initialised) {
         this.initialised = true;
