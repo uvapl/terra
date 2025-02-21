@@ -116,6 +116,8 @@ Terra.f.openFile = (id, filename) => {
       if (removeFirstTab) {
         Terra.f.getAllEditorTabs()[0].instance.fakeOnContainerOpenEvent = true;
         Terra.f.getAllEditorTabs()[0].instance.fakeOnEditorFocusEvent = true;
+        Terra.f.getAllEditorTabs()[1].instance.fakeOnContainerOpenEvent = true;
+        Terra.f.getAllEditorTabs()[1].instance.fakeOnEditorFocusEvent = true;
         currentTab.parent.removeChild(tabs[0]);
       }
     }
