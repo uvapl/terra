@@ -490,7 +490,7 @@ class EditorComponent {
       }
     });
 
-    this.editor.session.on('change', () => {
+    this.editor.on('change', () => {
       this.onEditorChange();
       if (Terra.c.IS_IDE) {
         Terra.pluginManager.triggerEvent('onEditorChange', this);
