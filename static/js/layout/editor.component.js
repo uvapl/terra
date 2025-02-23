@@ -429,6 +429,9 @@ class EditorComponent {
   setProgLang = (proglang) => {
     let mode;
 
+    // By default, the mode is just the proglang itself.
+    // However, we need to convert some file extensions (=proglang) to the
+    // correct corresponding mode.
     switch (proglang.toLowerCase()) {
       case 'py':
         mode = 'python';
