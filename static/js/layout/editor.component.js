@@ -190,7 +190,7 @@ class EditorComponent {
     this.container.extendState({ value: this.editor.getValue() });
 
     const { fileId } = this.container.getState();
-    if (fileId && !Terra.c.IS_IFRAME) {
+    if (fileId) {
       Terra.vfs.updateFile(fileId, {
         content: this.editor.getValue(),
       });
