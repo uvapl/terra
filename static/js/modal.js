@@ -11,7 +11,7 @@
  * @param {object} [modalOptions.attrs.class] - Optional container classes.
  * @returns {jQuery} The modal element.
  */
-function createModal(modalOptions = {}) {
+Terra.f.createModal = (modalOptions = {}) => {
   if (!Terra.f.isObject(modalOptions.attrs)) {
     modalOptions.attrs = {}
   }
@@ -62,7 +62,7 @@ function createModal(modalOptions = {}) {
  * @param {jQuery} $modal - The modal element reference.
  * @param {boolean} [remove=true] - Whether to remove the modal after hiding.
  */
-const hideModal = ($modal, remove = true) => {
+Terra.f.hideModal = ($modal, remove = true) => {
   $modal.removeClass('show');
 
   if (remove) {
@@ -79,7 +79,7 @@ const hideModal = ($modal, remove = true) => {
  * @param {jQuery} $modal - The modal element reference.
  * @returns {Promise<void>} Resolves after the model has been shown.
  */
-function showModal($modal) {
+Terra.f.showModal = ($modal) => {
   return new Promise((resolve) => {
     // Use setTimeout trick to add the class after the modal HTML has been
     // rendered to the DOM to show the fade-in animation.

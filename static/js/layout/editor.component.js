@@ -153,7 +153,7 @@ class EditorComponent {
           // Prevent the event from happening.
           e.preventDefault();
 
-          const $modal = createModal({
+          const $modal = Terra.f.createModal({
             title: 'Exceeded maximum file size',
             body: 'The file size exceeds the maximum file size. This limit is solely required when you are connected to your local filesystem. Please reduce the file size beforing adding more content.',
             footer: ' <button type="button" class="button primary-btn confirm-btn">Go back</button>',
@@ -164,8 +164,8 @@ class EditorComponent {
             }
           });
 
-          showModal($modal);
-          $modal.find('.confirm-btn').click(() => hideModal($modal));
+          Terra.f.showModal($modal);
+          $modal.find('.confirm-btn').click(() => Terra.f.hideModal($modal));
         }
       }
     });
@@ -190,7 +190,7 @@ class EditorComponent {
     this.container.extendState({ value: this.editor.getValue() });
 
     const { fileId } = this.container.getState();
-    if (fileId && !Terra.c.IS_IFRAME) {
+    if (fileId) {
       Terra.vfs.updateFile(fileId, {
         content: this.editor.getValue(),
       });
@@ -429,6 +429,9 @@ class EditorComponent {
   setProgLang = (proglang) => {
     let mode;
 
+    // By default, the mode is just the proglang itself.
+    // However, we need to convert some file extensions (=proglang) to the
+    // correct corresponding mode.
     switch (proglang.toLowerCase()) {
       case 'py':
         mode = 'python';

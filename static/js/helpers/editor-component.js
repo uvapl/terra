@@ -160,7 +160,7 @@ Terra.f.saveFile = () => {
 
   const folderOptions = Terra.f.createFolderOptionsHtml();
 
-  const $modal = createModal({
+  const $modal = Terra.f.createModal({
     title: 'Save file',
     body: `
     <div class="form-grid">
@@ -191,7 +191,7 @@ Terra.f.saveFile = () => {
     }
   });
 
-  showModal($modal);
+  Terra.f.showModal($modal);
   $modal.find('.text-input').focus().select();
 
   $modal.find('.cancel-btn').click(() => {
@@ -200,7 +200,7 @@ Terra.f.saveFile = () => {
       Terra.v.saveFileTippy = null;
     }
 
-    hideModal($modal);
+    Terra.f.hideModal($modal);
   });
 
   $modal.find('.primary-btn').click(() => {
@@ -261,7 +261,7 @@ Terra.f.saveFile = () => {
     // For some reason no layout update is triggered, so we trigger an update.
     Terra.layout.emit('stateChanged');
 
-    hideModal($modal);
+    Terra.f.hideModal($modal);
 
     const proglang = Terra.f.getFileExtension(filename);
 

@@ -105,7 +105,7 @@
           `
         }
 
-        const $modal = createModal({
+        const $modal = Terra.f.createModal({
           title: 'Check50 information required',
           body,
           footer: `
@@ -118,9 +118,9 @@
           }
         });
 
-        showModal($modal);
+        Terra.f.showModal($modal);
 
-        $modal.find('.cancel-btn').click(() => hideModal($modal));
+        $modal.find('.cancel-btn').click(() => Terra.f.hideModal($modal));
         $modal.find('.primary-btn').click(() => {
           if ($modal.find('.password').length > 0) {
             const password = $modal.find('.password').val().trim();
@@ -147,7 +147,7 @@
 
           if (hasPassword && hasSlug) {
             this.runCheck50();
-            hideModal($modal);
+            Terra.f.hideModal($modal);
           }
         });
       } else {

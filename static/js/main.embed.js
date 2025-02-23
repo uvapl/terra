@@ -9,9 +9,15 @@
 initApp().then(({ layout }) => {
   // Listen for the content of the file to be received.
   window.addEventListener('message', function(event) {
-    const editor = Terra.f.getActiveEditor().instance.editor;
-    editor.setValue(Terra.f.removeIndent(event.data));
-    editor.clearSelection();
+    const tab = Terra.f.getActiveEditor();
+    const editor = tab.instance.editor;
+    const fileId = tab.instance.container.getState().fileId;
+    const content = Terra.f.removeIndent(event.data);
+    if (content) {
+      Terra.vfs.updateFile(fileId, { content });
+      editor.setValue(content);
+      editor.clearSelection();
+    }
   });
 
 }).catch((err) => {
@@ -40,6 +46,9 @@ function initApp() {
     // Update local storage key.
     const currentStorageKey = Terra.f.makeLocalStorageKey(window.location.href);
     Terra.f.updateLocalStoragePrefix(currentStorageKey);
+
+    // Create the tab in the virtual filesystem.
+    Terra.vfs.createFile({ name: queryParams.filename });
 
     // Create tabs with the filename as key and empty string as the content.
     const tabs = {}

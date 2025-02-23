@@ -169,7 +169,7 @@ class GitFS {
         const retryAfter = Math.ceil(payload.retryAfter / 60);
         $('#file-tree').html('<div class="info-msg error">Exceeded GitHub API limit.</div>');
 
-        const $modal = createModal({
+        const $modal = Terra.f.createModal({
           title: 'Exceeded GitHub API limit',
           body: `
             <p>
@@ -187,9 +187,9 @@ class GitFS {
           }
         });
 
-        showModal($modal);
+        Terra.f.showModal($modal);
 
-        $modal.find('.primary-btn').click(() => hideModal($modal));
+        $modal.find('.primary-btn').click(() => Terra.f.hideModal($modal));
         break;
 
       case 'fetch-branches-success':

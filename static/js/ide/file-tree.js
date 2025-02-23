@@ -174,7 +174,7 @@ Terra.f.createFileTreeFromVFS = (parentId = null) => {
  * @param {FancytreeNode} node - The node to delete.
  */
 Terra.f.deleteFileTreeItem = (node) => {
-  const $modal = createModal({
+  const $modal = Terra.f.createModal({
     title: 'Confirmation required',
     body: `<p>You are about to delete the ${node.data.type} <strong>${node.title}</strong> permanently, are you sure? This action can't be undone.</p>`,
     footer: `
@@ -187,11 +187,11 @@ Terra.f.deleteFileTreeItem = (node) => {
     }
   });
 
-  showModal($modal);
+  Terra.f.showModal($modal);
 
   $modal.find('.cancel-btn').click(() => {
     Terra.v.blockLFSPolling = false;
-    hideModal($modal);
+    Terra.f.hideModal($modal);
   });
 
   $modal.find('.confirm-btn').click(() => {
@@ -211,7 +211,7 @@ Terra.f.deleteFileTreeItem = (node) => {
     // Delete from the file tree.
     node.remove();
 
-    hideModal($modal);
+    Terra.f.hideModal($modal);
     Terra.v.blockLFSPolling = false;
 
     // Reload tree such that the 'No files or folders found' becomes visible
