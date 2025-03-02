@@ -19,14 +19,16 @@ class ExamApp extends App {
           // Create the content objects that represent each tab in the editor.
           const content = this.generateConfigContent(config.tabs, fontSize);
 
-          // Create the files inside the virtual file system.
-          content.forEach((file) => {
-            Terra.vfs.createFile({
-              id: file.componentState.fileId,
-              name: file.title,
-              content: file.componentState.value,
-            })
-          });
+          if (Object.keys(Terra.vfs.files).length === 0) {
+            // Create the files inside the virtual file system.
+            content.forEach((file) => {
+              Terra.vfs.createFile({
+                id: file.componentState.fileId,
+                name: file.title,
+                content: file.componentState.value,
+              })
+            });
+          }
 
           // Create the layout object.
           const layout = this.createLayout(content, fontSize, {
