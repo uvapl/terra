@@ -1,6 +1,7 @@
 class IDEApp extends App {
   setupLayout = () => {
     Terra.layout = this.createLayout();
+    this.postSetupLayout();
   }
 
   /**

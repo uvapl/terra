@@ -2,8 +2,38 @@
  * Base class that is extended for each of the apps.
  */
 class App {
-  setupLayout() {
+  setupLayout = () => {
     console.error('setupLayout() not implemented');
+  }
+
+  /**
+   * Called after the layout has been setup to do some post setup work.
+   */
+  postSetupLayout = () => {
+    Terra.layout.on('tabCreated', (tab) => {
+      const editorComponent = tab.contentItem.instance;
+      const { editor } = editorComponent;
+      if (editor) {
+        editor.on('change', () => this.onEditorChange(editorComponent));
+      }
+    });
+  }
+
+  /**
+   * Callback functions that is called when any editor its content changes.
+   *
+   * NOTE: This function must always be called. When overriding, make sure to
+   * call `super.onEditorChange()`. Functionality in here should be the default
+   * and the IDEApp, ExamApp or EmbedApp can override this method with the goal
+   * of *extending* the functionality (not really overriding it).
+   */
+  onEditorChange = (editorComponent) => {
+    const { fileId } = editorComponent.container.getState();
+    if (fileId) {
+      Terra.vfs.updateFile(fileId, {
+        content: editorComponent.editor.getValue(),
+      });
+    }
   }
 
   /**
@@ -14,7 +44,7 @@ class App {
    * @param {number} fontSize - The default font-size used for the content.
    * @returns {array} List of content objects.
    */
-  generateConfigContent(tabs, fontSize) {
+  generateConfigContent = (tabs, fontSize) => {
     return Object.keys(tabs).map((filename) => ({
       type: 'component',
       componentName: 'editor',
@@ -40,7 +70,7 @@ class App {
    * commands that will be rendered by the layout.
    * @returns {Layout} The layout instance.
    */
-  createLayout(content, fontSize, options = {}) {
+  createLayout = (content, fontSize, options = {}) => {
     const defaultLayoutConfig = {
       settings: {
         showPopoutIcon: false,

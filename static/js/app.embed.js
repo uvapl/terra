@@ -42,6 +42,7 @@ class EmbedApp extends App {
     // Make layout instance available at all times.
     Terra.layout = layout;
 
+    this.postSetupLayout();
     return layout;
   }
 }
