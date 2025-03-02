@@ -1,5 +1,7 @@
 Terra.app = new EmbedApp();
-Terra.app.initLayout().on('initialised', () => {
+Terra.app.setupLayout();
+
+Terra.layout.on('initialised', () => {
   // Listen for the content of the file to be received.
   window.addEventListener('message', function(event) {
     const tab = Terra.f.getActiveEditor();
@@ -13,3 +15,5 @@ Terra.app.initLayout().on('initialised', () => {
     }
   });
 });
+
+Terra.layout.init();

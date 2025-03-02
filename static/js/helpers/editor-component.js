@@ -304,8 +304,10 @@ Terra.f.runCode = async (fileId = null, clearTerm = false) => {
     fileId = Terra.f.getActiveEditor().instance.container.getState().fileId;
   }
 
+
   // Run given file id.
   const file = Terra.vfs.findFileById(fileId);
+  console.log('file', file);
   filename = file.name;
   files = [file];
 

@@ -2,8 +2,8 @@
  * Base class that is extended for each of the apps.
  */
 class App {
-  initLayout() {
-    console.error('initLayout() not implemented');
+  setupLayout() {
+    console.error('setupLayout() not implemented');
   }
 
   /**

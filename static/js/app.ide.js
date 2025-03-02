@@ -1,15 +1,6 @@
 class IDEApp extends App {
-  initLayout() {
-    // Create the layout object.
-    const layout = this.createLayout();
-
-    // Call the init function that creates all components.
-    layout.init();
-
-    // Make layout instance available at all times.
-    Terra.layout = layout;
-
-    return layout;
+  setupLayout() {
+    Terra.layout = this.createLayout();
   }
 
   /**

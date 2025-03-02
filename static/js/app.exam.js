@@ -1,5 +1,5 @@
 class ExamApp extends App {
-  initLayout() {
+  setupLayout() {
     return new Promise((resolve, reject) => {
       this.loadConfig()
         .then((config) => {
@@ -38,10 +38,7 @@ class ExamApp extends App {
           // Make layout instance available at all times.
           Terra.layout = layout;
 
-          // Call the init that creates all components.
-          layout.init();
-
-          resolve(layout, config);
+          resolve({ layout, config });
         })
         .catch((err) => reject(err));
     });
@@ -63,7 +60,7 @@ class ExamApp extends App {
       const queryParams = Terra.f.parseQueryParams();
       if (this.validateQueryParams(queryParams)) {
         try {
-          config = await getConfig(Terra.f.makeUrl(queryParams.url, { code: queryParams.code }));
+          config = await this.getConfig(Terra.f.makeUrl(queryParams.url, { code: queryParams.code }));
           config.code = queryParams.code;
           config.configUrl = queryParams.url;
 
@@ -119,6 +116,7 @@ class ExamApp extends App {
       if (!this.isValidConfig(config)) {
         reject('Invalid config file');
       } else {
+        Terra.vfs.loadFromLocalStorage();
         resolve(config);
       }
     });
@@ -354,14 +352,14 @@ class ExamApp extends App {
     const formData = new FormData();
     formData.append('code', uuid);
 
-    const editorComponent = Terra.layout.root.contentItems[0].contentItems[0];
-
     // Go through each tab and create a Blob with the file contents of that tab
     // and append it to the form data.
-    editorComponent.contentItems.forEach((contentItem) => {
-      const filename = contentItem.config.title;
-      const fileContent = contentItem.container.getState().value;
-      const blob = new Blob([fileContent], { type: 'text/plain' });
+    Terra.f.getAllEditorTabs().forEach((tab) => {
+      const filename = tab.config.title;
+      const fileId = tab.container.getState().fileId;
+      const file = Terra.vfs.getFileById(fileId)
+      const blob = new Blob([file.content], { type: 'text/plain' });
+      console.log('[AUTOSAVE] file', file)
       formData.append(`files[${filename}]`, blob, filename);
     });
 
