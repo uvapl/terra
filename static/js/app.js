@@ -2,10 +2,6 @@
  * Base class that is extended for each of the apps.
  */
 class App {
-  constructor() {
-    this.initLayout();
-  }
-
   initLayout() {
     console.error('initLayout() not implemented');
   }
