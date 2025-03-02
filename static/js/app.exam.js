@@ -40,6 +40,7 @@ class ExamApp extends App {
           // Make layout instance available at all times.
           Terra.layout = layout;
 
+          this.postSetupLayout();
           resolve({ layout, config });
         })
         .catch((err) => reject(err));

@@ -229,7 +229,9 @@ class EditorComponent {
     }
 
     setTimeout(() => {
-      this.editor.focus();
+      if (this.editor) {
+        this.editor.focus();
+      }
     }, 0)
 
     // If we ran into a layout state from localStorage that doesn't have
