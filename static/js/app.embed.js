@@ -1,6 +1,5 @@
 class EmbedApp extends App {
-  initLayout() {
-    console.log('initLayout() called from EmbedApp')
+  setupLayout() {
     const queryParams = Terra.f.parseQueryParams();
     if (typeof queryParams.filename !== 'string') {
       throw Error('No filename provided in query params');
@@ -42,10 +41,5 @@ class EmbedApp extends App {
 
     // Make layout instance available at all times.
     Terra.layout = layout;
-
-    // Call the init function that creates all components.
-    layout.init();
-
-    return layout;
   }
 }

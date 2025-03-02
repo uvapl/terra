@@ -1,7 +1,8 @@
 Terra.app = new ExamApp();
-Terra.app.initLayout()
-  .then((layout, config) => {
+Terra.app.setupLayout()
+  .then(({ layout, config }) => {
     layout.on('initialised', () => onAppInit(config));
+    layout.init();
   }).catch((err) => {
     console.error('Failed to bootstrap exam app:', err);
 
@@ -24,7 +25,7 @@ function onAppInit(config) {
   // over a minute of time.
   const startTimeout = Terra.f.getRandNumBetween(0, Terra.c.AUTOSAVE_START_OFFSET);
   setTimeout(() => {
-    registerAutoSave(config.postback, config.code);
+    Terra.app.registerAutoSave(config.postback, config.code);
   }, startTimeout);
 
   // Make the right navbar visible and add the click event listener to the
