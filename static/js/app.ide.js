@@ -1,5 +1,5 @@
 class IDEApp extends App {
-  setupLayout() {
+  setupLayout = () => {
     Terra.layout = this.createLayout();
   }
 
@@ -10,7 +10,7 @@ class IDEApp extends App {
    * @param {Array} [contentConfig=[]] The content configuration for the layout.
    * @returns {Layout} The layout instance.
    */
-  createLayout(forceDefaultLayout = false, contentConfig = []) {
+  createLayout = (forceDefaultLayout = false, contentConfig = []) => {
     const defaultContentConfig = contentConfig.map((tab) => ({
       type: 'component',
       componentName: 'editor',
