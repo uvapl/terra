@@ -228,7 +228,9 @@ class EditorComponent {
       return;
     }
 
-    this.editor.focus();
+    setTimeout(() => {
+      this.editor.focus();
+    }, 0)
 
     // If we ran into a layout state from localStorage that doesn't have
     // a file ID, or the file ID is not the same, then we should sync the
