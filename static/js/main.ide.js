@@ -1,7 +1,5 @@
 Terra.app = new IDEApp();
-const layout = Terra.app.initLayout();
-
-layout.on('initialised', () => {
+Terra.app.initLayout().on('initialised', () => {
   // Fetch the repo files or the local storage files (vfs) otherwise.
   const repoLink = Terra.f.getLocalStorageItem('git-repo');
   if (repoLink) {
