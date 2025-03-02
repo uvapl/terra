@@ -1,5 +1,5 @@
 class ExamApp extends App {
-  setupLayout() {
+  setupLayout = () => {
     return new Promise((resolve, reject) => {
       this.loadConfig()
         .then((config) => {
@@ -50,7 +50,7 @@ class ExamApp extends App {
    * @returns {Promise<object|string>} The configuration for the app once
    * resolved, or an error when rejected.
    */
-  loadConfig() {
+  loadConfig = () => {
     return new Promise(async (resolve, reject) => {
       let config;
 
@@ -75,7 +75,7 @@ class ExamApp extends App {
           this.notify('Connected to server', { fadeOutAfterMs: 10 * 1000 });
         } catch (err) {
           console.error('Failed to fetch config:', err);
-          notifyError('Could not connect to server');
+          this.notifyError('Could not connect to server');
           return;
         }
       } else {
@@ -109,7 +109,7 @@ class ExamApp extends App {
         } catch (err) {
           console.error('Failed to connect to server:');
           console.error(err);
-          notifyError('Failed to connect to server');
+          this.notifyError('Failed to connect to server');
         }
       }
 
@@ -129,7 +129,7 @@ class ExamApp extends App {
    * @param {string} url - The URL that returns a JSON config.
    * @returns {Promise<object>} The JSON config object.
    */
-  async getConfig(url) {
+  getConfig = async (url) => {
     return new Promise((resolve, reject) => {
       fetch(url)
         .then((response) => response.json())
@@ -147,7 +147,7 @@ class ExamApp extends App {
   /**
    * Lock the entire app, which gets triggered once the exam is over.
    */
-  lock() {
+  lock = () => {
     this.notify('Your code is now locked and cannot be edited anymore.');
 
     // Lock all components, making them read-only.
@@ -187,7 +187,7 @@ class ExamApp extends App {
    * @param {string} msg - The message to be displayed.
    * @param {object} options - Additional options for the notification.
    */
-  notifyError(msg, options) {
+  notifyError = (msg, options) => {
     this.notify(msg, { ...options, type: 'error' });
   }
 
@@ -199,7 +199,7 @@ class ExamApp extends App {
    * @param {string} options.type - The type of notification (e.g. 'error').
    * @param {number} options.fadeOutAfterMs - The time in milliseconds to fade.
    */
-  notify(msg, options = {}) {
+  notify = (msg, options = {}) => {
     if (window.notifyTimeoutId !== null) {
       clearTimeout(window.notifyTimeoutId);
       window.notifyTimeoutId = null;
@@ -226,7 +226,7 @@ class ExamApp extends App {
    * @param {object} config - The config object to validate.
    * @returns {boolean} True when the given object is a valid config object.
    */
-  isValidConfig(config) {
+  isValidConfig = (config) => {
     return Terra.f.isObject(config) && Terra.f.objectHasKeys(config, ['tabs', 'postback']);
   }
 
@@ -236,7 +236,7 @@ class ExamApp extends App {
    * @param {object} queryParams - The query parameters object.
    * @returns {boolean} True when the query params passes all validation checks.
    */
-  validateQueryParams(queryParams) {
+  validateQueryParams = (queryParams) => {
     if (!Terra.f.isObject(queryParams) || !Terra.f.objectHasKeys(queryParams, ['url', 'code'])) {
       return false;
     }
@@ -261,7 +261,7 @@ class ExamApp extends App {
    * @param {function} [saveCallback] - Callback when the save has been
    * done.
    */
-  registerAutoSave(url, uuid, force, saveCallback) {
+  registerAutoSave = (url, uuid, force, saveCallback) => {
     if (Terra.v.autoSaveIntervalId) {
       clearInterval(Terra.v.autoSaveIntervalId);
     }
@@ -311,7 +311,7 @@ class ExamApp extends App {
   /**
    * Update the last saved timestamp in the UI.
    */
-  updateLastSaved(showPrevAutoSaveTime) {
+  updateLastSaved = (showPrevAutoSaveTime) => {
     const currDate = new Date();
     const autoSaveTime = Terra.f.formatDate(currDate);
 
@@ -321,7 +321,7 @@ class ExamApp extends App {
         msg += ` (last save at ${Terra.f.formatDate(Terra.v.prevAutoSaveTime)})`
       }
 
-      notifyError(msg);
+      this.notifyError(msg);
     } else {
       Terra.app.notify(`Last save at ${autoSaveTime}`);
       Terra.v.prevAutoSaveTime = currDate;
@@ -348,7 +348,7 @@ class ExamApp extends App {
    *                        verification purposes.
    * @returns {Promise<Response>} The response from the submission endpoint.
    */
-  doAutoSave(url, uuid) {
+  doAutoSave = (url, uuid) => {
     const formData = new FormData();
     formData.append('code', uuid);
 
@@ -357,9 +357,8 @@ class ExamApp extends App {
     Terra.f.getAllEditorTabs().forEach((tab) => {
       const filename = tab.config.title;
       const fileId = tab.container.getState().fileId;
-      const file = Terra.vfs.getFileById(fileId)
+      const file = Terra.vfs.findFileById(fileId)
       const blob = new Blob([file.content], { type: 'text/plain' });
-      console.log('[AUTOSAVE] file', file)
       formData.append(`files[${filename}]`, blob, filename);
     });
 
@@ -370,7 +369,7 @@ class ExamApp extends App {
    * Hide the submit exam modal by removing it completely out of the DOM, which
    * simplifies our code a bit as we can handle a bit less.
    */
-  hideSubmitExamModal() {
+  hideSubmitExamModal = () => {
     let $modal = $('#submit-exam-model');
 
     if ($modal.length === 0) return;
@@ -387,7 +386,7 @@ class ExamApp extends App {
   /**
    * Show the modal that does one final submit of all the contents.
    */
-  showSubmitExamModal() {
+  showSubmitExamModal = () => {
     let lastSaveText = '';
     if (Terra.v.prevAutoSaveTime instanceof Date) {
       lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${Terra.f.formatDate(Terra.v.prevAutoSaveTime)}</span>.<br/>`;
@@ -410,7 +409,7 @@ class ExamApp extends App {
     `;
     $('body').append(modalHtml);
 
-    $modal = $('#submit-exam-model');
+    const $modal = $('#submit-exam-model');
     $modal.find('.dismiss-modal-btn').click(this.hideSubmitExamModal);
 
     // Use setTimeout trick to add the class after the modal HTML has been
