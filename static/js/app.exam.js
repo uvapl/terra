@@ -1,4 +1,9 @@
 class ExamApp extends App {
+  onEditorChange(editorComponent) {
+    super.onEditorChange(editorComponent);
+    Terra.v.editorIsDirty = true;
+  }
+
   setupLayout = () => {
     return new Promise((resolve, reject) => {
       this.loadConfig()

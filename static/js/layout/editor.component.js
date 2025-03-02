@@ -190,15 +190,7 @@ class EditorComponent {
    */
   onEditorChange = () => {
     Terra.v.blockLFSPolling = true;
-    Terra.v.editorIsDirty = true;
     this.container.extendState({ value: this.editor.getValue() });
-
-    const { fileId } = this.container.getState();
-    if (fileId) {
-      Terra.vfs.updateFile(fileId, {
-        content: this.editor.getValue(),
-      });
-    }
 
     clearTimeout(this.userIsTypingTimeoutId);
     this.userIsTypingTimeoutId = setTimeout(() => {
