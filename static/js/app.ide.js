@@ -4,6 +4,16 @@ class IDEApp extends App {
     this.postSetupLayout();
   }
 
+  onEditorChange(editorComponent) {
+    super.onEditorChange(editorComponent);
+    Terra.v.blockLFSPolling = true;
+
+    clearTimeout(this.userIsTypingTimeoutId);
+    this.userIsTypingTimeoutId = setTimeout(() => {
+      Terra.v.blockLFSPolling = false;
+    }, Terra.f.seconds(2));
+  }
+
   /**
    * Create the layout object with the given content objects and font-size.
    *
