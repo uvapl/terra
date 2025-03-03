@@ -84,13 +84,15 @@ function initApp() {
         const content = generateConfigContent(config.tabs, fontSize);
 
         // Create the files inside the virtual file system.
-        content.forEach((file) => {
-          Terra.vfs.createFile({
-            id: file.componentState.fileId,
-            name: file.title,
-            content: file.componentState.value,
-          })
-        });
+        if (Object.keys(Terra.vfs.files).length === 0) {
+          content.forEach((file) => {
+            Terra.vfs.createFile({
+              id: file.componentState.fileId,
+              name: file.title,
+              content: file.componentState.value,
+            })
+          });
+        }
 
         // Create the layout object.
         const layout = createLayout(content, fontSize, {
@@ -189,6 +191,7 @@ function loadConfig() {
     if (!isValidConfig(config)) {
       reject('Invalid config file');
     } else {
+      Terra.vfs.loadFromLocalStorage();
       resolve(config);
     }
   });
@@ -379,14 +382,13 @@ function doAutoSave(url, uuid) {
   const formData = new FormData();
   formData.append('code', uuid);
 
-  const editorComponent = Terra.layout.root.contentItems[0].contentItems[0];
-
   // Go through each tab and create a Blob with the file contents of that tab
   // and append it to the form data.
-  editorComponent.contentItems.forEach((contentItem) => {
-    const filename = contentItem.config.title;
-    const fileContent = contentItem.container.getState().value;
-    const blob = new Blob([fileContent], { type: 'text/plain' });
+  Terra.f.getAllEditorTabs().forEach((tab) => {
+    const filename = tab.config.title;
+    const fileId = tab.container.getState().fileId;
+    const file = Terra.vfs.findFileById(fileId)
+    const blob = new Blob([file.content], { type: 'text/plain' });
     formData.append(`files[${filename}]`, blob, filename);
   });
 

@@ -11,17 +11,25 @@
  * @returns {array} List of content objects.
  */
 function generateConfigContent(tabs, fontSize) {
-  return Object.keys(tabs).map((filename) => ({
-    type: 'component',
-    componentName: 'editor',
-    componentState: {
-      fontSize: fontSize,
-      value: tabs[filename],
-      fileId: Terra.f.uuidv4(),
-    },
-    title: filename,
-    isClosable: false,
-  }));
+  return Object.keys(tabs).map((filename) => {
+    let fileId = Terra.f.uuidv4();
+    const file = Terra.vfs.findFileWhere({ name: filename });
+    if (file) {
+      fileId = file.id;
+    }
+
+    return {
+      type: 'component',
+      componentName: 'editor',
+      componentState: {
+        fontSize: fontSize,
+        value: tabs[filename],
+        fileId,
+      },
+      title: filename,
+      isClosable: false,
+    }
+  });
 }
 
 /**
