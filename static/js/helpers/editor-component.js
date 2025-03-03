@@ -299,19 +299,20 @@ Terra.f.runCode = async (fileId = null, clearTerm = false) => {
   let filename = null;
   let files = null;
 
-  if (!fileId) {
+  if (fileId) {
+    // Run given file id.
+    const file = Terra.vfs.findFileById(fileId);
+    filename = file.name;
+    files = [file];
+
+    if (!file.content && Terra.f.hasLFS() && Terra.lfs.loaded) {
+      const content = await Terra.lfs.getFileContent(file.id);
+      files = [{ ...file, content }];
+    }
+  } else {
     // Run the active editor tab.
-    fileId = Terra.f.getActiveEditor().instance.container.getState().fileId;
-  }
-
-  // Run given file id.
-  const file = Terra.vfs.findFileById(fileId);
-  filename = file.name;
-  files = [file];
-
-  if (!file.content && Terra.f.hasLFS() && Terra.lfs.loaded) {
-    const content = await Terra.lfs.getFileContent(file.id);
-    files = [{ ...file, content }];
+    filename = Terra.f.getActiveEditor().config.title;
+    files = await Terra.f.getAllEditorFiles();
   }
 
   // Create a new worker instance if needed.
