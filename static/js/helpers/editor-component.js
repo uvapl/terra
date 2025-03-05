@@ -310,8 +310,9 @@ Terra.f.runCode = async (fileId = null, clearTerm = false) => {
       files = [{ ...file, content }];
     }
   } else {
-    // Run the active editor tab.
-    filename = Terra.f.getActiveEditor().config.title;
+    const tab = Terra.f.getActiveEditor();
+    fileId = tab.container.getState().fileId;
+    filename = tab.config.title;
     files = await Terra.f.getAllEditorFiles();
   }
 
