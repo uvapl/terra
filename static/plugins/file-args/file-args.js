@@ -64,7 +64,7 @@
 
       const currentArgs = (this.getState('fileargs')[filepath] || '').replace(/"/g, '&quot;');
 
-      const $modal = createModal({
+      const $modal = Terra.f.createModal({
         title: 'Enter file arguments',
         body: `
         <p>Enter the arguments to be passed for the current file in the input field below.</p>
@@ -80,16 +80,16 @@
         }
       });
 
-      showModal($modal);
+      Terra.f.showModal($modal);
 
-      $modal.find('.cancel-btn').click(() => hideModal($modal));
+      $modal.find('.cancel-btn').click(() => Terra.f.hideModal($modal));
       $modal.find('.primary-btn').click(() => {
         const args = $modal.find('.file-args').val();
         this.setState('fileargs', {
           ...this.getState('fileargs'),
           [filepath]: args
         });
-        hideModal($modal)
+        Terra.f.hideModal($modal)
       });
     }
   }

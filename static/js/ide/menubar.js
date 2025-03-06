@@ -277,7 +277,7 @@ Menubar.runTab = () => {
 
 Menubar.addCredentials = () => {
   const accessToken = Terra.f.getLocalStorageItem('git-access-token', '');
-  const $modal = createModal({
+  const $modal = Terra.f.createModal({
     title: 'Add GitHub credentials',
     body: `
       <div class="form-wrapper-full-width">
@@ -304,9 +304,9 @@ Menubar.addCredentials = () => {
     }
   });
 
-  showModal($modal);
+  Terra.f.showModal($modal);
 
-  $modal.find('.cancel-btn').click(() => hideModal($modal));
+  $modal.find('.cancel-btn').click(() => Terra.f.hideModal($modal));
   $modal.find('.confirm-btn').click(() => {
     const accessToken = $modal.find('.git-access-token').val();
     if (accessToken) {
@@ -319,7 +319,7 @@ Menubar.addCredentials = () => {
       $('#menu-item--connect-repo').addClass('disabled');
     }
 
-    hideModal($modal);
+    Terra.f.hideModal($modal);
   });
 };
 
@@ -337,7 +337,7 @@ Menubar.connectRepo = () => {
       </p>
     `;
 
-  const $connectModal = createModal({
+  const $connectModal = Terra.f.createModal({
     title: 'Connect repository',
     body: `
       <p>Only GitHub repostory links are supported. Leave empty to disconnect from the repository.</p>
@@ -355,7 +355,7 @@ Menubar.connectRepo = () => {
     }
   });
 
-  showModal($connectModal).then(() => {
+  Terra.f.showModal($connectModal).then(() => {
     $('#ide-connect-repo-modal .repo-link').focus();
   });
 
@@ -371,7 +371,7 @@ Menubar.connectRepo = () => {
     });
   }
 
-  $connectModal.find('.cancel-btn').click(() => hideModal($connectModal));
+  $connectModal.find('.cancel-btn').click(() => Terra.f.hideModal($connectModal));
   $connectModal.find('.confirm-btn').click(() => {
     const repoLink = $connectModal.find('.repo-link').val().trim();
 
@@ -403,7 +403,7 @@ Menubar.connectRepo = () => {
       Terra.pluginManager.triggerEvent('onStorageChange', 'local');
     }
 
-    hideModal($connectModal);
+    Terra.f.hideModal($connectModal);
 
     if (initialRepoLink || Terra.vfs.isEmpty()) {
       Terra.vfs.createGitFSWorker();
@@ -413,7 +413,7 @@ Menubar.connectRepo = () => {
 
       // Create a new modal after the previous one is hidden.
       setTimeout(() => {
-        const $confirmModal = createModal({
+        const $confirmModal = Terra.f.createModal({
           title: 'Are you sure?',
           body: `
             <p>
@@ -433,7 +433,7 @@ Menubar.connectRepo = () => {
           }
         });
 
-        showModal($confirmModal);
+        Terra.f.showModal($confirmModal);
 
         $confirmModal.find('.cancel-btn').click(() => {
           // Remove the connected repo link from local storage, because if the
@@ -441,10 +441,10 @@ Menubar.connectRepo = () => {
           // clone, which we want to prevent.
           Terra.f.removeLocalStorageItem('git-repo');
 
-          hideModal($confirmModal);
+          Terra.f.hideModal($confirmModal);
         });
         $confirmModal.find('.confirm-btn').click(() => {
-          hideModal($confirmModal);
+          Terra.f.hideModal($confirmModal);
           Terra.vfs.createGitFSWorker();
         });
 
