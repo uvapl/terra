@@ -81,6 +81,10 @@ class EditorComponent {
    * Bind all custom editor commands.
    */
   bindEditorCommands = () => {
+    // remove default sublime Ctrl+Enter command
+    this.editor.commands.removeCommand('addLineAfter');
+
+    // add custom commands
     this.editor.commands.addCommand({
       name: 'run',
       bindKey: { win: 'Ctrl+Enter', mac: 'Command+Enter' },
