@@ -1,9 +1,12 @@
+import { isObject } from './shared.js';
+import Terra from '../terra.js';
+
 /**
  * Disposes the user input when active. This is actived once user input is
  * requested through the `waitForInput` function.
  */
-Terra.f.disposeUserInput = () => {
-  if (Terra.f.isObject(Terra.v.userInputDisposable) && typeof Terra.v.userInputDisposable.dispose === 'function') {
+export function disposeUserInput() {
+  if (isObject(Terra.v.userInputDisposable) && typeof Terra.v.userInputDisposable.dispose === 'function') {
     Terra.v.userInputDisposable.dispose();
     Terra.v.userInputDisposable = null;
   }
@@ -12,15 +15,15 @@ Terra.f.disposeUserInput = () => {
 /**
  * Hide the cursor inside the terminal component.
  */
-Terra.f.hideTermCursor = () => {
-  term.write('\x1b[?25l');
+export function hideTermCursor() {
+  Terra.app.layout.term.write('\x1b[?25l');
 }
 
 /**
  * Show the cursor inside the terminal component.
  */
-Terra.f.showTermCursor = () => {
-  term.write('\x1b[?25h');
+export function showTermCursor() {
+  Terra.app.layout.term.write('\x1b[?25h');
 }
 
 /**
@@ -29,11 +32,11 @@ Terra.f.showTermCursor = () => {
  *
  * @returns {Promise<string>} The user's input.
  */
-Terra.f.waitForInput = () => {
+export function waitForInput() {
   return new Promise(resolve => {
     // Immediately focus the terminal when user input is requested.
-    Terra.f.showTermCursor();
-    term.focus();
+    showTermCursor();
+    Terra.app.layout.term.focus();
 
     // Disable some special characters.
     // For all input sequences, see http://xtermjs.org/docs/api/vtfeatures/#c0
@@ -45,10 +48,10 @@ Terra.f.waitForInput = () => {
 
     // Keep track of the value that is typed by the user.
     let value = '';
-    Terra.v.userInputDisposable = term.onKey(e => {
+    Terra.v.userInputDisposable = Terra.app.layout.term.onKey(e => {
       // Only append allowed characters.
       if (!blacklistedKeys.includes(e.key)) {
-        term.write(e.key);
+        Terra.app.layout.term.write(e.key);
         value += e.key;
       }
 
@@ -56,19 +59,19 @@ Terra.f.waitForInput = () => {
       // triggering a backspace '\b' character and then insert a space at that
       // position to clear the character.
       if (e.key === '\u007f' && value.length > 0) {
-        term.write('\b \b');
+        Terra.app.layout.term.write('\b \b');
         value = value.slice(0, -1);
       }
 
       // If the user presses enter, resolve the promise.
       if (e.key === '\r') {
-        Terra.f.disposeUserInput();
+        disposeUserInput();
 
         // Trigger a real enter in the terminal.
-        term.write('\n');
+        Terra.app.layout.term.write('\n');
         value += '\n';
 
-        Terra.f.hideTermCursor();
+        hideTermCursor();
         resolve(value);
       }
     });
@@ -87,8 +90,8 @@ Terra.f.waitForInput = () => {
  *
  *   'Error: write data discarded, use flow control to avoid losing data'
  */
-Terra.f.clearTermWriteBuffer = () => {
-  if (term) {
-    term._core._writeBuffer._writeBuffer = [];
+export function clearTermWriteBuffer() {
+  if (Terra.app.layout.term) {
+    Terra.app.layout.term._core._writeBuffer._writeBuffer = [];
   }
 }
