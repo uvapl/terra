@@ -1,10 +1,5 @@
 import { closeAllFiles } from './helpers/editor-component.js';
-import {
-  getRepoInfo,
-  hasGitFSWorker,
-  removeLocalStorageWarning,
-  setFileTreeTitle,
-} from './helpers/shared.js';
+import { getRepoInfo, hasGitFSWorker } from './helpers/shared.js';
 import { createModal, hideModal, showModal } from './modal.js';
 import VFS from './vfs.js';
 import pluginManager from './plugin-manager.js';
@@ -218,7 +213,7 @@ export default class GitFS {
 
       case 'clone-success':
         $('#file-tree .info-msg').remove();
-        removeLocalStorageWarning();
+        fileTreeManager.removeLocalStorageWarning();
 
         VFS.importFromGit(payload.repoContents).then(() => {
           fileTreeManager.createFileTree();
@@ -275,7 +270,7 @@ export function _createGitFSWorker() {
   const repoLink = localStorageManager.getLocalStorageItem('git-repo');
   const repoInfo = getRepoInfo(repoLink);
   if (repoInfo) {
-    setFileTreeTitle(`${repoInfo.user}/${repoInfo.repo}`)
+    fileTreeManager.setTitle(`${repoInfo.user}/${repoInfo.repo}`)
   }
 
   if (hasGitFSWorker()) {

@@ -3,13 +3,7 @@
 // https://developer.mozilla.org/en-US/docs/Web/API/File_System_API
 ////////////////////////////////////////////////////////////////////////////////
 import { closeAllFiles, getAllEditorTabs } from './helpers/editor-component.js';
-import {
-  hasGitFSWorker,
-  removeLocalStorageWarning,
-  seconds,
-  setFileTreeTitle,
-  showLocalStorageWarning
-} from './helpers/shared.js';
+import { hasGitFSWorker, seconds } from './helpers/shared.js';
 import VFS from './vfs.js';
 import pluginManager from './plugin-manager.js';
 import Terra from './terra.js';
@@ -45,7 +39,7 @@ class LocalFileSystem {
   async _init() {
     const lastTimeUsedLFS = localStorageManager.getLocalStorageItem('use-lfs', false);
     if (!lastTimeUsedLFS) {
-      showLocalStorageWarning();
+      fileTreeManager.showLocalStorageWarning();
     };
 
     const rootFolderHandle = await this.getFolderHandle('root');
@@ -86,8 +80,8 @@ class LocalFileSystem {
     this.terminate();
     VFS.clear();
     fileTreeManager.createFileTree(); // show empty file tree
-    showLocalStorageWarning();
-    setFileTreeTitle('local storage');
+    fileTreeManager.showLocalStorageWarning();
+    fileTreeManager.setTitle('local storage');
     pluginManager.triggerEvent('onStorageChange', 'local');
   }
 
@@ -168,7 +162,7 @@ class LocalFileSystem {
       }
 
       // Remove local file storage warning if present.
-      removeLocalStorageWarning();
+      fileTreeManager.removeLocalStorageWarning();
 
       closeAllFiles();
       await this._importFolderToVFS(rootFolderHandle);
@@ -200,7 +194,7 @@ class LocalFileSystem {
     // Save rootFolderHandle under the 'root' key for reference.
     await this.saveFolderHandle('root', null, rootFolderHandle);
 
-    setFileTreeTitle(rootFolderHandle.name);
+    fileTreeManager.setTitle(rootFolderHandle.name);
 
     // Read all contents and create the items in the VFS if they don't exist.
     await this._readFolder(rootFolderHandle, null);

@@ -9,7 +9,6 @@ import {
   getFileExtension,
   hasLFSApi,
   seconds,
-  showLocalStorageWarning
 } from './helpers/shared.js';
 import VFS from './vfs.js';
 import Terra from './terra.js';
@@ -37,7 +36,7 @@ export default class IDEApp extends App {
     }
 
     if (!repoLink && !hasLFSApi()) {
-      showLocalStorageWarning();
+      fileTreeManager.showLocalStorageWarning();
     }
 
     $(window).resize();

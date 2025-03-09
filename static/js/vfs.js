@@ -8,7 +8,7 @@
 import {
   addNewLineCharacter,
   hasGitFSWorker,
-  hasLFS,
+  hasLFSApi,
   registerTimeoutHandler,
   seconds,
   uuidv4
@@ -56,7 +56,7 @@ class VirtualFileSystem {
     // - The browser doesn't support the LFS class.
     // - The LFS class is not loaded yet. We make an exception for the
     //   openFolderPicker, because this function is used to load the LFS class.
-    if (!hasLFS() || (hasLFS() && !LFS.loaded && fn !== 'openFolderPicker')) return;
+    if (!hasLFSApi() || (hasLFSApi() && !LFS.loaded && fn !== 'openFolderPicker')) return;
 
     return LFS[fn](...payload);
   }
@@ -99,7 +99,7 @@ class VirtualFileSystem {
 
     // Remove the content from all files when LFS or Git is used, because LFS uses
     // lazy loading and GitFS is being cloned when refreshed anyway.
-    if (IS_IDE && ((hasLFS() && LFS.loaded) || hasGitFSWorker())) {
+    if (IS_IDE && ((hasLFSApi() && LFS.loaded) || hasGitFSWorker())) {
       const keys = ['sha', 'content'];
       Object.keys(files).forEach((fileId) => {
         files[fileId] = { ...files[fileId] };
@@ -653,7 +653,7 @@ class VirtualFileSystem {
   createGitFSWorker = () => {
     if (!IS_IDE) return;
 
-    if (hasLFS()) {
+    if (LFS.loaded) {
       LFS.terminate();
     }
 

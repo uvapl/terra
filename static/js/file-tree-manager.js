@@ -1,5 +1,5 @@
 import { DROP_AREA_INDICATOR_CLASS } from './ide/constants.js';
-import { getFileExtension, hasLFS, isObject, isValidFilename } from './helpers/shared.js'
+import { getFileExtension, hasLFSApi, isObject, isValidFilename } from './helpers/shared.js'
 import { createModal, hideModal, showModal } from './modal.js'
 import { getAllEditorTabs, openFile, runCode } from './helpers/editor-component.js'
 import VFS from './vfs.js'
@@ -34,6 +34,44 @@ class FileTreeManager {
     return `${string} (1)`;
   }
 
+  /**
+   * Set the file tree title.
+   *
+   * @param {string} title - The title to set.
+   */
+  setTitle = (title) => {
+    $('#file-tree-title').text(title);
+  }
+
+  /**
+   * Removes the local storage warning from the DOM.
+   */
+  removeLocalStorageWarning = () => {
+    $('.file-tree-container').removeClass('localstorage-mode')
+    $('#local-storage-warning').remove();
+  }
+
+  /**
+   * Add the local storage warning to the DOM.
+   */
+  showLocalStorageWarning = () => {
+    if ($('#local-storage-warning').length > 0) return;
+
+    const html = `
+      <div id="local-storage-warning" class="local-storage-warning">
+        <div class="warning-title">
+          <img src="static/img/icons/warning.png" alt="warning icon" class="warning-icon" /> Warning
+        </div>
+        <p>
+          You're currently using temporary browser storage. Clearing website data will
+          delete project files and folders permanently.
+        </p>
+      </div>
+    `;
+
+    $('.file-tree-container').addClass('localstorage-mode').append(html);
+  }
+
   destroyTree = () => {
     const tree = this.getInstance();
     if (tree) {
@@ -48,7 +86,7 @@ class FileTreeManager {
    * @param {string|null} [parentId] - The parent folder id.
    */
   createFile = (parentId = null) => {
-    if (hasLFS() && LFS.busy) return;
+    if (LFS.busy) return;
 
     // Create a new unique filename.
     let filename = 'Untitled';
@@ -105,7 +143,7 @@ class FileTreeManager {
    * @param {string|null} [parentId] - The parent id of the new folder.
    */
   createFolder = (parentId = null) => {
-    if (hasLFS() && LFS.busy) return;
+    if (LFS.busy) return;
 
     // Create a new unique foldername.
     let foldername = 'Untitled';
@@ -299,7 +337,7 @@ class FileTreeManager {
         },
       };
 
-      if (!hasLFS() || (hasLFS() && !LFS.loaded)) {
+      if (!hasLFSApi() || (hasLFSApi() && !LFS.loaded)) {
         menu.downloadFolder = {
           name: 'Download',
           callback: () => {
@@ -312,7 +350,7 @@ class FileTreeManager {
     }
 
     if (isFile) {
-      if (!hasLFS() || (hasLFS() && !LFS.loaded)) {
+      if (!hasLFSApi() || (hasLFSApi() && !LFS.loaded)) {
         menu.downloadFile = {
           name: 'Download',
           callback: () => {

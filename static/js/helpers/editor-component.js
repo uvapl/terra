@@ -1,7 +1,7 @@
 import { BASE_FONT_SIZE, IS_IDE } from '../constants.js';
 import {
   getFileExtension,
-  hasLFS,
+  hasLFSApi,
   isObject,
   isValidFilename
 } from './shared.js';
@@ -33,7 +33,7 @@ export function getAllEditorFiles() {
     getAllEditorTabs().map(async (tab) => {
       const containerState = tab.container.getState()
       let content = containerState.value;
-      if (!content && hasLFS() && LFS.loaded) {
+      if (!content && hasLFSApi() && LFS.loaded) {
         content = await LFS.getFileContent(containerState.fileId);
       }
 
@@ -320,7 +320,7 @@ export async function runCode(fileId = null, clearTerm = false) {
     filename = file.name;
     files = [file];
 
-    if (!file.content && hasLFS() && LFS.loaded) {
+    if (!file.content && hasLFSApi() && LFS.loaded) {
       const content = await LFS.getFileContent(file.id);
       files = [{ ...file, content }];
     }

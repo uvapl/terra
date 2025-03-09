@@ -1,8 +1,6 @@
 import Layout from './layout.js';
 import { BASE_FONT_SIZE } from '../constants.js';
-import {
-  hasLFS,
-} from '../helpers/shared.js';
+import { hasLFSApi } from '../helpers/shared.js';
 import LFS from '../lfs.js';
 import localStorageManager from '../local-storage-manager.js';
 
@@ -45,7 +43,7 @@ export default class LayoutIDE extends Layout {
     // Exclude the content from all editors for the IDE when LFS is enabled,
     // because for LFS we use lazy loading, i.e. only load the content when
     // opening the file.
-    if (hasLFS() && LFS.loaded) {
+    if (hasLFSApi() && LFS.loaded) {
       config = this._removeEditorValue(config);
     }
 
