@@ -7,11 +7,7 @@ import {
   closeFile,
   getActiveEditor
 } from '../helpers/editor-component.js';
-import {
-  isMac,
-  setFileTreeTitle,
-  showLocalStorageWarning
-} from '../helpers/shared.js';
+import { isMac } from '../helpers/shared.js';
 import {
   createModal,
   hideModal,
@@ -409,12 +405,12 @@ Menubar.connectRepo = () => {
       // Disconnect
       localStorageManager.removeLocalStorageItem('git-repo');
 
-      showLocalStorageWarning();
+      fileTreeManager.showLocalStorageWarning();
 
       // Clear all files after disconnecting.
       VFS.clear();
       fileTreeManager.createFileTree();
-      setFileTreeTitle('local storage');
+      fileTreeManager.setTitle('local storage');
       $('#file-tree .info-msg').remove();
 
       pluginManager.triggerEvent('onStorageChange', 'local');

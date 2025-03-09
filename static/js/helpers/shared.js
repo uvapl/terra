@@ -231,24 +231,6 @@ export function hasLFSApi() {
 }
 
 /**
- * Check whether the LFS has been initialized.
- *
- * @returns {boolean} True when LFS has been initialized, false otherwise.
- */
-export function hasLFS() {
-  return LFS.loaded;
-}
-
-/**
- * Set the file tree title.
- *
- * @param {string} title - The title to set.
- */
-export function setFileTreeTitle(title) {
-  $('#file-tree-title').text(title);
-}
-
-/**
  * Get the repo name and username of a given repo link.
  *
  * @example getRepoName('https://github.com/<user>/<repo>')
@@ -276,35 +258,6 @@ export function getRepoInfo(repoLink) {
  */
 export function isValidFilename(filename) {
   return !/[\/\\:*?"<>|]/.test(filename) && !['&lt;', '&gt;'].includes(filename);
-}
-
-/**
- * Removes the local storage warning from the DOM.
- */
-export function removeLocalStorageWarning() {
-  $('.file-tree-container').removeClass('localstorage-mode')
-  $('#local-storage-warning').remove();
-}
-
-/**
- * Add the local storage warning to the DOM.
- */
-export function showLocalStorageWarning() {
-  if ($('#local-storage-warning').length > 0) return;
-
-  const html = `
-    <div id="local-storage-warning" class="local-storage-warning">
-      <div class="warning-title">
-        <img src="static/img/icons/warning.png" alt="warning icon" class="warning-icon" /> Warning
-      </div>
-      <p>
-        You're currently using temporary browser storage. Clearing website data will
-        delete project files and folders permanently.
-      </p>
-    </div>
-  `;
-
-  $('.file-tree-container').addClass('localstorage-mode').append(html);
 }
 
 /**

@@ -10,7 +10,6 @@ import {
 import {
   getFileExtension,
   hasGitFSWorker,
-  hasLFS,
   hasLFSApi,
   seconds
 } from '../helpers/shared.js';
@@ -175,7 +174,7 @@ export default class EditorComponent {
    */
   bindEditorLFSCommands = () => {
     this.editor.commands.on('exec', (e) => {
-      if (hasLFS() && LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
+      if (hasLFSApi() && LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
         const inputText = e.args.text || '';
         const filesize = new Blob([this.editor.getValue() + inputText]).size;
         if (filesize >= LFS_MAX_FILE_SIZE) {
@@ -290,20 +289,20 @@ export default class EditorComponent {
    * Reload the file content either from VFS or LFS.
    * This only applies for the IDE.
    *
-   * @param {boolen} [force] - True to force reload the file content from LFS.
+   * @param {boolean} [force] - True to force reload the file content from LFS.
    */
   reloadFileContent = (force = false) => {
     if (Terra.v.blockLFSPolling && !force) return;
 
     const file = VFS.findFileById(this.container.getState().fileId);
     if (file) {
-      if (hasLFS() && LFS.loaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
+      if (hasLFSApi() && LFS.loaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
         // Disable the editor if the file is too large.
         this.editor.container.classList.add('exceeded-filesize');
         this.editor.setReadOnly(true);
         this.editor.clearSelection();
         this.editor.blur();
-      } else if (hasLFS() && !hasGitFSWorker() && !file.content) {
+      } else if (hasLFSApi() && LFS.loaded && !hasGitFSWorker() && !file.content) {
         // Load the file content from LFS.
         const cursorPos = this.editor.getCursorPosition()
         LFS.getFileContent(file.id).then((content) => {
