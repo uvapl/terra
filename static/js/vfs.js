@@ -5,6 +5,21 @@
 // determines whether to save it local storage, LFS or GitFS.
 ////////////////////////////////////////////////////////////////////////////////
 
+import {
+  addNewLineCharacter,
+  hasGitFSWorker,
+  hasLFS,
+  registerTimeoutHandler,
+  seconds,
+  uuidv4
+} from './helpers/shared.js';
+import { IS_IDE } from './constants.js';
+import VFS from './vfs.js';
+import LFS from './lfs.js';
+import { _createGitFSWorker } from './gitfs.js';
+import Terra from './terra.js';
+import localStorageManager from './local-storage-manager.js';
+
 class VirtualFileSystem {
   constructor() {
     this.files = {};
@@ -20,7 +35,7 @@ class VirtualFileSystem {
    * @param {array} payload - Arguments to pass to the function.
    */
   _git = (fn, ...payload) => {
-    if (!Terra.f.hasGitFSWorker()) return;
+    if (!hasGitFSWorker()) return;
 
     try {
       Terra.gitfs[fn](...payload);
@@ -41,9 +56,9 @@ class VirtualFileSystem {
     // - The browser doesn't support the LFS class.
     // - The LFS class is not loaded yet. We make an exception for the
     //   openFolderPicker, because this function is used to load the LFS class.
-    if (!Terra.f.hasLFS() || (Terra.f.hasLFS() && !Terra.lfs.loaded && fn !== 'openFolderPicker')) return;
+    if (!hasLFS() || (hasLFS() && !LFS.loaded && fn !== 'openFolderPicker')) return;
 
-    return Terra.lfs[fn](...payload);
+    return LFS[fn](...payload);
   }
 
   /**
@@ -64,7 +79,7 @@ class VirtualFileSystem {
    * Load the saved virtual filesystem state from local storage.
    */
   loadFromLocalStorage = () => {
-    const savedState = Terra.f.getLocalStorageItem('vfs');
+    const savedState = localStorageManager.getLocalStorageItem('vfs');
     if (typeof savedState === 'string') {
       const json = JSON.parse(savedState);
 
@@ -84,7 +99,7 @@ class VirtualFileSystem {
 
     // Remove the content from all files when LFS or Git is used, because LFS uses
     // lazy loading and GitFS is being cloned when refreshed anyway.
-    if (Terra.c.IS_IDE && ((Terra.f.hasLFS() && Terra.lfs.loaded) || Terra.f.hasGitFSWorker())) {
+    if (IS_IDE && ((hasLFS() && LFS.loaded) || hasGitFSWorker())) {
       const keys = ['sha', 'content'];
       Object.keys(files).forEach((fileId) => {
         files[fileId] = { ...files[fileId] };
@@ -96,7 +111,7 @@ class VirtualFileSystem {
       });
     }
 
-    Terra.f.setLocalStorageItem('vfs', JSON.stringify({
+    localStorageManager.setLocalStorageItem('vfs', JSON.stringify({
       files,
       folders: this.folders,
     }));
@@ -295,7 +310,7 @@ class VirtualFileSystem {
    */
   createFile = (fileObj, userInvoked = true) => {
     const newFile = {
-      id: Terra.f.uuidv4(),
+      id: uuidv4(),
       name: 'Untitled',
       parentId: null,
       content: '',
@@ -324,7 +339,7 @@ class VirtualFileSystem {
    */
   createFolder = (folderObj, userInvoked = true) => {
     const newFolder = {
-      id: Terra.f.uuidv4(),
+      id: uuidv4(),
       name: 'Untitled',
       parentId: null,
       createdAt: new Date().toISOString(),
@@ -362,7 +377,7 @@ class VirtualFileSystem {
 
     if (file) {
       // Move the file to the new location before updating the file object,
-      // because the Terra.lfs.moveFile needs to use the absolute paths from VFS.
+      // because the LFS.moveFile needs to use the absolute paths from VFS.
       if (isRenamed || isMoved) {
         await this._lfs(
           'moveFile',
@@ -390,12 +405,12 @@ class VirtualFileSystem {
       // Just commit the changes to the file.
       if (isContentChanged && userInvoked) {
         // Only commit changes after 2 seconds of inactivity.
-        Terra.f.registerTimeoutHandler(`git-commit-${file.id}`, Terra.f.seconds(2), () => {
+        registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
           this._git('commit', newPath, file.content, file.sha);
         });
 
         // Update the file content in the LFS after a second of inactivity.
-        Terra.f.registerTimeoutHandler(`lfs-sync-${file.id}`, Terra.f.seconds(1), () => {
+        registerTimeoutHandler(`lfs-sync-${file.id}`, seconds(1), () => {
           this._lfs('writeFileToFolder', file.parentId, file.id, file.name, file.content);
         });
       }
@@ -424,7 +439,7 @@ class VirtualFileSystem {
 
     if (folder) {
       // Move the folder to the new location before updating the folder object,
-      // because the Terra.lfs.moveFolder needs to use the absolute paths from VFS.
+      // because the LFS.moveFolder needs to use the absolute paths from VFS.
       if (isRenamed || isMoved) {
         await this._lfs(
           'moveFolder',
@@ -534,7 +549,7 @@ class VirtualFileSystem {
     if (!file) return;
 
     const fileBlob = new Blob(
-      [Terra.f.addNewLineCharacter(file.content)],
+      [addNewLineCharacter(file.content)],
       { type: 'text/plain;charset=utf-8' }
     );
     saveAs(fileBlob, file.name);
@@ -550,7 +565,7 @@ class VirtualFileSystem {
     // Put all direct files into the zip file.
     const files = this.findFilesWhere({ parentId: folderId });
     for (const file of files) {
-      zip.file(file.name, Terra.f.addNewLineCharacter(file.content));
+      zip.file(file.name, addNewLineCharacter(file.content));
     }
 
     // Get all the nested folders and files.
@@ -614,7 +629,7 @@ class VirtualFileSystem {
         const path = fileOrFolder.path.split('/')
         const name = path.pop();
 
-        const parentId = path.length > 0 ? Terra.vfs.findFolderByPath(path.join('/')).id : null;
+        const parentId = path.length > 0 ? VFS.findFolderByPath(path.join('/')).id : null;
 
         if (fileOrFolder.type === 'tree') {
           this.createFolder({ name, parentId, sha });
@@ -636,13 +651,13 @@ class VirtualFileSystem {
    * LFS if it's currently active. This is only allow in the IDE app.
    */
   createGitFSWorker = () => {
-    if (!Terra.c.IS_IDE) return;
+    if (!IS_IDE) return;
 
-    if (Terra.f.hasLFS()) {
-      Terra.lfs.terminate();
+    if (hasLFS()) {
+      LFS.terminate();
     }
 
-    Terra.f._createGitFSWorker();
+    _createGitFSWorker();
   }
 
   /**
@@ -675,4 +690,4 @@ class VirtualFileSystem {
   }
 }
 
-Terra.vfs = new VirtualFileSystem();
+export default new VirtualFileSystem();

@@ -1,8 +1,12 @@
-class LayoutIDE extends Layout {
-  constructor(defaultLayoutConfig, options = {}) {
-    super(defaultLayoutConfig, options);
-  }
+import Layout from './layout.js';
+import { BASE_FONT_SIZE } from '../constants.js';
+import {
+  hasLFS,
+} from '../helpers/shared.js';
+import LFS from '../lfs.js';
+import localStorageManager from '../local-storage-manager.js';
 
+export default class LayoutIDE extends Layout {
   getClearTermButtonHtml = () => '<button id="clear-term" class="button clear-term-btn">Clear terminal</button>';
 
   createControls = () => {
@@ -16,11 +20,11 @@ class LayoutIDE extends Layout {
 
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');
-    const currentFontSize = Terra.f.getLocalStorageItem('font-size') || Terra.c.BASE_FONT_SIZE;
+    const currentFontSize = localStorageManager.getLocalStorageItem('font-size') || BASE_FONT_SIZE;
     $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
 
     // Add active state to theme dropdown.
-    const currentTheme = Terra.f.getLocalStorageItem('theme') || 'light';
+    const currentTheme = localStorageManager.getLocalStorageItem('theme') || 'light';
     const $editorThemeMenu = $('#editor-theme-menu');
     $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
 
@@ -41,13 +45,13 @@ class LayoutIDE extends Layout {
     // Exclude the content from all editors for the IDE when LFS is enabled,
     // because for LFS we use lazy loading, i.e. only load the content when
     // opening the file.
-    if (Terra.f.hasLFS() && Terra.lfs.loaded) {
+    if (hasLFS() && LFS.loaded) {
       config = this._removeEditorValue(config);
     }
 
 
     const state = JSON.stringify(config);
-    Terra.f.setLocalStorageItem('layout', state);
+    localStorageManager.setLocalStorageItem('layout', state);
   }
 
   _removeEditorValue = (config) => {

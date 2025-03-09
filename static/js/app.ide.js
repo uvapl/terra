@@ -1,27 +1,43 @@
-class IDEApp extends App {
+import App from './app.js';
+import LayoutIDE from './layout/layout.ide.js';
+import { BASE_FONT_SIZE } from './constants.js';
+import {
+  getActiveEditor,
+  getAllEditorTabs
+} from './helpers/editor-component.js';
+import {
+  getFileExtension,
+  hasLFSApi,
+  seconds,
+  showLocalStorageWarning
+} from './helpers/shared.js';
+import VFS from './vfs.js';
+import Terra from './terra.js';
+import { hasWorker } from './lang-worker-api.js';
+import localStorageManager from './local-storage-manager.js';
+import fileTreeManager from './file-tree-manager.js';
+
+export default class IDEApp extends App {
   setupLayout = () => {
     this.layout = this.createLayout();
   }
 
   postSetupLayout = () => {
     // Fetch the repo files or the local storage files (vfs) otherwise.
-    const repoLink = Terra.f.getLocalStorageItem('git-repo');
+    const repoLink = localStorageManager.getLocalStorageItem('git-repo');
     if (repoLink) {
-      Terra.vfs.createGitFSWorker();
+      VFS.createGitFSWorker();
     } else {
-      Terra.f.createFileTree();
+      fileTreeManager.createFileTree();
     }
 
-    if (Terra.f.hasLFSApi()) {
-      // Enable code for local filesystem.
-      $('body').append('<script src="static/js/lfs.js"></script>');
-    } else {
+    if (!hasLFSApi()) {
       // Disable open-folder if the FileSystemAPI is not supported.
       $('#menu-item--open-folder').remove();
     }
 
-    if (!repoLink && !Terra.f.hasLFSApi()) {
-      Terra.f.showLocalStorageWarning();
+    if (!repoLink && !hasLFSApi()) {
+      showLocalStorageWarning();
     }
 
     $(window).resize();
@@ -31,7 +47,7 @@ class IDEApp extends App {
    * Reset the layout to its initial state.
    */
   resetLayout = () => {
-    const oldContentConfig = Terra.f.getAllEditorTabs().map((tab) => ({
+    const oldContentConfig = getAllEditorTabs().map((tab) => ({
       title: tab.config.title,
       componentState: {
         fileId: tab.container.getState().fileId,
@@ -42,8 +58,8 @@ class IDEApp extends App {
     this.layout = this.createLayout(true, oldContentConfig);
     this.layout.on('initialised', () => {
       setTimeout(() => {
-        const currentTab = Terra.f.getActiveEditor();
-        const proglang = Terra.f.getFileExtension(currentTab.config.title);
+        const currentTab = getActiveEditor();
+        const proglang = getFileExtension(currentTab.config.title);
         if (hasWorker(proglang) && Terra.langWorkerApi) {
           Terra.langWorkerApi.restart();
         }
@@ -58,7 +74,7 @@ class IDEApp extends App {
     clearTimeout(this.userIsTypingTimeoutId);
     this.userIsTypingTimeoutId = setTimeout(() => {
       Terra.v.blockLFSPolling = false;
-    }, Terra.f.seconds(2));
+    }, seconds(2));
   }
 
   /**
@@ -73,7 +89,7 @@ class IDEApp extends App {
       type: 'component',
       componentName: 'editor',
       componentState: {
-        fontSize: Terra.c.BASE_FONT_SIZE,
+        fontSize: BASE_FONT_SIZE,
         ...tab.componentState,
       },
       title: 'Untitled',
@@ -102,7 +118,7 @@ class IDEApp extends App {
                   type: 'component',
                   componentName: 'editor',
                   componentState: {
-                    fontSize: Terra.c.BASE_FONT_SIZE,
+                    fontSize: BASE_FONT_SIZE,
                   },
                   title: 'Untitled',
                 },
@@ -111,7 +127,7 @@ class IDEApp extends App {
             {
               type: 'component',
               componentName: 'terminal',
-              componentState: { fontSize: Terra.c.BASE_FONT_SIZE },
+              componentState: { fontSize: BASE_FONT_SIZE },
               isClosable: false,
               reorderEnabled: false,
             }
@@ -124,6 +140,3 @@ class IDEApp extends App {
   }
 
 }
-
-Terra.app = new IDEApp();
-Terra.app.init();
