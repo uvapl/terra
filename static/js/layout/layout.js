@@ -1,6 +1,6 @@
 $(window).on('resize', () => {
-  if (Terra.layout) {
-    Terra.layout.updateSize(window.innerWidth, window.innerHeight);
+  if (Terra.app.layout) {
+    Terra.app.layout.updateSize(window.innerWidth, window.innerHeight);
   }
 });
 
@@ -93,19 +93,19 @@ class Layout extends GoldenLayout {
   }
 
   emitToAllComponents = (event, data) => {
-    Terra.layout.root.contentItems[0].contentItems.forEach((contentItem) => {
+    Terra.app.layout.root.contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data);
     });
   }
 
   emitToEditorComponents = (event, data) => {
-    Terra.layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
+    Terra.app.layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data);
     });
   }
 
   emitToEditorComponentWithFileId = (event, fileId, data) => {
-    Terra.layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
+    Terra.app.layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data, fileId);
     });
   }

@@ -40,7 +40,7 @@ class EmbedApp extends App {
     $('body').addClass(isVertical ? 'vertical' : 'horizontal');
 
     // Make layout instance available at all times.
-    Terra.layout = layout;
+    this.layout = layout;
 
     return layout;
   }

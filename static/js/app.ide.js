@@ -1,6 +1,6 @@
 class IDEApp extends App {
   setupLayout = () => {
-    Terra.layout = this.createLayout();
+    this.layout = this.createLayout();
   }
 
   postSetupLayout = () => {
@@ -25,6 +25,31 @@ class IDEApp extends App {
     }
 
     $(window).resize();
+  }
+
+  /**
+   * Reset the layout to its initial state.
+   */
+  resetLayout = () => {
+    const oldContentConfig = Terra.f.getAllEditorTabs().map((tab) => ({
+      title: tab.config.title,
+      componentState: {
+        fileId: tab.container.getState().fileId,
+      }
+    }));
+
+    this.layout.destroy();
+    this.layout = this.createLayout(true, oldContentConfig);
+    this.layout.on('initialised', () => {
+      setTimeout(() => {
+        const currentTab = Terra.f.getActiveEditor();
+        const proglang = Terra.f.getFileExtension(currentTab.config.title);
+        if (hasWorker(proglang) && Terra.langWorkerApi) {
+          Terra.langWorkerApi.restart();
+        }
+      }, 10);
+    });
+    this.layout.init();
   }
 
   onEditorChange = () => {

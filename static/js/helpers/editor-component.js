@@ -4,7 +4,7 @@
  * @returns {object} The active editor instance.
  */
 Terra.f.getActiveEditor = () => {
-  return Terra.layout._lastActiveEditor;
+  return Terra.app.layout._lastActiveEditor;
 }
 
 /**
@@ -37,7 +37,7 @@ Terra.f.getAllEditorFiles = () => {
  * the recursive search will start.
  * @returns {array} List of all the editor tabs.
  */
-Terra.f.getAllEditorTabs = (contentItem = Terra.layout.root) => {
+Terra.f.getAllEditorTabs = (contentItem = Terra.app.layout.root) => {
   if (contentItem.isComponent) {
     return contentItem;
   }
@@ -259,7 +259,7 @@ Terra.f.saveFile = () => {
     tab.container.setState({ fileId: nodeId });
 
     // For some reason no layout update is triggered, so we trigger an update.
-    Terra.layout.emit('stateChanged');
+    Terra.app.layout.emit('stateChanged');
 
     Terra.f.hideModal($modal);
 

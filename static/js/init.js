@@ -13,9 +13,6 @@ Terra.v = {};
 // where 'f' is an abbreviation for 'functions'.
 Terra.f = {};
 
-// Reference to the GoldenLayout instance.
-Terra.layout = null;
-
 // Reference to the language worker API class instance.
 Terra.langWorkerApi = null;
 

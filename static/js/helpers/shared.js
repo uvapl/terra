@@ -377,19 +377,3 @@ Terra.f.registerTimeoutHandler = (id, timeout, callback) => {
     delete Terra.timeoutHandlers[id];
   }, timeout);
 }
-
-/**
- * Reset the layout to its initial state.
- */
-Terra.f.resetLayout = () => {
-  const oldContentConfig = Terra.f.getAllEditorTabs().map((tab) => ({
-    title: tab.config.title,
-    componentState: {
-      fileId: tab.container.getState().fileId,
-    }
-  }));
-
-  Terra.layout.destroy();
-  Terra.layout = createLayout(true, oldContentConfig);
-  Terra.layout.init();
-}
