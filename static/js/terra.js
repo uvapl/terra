@@ -13,12 +13,6 @@ Terra.langWorkerApi = null;
 // ===========================================================================
 
 if ($('body').hasClass('terra-ide')) {
-  // Reference to the local filesystem if loaded.
-  // Terra.lfs = null;
-
-  // Reference to the virtual filesystem if loaded.
-  // Terra.vfs = null;
-
   // Reference to the git filesystem if loaded.
   Terra.gitfs = null;
 
