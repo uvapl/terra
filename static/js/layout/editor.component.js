@@ -390,11 +390,11 @@ class EditorComponent {
   /**
    * Set the active editor.
    *
-   * @param {*} value - The editor instance to set as active.
+   * @param {*} editor - The editor instance to set as active.
    */
-  setActiveEditor = (value) => {
-    Terra.layout._lastActiveEditor = (typeof value !== 'undefined')
-      ? value
+  setActiveEditor = (editor) => {
+    Terra.app.layout._lastActiveEditor = (typeof editor !== 'undefined')
+      ? editor
       : this.container.parent;
   }
 
@@ -501,6 +501,7 @@ class EditorComponent {
     });
 
     this.editor.on('focus', () => {
+      console.log('focus')
       this.onEditorFocus();
       if (Terra.c.IS_IDE) {
         Terra.pluginManager.triggerEvent('onEditorFocus', this);

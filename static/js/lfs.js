@@ -202,7 +202,7 @@ class LocalFileSystem {
         tab.container.setState({ fileId: file.id });
       }
     });
-    Terra.layout.emitToAllComponents('reloadContent');
+    Terra.app.layout.emitToAllComponents('reloadContent');
 
     this.loaded = true;
     Terra.f.setLocalStorageItem('use-lfs', true);

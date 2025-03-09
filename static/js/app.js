@@ -2,15 +2,22 @@
  * Base class that is extended for each of the apps.
  */
 class App {
+
+  /**
+   * Reference to the GoldenLayout instance.
+   * @type {GoldenLayout.Layout}
+   */
+  layout = null;
+
   init = async () => {
     // Await the setupLayout because some apps might need to do async work.
     await this.setupLayout();
 
     // We register the postSetupLayout as a callback, which will be called when
     // the subsequent init() function has finished.
-    Terra.layout.on('initialised', () => this._call('postSetupLayout'));
+    this.layout.on('initialised', () => this._call('postSetupLayout'));
 
-    Terra.layout.init();
+    this.layout.init();
   }
 
   setupLayout = () => {
@@ -48,7 +55,7 @@ class App {
    * Called after the layout has been setup to do some post setup work.
    */
   _postSetupLayout = () => {
-    Terra.layout.on('tabCreated', (tab) => {
+    this.layout.on('tabCreated', (tab) => {
       const editorComponent = tab.contentItem.instance;
       const { editor } = editorComponent;
       if (editor) {

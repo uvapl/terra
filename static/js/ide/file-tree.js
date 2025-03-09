@@ -513,7 +513,7 @@ Terra.f.beforeCloseEditNodeCallback = (event, data) => {
     tab.instance.setProgLang(proglang);
 
     // For some reason no update is triggered, so we trigger an update.
-    Terra.layout.emit('stateChanged');
+    Terra.app.layout.emit('stateChanged');
   }
 
   // Destroy the leftover tooltip if it exists.

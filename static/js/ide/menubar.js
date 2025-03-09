@@ -179,7 +179,7 @@ function registerMenubarEventListeners() {
   $('#menu-item--add-credentials').click(Menubar.addCredentials);
   $('#menu-item--connect-repo').click(Menubar.connectRepo);
 
-  $('#menu-item--reset-layout').click(Terra.f.resetLayout);
+  $('#menu-item--reset-layout').click(Terra.app.resetLayout);
 
   // Prevent the default browser save dialog when pressing ctrl+s or cmd+s.
   Mousetrap.bind(['ctrl+s', 'meta+s'], (event) => event.preventDefault());

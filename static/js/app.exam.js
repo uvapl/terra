@@ -47,7 +47,7 @@ class ExamApp extends App {
         });
 
         // Make layout instance available at all times.
-        Terra.layout = layout;
+        this.layout = layout;
 
         resolve();
       })
