@@ -2,32 +2,65 @@
  * Base class that is extended for each of the apps.
  */
 class App {
+  init = async () => {
+    // Await the setupLayout because some apps might need to do async work.
+    await this.setupLayout();
+
+    // We register the postSetupLayout as a callback, which will be called when
+    // the subsequent init() function has finished.
+    Terra.layout.on('initialised', () => this._call('postSetupLayout'));
+
+    Terra.layout.init();
+  }
+
   setupLayout = () => {
-    console.error('setupLayout() not implemented');
+    console.info('setupLayout() not implemented');
+  }
+
+  /**
+   *  Given a function name, call its private function (prefixed with an
+   *  underscore) if it exists, as well as its public function which is only
+   *  implemented in child classes that extend the App class. This logic is
+   *  added to prevent rebinding `this` for every function that is needed as
+   *  well as calling `super.fn()` in child classes. Moreover, there's quite
+   *  some functions that we *always* want to execute, but allow child classes
+   *  to *extend* the logic and not overwrite it.
+   *
+   * @param {string} fn - The function name to execute
+   * @param {array} args - A list of arguments to pass to the function
+   */
+  _call(fn, args) {
+    if (!Array.isArray(args)) {
+      args = [args];
+    }
+
+    const privateFn = `_${fn}`;
+    if (typeof this[privateFn] === 'function') {
+      this[privateFn].apply(this, args);
+    }
+
+    if (typeof this[fn] === 'function') {
+      this[fn].apply(this, args);
+    }
   }
 
   /**
    * Called after the layout has been setup to do some post setup work.
    */
-  postSetupLayout = () => {
+  _postSetupLayout = () => {
     Terra.layout.on('tabCreated', (tab) => {
       const editorComponent = tab.contentItem.instance;
       const { editor } = editorComponent;
       if (editor) {
-        editor.on('change', () => this.onEditorChange(editorComponent));
+        editor.on('change', () => this._call('onEditorChange', [editorComponent]));
       }
     });
   }
 
   /**
    * Callback functions that is called when any editor its content changes.
-   *
-   * NOTE: This function must always be called. When overriding, make sure to
-   * call `super.onEditorChange()`. Functionality in here should be the default
-   * and the IDEApp, ExamApp or EmbedApp can override this method with the goal
-   * of *extending* the functionality (not really overriding it).
    */
-  onEditorChange = (editorComponent) => {
+  _onEditorChange = (editorComponent) => {
     const { fileId } = editorComponent.container.getState();
     if (fileId) {
       Terra.vfs.updateFile(fileId, {

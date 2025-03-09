@@ -42,7 +42,24 @@ class EmbedApp extends App {
     // Make layout instance available at all times.
     Terra.layout = layout;
 
-    this.postSetupLayout();
     return layout;
   }
+
+  postSetupLayout = () => {
+    // Listen for the content of the file to be received.
+    window.addEventListener('message', function(event) {
+      const tab = Terra.f.getActiveEditor();
+      const editor = tab.instance.editor;
+      const fileId = tab.instance.container.getState().fileId;
+      const content = Terra.f.removeIndent(event.data);
+      if (content) {
+        Terra.vfs.updateFile(fileId, { content });
+        editor.setValue(content);
+        editor.clearSelection();
+      }
+    });
+  }
 }
+
+Terra.app = new EmbedApp();
+Terra.app.init();
