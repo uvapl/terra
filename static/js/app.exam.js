@@ -1,54 +1,99 @@
 class ExamApp extends App {
-  onEditorChange(editorComponent) {
-    super.onEditorChange(editorComponent);
+  /**
+   * Contains a reference to the exam config.
+   * @type {object}
+   */
+  config = null;
+
+  onEditorChange = () => {
     Terra.v.editorIsDirty = true;
   }
 
   setupLayout = () => {
     return new Promise((resolve, reject) => {
-      this.loadConfig()
-        .then((config) => {
-          if (!config.tabs) {
-            config.tabs = {};
-          }
+      this.loadConfig().then(() => {
+        if (!this.config.tabs) {
+          this.config.tabs = {};
+        }
 
-          // Get the programming language based on tabs filename.
-          const proglang = Terra.f.getFileExtension(Object.keys(config.tabs)[0]);
+        // Get the programming language based on tabs filename.
+        const proglang = Terra.f.getFileExtension(Object.keys(this.config.tabs)[0]);
 
-          // Initialise the programming language specific worker API.
-          Terra.langWorkerApi = new LangWorkerAPI(proglang);
+        // Initialise the programming language specific worker API.
+        Terra.langWorkerApi = new LangWorkerAPI(proglang);
 
-          // Get the font-size stored in local storage or use fallback value.
-          const fontSize = Terra.f.getLocalStorageItem('font-size', Terra.c.BASE_FONT_SIZE);
+        // Get the font-size stored in local storage or use fallback value.
+        const fontSize = Terra.f.getLocalStorageItem('font-size', Terra.c.BASE_FONT_SIZE);
 
-          // Create the content objects that represent each tab in the editor.
-          const content = this.generateConfigContent(config.tabs, fontSize);
+        // Create the content objects that represent each tab in the editor.
+        const content = this.generateConfigContent(this.config.tabs, fontSize);
 
-          if (Object.keys(Terra.vfs.files).length === 0) {
-            // Create the files inside the virtual file system.
-            content.forEach((file) => {
-              Terra.vfs.createFile({
-                id: file.componentState.fileId,
-                name: file.title,
-                content: file.componentState.value,
-              })
-            });
-          }
-
-          // Create the layout object.
-          const layout = this.createLayout(content, fontSize, {
-            proglang,
-            buttonConfig: config.buttons,
-            autocomplete: config.autocomplete,
+        if (Object.keys(Terra.vfs.files).length === 0) {
+          // Create the files inside the virtual file system.
+          content.forEach((file) => {
+            Terra.vfs.createFile({
+              id: file.componentState.fileId,
+              name: file.title,
+              content: file.componentState.value,
+            })
           });
+        }
 
-          // Make layout instance available at all times.
-          Terra.layout = layout;
+        // Create the layout object.
+        const layout = this.createLayout(content, fontSize, {
+          proglang,
+          buttonConfig: this.config.buttons,
+          autocomplete: this.config.autocomplete,
+        });
 
-          this.postSetupLayout();
-          resolve({ layout, config });
-        })
-        .catch((err) => reject(err));
+        // Make layout instance available at all times.
+        Terra.layout = layout;
+
+        resolve();
+      })
+      .catch((err) => {
+        // Remove the right navbar when the application failed to initialise.
+        $('.navbar-right').remove();
+      });
+    });
+  }
+
+  postSetupLayout = () => {
+    Terra.v.editorIsDirty = false;
+
+    if (this.config.course_name && this.config.exam_name) {
+      $('.page-title').html(`
+        <span class="course-name">${this.config.course_name}</span>
+        <span class="exam-name">${this.config.exam_name}</span>
+      `);
+    }
+
+    // Register the auto-save after a certain auto-save offset time to prevent
+    // the server receives many requests at once. This helps to spread them out
+    // over a minute of time.
+    const startTimeout = Terra.f.getRandNumBetween(0, Terra.c.AUTOSAVE_START_OFFSET);
+    setTimeout(() => {
+      Terra.app.registerAutoSave(this.config.postback, this.config.code);
+    }, startTimeout);
+
+    // Make the right navbar visible and add the click event listener to the
+    // submit button.
+    $('.navbar-right')
+      .removeClass('hidden')
+      .find('#submit-btn')
+      .click(Terra.app.showSubmitExamModal);
+
+    // Immediately lock everything if this exam is locked.
+    if (this.config.locked === true) {
+      Terra.app.lock();
+    }
+
+    // Catch ctrl-w and cmd-w to prevent the user from closing the tab.
+    $(window).on('beforeunload', (e) => {
+      const message = 'Are you sure you want to leave this page?';
+      e.preventDefault();
+      e.returnValue = message;
+      return message;
     });
   }
 
@@ -124,8 +169,9 @@ class ExamApp extends App {
       if (!this.isValidConfig(config)) {
         reject('Invalid config file');
       } else {
+        this.config = config;
         Terra.vfs.loadFromLocalStorage();
-        resolve(config);
+        resolve();
       }
     });
   }
@@ -455,3 +501,6 @@ class ExamApp extends App {
   }
 
 }
+
+Terra.app = new ExamApp();
+Terra.app.init();

@@ -1,11 +1,33 @@
 class IDEApp extends App {
   setupLayout = () => {
     Terra.layout = this.createLayout();
-    this.postSetupLayout();
   }
 
-  onEditorChange(editorComponent) {
-    super.onEditorChange(editorComponent);
+  postSetupLayout = () => {
+    // Fetch the repo files or the local storage files (vfs) otherwise.
+    const repoLink = Terra.f.getLocalStorageItem('git-repo');
+    if (repoLink) {
+      Terra.vfs.createGitFSWorker();
+    } else {
+      Terra.f.createFileTree();
+    }
+
+    if (Terra.f.hasLFSApi()) {
+      // Enable code for local filesystem.
+      $('body').append('<script src="static/js/lfs.js"></script>');
+    } else {
+      // Disable open-folder if the FileSystemAPI is not supported.
+      $('#menu-item--open-folder').remove();
+    }
+
+    if (!repoLink && !Terra.f.hasLFSApi()) {
+      Terra.f.showLocalStorageWarning();
+    }
+
+    $(window).resize();
+  }
+
+  onEditorChange = () => {
     Terra.v.blockLFSPolling = true;
 
     clearTimeout(this.userIsTypingTimeoutId);
@@ -77,3 +99,6 @@ class IDEApp extends App {
   }
 
 }
+
+Terra.app = new IDEApp();
+Terra.app.init();
