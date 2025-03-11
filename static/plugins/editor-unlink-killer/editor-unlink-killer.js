@@ -21,22 +21,19 @@ class EditorUnlinkKiller extends TerraPlugin {
   checkTabs() {
     const tabs = Terra.f.getAllEditorTabs();
     tabs.forEach((tab) => {
+      if(tab.config.title == 'Untitled') return;
       const fileId = tab.container.getState().fileId;
       if (!this.isValidFileId(fileId)) {
         console.error(`Invalid file ID detected: ${fileId}`);
-        this.disableIDE(`The tab you were editing could not be saved. But whatever's was there 10 seconds ago should still be saved, so please try to reload.`);
+        this.disableIDE(`The tab you were editing could not be saved. But whatever was
+                         there 10 seconds ago should still be saved, so please try to
+                         reload.`);
       }
     });
   }
 
   isValidFileId(fileId) {
-    if (Terra.f.hasLFS() && Terra.lfs.loaded) {
-      return !!Terra.vfs.findFileById(fileId);
-    } else if (Terra.f.hasGitFSWorker()) {
-      return !!Terra.vfs.findFileById(fileId);
-    } else {
-      return !!Terra.vfs.findFileById(fileId);
-    }
+    return !!Terra.vfs.findFileById(fileId);
   }
 
   disableIDE(errorMessage) {
