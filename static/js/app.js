@@ -110,60 +110,12 @@ export default class App {
       type: 'component',
       componentName: 'editor',
       componentState: {
-        fontSize: fontSize,
+        fontSize,
         value: tabs[filename],
         fileId: uuidv4(),
       },
       title: filename,
       isClosable: false,
     }));
-  }
-
-  /**
-   * Create the layout object with the given content objects and font-size.
-   *
-   * @param {array} content - List of content objects.
-   * @param {number} fontSize - The default font-size to be used.
-   * @param {object} options - Additional options object.
-   * @param {boolean} options.vertical - Whether the layout should be vertical.
-   * @param {string} options.proglang - The programming language to be used
-   * @param {object} options.buttonConfig - Object containing buttons with their
-   * commands that will be rendered by the layout.
-   * @returns {Layout} The layout instance.
-   */
-  createLayout = (content, fontSize, options = {}) => {
-    const defaultLayoutConfig = {
-      settings: {
-        showPopoutIcon: false,
-        showMaximiseIcon: false,
-        showCloseIcon: false,
-        reorderEnabled: false,
-      },
-      dimensions: {
-        headerHeight: 30,
-        borderWidth: IS_IFRAME ? 0 : 10,
-      },
-      content: [
-        {
-          type: options.vertical ? 'column' : 'row',
-          isClosable: false,
-          content: [
-            {
-              type: 'stack',
-              isClosable: false,
-              content: content,
-            },
-            {
-              type: 'component',
-              componentName: 'terminal',
-              componentState: { fontSize: fontSize },
-              isClosable: false,
-            }
-          ]
-        }
-      ]
-    };
-
-    return new Layout(defaultLayoutConfig, options);
   }
 }

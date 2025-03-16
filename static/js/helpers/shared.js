@@ -15,6 +15,40 @@ export function isObject(obj) {
 }
 
 /**
+ * Deep merge two objects together.
+ *
+ * @param {object} target
+ * @param {object} source
+ * @returns {object} A new object with the merged properties.
+ */
+export function mergeObjects(target, source) {
+  // If both are arrays, merge them by index
+  if (Array.isArray(target) && Array.isArray(source)) {
+    source.forEach((item, index) => {
+      if (target[index] === undefined) {
+        target[index] = item;
+      } else {
+        target[index] = mergeObjects(target[index], item);
+      }
+    });
+  } else if (source && typeof source === 'object' && !Array.isArray(source)) {
+    // If source is an object, merge its properties
+    for (const key in source) {
+      if (source[key] && typeof source[key] === 'object') {
+        // Recursively merge nested objects or arrays
+        target[key] = mergeObjects(target[key] || (Array.isArray(source[key]) ? [] : {}), source[key]);
+      } else {
+        target[key] = source[key];
+      }
+    }
+  } else {
+    // If it's neither an object nor array, just set the value
+    target = source;
+  }
+  return target;
+}
+
+/**
  * Prefix the given number with a zero if below 10.
  *
  * @param {string|number} num - The number to be prefixed.

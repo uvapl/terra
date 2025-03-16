@@ -11,6 +11,7 @@ import VFS from './vfs.js';
 import Terra from './terra.js';
 import LangWorkerAPI from './lang-worker-api.js';
 import localStorageManager from './local-storage-manager.js';
+import EmbedLayout from './layout/layout.embed.js';
 
 export default class EmbedApp extends App {
   setupLayout = () => {
@@ -72,5 +73,38 @@ export default class EmbedApp extends App {
         editor.clearSelection();
       }
     });
+  }
+
+  /**
+   * Create the layout object with the given content objects and font-size.
+   *
+   * @param {array} content - List of content objects.
+   * @param {number} fontSize - The default font-size to be used.
+   * @param {object} options - Additional options object.
+   * @param {boolean} options.vertical - Whether the layout should be vertical.
+   * @param {string} options.proglang - The programming language to be used
+   * @returns {EmbedLayout} The layout instance.
+   */
+  createLayout = (content, fontSize, options = {}) => {
+    const defaultLayoutConfig = {
+      dimensions: {
+        borderWidth: 0,
+      },
+      content: [
+        {
+          type: options.vertical ? 'column' : 'row',
+          content: [
+            {
+              content,
+            },
+            {
+              componentState: { fontSize },
+            }
+          ]
+        }
+      ]
+    };
+
+    return new EmbedLayout(defaultLayoutConfig, options);
   }
 }

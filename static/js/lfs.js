@@ -9,6 +9,7 @@ import pluginManager from './plugin-manager.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
+import { IS_IDE } from './constants.js';
 
 class LocalFileSystem {
   IDB_VERSION = 1;
@@ -29,9 +30,10 @@ class LocalFileSystem {
   busy = false;
 
   constructor() {
-    // Only initialize if the user is not connected to git.
+    // Only initialize if the user is not connected to git and if we're inside
+    // the IDE.
     const gitRepoLink = localStorageManager.getLocalStorageItem('git-repo');
-    if (!gitRepoLink) {
+    if (IS_IDE && !gitRepoLink) {
       this._init();
     }
   }

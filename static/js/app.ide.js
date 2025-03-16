@@ -1,5 +1,5 @@
 import App from './app.js';
-import LayoutIDE from './layout/layout.ide.js';
+import IDELayout from './layout/layout.ide.js';
 import { BASE_FONT_SIZE } from './constants.js';
 import {
   getActiveEditor,
@@ -134,7 +134,7 @@ export default class IDEApp extends App {
       ]
     };
 
-    return new LayoutIDE(defaultLayoutConfig, { forceDefaultLayout });
+    return new IDELayout(defaultLayoutConfig, { forceDefaultLayout });
   }
 
 }

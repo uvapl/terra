@@ -1,6 +1,6 @@
 import { IS_IDE, BASE_FONT_SIZE } from '../constants.js';
 import { runButtonCommand, runCode } from '../helpers/editor-component.js';
-import { isMac, isObject } from '../helpers/shared.js';
+import { isMac, isObject, mergeObjects } from '../helpers/shared.js';
 import EditorComponent from './editor.component.js';
 import TerminalComponent from './term.component.js';
 import pluginManager from '../plugin-manager.js';
@@ -13,6 +13,42 @@ $(window).on('resize', () => {
   }
 });
 
+/**
+ * Default layout config that is used when the layout is created for the first
+ * time (and thus not saved in local storage) or when the layout is reset.
+ * @type {object}
+ */
+const DEFAULT_LAYOUT_CONFIG = {
+  settings: {
+    showPopoutIcon: false,
+    showMaximiseIcon: false,
+    showCloseIcon: false,
+    reorderEnabled: false,
+  },
+  dimensions: {
+    headerHeight: 30,
+    borderWidth: 10,
+  },
+  content: [
+    {
+      type: 'row',
+      isClosable: false,
+      content: [
+        {
+          type: 'stack',
+          isClosable: false,
+        },
+        {
+          type: 'component',
+          componentName: 'terminal',
+          componentState: { fontSize: BASE_FONT_SIZE },
+          isClosable: false,
+        }
+      ]
+    }
+  ]
+};
+
 export default class Layout extends GoldenLayout {
   /**
    * Whether the layout has been initialised or not.
@@ -24,7 +60,6 @@ export default class Layout extends GoldenLayout {
    * Only for the Exam app we will have only one programming language,
    * which we bind in the layout class, in order to check whether we should
    * render additional config buttons.
-   *
    * @type {string}
    */
   proglang = null;
@@ -57,22 +92,20 @@ export default class Layout extends GoldenLayout {
   /**
    * Reference to the terminal component.
    * There can only be one terminal component inside any app.
-   *
    * @type {Terminal}
    */
   term = null;
 
-  constructor(defaultLayoutConfig, options = {}) {
+  constructor(additionalLayoutConfig, options = {}) {
     let layoutConfig = localStorageManager.getLocalStorageItem('layout');
     if (layoutConfig && !options.forceDefaultLayout) {
       layoutConfig = JSON.parse(layoutConfig);
     } else {
-      layoutConfig = defaultLayoutConfig;
+      layoutConfig = mergeObjects(DEFAULT_LAYOUT_CONFIG, additionalLayoutConfig);
     }
 
     super(layoutConfig, $('#layout'));
 
-    this.defaultLayoutConfig = defaultLayoutConfig;
     this.proglang = options.proglang;
     this.iframe = $('body').hasClass('terra-embed');
     this.vertical = options.vertical;
@@ -95,7 +128,7 @@ export default class Layout extends GoldenLayout {
         setTimeout(() => {
           this.emitToAllComponents('afterFirstRender');
           this.setTheme(localStorageManager.getLocalStorageItem('theme') || 'light');
-          this.createControls();
+          this.renderButtons();
           this.showTermStartupMessage();
           if (IS_IDE) {
             pluginManager.triggerEvent('onLayoutLoaded');
@@ -114,6 +147,37 @@ export default class Layout extends GoldenLayout {
 
     this.registerComponent('editor', EditorComponent);
     this.registerComponent('terminal', TerminalComponent);
+  }
+
+  renderConfigButtons = () => {
+    if (this.proglang === 'py' && isObject(this.buttonConfig)) {
+      Object.keys(this.buttonConfig).forEach((name) => {
+        const id = name.replace(/\s/g, '-').toLowerCase();
+        const selector = `#${id}`;
+
+        let cmd = this.buttonConfig[name];
+        if (!Array.isArray(cmd)) {
+          cmd = cmd.split('\n');
+        }
+
+        $('.terminal-component-container .lm_header')
+          .append(`<button id="${id}" class="button config-btn ${id}-btn" disabled>${name}</button>`);
+
+        $(selector).click(() => runButtonCommand(selector, cmd));
+      });
+    }
+  }
+
+  addActiveStates = () => {
+    // Add active state to font-size dropdown.
+    const $fontSizeMenu = $('#font-size-menu');
+    const currentFontSize = localStorageManager.getLocalStorageItem('font-size') || BASE_FONT_SIZE;
+    $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
+
+    // Add active state to theme dropdown.
+    const currentTheme = localStorageManager.getLocalStorageItem('theme') || 'light';
+    const $editorThemeMenu = $('#editor-theme-menu');
+    $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
   }
 
   showTermStartupMessage = () => {
@@ -192,97 +256,39 @@ export default class Layout extends GoldenLayout {
 
   getClearTermButtonHtml = () => '<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>';
 
-  createControls = () => {
-    const runCodeButtonHtml = this.getRunCodeButtonHtml();
-    const clearTermButtonHtml = this.getClearTermButtonHtml();
+  getSettingsMenuHtml = () => `
+    <div class="settings-menu">
+      <button class="settings-btn"></button>
+      <ul class="settings-dropdown">
+        <li class="has-dropdown">
+          Editor theme
+          <ul class="settings-dropdown" id="editor-theme-menu">
+            <li data-val="light">Light</li>
+            <li data-val="dark">Dark</li>
+          </ul>
+        </li>
+        <li class="has-dropdown">
+          Font size
+          <ul class="settings-dropdown" id="font-size-menu">
+            <li data-val="10">10</li>
+            <li data-val="11">11</li>
+            <li data-val="12">12</li>
+            <li data-val="14">14</li>
+            <li data-val="16">16</li>
+            <li data-val="18">18</li>
+            <li data-val="24">24</li>
+            <li data-val="30">30</li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  `;
 
-    const settingsMenuHtml = `
-      <div class="settings-menu">
-        <button class="settings-btn"></button>
-        <ul class="settings-dropdown">
-          <li class="has-dropdown">
-            Editor theme
-            <ul class="settings-dropdown" id="editor-theme-menu">
-              <li data-val="light">Light</li>
-              <li data-val="dark">Dark</li>
-            </ul>
-          </li>
-          <li class="has-dropdown">
-            Font size
-            <ul class="settings-dropdown" id="font-size-menu">
-              <li data-val="10">10</li>
-              <li data-val="11">11</li>
-              <li data-val="12">12</li>
-              <li data-val="14">14</li>
-              <li data-val="16">16</li>
-              <li data-val="18">18</li>
-              <li data-val="24">24</li>
-              <li data-val="30">30</li>
-            </ul>
-          </li>
-        </ul>
-      </div>
-    `;
-
-    const $editorContainer = $('.editor-component-container');
-    const $terminalContainer = $('.terminal-component-container');
-
-    if (this.iframe && this.vertical) {
-      $editorContainer
-        .find('.lm_controls')
-        .append(runCodeButtonHtml)
-        .append(settingsMenuHtml);
-    } else if (this.iframe) {
-      // Horizontal layout.
-      $terminalContainer.find('.lm_controls')
-        .append(runCodeButtonHtml)
-        .append(settingsMenuHtml);
-    } else {
-      // Exam layout.
-      $terminalContainer.find('.lm_header').append(runCodeButtonHtml).append(clearTermButtonHtml)
-      $terminalContainer.find('.lm_controls').append(settingsMenuHtml);
-    }
-
-    // Add custom buttons to the header.
-    if (this.proglang === 'py' && isObject(this.buttonConfig)) {
-      Object.keys(this.buttonConfig).forEach((name) => {
-        const id = name.replace(/\s/g, '-').toLowerCase();
-        const selector = `#${id}`;
-
-        let cmd = this.buttonConfig[name];
-        if (!Array.isArray(cmd)) {
-          cmd = cmd.split('\n');
-        }
-
-        $('.terminal-component-container .lm_header')
-          .append(`<button id="${id}" class="button config-btn ${id}-btn" disabled>${name}</button>`);
-
-        $(selector).click(() => runButtonCommand(selector, cmd));
-      });
-    }
-
-    // Add active state to font-size dropdown.
-    const $fontSizeMenu = $('#font-size-menu');
-    const currentFontSize = localStorageManager.getLocalStorageItem('font-size') || BASE_FONT_SIZE;
-    $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
-
-    // Add active state to theme dropdown.
-    const currentTheme = localStorageManager.getLocalStorageItem('theme') || 'light';
-    const $editorThemeMenu = $('#editor-theme-menu');
-    $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
-
-    // Add event listeners for setttings menu.
-    $('.settings-menu').click((event) => $(event.target).toggleClass('open'));
-    $(document).click((event) => {
-      if (!$(event.target).is($('.settings-menu.open'))) {
-        $('.settings-menu').removeClass('open');
-      }
-    });
-
-    this.addControlsEventListeners();
+  renderButtons = () => {
+    console.log('renderButtons() is not implemented');
   }
 
-  addControlsEventListeners = () => {
+  addButtonEventListeners = () => {
     $('#run-code').click(() => runCode(null, this.iframe));
     $('#clear-term').click(() => Terra.app.layout.term.reset());
 
@@ -300,6 +306,14 @@ export default class Layout extends GoldenLayout {
       const $element = $(event.target);
       this.setTheme($element.data('val'));
       $element.addClass('active').siblings().removeClass('active');
+    });
+
+    // Add event listeners for setttings menu.
+    $('.settings-menu').click((event) => $(event.target).toggleClass('open'));
+    $(document).click((event) => {
+      if (!$(event.target).is($('.settings-menu.open'))) {
+        $('.settings-menu').removeClass('open');
+      }
     });
   };
 }

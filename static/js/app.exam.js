@@ -17,6 +17,7 @@ import {
   parseQueryParams,
 } from './helpers/shared.js';
 import LangWorkerAPI from './lang-worker-api.js';
+import ExamLayout from './layout/layout.exam.js';
 import localStorageManager from './local-storage-manager.js';
 import Terra from './terra.js';
 import VFS from './vfs.js';
@@ -51,7 +52,8 @@ export default class ExamApp extends App {
         // Create the content objects that represent each tab in the editor.
         const content = this.generateConfigContent(this.config.tabs, fontSize);
 
-        if (Object.keys(VFS.files).length === 0) {
+        const hasPersistedState = Object.keys(VFS.files).length > 0;
+        if (!hasPersistedState) {
           // Create the files inside the virtual file system.
           content.forEach((file) => {
             VFS.createFile({
@@ -67,6 +69,7 @@ export default class ExamApp extends App {
           proglang,
           buttonConfig: this.config.buttons,
           autocomplete: this.config.autocomplete,
+          forceDefaultLayout: !hasPersistedState,
         });
 
         // Make layout instance available at all times.
@@ -79,6 +82,34 @@ export default class ExamApp extends App {
         $('.navbar-right').remove();
       });
     });
+  }
+
+  /**
+   * Create the layout object with the given content objects and font-size.
+   *
+   * @param {array} content - List of content objects.
+   * @param {number} fontSize - The default font-size to be used.
+   * @param {object} options - Additional options object.
+   * @param {string} options.proglang - The programming language to be used.
+   * @param {object} options.buttonConfig - Object containing buttons with their
+   * commands that will be rendered by the layout.
+   * @returns {ExamLayout} The layout instance.
+   */
+  createLayout = (content, fontSize, options = {}) => {
+    const defaultLayoutConfig = {
+      content: [
+        {
+          content: [
+            { content },
+            {
+              componentState: { fontSize },
+            }
+          ]
+        }
+      ]
+    };
+
+    return new ExamLayout(defaultLayoutConfig, options);
   }
 
   postSetupLayout = () => {
@@ -333,10 +364,9 @@ export default class ExamApp extends App {
    *
    * @param {string} url - The endpoint where the files will be submitted to.
    * @param {string} uuid - Unique user ID that the POST request needs for
-   *                        verification purposes.
+   * verification purposes.
    * @param {boolean} [force] - Whether to trigger the auto-save immediately.
-   * @param {function} [saveCallback] - Callback when the save has been
-   * done.
+   * @param {function} [saveCallback] - Callback when the save has been done.
    */
   registerAutoSave = (url, uuid, force, saveCallback) => {
     if (Terra.v.autoSaveIntervalId) {
@@ -434,7 +464,7 @@ export default class ExamApp extends App {
     getAllEditorTabs().forEach((tab) => {
       const filename = tab.config.title;
       const fileId = tab.container.getState().fileId;
-      const file = VFS.findFileById(fileId)
+      const file = VFS.findFileById(fileId);
       const blob = new Blob([file.content], { type: 'text/plain' });
       formData.append(`files[${filename}]`, blob, filename);
     });
@@ -513,8 +543,8 @@ export default class ExamApp extends App {
     // Wait for the modal to be shown and then execute the code.
     // interval = 300ms for the opening transition to be completed.
     const submitTimeoutId = setTimeout(async () => {
-      const config = await this.loadConfig();
-      this.registerAutoSave(config.postback, config.code, true, () => {
+      await this.loadConfig();
+      this.registerAutoSave(this.config.postback, this.config.code, true, () => {
         // Stop all timeouts after the first successful save.
         clearTimeout(infoMsgTimeoutId);
         clearTimeout(submitTimeoutId);
