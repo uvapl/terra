@@ -25,7 +25,7 @@ import fileTreeManager from '../file-tree-manager.js';
 /**
  * Editor component for GoldenLayout.
  */
-export default class EditorComponent {
+export default class EditorComponent extends EventTarget {
   /**
    * Component container object.
    * @type {GoldenLayout.ItemContainer}
@@ -57,7 +57,14 @@ export default class EditorComponent {
   fakeOnContainerOpenEvent = false;
   fakeOnEditorFocusEvent = false;
 
+  /**
+   * Indicates whether the user is currently typing in the editor.
+   * @type {boolean}
+   */
+  userIsEditing = false;
+
   constructor(container, state) {
+    super();
     this.container = container;
     this.state = state;
 
@@ -210,15 +217,20 @@ export default class EditorComponent {
   }
 
   /**
-   * Callback when the editor content changes, triggered per keystroke.
+   * Callback when the editor content changes, triggered each keystroke.
    */
   onEditorChange = () => {
-    Terra.v.blockLFSPolling = true;
     this.container.extendState({ value: this.editor.getValue() });
+
+    if (!this.userIsEditing) {
+      this.userIsEditing = true;
+      this.dispatchEvent(new Event('startEditing'));
+    }
 
     clearTimeout(this.userIsTypingTimeoutId);
     this.userIsTypingTimeoutId = setTimeout(() => {
-      Terra.v.blockLFSPolling = false;
+      this.userIsEditing = false;
+      this.dispatchEvent(new Event('stopEditing'));
     }, seconds(2));
   }
 

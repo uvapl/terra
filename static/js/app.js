@@ -18,15 +18,44 @@ export default class App {
     // Await the setupLayout because some apps might need to do async work.
     await this.setupLayout();
 
+    // Register the editor tab created callback *before* the layout is
+    // initialized to ensure it is always called properly.
+    this.layout.on('tabCreated', (tab) => this._call('onEditorTabCreated', [tab]));
+
     // We register the postSetupLayout as a callback, which will be called when
     // the subsequent init() function has finished.
     this.layout.on('initialised', () => this._call('postSetupLayout'));
 
+    // Start initializing the layout.
     this.layout.init();
   }
 
+  /**
+   * Other apps that extend this class are expected to implement this.
+   */
   setupLayout = () => {
     console.info('setupLayout() not implemented');
+  }
+
+  /**
+   * Callback function when a new tab has been created in the layout.
+   *
+   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
+   */
+  _onEditorTabCreated = (tab) => {
+    if (tab.contentItem.isTerminal) return;
+
+    const editorComponent = tab.contentItem.instance;
+
+    editorComponent.addEventListener(
+      'startEditing',
+      () => this._call('onEditorStartEditing', [editorComponent])
+    );
+
+    editorComponent.addEventListener(
+      'stopEditing',
+      () => this._call('onEditorStopEditing', [editorComponent])
+    );
   }
 
   /**
@@ -57,22 +86,9 @@ export default class App {
   }
 
   /**
-   * Called after the layout has been setup to do some post setup work.
+   * Callback functions for when the editor starts editing.
    */
-  _postSetupLayout = () => {
-    this.layout.on('tabCreated', (tab) => {
-      const editorComponent = tab.contentItem.instance;
-      const { editor } = editorComponent;
-      if (editor) {
-        editor.on('change', () => this._call('onEditorChange', [editorComponent]));
-      }
-    });
-  }
-
-  /**
-   * Callback functions that is called when any editor its content changes.
-   */
-  _onEditorChange = (editorComponent) => {
+  _onEditorStartEditing = (editorComponent) => {
     const { fileId } = editorComponent.container.getState();
     if (fileId) {
       VFS.updateFile(fileId, {

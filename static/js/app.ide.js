@@ -67,13 +67,12 @@ export default class IDEApp extends App {
     this.layout.init();
   }
 
-  onEditorChange = () => {
+  onEditorStartEditing = () => {
     Terra.v.blockLFSPolling = true;
+  }
 
-    clearTimeout(this.userIsTypingTimeoutId);
-    this.userIsTypingTimeoutId = setTimeout(() => {
-      Terra.v.blockLFSPolling = false;
-    }, seconds(2));
+  onEditorStopEditing = () => {
+    Terra.v.blockLFSPolling = false;
   }
 
   /**
