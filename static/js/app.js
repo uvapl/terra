@@ -1,7 +1,12 @@
+import Layout from './layout/layout.js';
+import { uuidv4 } from './helpers/shared.js'
+import { IS_IFRAME } from './constants.js';
+import VFS from './vfs.js';
+
 /**
  * Base class that is extended for each of the apps.
  */
-class App {
+export default class App {
 
   /**
    * Reference to the GoldenLayout instance.
@@ -70,7 +75,7 @@ class App {
   _onEditorChange = (editorComponent) => {
     const { fileId } = editorComponent.container.getState();
     if (fileId) {
-      Terra.vfs.updateFile(fileId, {
+      VFS.updateFile(fileId, {
         content: editorComponent.editor.getValue(),
       });
     }
@@ -91,7 +96,7 @@ class App {
       componentState: {
         fontSize: fontSize,
         value: tabs[filename],
-        fileId: Terra.f.uuidv4(),
+        fileId: uuidv4(),
       },
       title: filename,
       isClosable: false,
@@ -120,7 +125,7 @@ class App {
       },
       dimensions: {
         headerHeight: 30,
-        borderWidth: Terra.c.IS_FRAME ? 0 : 10,
+        borderWidth: IS_IFRAME ? 0 : 10,
       },
       content: [
         {

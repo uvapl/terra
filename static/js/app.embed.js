@@ -1,6 +1,20 @@
-class EmbedApp extends App {
+import App from './app.js';
+import { BASE_FONT_SIZE } from './constants.js';
+import { getActiveEditor } from './helpers/editor-component.js'
+import {
+  getFileExtension,
+  makeLocalStorageKey,
+  parseQueryParams,
+  removeIndent,
+} from './helpers/shared.js';
+import VFS from './vfs.js';
+import Terra from './terra.js';
+import LangWorkerAPI from './lang-worker-api.js';
+import localStorageManager from './local-storage-manager.js';
+
+export default class EmbedApp extends App {
   setupLayout = () => {
-    const queryParams = Terra.f.parseQueryParams();
+    const queryParams = parseQueryParams();
     if (typeof queryParams.filename !== 'string') {
       throw Error('No filename provided in query params');
     }
@@ -9,24 +23,24 @@ class EmbedApp extends App {
     const isVertical = !isHorizontal;
 
     // Update local storage key.
-    const currentStorageKey = Terra.f.makeLocalStorageKey(window.location.href);
-    Terra.f.updateLocalStoragePrefix(currentStorageKey);
+    const currentStorageKey = makeLocalStorageKey(window.location.href);
+    localStorageManager.updateLocalStoragePrefix(currentStorageKey);
 
     // Create the tab in the virtual filesystem.
-    Terra.vfs.createFile({ name: queryParams.filename });
+    VFS.createFile({ name: queryParams.filename });
 
     // Create tabs with the filename as key and empty string as the content.
     const tabs = {}
     tabs[queryParams.filename] = '';
 
     // Get the programming language based on the filename.
-    const proglang = Terra.f.getFileExtension(queryParams.filename);
+    const proglang = getFileExtension(queryParams.filename);
 
     // Initialise the programming language specific worker API.
     Terra.langWorkerApi = new LangWorkerAPI(proglang);
 
     // Get the font-size stored in local storage or use fallback value.
-    const fontSize = Terra.f.getLocalStorageItem('font-size', Terra.c.BASE_FONT_SIZE);
+    const fontSize = localStorageManager.getLocalStorageItem('font-size', BASE_FONT_SIZE);
 
     // Create the content objects that represent each tab in the editor.
     const content = this.generateConfigContent(tabs, fontSize);
@@ -48,18 +62,15 @@ class EmbedApp extends App {
   postSetupLayout = () => {
     // Listen for the content of the file to be received.
     window.addEventListener('message', function(event) {
-      const tab = Terra.f.getActiveEditor();
+      const tab = getActiveEditor();
       const editor = tab.instance.editor;
       const fileId = tab.instance.container.getState().fileId;
-      const content = Terra.f.removeIndent(event.data);
+      const content = removeIndent(event.data);
       if (content) {
-        Terra.vfs.updateFile(fileId, { content });
+        VFS.updateFile(fileId, { content });
         editor.setValue(content);
         editor.clearSelection();
       }
     });
   }
 }
-
-Terra.app = new EmbedApp();
-Terra.app.init();

@@ -1,4 +1,27 @@
-class ExamApp extends App {
+import App from './app.js';
+import {
+  BASE_FONT_SIZE,
+  AUTOSAVE_INTERVAL,
+  AUTOSAVE_START_OFFSET,
+} from './constants.js';
+import { getAllEditorTabs } from './helpers/editor-component.js';
+import {
+  formatDate,
+  getFileExtension,
+  getRandNumBetween,
+  isObject,
+  isValidUrl,
+  makeLocalStorageKey,
+  makeUrl,
+  objectHasKeys,
+  parseQueryParams,
+} from './helpers/shared.js';
+import LangWorkerAPI from './lang-worker-api.js';
+import localStorageManager from './local-storage-manager.js';
+import Terra from './terra.js';
+import VFS from './vfs.js';
+
+export default class ExamApp extends App {
   /**
    * Contains a reference to the exam config.
    * @type {object}
@@ -17,21 +40,21 @@ class ExamApp extends App {
         }
 
         // Get the programming language based on tabs filename.
-        const proglang = Terra.f.getFileExtension(Object.keys(this.config.tabs)[0]);
+        const proglang = getFileExtension(Object.keys(this.config.tabs)[0]);
 
         // Initialise the programming language specific worker API.
         Terra.langWorkerApi = new LangWorkerAPI(proglang);
 
         // Get the font-size stored in local storage or use fallback value.
-        const fontSize = Terra.f.getLocalStorageItem('font-size', Terra.c.BASE_FONT_SIZE);
+        const fontSize = localStorageManager.getLocalStorageItem('font-size', BASE_FONT_SIZE);
 
         // Create the content objects that represent each tab in the editor.
         const content = this.generateConfigContent(this.config.tabs, fontSize);
 
-        if (Object.keys(Terra.vfs.files).length === 0) {
+        if (Object.keys(VFS.files).length === 0) {
           // Create the files inside the virtual file system.
           content.forEach((file) => {
-            Terra.vfs.createFile({
+            VFS.createFile({
               id: file.componentState.fileId,
               name: file.title,
               content: file.componentState.value,
@@ -71,7 +94,7 @@ class ExamApp extends App {
     // Register the auto-save after a certain auto-save offset time to prevent
     // the server receives many requests at once. This helps to spread them out
     // over a minute of time.
-    const startTimeout = Terra.f.getRandNumBetween(0, Terra.c.AUTOSAVE_START_OFFSET);
+    const startTimeout = getRandNumBetween(0, AUTOSAVE_START_OFFSET);
     setTimeout(() => {
       Terra.app.registerAutoSave(this.config.postback, this.config.code);
     }, startTimeout);
@@ -110,17 +133,17 @@ class ExamApp extends App {
       // First, check if there are query params given. If so, validate them.
       // Next, get the config data and when fetched succesfully, save it into
       // local storage and remove the query params from the URL.
-      const queryParams = Terra.f.parseQueryParams();
+      const queryParams = parseQueryParams();
       if (this.validateQueryParams(queryParams)) {
         try {
-          config = await this.getConfig(Terra.f.makeUrl(queryParams.url, { code: queryParams.code }));
+          config = await this.getConfig(makeUrl(queryParams.url, { code: queryParams.code }));
           config.code = queryParams.code;
           config.configUrl = queryParams.url;
 
-          const currentStorageKey = Terra.f.makeLocalStorageKey(config.configUrl);
-          Terra.f.setLocalStorageItem('last-used', currentStorageKey);
-          Terra.f.updateLocalStoragePrefix(currentStorageKey);
-          Terra.f.setLocalStorageItem('config', JSON.stringify(config));
+          const currentStorageKey = makeLocalStorageKey(config.configUrl);
+          localStorageManager.setLocalStorageItem('last-used', currentStorageKey);
+          localStorageManager.updateLocalStoragePrefix(currentStorageKey);
+          localStorageManager.setLocalStorageItem('config', JSON.stringify(config));
 
           // Remove query params from the URL.
           history.replaceState({}, null, window.location.origin + window.location.pathname);
@@ -136,26 +159,26 @@ class ExamApp extends App {
 
         // This should only update the local storage prefix if it's
         // not the default prefix.
-        if (Terra.c.LOCAL_STORAGE_PREFIX === Terra.c.DEFAULT_LOCAL_STORAGE_PREFIX) {
-          const currentStorageKey = Terra.f.getLocalStorageItem('last-used');
+        if (localStorageManager.isDefaultPrefix()) {
+          const currentStorageKey = localStorageManager.getLocalStorageItem('last-used');
 
           if (currentStorageKey) {
-            Terra.f.updateLocalStoragePrefix(currentStorageKey);
+            localStorageManager.updateLocalStoragePrefix(currentStorageKey);
           }
         }
 
-        const localConfig = JSON.parse(Terra.f.getLocalStorageItem('config'));
+        const localConfig = JSON.parse(localStorageManager.getLocalStorageItem('config'));
 
         // Check immediately if the server is reachable by retrieving the
         // config again. If it is reachable, use the localConfig as the actual
         // config, otherwise notify the user that we failed to connect.
         try {
-          const newConfig = await this.getConfig(Terra.f.makeUrl(localConfig.configUrl, { code: localConfig.code }))
+          const newConfig = await this.getConfig(makeUrl(localConfig.configUrl, { code: localConfig.code }))
 
           // While we fallback on localstorage, we still need to check whether
           // the exam is locked, so we have to update the `locked` property.
           localConfig.locked = newConfig.locked;
-          Terra.f.setLocalStorageItem('config', JSON.stringify(localConfig));
+          localStorageManager.setLocalStorageItem('config', JSON.stringify(localConfig));
 
           config = localConfig;
           this.notify('Connected to server', { fadeOutAfterMs: 10 * 1000 });
@@ -170,7 +193,7 @@ class ExamApp extends App {
         reject('Invalid config file');
       } else {
         this.config = config;
-        Terra.vfs.loadFromLocalStorage();
+        VFS.loadFromLocalStorage();
         resolve();
       }
     });
@@ -226,7 +249,7 @@ class ExamApp extends App {
     if ($submitModal.length > 0) {
       let lastSubmissionText = '';
       if (Terra.v.prevAutoSaveTime instanceof Date) {
-        lastSubmissionText = `<br/><br/>✅ The last successful submit was at ${Terra.f.formatDate(Terra.v.prevAutoSaveTime)}.`;
+        lastSubmissionText = `<br/><br/>✅ The last successful submit was at ${formatDate(Terra.v.prevAutoSaveTime)}.`;
       }
 
       $submitModal.find('.modal-body').html(`❌ The submission was locked since the last submit. ${lastSubmissionText}`);
@@ -281,7 +304,7 @@ class ExamApp extends App {
    * @returns {boolean} True when the given object is a valid config object.
    */
   isValidConfig = (config) => {
-    return Terra.f.isObject(config) && Terra.f.objectHasKeys(config, ['tabs', 'postback']);
+    return isObject(config) && objectHasKeys(config, ['tabs', 'postback']);
   }
 
   /**
@@ -291,13 +314,13 @@ class ExamApp extends App {
    * @returns {boolean} True when the query params passes all validation checks.
    */
   validateQueryParams = (queryParams) => {
-    if (!Terra.f.isObject(queryParams) || !Terra.f.objectHasKeys(queryParams, ['url', 'code'])) {
+    if (!isObject(queryParams) || !objectHasKeys(queryParams, ['url', 'code'])) {
       return false;
     }
 
     // At this point, we know we have a 'url' and 'code' param.
     const configUrl = window.decodeURI(queryParams.url);
-    if (!Terra.f.isValidUrl(configUrl)) {
+    if (!isValidUrl(configUrl)) {
       console.error('Invalid config URL');
       return false;
     }
@@ -357,7 +380,7 @@ class ExamApp extends App {
       }
     };
 
-    Terra.v.autoSaveIntervalId = setInterval(run, Terra.c.AUTOSAVE_INTERVAL);
+    Terra.v.autoSaveIntervalId = setInterval(run, AUTOSAVE_INTERVAL);
 
     if (force) run();
   }
@@ -367,12 +390,12 @@ class ExamApp extends App {
    */
   updateLastSaved = (showPrevAutoSaveTime) => {
     const currDate = new Date();
-    const autoSaveTime = Terra.f.formatDate(currDate);
+    const autoSaveTime = formatDate(currDate);
 
     if (showPrevAutoSaveTime) {
       let msg = `Could not save at ${autoSaveTime}`;
       if (Terra.v.prevAutoSaveTime instanceof Date) {
-        msg += ` (last save at ${Terra.f.formatDate(Terra.v.prevAutoSaveTime)})`
+        msg += ` (last save at ${formatDate(Terra.v.prevAutoSaveTime)})`
       }
 
       this.notifyError(msg);
@@ -408,10 +431,10 @@ class ExamApp extends App {
 
     // Go through each tab and create a Blob with the file contents of that tab
     // and append it to the form data.
-    Terra.f.getAllEditorTabs().forEach((tab) => {
+    getAllEditorTabs().forEach((tab) => {
       const filename = tab.config.title;
       const fileId = tab.container.getState().fileId;
-      const file = Terra.vfs.findFileById(fileId)
+      const file = VFS.findFileById(fileId)
       const blob = new Blob([file.content], { type: 'text/plain' });
       formData.append(`files[${filename}]`, blob, filename);
     });
@@ -443,7 +466,7 @@ class ExamApp extends App {
   showSubmitExamModal = () => {
     let lastSaveText = '';
     if (Terra.v.prevAutoSaveTime instanceof Date) {
-      lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${Terra.f.formatDate(Terra.v.prevAutoSaveTime)}</span>.<br/>`;
+      lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${formatDate(Terra.v.prevAutoSaveTime)}</span>.<br/>`;
     }
 
     const modalHtml = `
@@ -499,8 +522,4 @@ class ExamApp extends App {
 
     }, 300);
   }
-
 }
-
-Terra.app = new ExamApp();
-Terra.app.init();

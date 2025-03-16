@@ -1,13 +1,34 @@
 ////////////////////////////////////////////////////////////////////////////////
 // This file contains the logic for the menubar at the top of the IDE app.
 ////////////////////////////////////////////////////////////////////////////////
+import { MODAL_ANIM_DURATION } from '../constants.js';
+import {
+  closeAllFiles,
+  closeFile,
+  getActiveEditor
+} from '../helpers/editor-component.js';
+import {
+  isMac,
+  setFileTreeTitle,
+  showLocalStorageWarning
+} from '../helpers/shared.js';
+import {
+  createModal,
+  hideModal,
+  showModal
+} from '../modal.js';
+import VFS from '../vfs.js';
+import pluginManager from '../plugin-manager.js';
+import Terra from '../terra.js';
+import localStorageManager from '../local-storage-manager.js';
+import fileTreeManager from '../file-tree-manager.js';
 
 $(document).ready(() => {
   $('.menubar [data-keystroke]').each((_, element) => setMenubarKeystrokeIcons(element));
   registerMenubarEventListeners();
 
   // Disable the connect repo button if no credentials are set yet.
-  const gitToken = Terra.f.getLocalStorageItem('git-access-token');
+  const gitToken = localStorageManager.getLocalStorageItem('git-access-token');
   if (!gitToken) {
     $('#menu-item--connect-repo').addClass('disabled');
   }
@@ -17,7 +38,7 @@ $(document).ready(() => {
 // Functions
 // ===========================================================================
 
-function renderGitRepoBranches(branches) {
+export function renderGitRepoBranches(branches) {
   $('#menu-item--branch').addClass('has-dropdown');
   $('#menu-item--branch ul').remove();
 
@@ -37,20 +58,16 @@ function renderGitRepoBranches(branches) {
     if ($element.hasClass('active')) return;
 
     const newBranch = $element.data('val');
-    Terra.f.setLocalStorageItem('git-branch', newBranch);
+    localStorageManager.setLocalStorageItem('git-branch', newBranch);
     $element.addClass('active').siblings().removeClass('active');
 
-    Terra.vfs._git('setRepoBranch', newBranch);
+    VFS._git('setRepoBranch', newBranch);
 
-    const tree = Terra.f.getFileTreeInstance();
-    if (tree) {
-      $('#file-tree').fancytree('destroy');
-      Terra.filetree = null;
-    }
+    fileTreeManager.destroyTree();
 
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
-    Terra.vfs._git('clone');
-    Terra.f.closeAllFiles();
+    VFS._git('clone');
+    closeAllFiles();
   });
 }
 
@@ -62,9 +79,9 @@ function renderGitRepoBranches(branches) {
  */
 function setMenubarKeystrokeIcons(element) {
   const keystroke = $(element).data('keystroke')
-    .replace('CTRL_META', Terra.f.isMac() ? '\u2318' : 'Ctrl')
-    .replace('ALT_OPTION', Terra.f.isMac() ? '\u2325' : 'Alt')
-    .replace('CTRL', Terra.f.isMac() ? '\u2303' : 'Ctrl')
+    .replace('CTRL_META', isMac() ? '\u2318' : 'Ctrl')
+    .replace('ALT_OPTION', isMac() ? '\u2325' : 'Alt')
+    .replace('CTRL', isMac() ? '\u2303' : 'Ctrl')
     .replace('SHIFT', '\u21E7')
     .replace('ENTER', '\u23CE')
     .replace('UP', '\u2191')
@@ -79,13 +96,13 @@ function setMenubarKeystrokeIcons(element) {
   `);
 }
 
-const closeActiveMenuBarMenu = (event) => {
+function closeActiveMenuBarMenu(event) {
   // Focus the active editor tab, except for making new files/folders.
   // Check if the event.target has neither the id menu-item--new-file and
   // and menu-item--new-folder.
   const isInsideMenu = $('.menubar > li.open').find($(event.target)).length > 0;
   const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
-  const editor = Terra.f.getActiveEditor().instance.editor;
+  const editor = getActiveEditor().instance.editor;
   if (isInsideMenu && isNotNewFileOrFolderBtn && editor) {
     // Set Terra.v.blockLFSPolling to prevent file contents being reloaded
     Terra.v.blockLFSPolling = true;
@@ -138,14 +155,14 @@ function registerMenubarEventListeners() {
 
   // All submenu item event listeners.
   // =================================
-  $('#menu-item--new-file').click(() => Terra.f.createNewFileTreeFile());
-  Mousetrap.bind(['ctrl+t'], () => Terra.f.createNewFileTreeFile());
+  $('#menu-item--new-file').click(() => fileTreeManager.createFile());
+  Mousetrap.bind(['ctrl+t'], () => fileTreeManager.createFile());
 
-  $('#menu-item--new-folder').click(() => Terra.f.createNewFileTreeFolder());
-  Mousetrap.bind(['ctrl+shift+t'], () => Terra.f.createNewFileTreeFolder());
+  $('#menu-item--new-folder').click(() => fileTreeManager.createFolder());
+  Mousetrap.bind(['ctrl+shift+t'], () => fileTreeManager.createFolder());
 
-  $('#menu-item--close-file').click(Terra.f.closeFile);
-  Mousetrap.bind(['ctrl+w'], Terra.f.closeFile);
+  $('#menu-item--close-file').click(closeFile);
+  Mousetrap.bind(['ctrl+w'], closeFile);
 
   $('#menu-item--comment').click(Menubar.toggleComment);
 
@@ -188,11 +205,11 @@ function registerMenubarEventListeners() {
 const Menubar = {};
 
 Menubar.openNewFile = () => {
-  Terra.f.createNewFileTreeFile();
+  fileTreeManager.createFile();
 };
 
 Menubar.openLFSFolder = () => {
-  Terra.vfs._lfs('openFolderPicker').then(() => {
+  VFS._lfs('openFolderPicker').then(() => {
     $('#file-tree .info-msg').remove();
     $('#menu-item--close-folder').removeClass('disabled');
   });
@@ -201,21 +218,21 @@ Menubar.openLFSFolder = () => {
 Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-folder').hasClass('disabled')) return;
 
-  Terra.vfs._lfs('closeFolder');
-  Terra.f.closeAllFiles();
+  VFS._lfs('closeFolder');
+  closeAllFiles();
   closeActiveMenuBarMenu(event);
 };
 
 Menubar.undo = () => {
-  Terra.f.getActiveEditor().instance.editor.undo();
+  getActiveEditor().instance.editor.undo();
 };
 
 Menubar.redo = () => {
-  Terra.f.getActiveEditor().instance.editor.redo();
+  getActiveEditor().instance.editor.redo();
 };
 
 Menubar.copyToClipboard = () => {
-  const editor = Terra.f.getActiveEditor().instance.editor;
+  const editor = getActiveEditor().instance.editor;
   if (!editor.selection.isEmpty()) {
     const text = editor.getSelectedText();
     navigator.clipboard.writeText(text);
@@ -226,58 +243,58 @@ Menubar.cut = () => {
   Menubar.copyToClipboard();
 
   // Cut the selected text.
-  Terra.f.getActiveEditor().instance.editor.insert('');
+  getActiveEditor().instance.editor.insert('');
 };
 
 Menubar.toggleComment = () => {
-  Terra.f.getActiveEditor().instance.editor.toggleCommentLines();
+  getActiveEditor().instance.editor.toggleCommentLines();
 }
 
 Menubar.moveLinesUp = () => {
-  Terra.f.getActiveEditor().instance.editor.moveLinesUp();
+  getActiveEditor().instance.editor.moveLinesUp();
 }
 
 Menubar.moveLinesDown = () => {
-  Terra.f.getActiveEditor().instance.editor.moveLinesDown();
+  getActiveEditor().instance.editor.moveLinesDown();
 }
 
 Menubar.pasteFromClipboard = () => {
   navigator.clipboard.readText().then((text) => {
-    Terra.f.getActiveEditor().instance.editor.insert(text);
+    getActiveEditor().instance.editor.insert(text);
   });
 };
 
 Menubar.indent = () => {
-  Terra.f.getActiveEditor().instance.editor.blockIndent();
+  getActiveEditor().instance.editor.blockIndent();
 };
 
 Menubar.outdent = () => {
-  Terra.f.getActiveEditor().instance.editor.blockOutdent();
+  getActiveEditor().instance.editor.blockOutdent();
 };
 
 Menubar.findNext = () => {
-  Terra.f.getActiveEditor().instance.editor.findNext();
+  getActiveEditor().instance.editor.findNext();
 }
 
 Menubar.findPrev = () => {
-  Terra.f.getActiveEditor().instance.editor.findPrevious();
+  getActiveEditor().instance.editor.findPrevious();
 }
 
 Menubar.search = () => {
-  Terra.f.getActiveEditor().instance.editor.execCommand('find');
+  getActiveEditor().instance.editor.execCommand('find');
 };
 
 Menubar.replace = () => {
-  Terra.f.getActiveEditor().instance.editor.execCommand('replace');
+  getActiveEditor().instance.editor.execCommand('replace');
 };
 
 Menubar.runTab = () => {
-  Terra.f.getActiveEditor().instance.editor.execCommand('run');
+  getActiveEditor().instance.editor.execCommand('run');
 };
 
 Menubar.addCredentials = () => {
-  const accessToken = Terra.f.getLocalStorageItem('git-access-token', '');
-  const $modal = Terra.f.createModal({
+  const accessToken = localStorageManager.getLocalStorageItem('git-access-token', '');
+  const $modal = createModal({
     title: 'Add GitHub credentials',
     body: `
       <div class="form-wrapper-full-width">
@@ -304,29 +321,29 @@ Menubar.addCredentials = () => {
     }
   });
 
-  Terra.f.showModal($modal);
+  showModal($modal);
 
-  $modal.find('.cancel-btn').click(() => Terra.f.hideModal($modal));
+  $modal.find('.cancel-btn').click(() => hideModal($modal));
   $modal.find('.confirm-btn').click(() => {
     const accessToken = $modal.find('.git-access-token').val();
     if (accessToken) {
       $('#menu-item--connect-repo').removeClass('disabled');
-      Terra.f.setLocalStorageItem('git-access-token', accessToken);
+      localStorageManager.setLocalStorageItem('git-access-token', accessToken);
     } else {
-      Terra.f.removeLocalStorageItem('git-access-token');
+      localStorageManager.removeLocalStorageItem('git-access-token');
 
       // No credentials set, disable connect repo button.
       $('#menu-item--connect-repo').addClass('disabled');
     }
 
-    Terra.f.hideModal($modal);
+    hideModal($modal);
   });
 };
 
 Menubar.connectRepo = () => {
-  if (!Terra.f.getLocalStorageItem('git-access-token')) return;
+  if (!localStorageManager.getLocalStorageItem('git-access-token')) return;
 
-  const initialRepoLink = Terra.f.getLocalStorageItem('git-repo', '');
+  const initialRepoLink = localStorageManager.getLocalStorageItem('git-repo', '');
 
   const localFilesNotice = initialRepoLink
     ? '<p class="text-small">Leave empty to disconnect from the repository.</p>'
@@ -337,7 +354,7 @@ Menubar.connectRepo = () => {
       </p>
     `;
 
-  const $connectModal = Terra.f.createModal({
+  const $connectModal = createModal({
     title: 'Connect repository',
     body: `
       <p>Only GitHub repostory links are supported. Leave empty to disconnect from the repository.</p>
@@ -355,7 +372,7 @@ Menubar.connectRepo = () => {
     }
   });
 
-  Terra.f.showModal($connectModal).then(() => {
+  showModal($connectModal).then(() => {
     $('#ide-connect-repo-modal .repo-link').focus();
   });
 
@@ -371,7 +388,7 @@ Menubar.connectRepo = () => {
     });
   }
 
-  $connectModal.find('.cancel-btn').click(() => Terra.f.hideModal($connectModal));
+  $connectModal.find('.cancel-btn').click(() => hideModal($connectModal));
   $connectModal.find('.confirm-btn').click(() => {
     const repoLink = $connectModal.find('.repo-link').val().trim();
 
@@ -383,37 +400,37 @@ Menubar.connectRepo = () => {
 
     // Remove previously selected branch such that the clone will use the
     // default branch for the new repo.
-    Terra.f.removeLocalStorageItem('git-branch');
+    localStorageManager.removeLocalStorageItem('git-branch');
 
     if (repoLink) {
-      Terra.f.setLocalStorageItem('git-repo', repoLink);
+      localStorageManager.setLocalStorageItem('git-repo', repoLink);
       console.log('Connecting to repository:', repoLink);
     } else {
       // Disconnect
-      Terra.f.removeLocalStorageItem('git-repo');
+      localStorageManager.removeLocalStorageItem('git-repo');
 
-      Terra.f.showLocalStorageWarning();
+      showLocalStorageWarning();
 
       // Clear all files after disconnecting.
-      Terra.vfs.clear();
-      Terra.f.createFileTree();
-      Terra.f.setFileTreeTitle('local storage');
+      VFS.clear();
+      fileTreeManager.createFileTree();
+      setFileTreeTitle('local storage');
       $('#file-tree .info-msg').remove();
 
-      Terra.pluginManager.triggerEvent('onStorageChange', 'local');
+      pluginManager.triggerEvent('onStorageChange', 'local');
     }
 
-    Terra.f.hideModal($connectModal);
+    hideModal($connectModal);
 
-    if (initialRepoLink || Terra.vfs.isEmpty()) {
-      Terra.vfs.createGitFSWorker();
-    } else if (!Terra.vfs.isEmpty()) {
+    if (initialRepoLink || VFS.isEmpty()) {
+      VFS.createGitFSWorker();
+    } else if (!VFS.isEmpty()) {
       // Confirms with the user whether they want to discard their local files
       // permanently before connecting to a new repository.
 
       // Create a new modal after the previous one is hidden.
       setTimeout(() => {
-        const $confirmModal = Terra.f.createModal({
+        const $confirmModal = createModal({
           title: 'Are you sure?',
           body: `
             <p>
@@ -433,22 +450,22 @@ Menubar.connectRepo = () => {
           }
         });
 
-        Terra.f.showModal($confirmModal);
+        showModal($confirmModal);
 
         $confirmModal.find('.cancel-btn').click(() => {
           // Remove the connected repo link from local storage, because if the
           // user would (accidentally) refresh, then it would automatically
           // clone, which we want to prevent.
-          Terra.f.removeLocalStorageItem('git-repo');
+          localStorageManager.removeLocalStorageItem('git-repo');
 
-          Terra.f.hideModal($confirmModal);
+          hideModal($confirmModal);
         });
         $confirmModal.find('.confirm-btn').click(() => {
-          Terra.f.hideModal($confirmModal);
-          Terra.vfs.createGitFSWorker();
+          hideModal($confirmModal);
+          VFS.createGitFSWorker();
         });
 
-      }, Terra.c.MODAL_ANIM_DURATION);
+      }, MODAL_ANIM_DURATION);
     }
   });
 };

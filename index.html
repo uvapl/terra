@@ -8,7 +8,8 @@
   <link rel="stylesheet" href="static/css/vendor/goldenlayout/1.5.9/goldenlayout-base.css" />
   <link rel="stylesheet" href="static/css/vendor/goldenlayout/1.5.9/goldenlayout-light-theme.css" />
   <link rel="stylesheet" href="static/css/vendor/xterm-5.4.0.min.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-contextmenu/2.7.1/jquery.contextMenu.min.css">
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/jquery-contextmenu/2.7.1/jquery.contextMenu.min.css">
   <link rel="stylesheet" href="static/css/main.ide.css" />
   <title>Terra IDE</title>
 </head>
@@ -19,92 +20,92 @@
     <nav class="navbar">
       <div class="navbar-left">
         <h1 class="page-title">Terra IDE</h1>
-          <ul class="menubar">
-            <li>
-              File
-              <ul>
-                <li id="menu-item--open-folder" data-keystroke="CTRL SHIFT O">Open Folder</li>
-                <li id="menu-item--close-folder" class="disabled">Close Folder</li>
-                <li id="menu-item--new-file" data-keystroke="CTRL T">New File</li>
-                <li id="menu-item--new-folder" data-keystroke="CTRL SHIFT T">New Folder</li>
-                <li id="menu-item--close-file" data-keystroke="CTRL W">Close Current Tab</li>
-              </ul>
-            </li>
-            <li>
-              Text
-              <ul>
-                <li id="menu-item--comment" data-keystroke="CTRL_META /">Toggle comment</li>
-                <div class="separator"></div>
-                <li id="menu-item--move-lines-up" data-keystroke="CTRL_META ALT_OPTION UP">Move Lines Up</li>
-                <li id="menu-item--move-lines-down" data-keystroke="CTRL_META ALT_OPTION DOWN">Move Lines Down</li>
-                <div class="separator"></div>
-                <li id="menu-item--indent" data-keystroke="TAB">Indent</li>
-                <li id="menu-item--outdent" data-keystroke="SHIFT TAB">Outdent</li>
-              </ul>
-            </li>
-            <li>
-              Edit
-              <ul>
-                <li id="menu-item--undo" data-keystroke="CTRL_META Z">Undo</li>
-                <li id="menu-item--redo" data-keystroke="CTRL_META SHIFT Z">Redo</li>
-                <div class="separator"></div>
-                <li class="has-dropdown">
-                  Find
-                  <ul>
-                    <li id="menu-item--search" data-keystroke="CTRL_META F">Find</li>
-                    <li id="menu-item--find-next" data-keystroke="CTRL G">Find Next</li>
-                    <li id="menu-item--find-previous" data-keystroke="CTRL SHIFT G">Find Previous</li>
-                    <div class="separator"></div>
-                    <li id="menu-item--replace">Replace</li>
-                  </ul>
-                </li>
-                <div class="separator"></div>
-                <li id="menu-item--copy" data-keystroke="CTRL_META C">Copy</li>
-                <li id="menu-item--cut" data-keystroke="CTRL_META X">Cut</li>
-                <li id="menu-item--paste" data-keystroke="CTRL_META V">Paste</li>
-              </ul>
-            </li>
-            <li>
-              View
-              <ul>
-                <li id="menu-item--reset-layout">Reset Layout</li>
-                <li class="has-dropdown">
-                  Editor theme
-                  <ul id="editor-theme-menu">
-                    <li data-val="light">Light</li>
-                    <li data-val="dark">Dark</li>
-                  </ul>
-                </li>
-                <li class="has-dropdown">
-                  Font size
-                  <ul id="font-size-menu">
-                    <li data-val="10">10</li>
-                    <li data-val="11">11</li>
-                    <li data-val="12">12</li>
-                    <li data-val="14">14</li>
-                    <li data-val="16">16</li>
-                    <li data-val="18">18</li>
-                    <li data-val="24">24</li>
-                    <li data-val="30">30</li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-            <li>
-              Run
-              <ul>
-                <li id="menu-item--run-tab" data-keystroke="CTRL_META ENTER">Current Tab</li>
-              </ul>
-            </li>
-            <li>
-              Git
-              <ul>
-                <li id="menu-item--add-credentials">Add credentials</li>
-                <li id="menu-item--connect-repo">Connect repository</li>
-                <li id="menu-item--branch" class="disabled">Branch</li>
-              </ul>
-            </li>
-          </ul>
+        <ul class="menubar">
+          <li>
+            File
+            <ul>
+              <li id="menu-item--open-folder" data-keystroke="CTRL SHIFT O">Open Folder</li>
+              <li id="menu-item--close-folder" class="disabled">Close Folder</li>
+              <li id="menu-item--new-file" data-keystroke="CTRL T">New File</li>
+              <li id="menu-item--new-folder" data-keystroke="CTRL SHIFT T">New Folder</li>
+              <li id="menu-item--close-file" data-keystroke="CTRL W">Close Current Tab</li>
+            </ul>
+          </li>
+          <li>
+            Text
+            <ul>
+              <li id="menu-item--comment" data-keystroke="CTRL_META /">Toggle comment</li>
+              <div class="separator"></div>
+              <li id="menu-item--move-lines-up" data-keystroke="CTRL_META ALT_OPTION UP">Move Lines Up</li>
+              <li id="menu-item--move-lines-down" data-keystroke="CTRL_META ALT_OPTION DOWN">Move Lines Down</li>
+              <div class="separator"></div>
+              <li id="menu-item--indent" data-keystroke="TAB">Indent</li>
+              <li id="menu-item--outdent" data-keystroke="SHIFT TAB">Outdent</li>
+            </ul>
+          </li>
+          <li>
+            Edit
+            <ul>
+              <li id="menu-item--undo" data-keystroke="CTRL_META Z">Undo</li>
+              <li id="menu-item--redo" data-keystroke="CTRL_META SHIFT Z">Redo</li>
+              <div class="separator"></div>
+              <li class="has-dropdown">
+                Find
+                <ul>
+                  <li id="menu-item--search" data-keystroke="CTRL_META F">Find</li>
+                  <li id="menu-item--find-next" data-keystroke="CTRL G">Find Next</li>
+                  <li id="menu-item--find-previous" data-keystroke="CTRL SHIFT G">Find Previous</li>
+                  <div class="separator"></div>
+                  <li id="menu-item--replace">Replace</li>
+                </ul>
+              </li>
+              <div class="separator"></div>
+              <li id="menu-item--copy" data-keystroke="CTRL_META C">Copy</li>
+              <li id="menu-item--cut" data-keystroke="CTRL_META X">Cut</li>
+              <li id="menu-item--paste" data-keystroke="CTRL_META V">Paste</li>
+            </ul>
+          </li>
+          <li>
+            View
+            <ul>
+              <li id="menu-item--reset-layout">Reset Layout</li>
+              <li class="has-dropdown">
+                Editor theme
+                <ul id="editor-theme-menu">
+                  <li data-val="light">Light</li>
+                  <li data-val="dark">Dark</li>
+                </ul>
+              </li>
+              <li class="has-dropdown">
+                Font size
+                <ul id="font-size-menu">
+                  <li data-val="10">10</li>
+                  <li data-val="11">11</li>
+                  <li data-val="12">12</li>
+                  <li data-val="14">14</li>
+                  <li data-val="16">16</li>
+                  <li data-val="18">18</li>
+                  <li data-val="24">24</li>
+                  <li data-val="30">30</li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+          <li>
+            Run
+            <ul>
+              <li id="menu-item--run-tab" data-keystroke="CTRL_META ENTER">Current Tab</li>
+            </ul>
+          </li>
+          <li>
+            Git
+            <ul>
+              <li id="menu-item--add-credentials">Add credentials</li>
+              <li id="menu-item--connect-repo">Connect repository</li>
+              <li id="menu-item--branch" class="disabled">Branch</li>
+            </ul>
+          </li>
+        </ul>
       </div>
       <div class="msg-container"></div>
       <div class="navbar-right">
@@ -114,12 +115,12 @@
     </nav>
     <div class="layout-outer-container">
       <div class="file-tree-container">
-          <div class="title-container">
-            <span class="title" id="file-tree-title">local storage</span>
-            <button type="button" class="add-folder-btn" id="file-tree--add-folder-btn"></button>
-            <button type="button" class="add-file-btn" id="file-tree--add-file-btn"></button>
-          </div>
-          <div id="file-tree" class="file-tree"></div>
+        <div class="title-container">
+          <span class="title" id="file-tree-title">local storage</span>
+          <button type="button" class="add-folder-btn" id="file-tree--add-folder-btn"></button>
+          <button type="button" class="add-file-btn" id="file-tree--add-file-btn"></button>
+        </div>
+        <div id="file-tree" class="file-tree"></div>
       </div>
       <div id="layout" class="layout-container"></div>
     </div>
@@ -141,31 +142,7 @@
   <script src="static/js/vendor/tooltip/tippy-6.3.7.min.js"></script>
 
   <!-- Load custom scripts -->
-  <script src="static/js/init.js"></script>
-  <script src="static/js/constants.js"></script>
-  <script src="static/js/ide/constants.js"></script>
-  <script src="static/js/helpers/shared.js"></script>
-  <script src="static/js/helpers/editor-component.js"></script>
-  <script src="static/js/helpers/term-component.js"></script>
-  <script src="static/js/plugin-manager.js"></script>
-  <script src="static/js/modal.js"></script>
-  <script src="static/js/vfs.js"></script>
-  <script src="static/js/layout/term.component.js"></script>
-  <script src="static/js/layout/editor.component.js"></script>
-  <script src="static/js/layout/layout.js"></script>
-  <script src="static/js/layout/layout.ide.js"></script>
-  <script src="static/js/lang-worker-api.js"></script>
-  <script src="static/js/gitfs.js"></script>
-  <script src="static/js/ide/menubar.js"></script>
-  <script src="static/js/ide/file-tree.js"></script>
-  <script src="static/js/app.js"></script>
-  <script src="static/js/app.ide.js"></script>
-
-  <!-- Custom plugins -->
-  <script src="static/plugins/check50/check50.js"></script>
-  <script src="static/plugins/right-sidebar/right-sidebar.js"></script>
-  <script src="static/plugins/file-args/file-args.js"></script>
-  <script src="static/plugins/editor-unlink-killer/editor-unlink-killer.js"></script>
+  <script src="static/js/main.ide.js" type="module"></script>
 </body>
 
 </html>

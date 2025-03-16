@@ -1,19 +1,69 @@
+import { IS_IDE, BASE_FONT_SIZE } from '../constants.js';
+import { runButtonCommand, runCode } from '../helpers/editor-component.js';
+import { isMac, isObject } from '../helpers/shared.js';
+import EditorComponent from './editor.component.js';
+import TerminalComponent from './term.component.js';
+import pluginManager from '../plugin-manager.js';
+import Terra from '../terra.js';
+import localStorageManager from '../local-storage-manager.js';
+
 $(window).on('resize', () => {
   if (Terra.app.layout) {
     Terra.app.layout.updateSize(window.innerWidth, window.innerHeight);
   }
 });
 
-class Layout extends GoldenLayout {
+export default class Layout extends GoldenLayout {
+  /**
+   * Whether the layout has been initialised or not.
+   * @type {boolean}
+   */
   initialised = false;
-  proglag = null;
+
+  /**
+   * Only for the Exam app we will have only one programming language,
+   * which we bind in the layout class, in order to check whether we should
+   * render additional config buttons.
+   *
+   * @type {string}
+   */
+  proglang = null;
+
+  /**
+   * The button config only available in the Exam app.
+   * @type {object}
+   */
   buttonConfig = null;
+
+  /**
+   * Wether to show a vertical layout where the terminal is below the editor
+   * instead of the horizontal layout where the terminal is on the right.
+   * @type {boolean}
+   */
   vertical = false;
+
+  /**
+   * Whether the layout is rendered in an iframe or not.
+   * @type {boolean}
+   */
   iframe = false;
+
+  /**
+   * Reference to the default layout config.
+   * @type {object}
+   */
   defaultLayoutConfig = null;
 
+  /**
+   * Reference to the terminal component.
+   * There can only be one terminal component inside any app.
+   *
+   * @type {Terminal}
+   */
+  term = null;
+
   constructor(defaultLayoutConfig, options = {}) {
-    let layoutConfig = Terra.f.getLocalStorageItem('layout');
+    let layoutConfig = localStorageManager.getLocalStorageItem('layout');
     if (layoutConfig && !options.forceDefaultLayout) {
       layoutConfig = JSON.parse(layoutConfig);
     } else {
@@ -27,11 +77,15 @@ class Layout extends GoldenLayout {
     this.iframe = $('body').hasClass('terra-embed');
     this.vertical = options.vertical;
 
-    if (Terra.f.isObject(options.buttonConfig)) {
+    if (isObject(options.buttonConfig)) {
       this.buttonConfig = options.buttonConfig;
     }
 
-    this.on('stateChanged', () => this.onStateChanged());
+    this.on('stateChanged', () => {
+      if (this.isInitialised) {
+        this.onStateChanged();
+      }
+    });
 
     this.on('stackCreated', (stack) => {
       if (!this.initialised) {
@@ -40,14 +94,14 @@ class Layout extends GoldenLayout {
         // through the registerComponent() function, prior to calling this part.
         setTimeout(() => {
           this.emitToAllComponents('afterFirstRender');
-          this.setTheme(Terra.f.getLocalStorageItem('theme') || 'light');
+          this.setTheme(localStorageManager.getLocalStorageItem('theme') || 'light');
           this.createControls();
           this.showTermStartupMessage();
-          if (Terra.c.IS_IDE) {
-            Terra.pluginManager.triggerEvent('onLayoutLoaded');
+          if (IS_IDE) {
+            pluginManager.triggerEvent('onLayoutLoaded');
           }
 
-          if (Array.isArray(options.autocomplete) && options.autocomplete.every(Terra.f.isObject)) {
+          if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
             this.emitToEditorComponents('setCustomAutocompleter', options.autocomplete);
           }
 
@@ -70,10 +124,10 @@ class Layout extends GoldenLayout {
     }
 
     for (const line of msg) {
-      term.write(line + '\n');
+      Terra.app.layout.term.write(line + '\n');
     }
 
-    term.write('\n');
+    Terra.app.layout.term.write('\n');
   }
 
   // Emit an event recursively to all components. Optionally the `fileId` can
@@ -113,7 +167,7 @@ class Layout extends GoldenLayout {
   onStateChanged = () => {
     const config = this.toConfig();
     const state = JSON.stringify(config);
-    Terra.f.setLocalStorageItem('layout', state);
+    localStorageManager.setLocalStorageItem('layout', state);
   }
 
   setTheme = (theme) => {
@@ -128,11 +182,11 @@ class Layout extends GoldenLayout {
     }
 
     this.emitToAllComponents('themeChanged', theme);
-    Terra.f.setLocalStorageItem('theme', theme);
+    localStorageManager.setLocalStorageItem('theme', theme);
   }
 
   getRunCodeButtonHtml = () => {
-    const runCodeShortcut = Terra.f.isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
+    const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
     return `<button id="run-code" class="button primary-btn run-user-code-btn" disabled>Run (${runCodeShortcut})</button>`;
   };
 
@@ -190,7 +244,7 @@ class Layout extends GoldenLayout {
     }
 
     // Add custom buttons to the header.
-    if (this.proglang === 'py' && Terra.f.isObject(this.buttonConfig)) {
+    if (this.proglang === 'py' && isObject(this.buttonConfig)) {
       Object.keys(this.buttonConfig).forEach((name) => {
         const id = name.replace(/\s/g, '-').toLowerCase();
         const selector = `#${id}`;
@@ -203,17 +257,17 @@ class Layout extends GoldenLayout {
         $('.terminal-component-container .lm_header')
           .append(`<button id="${id}" class="button config-btn ${id}-btn" disabled>${name}</button>`);
 
-        $(selector).click(() => Terra.f.runButtonCommand(selector, cmd));
+        $(selector).click(() => runButtonCommand(selector, cmd));
       });
     }
 
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');
-    const currentFontSize = Terra.f.getLocalStorageItem('font-size') || Terra.c.BASE_FONT_SIZE;
+    const currentFontSize = localStorageManager.getLocalStorageItem('font-size') || BASE_FONT_SIZE;
     $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
 
     // Add active state to theme dropdown.
-    const currentTheme = Terra.f.getLocalStorageItem('theme') || 'light';
+    const currentTheme = localStorageManager.getLocalStorageItem('theme') || 'light';
     const $editorThemeMenu = $('#editor-theme-menu');
     $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
 
@@ -229,15 +283,15 @@ class Layout extends GoldenLayout {
   }
 
   addControlsEventListeners = () => {
-    $('#run-code').click(() => Terra.f.runCode(null, this.iframe));
-    $('#clear-term').click(() => term.reset());
+    $('#run-code').click(() => runCode(null, this.iframe));
+    $('#clear-term').click(() => Terra.app.layout.term.reset());
 
     // Update font-size for all components on change.
     $('#font-size-menu').find('li').click((event) => {
       const $element = $(event.target);
       const newFontSize = parseInt($element.data('val'));
       this.emitToAllComponents('fontSizeChanged', newFontSize);
-      Terra.f.setLocalStorageItem('font-size', newFontSize);
+      localStorageManager.setLocalStorageItem('font-size', newFontSize);
       $element.addClass('active').siblings().removeClass('active');
     });
 

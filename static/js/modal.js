@@ -1,3 +1,6 @@
+import { isObject } from './helpers/shared.js';
+import { MODAL_ANIM_DURATION } from './constants.js';
+
 /**
  * Create a new modal, append its HTML to the body, and returns the new modal.
  *
@@ -11,8 +14,8 @@
  * @param {object} [modalOptions.attrs.class] - Optional container classes.
  * @returns {jQuery} The modal element.
  */
-Terra.f.createModal = (modalOptions = {}) => {
-  if (!Terra.f.isObject(modalOptions.attrs)) {
+export function createModal(modalOptions = {}) {
+  if (!isObject(modalOptions.attrs)) {
     modalOptions.attrs = {}
   }
 
@@ -62,14 +65,14 @@ Terra.f.createModal = (modalOptions = {}) => {
  * @param {jQuery} $modal - The modal element reference.
  * @param {boolean} [remove=true] - Whether to remove the modal after hiding.
  */
-Terra.f.hideModal = ($modal, remove = true) => {
+export function hideModal($modal, remove = true) {
   $modal.removeClass('show');
 
   if (remove) {
     // Wait for animation to be completed.
     setTimeout(() => {
       $modal.remove();
-    }, Terra.c.MODAL_ANIM_DURATION);
+    }, MODAL_ANIM_DURATION);
   }
 };
 
@@ -79,12 +82,12 @@ Terra.f.hideModal = ($modal, remove = true) => {
  * @param {jQuery} $modal - The modal element reference.
  * @returns {Promise<void>} Resolves after the model has been shown.
  */
-Terra.f.showModal = ($modal) => {
+export function showModal($modal) {
   return new Promise((resolve) => {
     // Use setTimeout trick to add the class after the modal HTML has been
     // rendered to the DOM to show the fade-in animation.
     setTimeout(() => $modal.addClass('show'), 10);
 
-    setTimeout(() => resolve(), Terra.c.MODAL_ANIM_DURATION);
+    setTimeout(() => resolve(), MODAL_ANIM_DURATION);
   })
 }
