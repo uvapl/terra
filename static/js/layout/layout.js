@@ -78,12 +78,6 @@ export default class Layout extends GoldenLayout {
   vertical = false;
 
   /**
-   * Whether the layout is rendered in an iframe or not.
-   * @type {boolean}
-   */
-  iframe = false;
-
-  /**
    * Reference to the default layout config.
    * @type {object}
    */
@@ -96,6 +90,16 @@ export default class Layout extends GoldenLayout {
    */
   term = null;
 
+  /**
+   * Default terminal startup message. Each element in the array is written on a
+   * separateline.
+   * @type {array}
+   */
+  termStartupMessage = [
+    'Click the "Run" button to execute code.',
+    'Click the "Clear terminal" button to clear this screen.'
+  ];
+
   constructor(additionalLayoutConfig, options = {}) {
     let layoutConfig = localStorageManager.getLocalStorageItem('layout');
     if (layoutConfig && !options.forceDefaultLayout) {
@@ -107,7 +111,6 @@ export default class Layout extends GoldenLayout {
     super(layoutConfig, $('#layout'));
 
     this.proglang = options.proglang;
-    this.iframe = $('body').hasClass('terra-embed');
     this.vertical = options.vertical;
 
     if (isObject(options.buttonConfig)) {
@@ -181,13 +184,7 @@ export default class Layout extends GoldenLayout {
   }
 
   showTermStartupMessage = () => {
-    const msg = ['Click the "Run" button to execute code.'];
-
-    if (!this.iframe) {
-      msg.push('Click the "Clear terminal" button to clear this screen.');
-    }
-
-    for (const line of msg) {
+    for (const line of this.termStartupMessage) {
       Terra.app.layout.term.write(line + '\n');
     }
 

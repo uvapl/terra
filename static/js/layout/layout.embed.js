@@ -1,6 +1,16 @@
 import Layout from './layout.js';
 
 export default class EmbedLayout extends Layout {
+  /**
+   * Whether the layout is rendered in an iframe or not.
+   * @type {boolean}
+   */
+  iframe = true;
+
+  termStartupMessage = [
+    'Click the "Run" button to execute code.',
+  ];
+
   renderButtons = () => {
     const runCodeButtonHtml = this.getRunCodeButtonHtml();
     const settingsMenuHtml = this.getSettingsMenuHtml();
