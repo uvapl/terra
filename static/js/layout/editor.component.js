@@ -1,7 +1,31 @@
+import { LFS_MAX_FILE_SIZE, IS_IDE, BASE_FONT_SIZE } from '../constants.js';
+import {
+  closeFile,
+  getAceCompleters,
+  getActiveEditor,
+  getAllEditorTabs,
+  runCode,
+  saveFile
+} from '../helpers/editor-component.js';
+import {
+  getFileExtension,
+  hasGitFSWorker,
+  hasLFSApi,
+  seconds
+} from '../helpers/shared.js';
+import { createLangWorkerApi } from '../lang-worker-api.js';
+import { createModal, hideModal, showModal } from '../modal.js';
+import VFS from '../vfs.js';
+import LFS from '../lfs.js';
+import pluginManager from '../plugin-manager.js';
+import Terra from '../terra.js';
+import localStorageManager from '../local-storage-manager.js';
+import fileTreeManager from '../file-tree-manager.js';
+
 /**
  * Editor component for GoldenLayout.
  */
-class EditorComponent {
+export default class EditorComponent extends EventTarget {
   /**
    * Component container object.
    * @type {GoldenLayout.ItemContainer}
@@ -33,7 +57,14 @@ class EditorComponent {
   fakeOnContainerOpenEvent = false;
   fakeOnEditorFocusEvent = false;
 
+  /**
+   * Indicates whether the user is currently typing in the editor.
+   * @type {boolean}
+   */
+  userIsEditing = false;
+
   constructor(container, state) {
+    super();
     this.container = container;
     this.state = state;
 
@@ -46,12 +77,12 @@ class EditorComponent {
     this.bindEditorCommands();
     this.bindEditorEvents();
 
-    this.setTheme(Terra.f.getLocalStorageItem('theme') || 'light');
-    this.setFontSize(this.state.fontSize || Terra.c.BASE_FONT_SIZE);
+    this.setTheme(localStorageManager.getLocalStorageItem('theme') || 'light');
+    this.setFontSize(this.state.fontSize || BASE_FONT_SIZE);
 
     // Set the proglang, or use 'text' as the filetype if there's no file ext.
     const filename = this.container.parent.config.title;
-    const proglang = filename.includes('.') ? Terra.f.getFileExtension(filename) : 'text';
+    const proglang = filename.includes('.') ? getFileExtension(filename) : 'text';
     this.setProgLang(proglang);
   }
 
@@ -74,7 +105,7 @@ class EditorComponent {
     this.editor.setOption('enableLiveAutocompletion', true);
     this.editor.setValue(this.state.value || '');
     this.editor.clearSelection();
-    this.editor.completers = Terra.f.getAceCompleters();
+    this.editor.completers = getAceCompleters();
   }
 
   /**
@@ -88,15 +119,15 @@ class EditorComponent {
     this.editor.commands.addCommand({
       name: 'run',
       bindKey: { win: 'Ctrl+Enter', mac: 'Command+Enter' },
-      exec: () => Terra.f.runCode(),
+      exec: () => runCode(),
     });
 
     this.editor.commands.addCommand({
       name: 'save',
       bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
       exec: () => {
-        if (Terra.c.IS_IDE) {
-          Terra.f.saveFile();
+        if (IS_IDE) {
+          saveFile();
         }
       }
     });
@@ -113,11 +144,11 @@ class EditorComponent {
       exec: () => this.editor.moveLinesDown(),
     });
 
-    if (Terra.c.IS_IDE) {
+    if (IS_IDE) {
       this.bindEditorIDECommands();
     }
 
-    if (Terra.f.hasLFSApi()) {
+    if (hasLFSApi()) {
       this.bindEditorLFSCommands();
     }
   }
@@ -129,19 +160,19 @@ class EditorComponent {
     this.editor.commands.addCommand({
       name: 'closeFile',
       bindKey: 'Ctrl+W',
-      exec: () => Terra.f.closeFile(),
+      exec: () => closeFile(),
     });
 
     this.editor.commands.addCommand({
       name: 'createNewFileTreeFile',
       bindKey: 'Ctrl+T',
-      exec: () => Terra.f.createNewFileTreeFile(),
+      exec: () => fileTreeManager.createFile(),
     });
 
     this.editor.commands.addCommand({
       name: 'createNewFileTreeFolder',
       bindKey: 'Ctrl+Shift+T',
-      exec: () => Terra.f.createNewFileTreeFolder(),
+      exec: () => fileTreeManager.createFolder(),
     });
   }
 
@@ -150,14 +181,14 @@ class EditorComponent {
    */
   bindEditorLFSCommands = () => {
     this.editor.commands.on('exec', (e) => {
-      if (Terra.f.hasLFS() && Terra.lfs.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
+      if (hasLFSApi() && LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
         const inputText = e.args.text || '';
         const filesize = new Blob([this.editor.getValue() + inputText]).size;
-        if (filesize >= Terra.c.LFS_MAX_FILE_SIZE) {
+        if (filesize >= LFS_MAX_FILE_SIZE) {
           // Prevent the event from happening.
           e.preventDefault();
 
-          const $modal = Terra.f.createModal({
+          const $modal = createModal({
             title: 'Exceeded maximum file size',
             body: 'The file size exceeds the maximum file size. This limit is solely required when you are connected to your local filesystem. Please reduce the file size beforing adding more content.',
             footer: ' <button type="button" class="button primary-btn confirm-btn">Go back</button>',
@@ -168,8 +199,8 @@ class EditorComponent {
             }
           });
 
-          Terra.f.showModal($modal);
-          $modal.find('.confirm-btn').click(() => Terra.f.hideModal($modal));
+          showModal($modal);
+          $modal.find('.confirm-btn').click(() => hideModal($modal));
         }
       }
     });
@@ -180,30 +211,27 @@ class EditorComponent {
    */
   onEditorLoad = () => {
     this.editor.getSession().getUndoMananger().reset();
-    if (Terra.c.IS_IDE) {
-      Terra.pluginManager.call('onEditorLoad', this.editor);
+    if (IS_IDE) {
+      pluginManager.call('onEditorLoad', this.editor);
     }
   }
 
   /**
-   * Callback when the editor content changes, triggered per keystroke.
+   * Callback when the editor content changes, triggered each keystroke.
    */
   onEditorChange = () => {
-    Terra.v.blockLFSPolling = true;
-    Terra.v.editorIsDirty = true;
     this.container.extendState({ value: this.editor.getValue() });
 
-    const { fileId } = this.container.getState();
-    if (fileId) {
-      Terra.vfs.updateFile(fileId, {
-        content: this.editor.getValue(),
-      });
+    if (!this.userIsEditing) {
+      this.userIsEditing = true;
+      this.dispatchEvent(new Event('startEditing'));
     }
 
     clearTimeout(this.userIsTypingTimeoutId);
     this.userIsTypingTimeoutId = setTimeout(() => {
-      Terra.v.blockLFSPolling = false;
-    }, Terra.f.seconds(2));
+      this.userIsEditing = false;
+      this.dispatchEvent(new Event('stopEditing'));
+    }, seconds(2));
   }
 
   /**
@@ -244,8 +272,8 @@ class EditorComponent {
     // non-IDE versions, because the ID always uses IDs properly and can have
     // multiple filenames. It can be assumed that both the exam and iframe will
     // not have duplicate filenames.
-    if (!Terra.c.IS_IDE) {
-      const file = Terra.vfs.findFileWhere({ name: this.container.parent.config.title });
+    if (!IS_IDE) {
+      const file = VFS.findFileWhere({ name: this.container.parent.config.title });
       const { fileId } = this.container.getState();
       if (!fileId || (file && fileId !== file.id)) {
         this.container.extendState({ fileId: file.id });
@@ -255,11 +283,11 @@ class EditorComponent {
     // Add custom class for styling purposes.
     this.getParentComponentElement().classList.add('component-container', 'editor-component-container');
 
-    if (!Terra.f.getActiveEditor()) {
+    if (!getActiveEditor()) {
       this.setActiveEditor();
     }
 
-    if (Terra.c.IS_IDE) {
+    if (IS_IDE) {
       this.reloadFileContent(true);
     }
 
@@ -273,23 +301,23 @@ class EditorComponent {
    * Reload the file content either from VFS or LFS.
    * This only applies for the IDE.
    *
-   * @param {boolen} [force] - True to force reload the file content from LFS.
+   * @param {boolean} [force] - True to force reload the file content from LFS.
    */
   reloadFileContent = (force = false) => {
     if (Terra.v.blockLFSPolling && !force) return;
 
-    const file = Terra.vfs.findFileById(this.container.getState().fileId);
+    const file = VFS.findFileById(this.container.getState().fileId);
     if (file) {
-      if (Terra.f.hasLFS() && Terra.lfs.loaded && typeof file.size === 'number' && file.size > Terra.c.LFS_MAX_FILE_SIZE) {
+      if (hasLFSApi() && LFS.loaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
         // Disable the editor if the file is too large.
         this.editor.container.classList.add('exceeded-filesize');
         this.editor.setReadOnly(true);
         this.editor.clearSelection();
         this.editor.blur();
-      } else if (Terra.f.hasLFS() && !Terra.f.hasGitFSWorker() && !file.content) {
+      } else if (hasLFSApi() && LFS.loaded && !hasGitFSWorker() && !file.content) {
         // Load the file content from LFS.
         const cursorPos = this.editor.getCursorPosition()
-        Terra.lfs.getFileContent(file.id).then((content) => {
+        LFS.getFileContent(file.id).then((content) => {
           // Only update the content if it has changed.
           if (this.editor && typeof content === 'string' && this.editor.getValue() !== content) {
             this.editor.setValue(content);
@@ -360,7 +388,7 @@ class EditorComponent {
 
     // If it's the last tab being closed, then we insert another 'Untitled' tab,
     // because we always need at least one tab open.
-    const tabs = Terra.f.getAllEditorTabs();
+    const tabs = getAllEditorTabs();
     const totalTabs = tabs.length;
 
     if (totalTabs >= 2) {
@@ -376,7 +404,7 @@ class EditorComponent {
         type: 'component',
         componentName: 'editor',
         componentState: {
-          fontSize: Terra.c.BASE_FONT_SIZE,
+          fontSize: BASE_FONT_SIZE,
         },
         title: 'Untitled',
       });
@@ -398,11 +426,11 @@ class EditorComponent {
   /**
    * Set the active editor.
    *
-   * @param {*} value - The editor instance to set as active.
+   * @param {*} editor - The editor instance to set as active.
    */
-  setActiveEditor = (value) => {
-    Terra.layout._lastActiveEditor = (typeof value !== 'undefined')
-      ? value
+  setActiveEditor = (editor) => {
+    Terra.app.layout._lastActiveEditor = (typeof editor !== 'undefined')
+      ? editor
       : this.container.parent;
   }
 
@@ -496,22 +524,22 @@ class EditorComponent {
   bindEditorEvents = () => {
     this.editor.on('load', () => {
       this.onEditorLoad();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorLoad', this);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('onEditorLoad', this);
       }
     });
 
     this.editor.on('change', () => {
       this.onEditorChange();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorChange', this);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('onEditorChange', this);
       }
     });
 
     this.editor.on('focus', () => {
       this.onEditorFocus();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorFocus', this);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('onEditorFocus', this);
       }
     });
   }
@@ -524,71 +552,71 @@ class EditorComponent {
     this.container.on('afterFirstRender', this.onContainerAfterFirstRender);
 
     this.container.on('onTabDragStop', ({ event, tab }) => {
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onTabDragStop', event, tab);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('onTabDragStop', event, tab);
       }
     });
 
     this.container.on('show', () => {
       this.onContainerOpen();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerOpen', this);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('onEditorContainerOpen', this);
       }
     });
 
     this.container.on('lock', () => {
       this.onContainerLock();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerLock', this);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('onEditorContainerLock', this);
       }
     });
 
     this.container.on('setCustomAutocompleter', (completions) => {
       this.onContainerSetCustomAutoCompleter(completions);
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerSetCustomAutoCompleter', completions, this);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('onEditorContainerSetCustomAutoCompleter', completions, this);
       }
     });
 
     this.container.on('unlock', () => {
       this.onContainerUnlock();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerUnlock', this);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('onEditorContainerUnlock', this);
       }
     });
 
     this.container.on('themeChanged', (theme) => {
       this.setTheme(theme);
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('setEditorTheme', theme, this);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('setEditorTheme', theme, this);
       }
     });
 
     this.container.on('fontSizeChanged', (fontSize) => {
       this.setFontSize(fontSize);
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('setEditorFontSize', fontSize, this);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('setEditorFontSize', fontSize, this);
       }
     });
 
     this.container.on('resize', () => {
       this.onContainerResize();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerResize', this);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('onEditorContainerResize', this);
       }
     });
 
     this.container.on('destroy', () => {
       this.onContainerDestroy();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerDestroy', this);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('onEditorContainerDestroy', this);
       }
     });
 
     this.container.on('reloadContent', () => {
       this.reloadFileContent();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerReloadContent', this);
+      if (IS_IDE) {
+        pluginManager.triggerEvent('onEditorContainerReloadContent', this);
       }
     });
   }

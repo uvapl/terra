@@ -1,16 +1,15 @@
-/**
- * Global variable with reference to the term. There can only be one terminal
- * inside the UI, which is needed in other files, therefore we need a reference
- * availble to all files.
- *
- * @type {Terminal}
- */
-let term;
+import { BASE_FONT_SIZE } from '../constants.js';
+import { hideTermCursor } from '../helpers/term-component.js';
+import Terra from '../terra.js';
 
 /**
  * Terminal component for GoldenLayout.
  */
-class TerminalComponent {
+export default class TerminalComponent {
+  /**
+   * [TODO:description]
+   * @type {[TODO:type]}
+   */
   fitAddon = new FitAddon.FitAddon();
   container = null;
   state = null;
@@ -34,17 +33,17 @@ class TerminalComponent {
     // Add custom class for styling purposes.
     this.getParentComponentElement().classList.add('component-container', 'terminal-component-container');
 
-    const fontSize = this.state.fontSize || Terra.c.BASE_FONT_SIZE;
+    const fontSize = this.state.fontSize || BASE_FONT_SIZE;
 
-    term = new Terminal({
+    Terra.app.layout.term = new Terminal({
       convertEol: true,
       disableStdin: true,
       cursorBlink: true,
       fontSize,
       lineHeight: 1.2
-    })
-    term.loadAddon(this.fitAddon);
-    term.open(this.container.getElement()[0]);
+    });
+    Terra.app.layout.term.loadAddon(this.fitAddon);
+    Terra.app.layout.term.open(this.container.getElement()[0]);
     this.fitAddon.fit();
 
     // Trigger a single resize after the terminal has rendered to make sure it
@@ -55,7 +54,7 @@ class TerminalComponent {
 
 
     this.setFontSize(fontSize);
-    Terra.f.hideTermCursor();
+    hideTermCursor();
   }
 
   /**
@@ -69,11 +68,11 @@ class TerminalComponent {
    * Callback when the container is destroyed.
    */
   onContainerDestroy = () => {
-    if (term && typeof term.destroy === 'function') {
-      term.destroy();
+    if (Terra.app.layout.term && typeof Terra.app.layout.term.destroy === 'function') {
+      Terra.app.layout.term.destroy();
     }
 
-    term = null;
+    Terra.app.layout.term = null;
   }
 
   /**
@@ -90,7 +89,7 @@ class TerminalComponent {
    */
   setFontSize = (fontSize) => {
     this.container.extendState({ fontSize });
-    term.options.fontSize = fontSize;
+    Terra.app.layout.term.options.fontSize = fontSize;
     this.fitAddon.fit();
   };
 

@@ -1,38 +1,21 @@
-class LayoutIDE extends Layout {
-  constructor(defaultLayoutConfig, options = {}) {
-    super(defaultLayoutConfig, options);
-  }
+import Layout from './layout.js';
+import { hasLFSApi } from '../helpers/shared.js';
+import LFS from '../lfs.js';
+import localStorageManager from '../local-storage-manager.js';
 
+export default class IDELayout extends Layout {
   getClearTermButtonHtml = () => '<button id="clear-term" class="button clear-term-btn">Clear terminal</button>';
 
-  createControls = () => {
+  renderButtons = () => {
     const runCodeButtonHtml = this.getRunCodeButtonHtml();
     const clearTermButtonHtml = this.getClearTermButtonHtml();
 
+    // Add run-code and clear-term to the DOM.
     const $terminalContainer = $('.terminal-component-container');
-
     $terminalContainer.find('.lm_header').append(runCodeButtonHtml);
     $terminalContainer.find('.lm_header > .lm_controls').prepend(clearTermButtonHtml)
 
-    // Add active state to font-size dropdown.
-    const $fontSizeMenu = $('#font-size-menu');
-    const currentFontSize = Terra.f.getLocalStorageItem('font-size') || Terra.c.BASE_FONT_SIZE;
-    $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
-
-    // Add active state to theme dropdown.
-    const currentTheme = Terra.f.getLocalStorageItem('theme') || 'light';
-    const $editorThemeMenu = $('#editor-theme-menu');
-    $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
-
-    // Add event listeners for setttings menu.
-    $('.settings-menu').click((event) => $(event.target).toggleClass('open'));
-    $(document).click((event) => {
-      if (!$(event.target).is($('.settings-menu.open'))) {
-        $('.settings-menu').removeClass('open');
-      }
-    });
-
-    this.addControlsEventListeners();
+    this.addButtonEventListeners();
   };
 
   onStateChanged = () => {
@@ -41,13 +24,12 @@ class LayoutIDE extends Layout {
     // Exclude the content from all editors for the IDE when LFS is enabled,
     // because for LFS we use lazy loading, i.e. only load the content when
     // opening the file.
-    if (Terra.f.hasLFS() && Terra.lfs.loaded) {
+    if (hasLFSApi() && LFS.loaded) {
       config = this._removeEditorValue(config);
     }
 
-
     const state = JSON.stringify(config);
-    Terra.f.setLocalStorageItem('layout', state);
+    localStorageManager.setLocalStorageItem('layout', state);
   }
 
   _removeEditorValue = (config) => {

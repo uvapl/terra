@@ -1,9 +1,16 @@
+import {
+  makeHtmlAttrs,
+  makeLocalStorageKey,
+} from './helpers/shared.js';
+import Terra from './terra.js';
+import localStorageManager from './local-storage-manager.js';
+
 // Base plugin class that all plugins should extend.
-class TerraPlugin {
+export class TerraPlugin {
   /**
    * Unique name of the plugin without spaces, required.
    * The name will be used to identify the plugin in the plugin manager.
-   * Example: 'foo' can then be referenced as `Terra.pluginManager.plugins.foo`.
+   * Example: 'foo' can then be referenced as `pluginManager.plugins.foo`.
    * @type {string}
    */
   name = null;
@@ -88,7 +95,7 @@ class TerraPlugin {
       attrs.disabled = 'disabled';
     }
 
-    return `<button ${Terra.f.makeHtmlAttrs(attrs)}>${buttonConfig.text}</button>`;
+    return `<button ${makeHtmlAttrs(attrs)}>${buttonConfig.text}</button>`;
   }
 
   /**
@@ -98,8 +105,8 @@ class TerraPlugin {
    */
   loadFromLocalStorage() {
     const className = this.constructor.name;
-    const storageKey = Terra.f.makeLocalStorageKey(className);
-    const state = Terra.f.getLocalStorageItem(storageKey, this.defaultState);
+    const storageKey = makeLocalStorageKey(className);
+    const state = localStorageManager.getLocalStorageItem(storageKey, this.defaultState);
 
     if (state) {
       return JSON.parse(state);
@@ -160,8 +167,8 @@ class TerraPlugin {
    */
   saveState() {
     const className = this.constructor.name;
-    const storageKey = Terra.f.makeLocalStorageKey(className);
-    Terra.f.setLocalStorageItem(storageKey, JSON.stringify(this.state));
+    const storageKey = makeLocalStorageKey(className);
+    localStorageManager.setLocalStorageItem(storageKey, JSON.stringify(this.state));
   }
 
   // EVENT LISTENERS THAT CAN BE IMPLEMENTED FOR EACH PLUGIN.
@@ -226,6 +233,27 @@ class TerraPluginManager {
   }
 
   /**
+   * Load a single plugin by name residing in the `static/plugins` directory.
+   *
+   * @param {string} pluginName - The name of the plugin to load.
+   */
+  loadPlugin = (pluginName) => {
+    import(`../plugins/${pluginName}/${pluginName}.js`).then((mod) => {
+      const plugin = new mod.default();
+      this.register(plugin);
+    });
+  }
+
+  /**
+   * Load multiple plugins names residing in the `static/plugins` directory.
+   *
+   * @param {array} pluginNames - List names of the plugins to load.
+   */
+  loadPlugins = (pluginNames) => {
+    pluginNames.forEach((pluginName) => this.loadPlugin(pluginName));
+  }
+
+  /**
    * Custom behavior for the storage change event. This is necessary because
    * we need to keep track automatically of the current storage name and
    * previous storage name that are required as arguments for the event.
@@ -259,20 +287,21 @@ class TerraPluginManager {
       }
     });
   }
-}
 
-/**
- * Get a plugin by name.
- *
- * @param {string} name - The name of the plugin to retrieve.
- * @throws {Error} - When the plugin does not exist.
- */
-Terra.f.getPlugin = (name) => {
-  if (!Terra.pluginManager.plugins.hasOwnProperty(name)) {
-    throw new Error(`Plugin with name "${name}" does not exist.`);
+
+  /**
+   * Get a plugin by name.
+   *
+   * @param {string} name - The name of the plugin to retrieve.
+   * @throws {Error} - When the plugin does not exist.
+   */
+  getPlugin = (name) => {
+    if (!this.plugins.hasOwnProperty(name)) {
+      throw new Error(`Plugin with name "${name}" does not exist.`);
+    }
+
+    return this.plugins[name];
   }
-
-  return Terra.pluginManager.plugins[name];
 }
 
-Terra.pluginManager = new TerraPluginManager();
+export default new TerraPluginManager();
