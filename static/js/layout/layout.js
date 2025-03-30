@@ -286,8 +286,8 @@ export default class Layout extends GoldenLayout {
   }
 
   addButtonEventListeners = () => {
-    $('#run-code').click(() => Terra.app.runCode(null, this.iframe));
-    $('#clear-term').click(() => Terra.app.layout.term.reset());
+    $('#run-code').click(this.onRunCodeButtonClick);
+    $('#clear-term').click(this.onClearTermButtonClick);
 
     // Update font-size for all components on change.
     $('#font-size-menu').find('li').click((event) => {
@@ -313,4 +313,12 @@ export default class Layout extends GoldenLayout {
       }
     });
   };
+
+  onRunCodeButtonClick = () => {
+    Terra.app.runCode();
+  }
+
+  onClearTermButtonClick = () => {
+    Terra.app.layout.term.reset();
+  }
 }

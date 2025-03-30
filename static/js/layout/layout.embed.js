@@ -1,12 +1,7 @@
+import Terra from '../terra.js';
 import Layout from './layout.js';
 
 export default class EmbedLayout extends Layout {
-  /**
-   * Whether the layout is rendered in an iframe or not.
-   * @type {boolean}
-   */
-  iframe = true;
-
   termStartupMessage = [
     'Click the "Run" button to execute code.',
   ];
@@ -34,5 +29,10 @@ export default class EmbedLayout extends Layout {
     this.renderConfigButtons();
     this.addActiveStates();
     this.addButtonEventListeners();
+  }
+
+
+  onRunCodeButtonClick = () => {
+    Terra.app.runCode(null, true);
   }
 }
