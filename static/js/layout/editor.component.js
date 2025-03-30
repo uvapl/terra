@@ -252,7 +252,7 @@ export default class EditorComponent extends EventTarget {
   /**
    * Callback when the editor container is opened.
    */
-  onContainerOpen = () => {
+  onShow = () => {
     if (!this.editor) return;
 
     if (this.fakeOnContainerOpenEvent) {
@@ -558,7 +558,7 @@ export default class EditorComponent extends EventTarget {
     });
 
     this.container.on('show', () => {
-      this.onContainerOpen();
+      this.onShow();
       if (IS_IDE) {
         pluginManager.triggerEvent('onEditorContainerOpen', this);
       }
