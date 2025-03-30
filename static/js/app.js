@@ -1,30 +1,59 @@
-import Layout from './layout/layout.js';
 import { uuidv4 } from './helpers/shared.js'
-import { IS_IFRAME } from './constants.js';
 import VFS from './vfs.js';
 
 /**
  * Base class that is extended for each of the apps.
  */
 export default class App {
-
   /**
    * Reference to the GoldenLayout instance.
    * @type {GoldenLayout.Layout}
    */
   layout = null;
 
-  init = async () => {
+  constructor() {
+    this._bindThis();
+  }
+
+  /**
+   * Bind all functions to the current instance of the class.
+   */
+  _bindThis() {
+    const functionNames = [];
+
+    let proto = Object.getPrototypeOf(this);
+    while (proto && proto !== Object.prototype) {
+      Object.getOwnPropertyNames(proto).forEach((fn) => {
+        if (functionNames.indexOf(fn) === -1 && typeof this[fn] === 'function' && fn !== 'constructor') {
+          functionNames.push(fn);
+        }
+      });
+
+      // Move up the prototype chain
+      proto = Object.getPrototypeOf(proto);
+    }
+
+    functionNames.forEach((fn) => {
+      this[fn] = this[fn].bind(this);
+    });
+  }
+
+  /**
+   * The initialisation function that is called when the app is loaded. This is
+   * explicitely invoked inside the main.<app-type>.js files rather than the
+   * constructor to ensure that the app is properly loaded before it is used.
+   */
+  async init() {
     // Await the setupLayout because some apps might need to do async work.
     await this.setupLayout();
 
     // Register the editor tab created callback *before* the layout is
     // initialized to ensure it is always called properly.
-    this.layout.on('tabCreated', (tab) => this._call('onEditorTabCreated', [tab]));
+    this.layout.on('tabCreated', this.onEditorTabCreated);
 
     // We register the postSetupLayout as a callback, which will be called when
     // the subsequent init() function has finished.
-    this.layout.on('initialised', () => this._call('postSetupLayout'));
+    this.layout.on('initialised', this.postSetupLayout);
 
     // Start initializing the layout.
     this.layout.init();
@@ -32,63 +61,52 @@ export default class App {
 
   /**
    * Other apps that extend this class are expected to implement this.
+   * This function can be either async or not.
    */
-  setupLayout = () => {
+  async setupLayout() {
     console.info('setupLayout() not implemented');
+  }
+
+  postSetupLayout() {
+    console.info('postSetupLayout() not implemented');
   }
 
   /**
    * Callback function when a new tab has been created in the layout.
    *
+   * This is default functionality and super.onEditorTabCreated() must be called
+   * first in child classes before any additional functionality.
+   *
    * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
    */
-  _onEditorTabCreated = (tab) => {
+  onEditorTabCreated(tab) {
     if (tab.contentItem.isTerminal) return;
 
     const editorComponent = tab.contentItem.instance;
 
-    editorComponent.addEventListener(
-      'startEditing',
-      () => this._call('onEditorStartEditing', [editorComponent])
-    );
-
-    editorComponent.addEventListener(
-      'stopEditing',
-      () => this._call('onEditorStopEditing', [editorComponent])
-    );
-  }
-
-  /**
-   *  Given a function name, call its private function (prefixed with an
-   *  underscore) if it exists, as well as its public function which is only
-   *  implemented in child classes that extend the App class. This logic is
-   *  added to prevent rebinding `this` for every function that is needed as
-   *  well as calling `super.fn()` in child classes. Moreover, there's quite
-   *  some functions that we *always* want to execute, but allow child classes
-   *  to *extend* the logic and not overwrite it.
-   *
-   * @param {string} fn - The function name to execute
-   * @param {array} args - A list of arguments to pass to the function
-   */
-  _call(fn, args) {
-    if (!Array.isArray(args)) {
-      args = [args];
+    if ('onEditorStartEditing' in this && typeof this.onEditorStartEditing === 'function') {
+      editorComponent.addEventListener(
+        'startEditing',
+        () => this.onEditorStartEditing(editorComponent)
+      );
     }
 
-    const privateFn = `_${fn}`;
-    if (typeof this[privateFn] === 'function') {
-      this[privateFn].apply(this, args);
-    }
-
-    if (typeof this[fn] === 'function') {
-      this[fn].apply(this, args);
+    if ('onEditorStopEditing' in this && typeof this.onEditorStopEditing === 'function') {
+      editorComponent.addEventListener(
+        'stopEditing',
+        () => this.onEditorStopEditing(editorComponent)
+      );
     }
   }
 
   /**
    * Callback functions for when the editor starts editing.
+   *
+   * This is default functionality and super.onEditorStartEditing() must be
+   * called first in child classes before any additional functionality.
    */
-  _onEditorStartEditing = (editorComponent) => {
+  onEditorStartEditing(editorComponent) {
+    console.log('[app] start editing');
     const { fileId } = editorComponent.container.getState();
     if (fileId) {
       VFS.updateFile(fileId, {
@@ -105,7 +123,7 @@ export default class App {
    * @param {number} fontSize - The default font-size used for the content.
    * @returns {array} List of content objects.
    */
-  generateConfigContent = (tabs, fontSize) => {
+  generateConfigContent(tabs, fontSize) {
     return Object.keys(tabs).map((filename) => ({
       type: 'component',
       componentName: 'editor',

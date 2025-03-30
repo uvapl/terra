@@ -14,7 +14,7 @@ import localStorageManager from './local-storage-manager.js';
 import EmbedLayout from './layout/layout.embed.js';
 
 export default class EmbedApp extends App {
-  setupLayout = () => {
+  setupLayout() {
     const queryParams = parseQueryParams();
     if (typeof queryParams.filename !== 'string') {
       throw Error('No filename provided in query params');
@@ -60,7 +60,7 @@ export default class EmbedApp extends App {
     return layout;
   }
 
-  postSetupLayout = () => {
+  postSetupLayout() {
     // Listen for the content of the file to be received.
     window.addEventListener('message', function(event) {
       const tab = getActiveEditor();
@@ -85,7 +85,7 @@ export default class EmbedApp extends App {
    * @param {string} options.proglang - The programming language to be used
    * @returns {EmbedLayout} The layout instance.
    */
-  createLayout = (content, fontSize, options = {}) => {
+  createLayout(content, fontSize, options = {}) {
     const defaultLayoutConfig = {
       dimensions: {
         borderWidth: 0,

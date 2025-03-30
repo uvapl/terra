@@ -17,11 +17,11 @@ import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
 
 export default class IDEApp extends App {
-  setupLayout = () => {
+  setupLayout() {
     this.layout = this.createLayout();
   }
 
-  postSetupLayout = () => {
+  postSetupLayout() {
     // Fetch the repo files or the local storage files (vfs) otherwise.
     const repoLink = localStorageManager.getLocalStorageItem('git-repo');
     if (repoLink) {
@@ -45,7 +45,7 @@ export default class IDEApp extends App {
   /**
    * Reset the layout to its initial state.
    */
-  resetLayout = () => {
+  resetLayout() {
     const oldContentConfig = getAllEditorTabs().map((tab) => ({
       title: tab.config.title,
       componentState: {
@@ -67,11 +67,12 @@ export default class IDEApp extends App {
     this.layout.init();
   }
 
-  onEditorStartEditing = () => {
+  onEditorStartEditing(editorComponent) {
+    super.onEditorStartEditing(editorComponent);
     Terra.v.blockLFSPolling = true;
   }
 
-  onEditorStopEditing = () => {
+  onEditorStopEditing(editorComponent) {
     Terra.v.blockLFSPolling = false;
   }
 
@@ -82,7 +83,7 @@ export default class IDEApp extends App {
    * @param {Array} [contentConfig=[]] The content configuration for the layout.
    * @returns {Layout} The layout instance.
    */
-  createLayout = (forceDefaultLayout = false, contentConfig = []) => {
+  createLayout(forceDefaultLayout = false, contentConfig = []) {
     const defaultContentConfig = contentConfig.map((tab) => ({
       type: 'component',
       componentName: 'editor',

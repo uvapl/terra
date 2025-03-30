@@ -29,11 +29,11 @@ export default class ExamApp extends App {
    */
   config = null;
 
-  onEditorChange = () => {
+  onEditorChange() {
     Terra.v.editorIsDirty = true;
   }
 
-  setupLayout = () => {
+  setupLayout() {
     return new Promise((resolve, reject) => {
       this.loadConfig().then(() => {
         if (!this.config.tabs) {
@@ -95,7 +95,7 @@ export default class ExamApp extends App {
    * commands that will be rendered by the layout.
    * @returns {ExamLayout} The layout instance.
    */
-  createLayout = (content, fontSize, options = {}) => {
+  createLayout(content, fontSize, options = {}) {
     const defaultLayoutConfig = {
       content: [
         {
@@ -112,7 +112,7 @@ export default class ExamApp extends App {
     return new ExamLayout(defaultLayoutConfig, options);
   }
 
-  postSetupLayout = () => {
+  postSetupLayout() {
     Terra.v.editorIsDirty = false;
 
     if (this.config.course_name && this.config.exam_name) {
@@ -157,7 +157,7 @@ export default class ExamApp extends App {
    * @returns {Promise<object|string>} The configuration for the app once
    * resolved, or an error when rejected.
    */
-  loadConfig = () => {
+  loadConfig() {
     return new Promise(async (resolve, reject) => {
       let config;
 
@@ -237,7 +237,7 @@ export default class ExamApp extends App {
    * @param {string} url - The URL that returns a JSON config.
    * @returns {Promise<object>} The JSON config object.
    */
-  getConfig = async (url) => {
+  async getConfig(url) {
     return new Promise((resolve, reject) => {
       fetch(url)
         .then((response) => response.json())
@@ -255,7 +255,7 @@ export default class ExamApp extends App {
   /**
    * Lock the entire app, which gets triggered once the exam is over.
    */
-  lock = () => {
+  lock() {
     this.notify('Your code is now locked and cannot be edited anymore.');
 
     // Lock all components, making them read-only.
@@ -295,7 +295,7 @@ export default class ExamApp extends App {
    * @param {string} msg - The message to be displayed.
    * @param {object} options - Additional options for the notification.
    */
-  notifyError = (msg, options) => {
+  notifyError(msg, options) {
     this.notify(msg, { ...options, type: 'error' });
   }
 
@@ -307,7 +307,7 @@ export default class ExamApp extends App {
    * @param {string} options.type - The type of notification (e.g. 'error').
    * @param {number} options.fadeOutAfterMs - The time in milliseconds to fade.
    */
-  notify = (msg, options = {}) => {
+  notify(msg, options = {}) {
     if (window.notifyTimeoutId !== null) {
       clearTimeout(window.notifyTimeoutId);
       window.notifyTimeoutId = null;
@@ -334,7 +334,7 @@ export default class ExamApp extends App {
    * @param {object} config - The config object to validate.
    * @returns {boolean} True when the given object is a valid config object.
    */
-  isValidConfig = (config) => {
+  isValidConfig(config) {
     return isObject(config) && objectHasKeys(config, ['tabs', 'postback']);
   }
 
@@ -344,7 +344,7 @@ export default class ExamApp extends App {
    * @param {object} queryParams - The query parameters object.
    * @returns {boolean} True when the query params passes all validation checks.
    */
-  validateQueryParams = (queryParams) => {
+  validateQueryParams(queryParams) {
     if (!isObject(queryParams) || !objectHasKeys(queryParams, ['url', 'code'])) {
       return false;
     }
@@ -368,7 +368,7 @@ export default class ExamApp extends App {
    * @param {boolean} [force] - Whether to trigger the auto-save immediately.
    * @param {function} [saveCallback] - Callback when the save has been done.
    */
-  registerAutoSave = (url, uuid, force, saveCallback) => {
+  registerAutoSave(url, uuid, force, saveCallback) {
     if (Terra.v.autoSaveIntervalId) {
       clearInterval(Terra.v.autoSaveIntervalId);
     }
@@ -418,7 +418,7 @@ export default class ExamApp extends App {
   /**
    * Update the last saved timestamp in the UI.
    */
-  updateLastSaved = (showPrevAutoSaveTime) => {
+  updateLastSaved(showPrevAutoSaveTime) {
     const currDate = new Date();
     const autoSaveTime = formatDate(currDate);
 
@@ -455,7 +455,7 @@ export default class ExamApp extends App {
    *                        verification purposes.
    * @returns {Promise<Response>} The response from the submission endpoint.
    */
-  doAutoSave = (url, uuid) => {
+  doAutoSave(url, uuid) {
     const formData = new FormData();
     formData.append('code', uuid);
 
@@ -476,7 +476,7 @@ export default class ExamApp extends App {
    * Hide the submit exam modal by removing it completely out of the DOM, which
    * simplifies our code a bit as we can handle a bit less.
    */
-  hideSubmitExamModal = () => {
+  hideSubmitExamModal() {
     let $modal = $('#submit-exam-model');
 
     if ($modal.length === 0) return;
@@ -493,7 +493,7 @@ export default class ExamApp extends App {
   /**
    * Show the modal that does one final submit of all the contents.
    */
-  showSubmitExamModal = () => {
+  showSubmitExamModal() {
     let lastSaveText = '';
     if (Terra.v.prevAutoSaveTime instanceof Date) {
       lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${formatDate(Terra.v.prevAutoSaveTime)}</span>.<br/>`;
