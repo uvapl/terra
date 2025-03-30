@@ -12,6 +12,7 @@ import pluginManager from '../plugin-manager.js';
 import { createLangWorkerApi } from '../lang-worker-api.js';
 import Terra from '../terra.js';
 import fileTreeManager from '../file-tree-manager.js';
+import EditorComponent from '../layout/editor.component.js';
 
 /**
  * Get the active tab its editor instance.
@@ -20,6 +21,18 @@ import fileTreeManager from '../file-tree-manager.js';
  */
 export function getActiveEditor() {
   return Terra.app.layout._lastActiveEditor;
+}
+
+/**
+* Set the active tab its editor instance.
+ *
+ * @param {EditorComponent} editor - The editor instance to set as active.
+ */
+export function setActiveEditor(editor) {
+  console.log('setActivEditor', editor instanceof EditorComponent, editor)
+  Terra.app.layout._lastActiveEditor = editor instanceof EditorComponent
+    ? editor.container.parent
+    : null;
 }
 
 /**

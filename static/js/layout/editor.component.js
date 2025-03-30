@@ -4,7 +4,8 @@ import {
   getAceCompleters,
   getAllEditorTabs,
   runCode,
-  saveFile
+  saveFile,
+  setActiveEditor
 } from '../helpers/editor-component.js';
 import {
   getFileExtension,
@@ -15,7 +16,6 @@ import { createLangWorkerApi } from '../lang-worker-api.js';
 import { createModal, hideModal, showModal } from '../modal.js';
 import LFS from '../lfs.js';
 import pluginManager from '../plugin-manager.js';
-import Terra from '../terra.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
 
@@ -178,6 +178,8 @@ export default class EditorComponent extends EventTarget {
    */
   bindEditorLFSCommands = () => {
     this.editor.commands.on('exec', (e) => {
+      // Verify whether the user exceeded the maximum file size when either
+      // pasting from the clipboard or inserting text (i.e. on each keystroke).
       if (hasLFSApi() && LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
         const inputText = e.args.text || '';
         const filesize = new Blob([this.editor.getValue() + inputText]).size;
@@ -240,7 +242,7 @@ export default class EditorComponent extends EventTarget {
       return;
     }
 
-    this.setActiveEditor();
+    setActiveEditor(this);
 
     // Spawn a new worker if necessary.
     createLangWorkerApi(this.proglang);
@@ -404,8 +406,7 @@ export default class EditorComponent extends EventTarget {
       if (tabs[0].instance.editor) {
         tabs[0].instance.editor.focus();
       }
-    }
-    else if (totalTabs === 1) {
+    } else if (totalTabs === 1) {
       const currentTab = tabs[0];
       currentTab.parent.addChild({
         type: 'component',
@@ -416,7 +417,7 @@ export default class EditorComponent extends EventTarget {
         title: 'Untitled',
       });
     } else {
-      this.setActiveEditor(null);
+      setActiveEditor(null);
     }
 
     this.editor.destroy();
@@ -428,17 +429,6 @@ export default class EditorComponent extends EventTarget {
    */
   getParentComponentElement = () => {
     return this.container.parent.parent.element[0];
-  }
-
-  /**
-   * Set the active editor.
-   *
-   * @param {*} editor - The editor instance to set as active.
-   */
-  setActiveEditor = (editor) => {
-    Terra.app.layout._lastActiveEditor = (typeof editor !== 'undefined')
-      ? editor
-      : this.container.parent;
   }
 
   /**
