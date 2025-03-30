@@ -1,7 +1,7 @@
 import { DROP_AREA_INDICATOR_CLASS } from './ide/constants.js';
 import { getFileExtension, hasLFSApi, isObject, isValidFilename } from './helpers/shared.js'
 import { createModal, hideModal, showModal } from './modal.js'
-import { getAllEditorTabs, openFile, runCode } from './helpers/editor-component.js'
+import { getAllEditorTabs, openFile } from './helpers/editor-component.js'
 import VFS from './vfs.js'
 import LFS from './lfs.js'
 import Terra from './terra.js'
@@ -366,7 +366,7 @@ class FileTreeManager {
           name: 'Run',
           callback: () => {
             Terra.v.userClickedContextMenuItem = true;
-            runCode(node.key);
+            Terra.app.runCode(node.key);
             Terra.v.blockLFSPolling = false;
           }
         };

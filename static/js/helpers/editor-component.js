@@ -29,7 +29,6 @@ export function getActiveEditor() {
  * @param {EditorComponent} editor - The editor instance to set as active.
  */
 export function setActiveEditor(editor) {
-  console.log('setActivEditor', editor instanceof EditorComponent, editor)
   Terra.app.layout._lastActiveEditor = editor instanceof EditorComponent
     ? editor.container.parent
     : null;
@@ -65,7 +64,11 @@ export function getAllEditorFiles() {
  * the recursive search will start.
  * @returns {array} List of all the editor tabs.
  */
-export function getAllEditorTabs(contentItem = Terra.app.layout.root) {
+export function getAllEditorTabs(contentItem) {
+  if (!Terra.app) return [];
+
+  if (!contentItem) contentItem = Terra.app.layout.root;
+
   if (contentItem.isComponent) {
     return contentItem;
   }
@@ -298,81 +301,6 @@ export function saveFile() {
 
     createLangWorkerApi(proglang);
   });
-}
-
-/**
- * Runs the code inside the worker by sending all files to the worker along with
- * the current active tab name. If the `fileId` is set, then solely that file
- * will be run.
- *
- * @param {string} [id] - The ID of the file to run.
- * @param {boolean} [clearTerm=false] Whether to clear the terminal before
- * printing the output.
- */
-export async function runCode(fileId = null, clearTerm = false) {
-  if (clearTerm) Terra.app.layout.term.reset();
-
-  if (Terra.langWorkerApi) {
-    if (!Terra.langWorkerApi.isReady) {
-      // Worker API is busy, wait for it to be done.
-      return;
-    } else if (Terra.langWorkerApi.isRunningCode) {
-      // Terminate worker in cases of infinite loops.
-      return Terra.langWorkerApi.restart(true);
-    }
-  }
-
-  $('#run-code').prop('disabled', true);
-
-  let filename = null;
-  let files = null;
-
-  if (fileId) {
-    // Run given file id.
-    const file = VFS.findFileById(fileId);
-    filename = file.name;
-    files = [file];
-
-    if (!file.content && hasLFSApi() && LFS.loaded) {
-      const content = await LFS.getFileContent(file.id);
-      files = [{ ...file, content }];
-    }
-  } else {
-    const tab = getActiveEditor();
-    fileId = tab.container.getState().fileId;
-    filename = tab.config.title;
-    files = await getAllEditorFiles();
-  }
-
-  // Create a new worker instance if needed.
-  const proglang = getFileExtension(filename);
-  createLangWorkerApi(proglang);
-
-  // Get file args (IDE only).
-  let args = [];
-  if (IS_IDE) {
-    const filepath = VFS.getAbsoluteFilePath(fileId);
-    const fileArgsPlugin = pluginManager.getPlugin('file-args').getState('fileargs');
-    const fileArgs = fileArgsPlugin[filepath];
-
-    const parseArgsRegex = /("[^"]*"|'[^']*'|\S+)/g;
-    args = (fileArgs !== undefined && fileArgs.match(parseArgsRegex)) || [];
-  }
-
-  // Wait for the worker to be ready before running the code.
-  if (Terra.langWorkerApi && !Terra.langWorkerApi.isReady) {
-    const runFileIntervalId = setInterval(() => {
-      if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {
-        Terra.langWorkerApi.runUserCode(filename, files, args);
-        checkForStopCodeButton();
-        clearInterval(runFileIntervalId);
-      }
-    }, 200);
-  } else if (Terra.langWorkerApi) {
-    // If the worker is ready, run the code immediately.
-    Terra.langWorkerApi.runUserCode(filename, files, args);
-    checkForStopCodeButton();
-  }
 }
 
 /**

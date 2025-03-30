@@ -9,7 +9,6 @@ import {
   getFileExtension,
   hasGitFSWorker,
   hasLFSApi,
-  seconds,
 } from './helpers/shared.js';
 import VFS from './vfs.js';
 import Terra from './terra.js';
@@ -17,6 +16,7 @@ import { hasWorker } from './lang-worker-api.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
 import LFS from './lfs.js';
+import pluginManager from './plugin-manager.js';
 
 export default class IDEApp extends App {
   setupLayout() {
@@ -173,4 +173,19 @@ export default class IDEApp extends App {
     return new IDELayout(defaultLayoutConfig, { forceDefaultLayout });
   }
 
+  /**
+   * Get the arguments for the current file.
+   * This is executed just before the user runs the code from an editor.
+   *
+   * @param {string} FileId - The ID of the file to get the arguments for.
+   * @returns {array} The arguments for the current file.
+   */
+  getCurrentFileArgs(fileId) {
+    const filepath = VFS.getAbsoluteFilePath(fileId);
+    const fileArgsPlugin = pluginManager.getPlugin('file-args').getState('fileargs');
+    const fileArgs = fileArgsPlugin[filepath];
+
+    const parseArgsRegex = /("[^"]*"|'[^']*'|\S+)/g;
+    return fileArgs !== undefined ? fileArgs.match(parseArgsRegex) : [];
+  }
 }

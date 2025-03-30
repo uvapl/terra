@@ -3,7 +3,6 @@ import {
   closeFile,
   getAceCompleters,
   getAllEditorTabs,
-  runCode,
   saveFile,
   setActiveEditor
 } from '../helpers/editor-component.js';
@@ -116,7 +115,7 @@ export default class EditorComponent extends EventTarget {
     this.editor.commands.addCommand({
       name: 'run',
       bindKey: { win: 'Ctrl+Enter', mac: 'Command+Enter' },
-      exec: () => runCode(),
+      exec: () => Terra.app.runCode(),
     });
 
     this.editor.commands.addCommand({

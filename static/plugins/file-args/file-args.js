@@ -59,12 +59,9 @@ export default class FileArgsPlugin extends TerraPlugin {
   }
 
   onButtonClick = () => {
-    console.log('onButtonClick')
     if (this.$button.is(':disabled')) return;
-    console.log('not disabled');
 
     const tab = getActiveEditor();
-    console.log('tab', tab);
     if (!tab || tab.instance.proglang !== 'c') return;
 
     const fileId = tab.container.getState().fileId;

@@ -1,5 +1,6 @@
 import { IS_IDE } from './constants.js';
-import { uuidv4 } from './helpers/shared.js'
+import { checkForStopCodeButton, getActiveEditor, getAllEditorFiles } from './helpers/editor-component.js';
+import { getFileExtension, hasLFSApi, uuidv4 } from './helpers/shared.js'
 import { createLangWorkerApi } from './lang-worker-api.js';
 import Terra from './terra.js';
 import VFS from './vfs.js';
@@ -199,5 +200,85 @@ export default class App {
       title: filename,
       isClosable: false,
     }));
+  }
+
+  /**
+   * Runs the code inside the worker by sending all files to the worker along with
+   * the current active tab name. If the `fileId` is set, then solely that file
+   * will be run.
+   *
+   * @param {string} [id] - The ID of the file to run.
+   * @param {boolean} [clearTerm=false] Whether to clear the terminal before
+   * printing the output.
+   */
+  async runCode(fileId = null, clearTerm = false) {
+    if (clearTerm) Terra.app.layout.term.reset();
+
+    // TODO: maybe do if (!Terra.langWorkerApi.isReady) { ... } else { ... }
+    if (Terra.langWorkerApi) {
+      if (!Terra.langWorkerApi.isReady) {
+        // Worker API is busy, wait for it to be done.
+        return;
+      } else if (Terra.langWorkerApi.isRunningCode) {
+        // Terminate worker in cases of infinite loops.
+        return Terra.langWorkerApi.restart(true);
+      }
+    }
+
+    $('#run-code').prop('disabled', true);
+
+    let filename = null;
+    let files = null;
+
+    if (fileId) {
+      // Run given file id.
+      const file = VFS.findFileById(fileId);
+      filename = file.name;
+      files = [file];
+
+      if (!file.content && hasLFSApi() && LFS.loaded) {
+        const content = await LFS.getFileContent(file.id);
+        files = [{ ...file, content }];
+      }
+    } else {
+      const tab = getActiveEditor();
+      fileId = tab.container.getState().fileId;
+      filename = tab.config.title;
+      files = await getAllEditorFiles();
+    }
+
+    // Create a new worker instance if needed.
+    const proglang = getFileExtension(filename);
+    createLangWorkerApi(proglang);
+
+    // Get file args, if any.
+    const args = this.getCurrentFileArgs(fileId);
+
+    // Wait for the worker to be ready before running the code.
+    if (Terra.langWorkerApi && !Terra.langWorkerApi.isReady) {
+      const runFileIntervalId = setInterval(() => {
+        if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {
+          Terra.langWorkerApi.runUserCode(filename, files, args);
+          checkForStopCodeButton();
+          clearInterval(runFileIntervalId);
+        }
+      }, 200);
+    } else if (Terra.langWorkerApi) {
+      // If the worker is ready, run the code immediately.
+      Terra.langWorkerApi.runUserCode(filename, files, args);
+      checkForStopCodeButton();
+    }
+  }
+
+  /**
+   * Get the arguments for the current file.
+   * This is executed just before the user runs the code from an editor.
+   * By default this returns an empty array if not implemented in child classes.
+   *
+   * @param {string} FileId - The ID of the file to get the arguments for.
+   * @returns {array} The arguments for the current file.
+   */
+  getCurrentFileArgs(fileId) {
+    return [];
   }
 }

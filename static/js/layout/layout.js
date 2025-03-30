@@ -1,5 +1,5 @@
 import { IS_IDE, BASE_FONT_SIZE } from '../constants.js';
-import { runButtonCommand, runCode } from '../helpers/editor-component.js';
+import { runButtonCommand } from '../helpers/editor-component.js';
 import { isMac, isObject, mergeObjects } from '../helpers/shared.js';
 import EditorComponent from './editor.component.js';
 import TerminalComponent from './term.component.js';
@@ -286,7 +286,7 @@ export default class Layout extends GoldenLayout {
   }
 
   addButtonEventListeners = () => {
-    $('#run-code').click(() => runCode(null, this.iframe));
+    $('#run-code').click(() => Terra.app.runCode(null, this.iframe));
     $('#clear-term').click(() => Terra.app.layout.term.reset());
 
     // Update font-size for all components on change.
