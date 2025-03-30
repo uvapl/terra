@@ -4,11 +4,13 @@ import IDEApp from './app.ide.js';
 import Terra from './terra.js';
 import pluginManager from './plugin-manager.js';
 
-pluginManager.loadPlugins([
+const plugins = [
   'check50',
   'file-args',
   'right-sidebar',
-]);
+];
 
-Terra.app = new IDEApp();
-Terra.app.init();
+pluginManager.loadPlugins(plugins).then(() => {
+    Terra.app = new IDEApp();
+    Terra.app.init();
+});

@@ -236,21 +236,28 @@ class TerraPluginManager {
    * Load a single plugin by name residing in the `static/plugins` directory.
    *
    * @param {string} pluginName - The name of the plugin to load.
+   * @returns {Promise} Resolves when the plugin is loaded.
    */
   loadPlugin = (pluginName) => {
-    import(`../plugins/${pluginName}/${pluginName}.js`).then((mod) => {
-      const plugin = new mod.default();
-      this.register(plugin);
-    });
+    return new Promise((resolve, reject) => {
+      import(`../plugins/${pluginName}/${pluginName}.js`)
+        .then((mod) => {
+          const plugin = new mod.default();
+          this.register(plugin);
+          resolve();
+        })
+        .catch(reject);
+    })
   }
 
   /**
    * Load multiple plugins names residing in the `static/plugins` directory.
    *
    * @param {array} pluginNames - List names of the plugins to load.
+   * @returns {Promise} Resolves when all plugins are loaded.
    */
   loadPlugins = (pluginNames) => {
-    pluginNames.forEach((pluginName) => this.loadPlugin(pluginName));
+    return Promise.all(pluginNames.map((pluginName) => this.loadPlugin(pluginName)));
   }
 
   /**
