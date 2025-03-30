@@ -1,12 +1,13 @@
 import App from './app.js';
 import IDELayout from './layout/layout.ide.js';
-import { BASE_FONT_SIZE } from './constants.js';
+import { BASE_FONT_SIZE, LFS_MAX_FILE_SIZE } from './constants.js';
 import {
   getActiveEditor,
   getAllEditorTabs
 } from './helpers/editor-component.js';
 import {
   getFileExtension,
+  hasGitFSWorker,
   hasLFSApi,
   seconds,
 } from './helpers/shared.js';
@@ -15,6 +16,7 @@ import Terra from './terra.js';
 import { hasWorker } from './lang-worker-api.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
+import LFS from './lfs.js';
 
 export default class IDEApp extends App {
   setupLayout() {
@@ -67,13 +69,46 @@ export default class IDEApp extends App {
     this.layout.init();
   }
 
+  /**
+   * Callback function when the user starts typing.
+   *
+   * @param {EditorComponent} editorComponent - The editor component instance.
+   */
   onEditorStartEditing(editorComponent) {
     super.onEditorStartEditing(editorComponent);
     Terra.v.blockLFSPolling = true;
   }
 
+  /**
+   * Callback function when the user stops typing.
+   *
+   * @param {EditorComponent} editorComponent - The editor component instance.
+   */
   onEditorStopEditing(editorComponent) {
     Terra.v.blockLFSPolling = false;
+  }
+
+  /**
+   * Reload the file content either from VFS or LFS.
+   *
+   * @param {EditorComponent} editorComponent - The editor component instance.
+   */
+  setEditorFileContent(editorComponent) {
+    const file = VFS.findFileById(editorComponent.getState().fileId);
+    if (!file) return;
+
+    if (hasLFSApi() && LFS.loaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
+      editorComponent.exceededFileSize();
+    } else if (hasLFSApi() && LFS.loaded && !hasGitFSWorker() && !file.content) {
+      // Load the file content from LFS.
+      const cursorPos = editorComponent.getCursorPosition();
+      LFS.getFileContent(file.id).then((content) => {
+        editorComponent.setContent(content);
+        editorComponent.setCursorPosition(cursorPos);
+      });
+    } else {
+      editorComponent.setContent(file.content);
+    }
   }
 
   /**

@@ -2,20 +2,17 @@ import { LFS_MAX_FILE_SIZE, IS_IDE, BASE_FONT_SIZE } from '../constants.js';
 import {
   closeFile,
   getAceCompleters,
-  getActiveEditor,
   getAllEditorTabs,
   runCode,
   saveFile
 } from '../helpers/editor-component.js';
 import {
   getFileExtension,
-  hasGitFSWorker,
   hasLFSApi,
   seconds
 } from '../helpers/shared.js';
 import { createLangWorkerApi } from '../lang-worker-api.js';
 import { createModal, hideModal, showModal } from '../modal.js';
-import VFS from '../vfs.js';
 import LFS from '../lfs.js';
 import pluginManager from '../plugin-manager.js';
 import Terra from '../terra.js';
@@ -81,7 +78,7 @@ export default class EditorComponent extends EventTarget {
     this.setFontSize(this.state.fontSize || BASE_FONT_SIZE);
 
     // Set the proglang, or use 'text' as the filetype if there's no file ext.
-    const filename = this.container.parent.config.title;
+    const filename = this.getFilename();
     const proglang = filename.includes('.') ? getFileExtension(filename) : 'text';
     this.setProgLang(proglang);
   }
@@ -264,71 +261,81 @@ export default class EditorComponent extends EventTarget {
       if (this.editor) {
         this.editor.focus();
       }
-    }, 0)
-
-    // If we ran into a layout state from localStorage that doesn't have
-    // a file ID, or the file ID is not the same, then we should sync the
-    // filesystem ID with this tab state's file ID. We can only do this for
-    // non-IDE versions, because the ID always uses IDs properly and can have
-    // multiple filenames. It can be assumed that both the exam and iframe will
-    // not have duplicate filenames.
-    if (!IS_IDE) {
-      const file = VFS.findFileWhere({ name: this.container.parent.config.title });
-      const { fileId } = this.container.getState();
-      if (!fileId || (file && fileId !== file.id)) {
-        this.container.extendState({ fileId: file.id });
-      }
-    }
+    }, 0);
 
     // Add custom class for styling purposes.
     this.getParentComponentElement().classList.add('component-container', 'editor-component-container');
+  }
 
-    if (!getActiveEditor()) {
-      this.setActiveEditor();
-    }
-
-    if (IS_IDE) {
-      this.reloadFileContent(true);
-    }
-
-    // Spawn a new worker if necessary.
-    if (this.ready) {
-      createLangWorkerApi(this.proglang);
+  /**
+   * Get the cursor position in the editor.
+   *
+   * @returns {Ace.Point} Contains the row and column of the cursor.
+   */
+  getCursorPosition = () => {
+    if (this.editor) {
+      return this.editor.getCursorPosition();
     }
   }
 
   /**
-   * Reload the file content either from VFS or LFS.
-   * This only applies for the IDE.
+   * Set the cursor position in the editor.
    *
-   * @param {boolean} [force] - True to force reload the file content from LFS.
+   * @param {Ace.Point} point - Contains the row and column of the cursor.
    */
-  reloadFileContent = (force = false) => {
-    if (Terra.v.blockLFSPolling && !force) return;
+  setCursorPosition = (point) => {
+    if (this.editor) {
+      this.editor.moveCursorToPosition(point);
+    }
+  }
 
-    const file = VFS.findFileById(this.container.getState().fileId);
-    if (file) {
-      if (hasLFSApi() && LFS.loaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
-        // Disable the editor if the file is too large.
-        this.editor.container.classList.add('exceeded-filesize');
-        this.editor.setReadOnly(true);
-        this.editor.clearSelection();
-        this.editor.blur();
-      } else if (hasLFSApi() && LFS.loaded && !hasGitFSWorker() && !file.content) {
-        // Load the file content from LFS.
-        const cursorPos = this.editor.getCursorPosition()
-        LFS.getFileContent(file.id).then((content) => {
-          // Only update the content if it has changed.
-          if (this.editor && typeof content === 'string' && this.editor.getValue() !== content) {
-            this.editor.setValue(content);
-            this.editor.clearSelection();
-            this.editor.moveCursorToPosition(cursorPos);
-          }
-        });
-      } else if (typeof file.content === 'string' && this.editor.getValue() !== file.content) {
-        this.editor.setValue(file.content);
-        this.editor.clearSelection();
-      }
+  /**
+   * Get the current state of the editor.
+   *
+   * @returns {object} The state of the editor.
+   */
+  getState = () => {
+    return this.container.getState();
+  }
+
+  /**
+   * Extend the curent state of the editor.
+   *
+   * @param {object} state - Additional values to overwrite or set.
+   */
+  extendState = (state) => {
+    this.container.extendState(state);
+  }
+
+  /**
+   * Get the filename of the tab that corresponds with this editor.
+   *
+   * @returns {string} The name of the tab.
+   */
+  getFilename = () => {
+    return this.container.parent.config.title;
+  }
+
+  /**
+   * Disable the editor if the content is too large.
+   */
+  exceededFileSize = () => {
+    this.editor.container.classList.add('exceeded-filesize');
+    this.editor.setReadOnly(true);
+    this.editor.clearSelection();
+    this.editor.blur();
+  }
+
+  /**
+   * Set the file content only when it has changed to prevent triggering
+   * unnecessary or redundant events.
+   *
+   * @param {string} content - The content to set.
+   */
+  setContent = (content) => {
+    if (typeof content === 'string' && this.editor.getValue() !== content) {
+      this.editor.setValue(content);
+      this.editor.clearSelection();
     }
   }
 
@@ -559,6 +566,7 @@ export default class EditorComponent extends EventTarget {
 
     this.container.on('show', () => {
       this.onShow();
+      this.dispatchEvent(new Event('onShow'));
       if (IS_IDE) {
         pluginManager.triggerEvent('onEditorContainerOpen', this);
       }
@@ -613,8 +621,8 @@ export default class EditorComponent extends EventTarget {
       }
     });
 
-    this.container.on('reloadContent', () => {
-      this.reloadFileContent();
+    this.container.on('vfsChanged', () => {
+      this.dispatchEvent(new Event('vfsChanged'));
       if (IS_IDE) {
         pluginManager.triggerEvent('onEditorContainerReloadContent', this);
       }

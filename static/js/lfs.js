@@ -211,9 +211,9 @@ class LocalFileSystem {
         tab.container.setState({ fileId: file.id });
       }
     });
-    Terra.app.layout.emitToAllComponents('reloadContent');
 
     this.loaded = true;
+    Terra.app.layout.emitToAllComponents('vfsChanged');
     localStorageManager.setLocalStorageItem('use-lfs', true);
   }
 

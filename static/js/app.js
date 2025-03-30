@@ -1,4 +1,7 @@
+import { IS_IDE } from './constants.js';
 import { uuidv4 } from './helpers/shared.js'
+import { createLangWorkerApi } from './lang-worker-api.js';
+import Terra from './terra.js';
 import VFS from './vfs.js';
 
 /**
@@ -84,35 +87,96 @@ export default class App {
 
     const editorComponent = tab.contentItem.instance;
 
-    if ('onEditorStartEditing' in this && typeof this.onEditorStartEditing === 'function') {
-      editorComponent.addEventListener(
-        'startEditing',
-        () => this.onEditorStartEditing(editorComponent)
-      );
+    // Bind event listeners to custom editor component events.
+    // key = event name
+    // value = callback function
+    const events = {
+      'startEditing': 'onEditorStartEditing',
+      'stopEditing': 'onEditorStopEditing',
+      'onShow': 'onEditorShow',
+      'vfsChanged': 'onVFSChanged',
     }
 
-    if ('onEditorStopEditing' in this && typeof this.onEditorStopEditing === 'function') {
-      editorComponent.addEventListener(
-        'stopEditing',
-        () => this.onEditorStopEditing(editorComponent)
-      );
+    for (const [eventName, fn] of Object.entries(events)) {
+      const callback = this[fn];
+      if (typeof callback === 'function') {
+        editorComponent.addEventListener(eventName, () => callback(editorComponent));
+      }
     }
   }
 
   /**
-   * Callback functions for when the editor starts editing.
+   * Callback function for when the editor starts editing.
    *
    * This is default functionality and super.onEditorStartEditing() must be
    * called first in child classes before any additional functionality.
+   *
+   * @param {EditorComponent} editorComponent - The editor component instance.
    */
   onEditorStartEditing(editorComponent) {
-    console.log('[app] start editing');
     const { fileId } = editorComponent.container.getState();
     if (fileId) {
       VFS.updateFile(fileId, {
         content: editorComponent.editor.getValue(),
       });
     }
+  }
+
+  /**
+   * Callback function when an editor instance becomes visible/active.
+   *
+   * This is default functionality and super.onEditorShow() must be
+   * called first in child classes before any additional functionality.
+   *
+   * @param {EditorComponent} editorComponent - The editor component instance.
+   */
+  onEditorShow(editorComponent) {
+    // If we ran into a layout state from localStorage that doesn't have
+    // a file ID, or the file ID is not the same, then we should sync the
+    // filesystem ID with this tab state's file ID. We can only do this for
+    // non-IDE versions, because the ID always uses IDs properly and can have
+    // multiple filenames. It can be assumed that both the exam and iframe will
+    // not have duplicate filenames.
+    if (!IS_IDE) {
+      const filename = editorComponent.getFilename();
+      const file = VFS.findFileWhere({ name: filename });
+      const { fileId } = editorComponent.getState();
+      if (!fileId || (file && fileId !== file.id)) {
+        editorComponent.extendState({ fileId: file.id });
+      }
+    }
+
+    if (editorComponent.ready) {
+      createLangWorkerApi(editorComponent.proglang);
+    }
+
+    this.setEditorFileContent(editorComponent);
+  }
+
+
+  /**
+   * Invoked after each LFS polling where each editor instance gets notified
+   * that the VFS content has been changed, which requires to reload the file
+   * content from the vfs.
+   *
+   * @param {EditorComponent} editorComponent - The editor component instance.
+   */
+  onVFSChanged(editorComponent) {
+    if (!Terra.v.blockLFSPolling) {
+      this.setEditorFileContent(editorComponent);
+    }
+  }
+
+  /**
+   * Reload the file content either from VFS or LFS.
+   *
+   * @param {EditorComponent} editorComponent - The editor component instance.
+   */
+  setEditorFileContent(editorComponent) {
+    const file = VFS.findFileById(editorComponent.getState().fileId);
+    if (!file) return;
+
+    editorComponent.setContent(file.content);
   }
 
   /**
