@@ -1,4 +1,4 @@
-import { closeAllFiles } from './helpers/editor-component.js';
+import { closeAllFiles, getAllEditorTabs } from './helpers/editor-component.js';
 import { getRepoInfo, hasGitFSWorker } from './helpers/shared.js';
 import { createModal, hideModal, showModal } from './modal.js';
 import VFS from './vfs.js';
@@ -216,6 +216,7 @@ export default class GitFS {
         fileTreeManager.removeLocalStorageWarning();
 
         VFS.importFromGit(payload.repoContents).then(() => {
+          getAllEditorTabs().forEach((tab) => tab.instance.editor.setReadOnly(false));
           fileTreeManager.createFileTree();
         });
         break;
@@ -264,7 +265,6 @@ export default class GitFS {
  * This is considered a private function invoked from VFS.createGitFSWorker.
  */
 export function _createGitFSWorker() {
-  closeAllFiles();
 
   const accessToken = localStorageManager.getLocalStorageItem('git-access-token');
   const repoLink = localStorageManager.getLocalStorageItem('git-repo');
@@ -276,9 +276,12 @@ export function _createGitFSWorker() {
   if (hasGitFSWorker()) {
     Terra.gitfs.terminate();
     Terra.gitfs = null;
+    closeAllFiles();
   }
 
   if (accessToken && repoLink) {
+    getAllEditorTabs().forEach((tab) => tab.instance.editor.setReadOnly(true));
+
     const gitfs = new GitFS(repoLink);
     Terra.gitfs = gitfs;
     gitfs._createWorker(accessToken);

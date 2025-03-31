@@ -19,6 +19,7 @@ import LFS from './lfs.js';
 import { _createGitFSWorker } from './gitfs.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
+import { getAllEditorTabs } from './helpers/editor-component.js';
 
 class VirtualFileSystem {
   constructor() {
@@ -606,6 +607,17 @@ class VirtualFileSystem {
    * @async
    */
   importFromGit = async (repoContents) => {
+    // Preserve all currently open tabs after refreshing.
+    // We first obtain the current filepaths before clearing the VFS.
+    const tabs = {};
+    getAllEditorTabs().forEach((tab) => {
+      const fileId = tab.container.getState().fileId;
+      if (fileId) {
+        const filepath = VFS.getAbsoluteFilePath(fileId);
+        tabs[filepath] = tab;
+      }
+    });
+
     // Remove all files from the virtual filesystem.
     this.clear();
 
@@ -642,6 +654,14 @@ class VirtualFileSystem {
           }, false);
         }
       });
+
+    // Finally, we sync the current tabs with their new file IDs.
+    for (const [filepath, tab] of Object.entries(tabs)) {
+      const file = this.findFileByPath(filepath);
+      if (file) {
+        tab.container.extendState({ fileId: file.id });
+      }
+    }
 
     this.saveState();
   }

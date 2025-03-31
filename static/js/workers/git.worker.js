@@ -186,12 +186,16 @@ class API {
         requestOptions.repo = this.repoName;
       }
 
+      delete requestOptions.ignoreRequestError;
+
       const res = await this.octokit.request(`${method} ${url}`, requestOptions);
       this.onRequestSuccess();
       return res;
     } catch (err) {
-      this._error('Failed to send GitHub request >>>>', err);
-      this.onRequestError(err);
+      if (!options.ignoreRequestError) {
+        this._error('Failed to send GitHub request >>>>', err);
+        this.onRequestError(err);
+      }
       throw err;
     }
   }
@@ -269,6 +273,7 @@ class API {
       repoContents = await this._request('GET', '/repos/{owner}/{repo}/git/trees/{branch}', {
         branch: this.repoBranch,
         recursive: true,
+        ignoreRequestError: true,
       });
     } catch {
       // If this request fails, then the repo is empty, which is fine.

@@ -254,7 +254,7 @@ class FileTreeManager {
 
     $modal.find('.confirm-btn').click(() => {
       if (node.data.isFile) {
-        closeFileTab(node.key);
+        this.closeFileTab(node.key);
         VFS.deleteFile(node.key);
       } else if (node.data.isFolder) {
         this.closeFilesInFolderRecursively(node.key);
@@ -298,7 +298,7 @@ class FileTreeManager {
   closeFilesInFolderRecursively = (folderId) => {
     const files = VFS.findFilesWhere({ parentId: folderId });
     for (const file of files) {
-      closeFileTab(file.id);
+      this.closeFileTab(file.id);
     }
 
     const folders = VFS.findFoldersWhere({ parentId: folderId });
