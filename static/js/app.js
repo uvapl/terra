@@ -52,14 +52,14 @@ export default class App {
     await this.setupLayout();
 
     // Register the editor tab created callback *before* the layout is
-    // initialized to ensure it is always called properly.
+    // initialised to ensure it is always called properly.
     this.layout.on('tabCreated', this.onEditorTabCreated);
 
     // We register the postSetupLayout as a callback, which will be called when
     // the subsequent init() function has finished.
     this.layout.on('initialised', this.postSetupLayout);
 
-    // Start initializing the layout.
+    // Start initialising the layout.
     this.layout.init();
   }
 

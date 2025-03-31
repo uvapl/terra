@@ -30,7 +30,7 @@ class LocalFileSystem {
   busy = false;
 
   constructor() {
-    // Only initialize if the user is not connected to git and if we're inside
+    // Only initialise if the user is not connected to git and if we're inside
     // the IDE.
     const gitRepoLink = localStorageManager.getLocalStorageItem('git-repo');
     if (IS_IDE && !gitRepoLink) {

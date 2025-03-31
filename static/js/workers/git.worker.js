@@ -81,7 +81,7 @@ class API {
       .then(() => {
         options.readyCallback();
       }).catch((err) => {
-        console.info('Failed to initialize git worker');
+        console.info('Failed to initialise git worker');
         console.error(err);
       });
   }
@@ -113,7 +113,7 @@ class API {
   }
 
   /**
-   * Initializes octokit and clone the repository immediately.
+   * Initialises octokit and clone the repository immediately.
    *
    * @async
    */
