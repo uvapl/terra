@@ -98,11 +98,11 @@ function closeActiveMenuBarMenu(event) {
   // and menu-item--new-folder.
   const isInsideMenu = $('.menubar > li.open').find($(event.target)).length > 0;
   const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
-  const editor = getActiveEditor().instance.editor;
-  if (isInsideMenu && isNotNewFileOrFolderBtn && editor) {
+  const editorComponent = getActiveEditor();
+  if (isInsideMenu && isNotNewFileOrFolderBtn && editorComponent && editorComponent.instance.editor) {
     // Set Terra.v.blockLFSPolling to prevent file contents being reloaded
     Terra.v.blockLFSPolling = true;
-    editor.focus();
+    editorComponent.instance.editor.focus();
     Terra.v.blockLFSPolling = false;
   }
 
