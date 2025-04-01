@@ -660,6 +660,7 @@ class VirtualFileSystem {
       const file = this.findFileByPath(filepath);
       if (file) {
         tab.container.extendState({ fileId: file.id });
+        Terra.app.layout.emitToAllComponents('vfsChanged');
       }
     }
 

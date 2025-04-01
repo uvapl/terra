@@ -322,9 +322,7 @@ export default class EditorComponent extends EventTarget {
    */
   exceededFileSize = () => {
     this.editor.container.classList.add('exceeded-filesize');
-    this.editor.setReadOnly(true);
-    this.editor.clearSelection();
-    this.editor.blur();
+    this.lock();
   }
 
   /**
@@ -341,17 +339,36 @@ export default class EditorComponent extends EventTarget {
   }
 
   /**
-   * Callback to lock the current editor.
+   * Lock the current editor by disabling any user input and any selection.
    */
-  onContainerLock = () => {
-    this.editor.setReadOnly(true);
+  lock = () => {
+    this.editor.setOptions({
+      readOnly: true,
+      highlightActiveLine: false,
+      highlightGutterLine: false,
+      highlightSelectedWord: false,
+      highlightIndentGuides: false,
+    });
+
+    this.editor.clearSelection();
+    this.editor.blur();
+
+    // this.editor.renderer.$cursorLayer.element.style.opacity = 0;
   }
 
   /**
-   * Callback to unlock the current editor.
+   * Unlock the current editor, allowing user input and selection.
    */
-  onContainerUnlock = () => {
-    this.editor.setReadOnly(false);
+  unlock = () => {
+    this.editor.setOptions({
+      readOnly: false,
+      highlightActiveLine: true,
+      highlightGutterLine: true,
+      highlightSelectedWord: true,
+      highlightIndentGuides: true,
+    });
+
+    // this.editor.renderer.$cursorLayer.element.style.opacity = 1;
   }
 
   /**
@@ -386,6 +403,13 @@ export default class EditorComponent extends EventTarget {
     // Reset the session after the first initial page render to prevent the
     // initial content is removed when users hit ctrl+z or cmd+z.
     this.editor.getSession().getUndoManager().reset();
+
+    // Prevent the user from selecting text when the editor is locked.
+    this.editor.getSession().selection.on('changeSelection', (e) => {
+      if (this.editor.getReadOnly()) {
+        this.editor.getSession().selection.clearSelection();
+      }
+    });
   }
 
   /**
@@ -562,7 +586,7 @@ export default class EditorComponent extends EventTarget {
     });
 
     this.container.on('lock', () => {
-      this.onContainerLock();
+      this.lock();
       if (IS_IDE) {
         pluginManager.triggerEvent('onEditorContainerLock', this);
       }
@@ -576,7 +600,7 @@ export default class EditorComponent extends EventTarget {
     });
 
     this.container.on('unlock', () => {
-      this.onContainerUnlock();
+      this.unlock();
       if (IS_IDE) {
         pluginManager.triggerEvent('onEditorContainerUnlock', this);
       }

@@ -216,7 +216,7 @@ export default class GitFS {
         fileTreeManager.removeLocalStorageWarning();
 
         VFS.importFromGit(payload.repoContents).then(() => {
-          getAllEditorTabs().forEach((tab) => tab.instance.editor.setReadOnly(false));
+          getAllEditorTabs().forEach((tab) => tab.instance.unlock());
           fileTreeManager.createFileTree();
         });
         break;
@@ -280,7 +280,7 @@ export function _createGitFSWorker() {
   }
 
   if (accessToken && repoLink) {
-    getAllEditorTabs().forEach((tab) => tab.instance.editor.setReadOnly(true));
+    getAllEditorTabs().forEach((tab) => tab.instance.lock());
 
     const gitfs = new GitFS(repoLink);
     Terra.gitfs = gitfs;

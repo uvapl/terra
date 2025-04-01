@@ -40,7 +40,7 @@ class EditorUnlinkKiller extends TerraPlugin {
     // Disable all ace editors
     const tabs = Terra.f.getAllEditorTabs();
     tabs.forEach((tab) => {
-      tab.instance.editor.setReadOnly(true);
+      tab.instance.lock();
     });
 
     // Disable the file tree
