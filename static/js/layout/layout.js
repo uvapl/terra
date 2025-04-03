@@ -205,6 +205,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     }
 
     // Add a regular editor component to the tabs list.
+    // Remove the tab from the list when it is destroyed.
     this.tabs.push(tab);
     tab.contentItem.container.on('destroy', () => {
       this.tabs.splice(this.tabs.indexOf(tab), 1);
@@ -232,13 +233,26 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       });
     }
 
-    editorComponent.addEventListener('focus', () => {
-      this.setActiveEditor(editorComponent);
-    });
+    editorComponent.addEventListener('focus', () => this.onEditorFocus(editorComponent));
+    editorComponent.addEventListener('destroy', () => this.onEditorDestroy(editorComponent));
+  }
 
-    editorComponent.addEventListener('destroy', () => {
-      this.setActiveEditor(null);
-    });
+  onEditorFocus(editorComponent) {
+    this.setActiveEditor(editorComponent);
+  }
+
+  onEditorDestroy(editorComponent) {
+    this.setActiveEditor(null);
+
+    // If it's the last tab being closed, then we insert another 'Untitled' tab,
+    // because we always need at least one tab open.
+    const editorComponents = this.getEditorComponents();
+    const totalTabs = editorComponents.length;
+
+    if (totalTabs === 1) {
+      const firstEditorComponent = editorComponents[0];
+      firstEditorComponent.addSiblingTab();
+    }
   }
 
   /**

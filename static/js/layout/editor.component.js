@@ -4,7 +4,6 @@ import { getFileExtension, seconds } from '../helpers/shared.js';
 import { createLangWorkerApi } from '../lang-worker-api.js';
 import pluginManager from '../plugin-manager.js';
 import localStorageManager from '../local-storage-manager.js';
-import Terra from '../terra.js';
 
 /**
  * Editor component for GoldenLayout.
@@ -406,18 +405,7 @@ export default class EditorComponent extends EventTarget {
    */
   onDestroy = () => {
     this.dispatchEvent(new Event('destroy'));
-
     if (!this.editor) return;
-
-    // If it's the last tab being closed, then we insert another 'Untitled' tab,
-    // because we always need at least one tab open.
-    const editorComponents = Terra.app.layout.getEditorComponents();
-    const totalTabs = editorComponents.length;
-
-    if (totalTabs === 1) {
-      const firstEditorComponent = editorComponents[0];
-      firstEditorComponent.addSiblingTab();
-    }
 
     this.editor.destroy();
     this.editor = null;
