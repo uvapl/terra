@@ -237,10 +237,20 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     editorComponent.addEventListener('destroy', () => this.onEditorDestroy(editorComponent));
   }
 
+  /**
+   * Callback when an editor is focused.
+   *
+   * @param {EditorComponent} editorComponent
+   */
   onEditorFocus(editorComponent) {
     this.setActiveEditor(editorComponent);
   }
 
+  /**
+   * Callback when an editor is about to be destroyed.
+   *
+   * @param {EditorComponent} editorComponent
+   */
   onEditorDestroy(editorComponent) {
     // If it's the last tab being closed, then we insert another 'Untitled' tab,
     // because we always need at least one tab open.
@@ -282,6 +292,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     }, 0);
   }
 
+  /**
+   * Render the config buttons through the app config.
+   */
   renderConfigButtons() {
     if (this.proglang === 'py' && isObject(this.buttonConfig)) {
       Object.keys(this.buttonConfig).forEach((name) => {
@@ -301,6 +314,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     }
   }
 
+  /**
+   * Add active states in the UI for certain dropdowns.
+   */
   addActiveStates() {
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');
@@ -313,6 +329,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
   }
 
+  /**
+   * Display the terminal startup message.
+   */
   showTermStartupMessage() {
     for (const line of this.termStartupMessage) {
       this.term.write(line + '\n');
@@ -321,23 +340,44 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     this.term.write('\n');
   }
 
+  /**
+   * Emit an event (optionally with data) to all components in the layout.
+   *
+   * @param {string} event - The event name.
+   * @param {object} data - Data object to pass along with the event.
+   */
   emitToAllComponents(event, data) {
     this.emitToEditorComponents(event, data);
     this.term.container.emit(event, data);
   }
 
+  /**
+   * Emit an event (optionally with data) to all editors.
+   *
+   * @param {string} event - The event name.
+   * @param {object} data - Data object to pass along with the event.
+   */
   emitToEditorComponents(event, data) {
     this.tabs.forEach((tab) => {
       tab.contentItem.container.emit(event, data);
     });
   }
 
+  /**
+   * Invoked on any change happening inside the internal GoldenLayout structure.
+   */
   onStateChanged() {
     const config = this.toConfig();
     const state = JSON.stringify(config);
     localStorageManager.setLocalStorageItem('layout', state);
   }
 
+  /**
+   * Callback function when the user selects a new theme, which consequently
+   * changes the theme of the layout and all components.
+   *
+   * @param {string} theme - Either 'dark' or 'light'.
+   */
   setTheme(theme) {
     const isDarkMode = (theme === 'dark');
 
@@ -353,15 +393,30 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     localStorageManager.setLocalStorageItem('theme', theme);
   }
 
+  /**
+   * Retrieve the HTML for the run code button.
+   *
+   * @returns {string}
+   */
   getRunCodeButtonHtml() {
     const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
     return `<button id="run-code" class="button primary-btn run-user-code-btn" disabled>Run (${runCodeShortcut})</button>`;
   };
 
+  /**
+   * Retrieve the HTML for the clear terminal button.
+   *
+   * @returns {string}
+   */
   getClearTermButtonHtml() {
     return '<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>'
   }
 
+  /**
+   * Retrieve the HTML for the settings menu.
+   *
+   * @returns {string}
+   */
   getSettingsMenuHtml() {
     return `
       <div class="settings-menu">
@@ -392,10 +447,17 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     `;
   }
 
+  /**
+   * Abstract function where the run-code, clear-term and additional
+   * buttons and dropdown should be rendered.
+   */
   renderButtons() {
     console.info('renderButtons() is not implemented');
   }
 
+  /**
+   * Add event listeners to the buttons and dropdowns in the layout.
+   */
   addButtonEventListeners() {
     $('#run-code').click(() => this.onRunCodeButtonClick());
     $('#clear-term').click(() => this.onClearTermButtonClick());
@@ -425,20 +487,36 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     });
   };
 
+  /**
+   * Callback when the user clicks the run-code button or pressed ctrl/cmd+enter.
+   */
   onRunCodeButtonClick() {
     this.dispatchEvent(new CustomEvent('runCode', {
       detail: { clearTerm: false },
     }));
   }
 
+  /**
+   * Callback when the user clicks the clear-term button.
+   */
   onClearTermButtonClick() {
     this.term.clear();
   }
 
+  /**
+   * Set the active editor component.
+   *
+   * @param {EditorComponent} editorComponent - The editor component to set as active.
+   */
   setActiveEditor(editorComponent) {
     this.activeEditor = editorComponent;
   }
 
+  /**
+   * Get the active editor component.
+   *
+   * @returns {EditorComponent} - The active editor component.
+   */
   getActiveEditor() {
     return this.activeEditor;
   }

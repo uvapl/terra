@@ -56,13 +56,16 @@ export default class App {
   }
 
   /**
-   * Other apps that extend this class are expected to implement this.
-   * This function can be either async or not.
+   * Child classes that extend this class are expected to implement this.
+   * This function can be async.
    */
   async setupLayout() {
     console.info('setupLayout() not implemented');
   }
 
+  /**
+   * Child classes that extend this class are expected to implement this.
+   */
   postSetupLayout() {
     console.info('postSetupLayout() not implemented');
   }
