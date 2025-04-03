@@ -391,7 +391,7 @@ export default class EditorComponent extends EventTarget {
 
     // Reset the session after the first initial page render to prevent the
     // initial content is removed when users hit ctrl+z or cmd+z.
-    this.editor.getSession().getUndoManager().reset();
+    this.clearUndoStack();
 
     // Prevent the user from selecting text when the editor is locked.
     this.editor.getSession().selection.on('changeSelection', (e) => {
@@ -399,6 +399,13 @@ export default class EditorComponent extends EventTarget {
         this.editor.getSession().selection.clearSelection();
       }
     });
+  }
+
+  /**
+   * Clear the undo stack of the editor.
+   */
+  clearUndoStack = () => {
+    this.editor.getSession().getUndoManager().reset();
   }
 
   setActive = () => {

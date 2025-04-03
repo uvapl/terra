@@ -167,7 +167,7 @@ export default class App {
    */
   onVFSChanged(editorComponent) {
     if (!Terra.v.blockLFSPolling) {
-      this.setEditorFileContent(editorComponent);
+      this.setEditorFileContent(editorComponent, true);
     }
   }
 

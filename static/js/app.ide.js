@@ -88,8 +88,9 @@ export default class IDEApp extends App {
    * Reload the file content either from VFS or LFS.
    *
    * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {boolean} clearUndoStack - Whether to clear the undo stack or not.
    */
-  setEditorFileContent(editorComponent) {
+  setEditorFileContent(editorComponent, clearUndoStack = false) {
     const file = VFS.findFileById(editorComponent.getState().fileId);
     if (!file) return;
 
@@ -101,6 +102,10 @@ export default class IDEApp extends App {
       LFS.getFileContent(file.id).then((content) => {
         editorComponent.setContent(content);
         editorComponent.setCursorPosition(cursorPos);
+
+        if (clearUndoStack) {
+          editorComponent.clearUndoStack();
+        }
       });
     } else {
       editorComponent.setContent(file.content);
