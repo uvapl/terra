@@ -1,23 +1,16 @@
-import { LFS_MAX_FILE_SIZE, IS_IDE, BASE_FONT_SIZE } from '../constants.js';
+import { BASE_FONT_SIZE } from '../constants.js';
 import {
-  closeFile,
   getAceCompleters,
   getAllEditorTabs,
-  saveFile,
   setActiveEditor
 } from '../helpers/editor-component.js';
 import {
   getFileExtension,
-  hasLFSApi,
   seconds
 } from '../helpers/shared.js';
 import { createLangWorkerApi } from '../lang-worker-api.js';
-import { createModal, hideModal, showModal } from '../modal.js';
-import LFS from '../lfs.js';
 import pluginManager from '../plugin-manager.js';
 import localStorageManager from '../local-storage-manager.js';
-import fileTreeManager from '../file-tree-manager.js';
-import Terra from '../terra.js';
 
 /**
  * Editor component for GoldenLayout.
@@ -71,7 +64,6 @@ export default class EditorComponent extends EventTarget {
   init = () => {
     this.bindContainerEvents();
     this.initEditor();
-    this.bindEditorCommands();
     this.bindEditorEvents();
 
     this.setTheme(localStorageManager.getLocalStorageItem('theme') || 'light');
@@ -81,6 +73,9 @@ export default class EditorComponent extends EventTarget {
     const filename = this.getFilename();
     const proglang = filename.includes('.') ? getFileExtension(filename) : 'text';
     this.setProgLang(proglang);
+
+    // Remove default sublime Ctrl+Enter command.
+    this.editor.commands.removeCommand('addLineAfter');
   }
 
   /**
@@ -109,100 +104,49 @@ export default class EditorComponent extends EventTarget {
    * Bind all custom editor commands.
    */
   bindEditorCommands = () => {
-    // remove default sublime Ctrl+Enter command
-    this.editor.commands.removeCommand('addLineAfter');
-
-    // add custom commands
-    this.editor.commands.addCommand({
-      name: 'run',
-      bindKey: { win: 'Ctrl+Enter', mac: 'Command+Enter' },
-      exec: () => Terra.app.runCode(),
-    });
-
-    this.editor.commands.addCommand({
-      name: 'save',
-      bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
-      exec: () => {
-        if (IS_IDE) {
-          saveFile();
-        }
-      }
-    });
-
-    this.editor.commands.addCommand({
-      name: 'moveLinesUp',
-      bindKey: { win: 'Ctrl+Alt+Up', mac: 'Command+Option+Up' },
-      exec: () => this.editor.moveLinesUp(),
-    });
-
-    this.editor.commands.addCommand({
-      name: 'moveLinesDown',
-      bindKey: { win: 'Ctrl+Alt+Down', mac: 'Command+Option+Down' },
-      exec: () => this.editor.moveLinesDown(),
-    });
-
-    if (IS_IDE) {
-      this.bindEditorIDECommands();
-    }
-
-    if (hasLFSApi()) {
-      this.bindEditorLFSCommands();
-    }
   }
 
   /**
-   * Bind all editor comments specific to the IDE.
+   * Register a new single command to the editor.
+   *
+   * @param {Ace.Command} command - Object with the command properties.
+   * See https://ajaxorg.github.io/ace-api-docs/interfaces/ace.Ace.Command.html
    */
-  bindEditorIDECommands = () => {
-    this.editor.commands.addCommand({
-      name: 'closeFile',
-      bindKey: 'Ctrl+W',
-      exec: () => closeFile(),
-    });
-
-    this.editor.commands.addCommand({
-      name: 'createNewFileTreeFile',
-      bindKey: 'Ctrl+T',
-      exec: () => fileTreeManager.createFile(),
-    });
-
-    this.editor.commands.addCommand({
-      name: 'createNewFileTreeFolder',
-      bindKey: 'Ctrl+Shift+T',
-      exec: () => fileTreeManager.createFolder(),
-    });
+  addCommand = (command) => {
+    this.editor.commands.addCommand(command);
   }
 
   /**
-   * Bind all editor commands specific to the LFS when the LFS API is enabled.
+   * Register multiple new commands to the editor.
+   *
+   * @param {Ace.Command} command - Object with the command properties.
+   * See https://ajaxorg.github.io/ace-api-docs/interfaces/ace.Ace.Command.html
    */
-  bindEditorLFSCommands = () => {
-    this.editor.commands.on('exec', (e) => {
-      // Verify whether the user exceeded the maximum file size when either
-      // pasting from the clipboard or inserting text (i.e. on each keystroke).
-      if (hasLFSApi() && LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
-        const inputText = e.args.text || '';
-        const filesize = new Blob([this.getContent() + inputText]).size;
-        if (filesize >= LFS_MAX_FILE_SIZE) {
-          // Prevent the event from happening.
-          e.preventDefault();
+  addCommands = (commands) => {
+    this.editor.commands.addCommands(commands);
+  }
 
-          const $modal = createModal({
-            title: 'Exceeded maximum file size',
-            body: 'The file size exceeds the maximum file size. This limit is solely required when you are connected to your local filesystem. Please reduce the file size beforing adding more content.',
-            footer: ' <button type="button" class="button primary-btn confirm-btn">Go back</button>',
-            footerClass: 'flex-end',
-            attrs: {
-              id: 'ide-exceeded-file-size-modal',
-              class: 'modal-width-small',
-            }
-          });
+  /**
+   * Register a callback function when a command is executed.
+   *
+   * @param {Function} callback - Function to be invoked.
+   */
+  onCommandExec = (callback) => {
+    this.editor.commands.on('exec', callback);
+  }
 
-          showModal($modal);
-          $modal.find('.confirm-btn').click(() => hideModal($modal));
-        }
-      }
-    });
+  /**
+   * Move the current line under the cursor up.
+   */
+  moveLinesUp = () => {
+    this.editor.moveLinesUp();
+  }
+
+  /**
+   * Move the current line under the cursor down.
+   */
+  moveLinesDown = () => {
+    this.editor.moveLinesDown();
   }
 
   /**
@@ -227,10 +171,14 @@ export default class EditorComponent extends EventTarget {
    * Callback when the user's cursor is focused on the editor.
    */
   onEditorFocus = () => {
+    console.log('onEditorFocus');
     if (this.fakeOnEditorFocusEvent) {
+      console.log('fakeOnEditorFocusEvent', this.fakeOnEditorFocusEvent);
       this.fakeOnEditorFocusEvent = false;
       return;
     }
+
+    console.log('SUCCESS');
 
     setActiveEditor(this);
 

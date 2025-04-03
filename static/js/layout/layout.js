@@ -1,5 +1,5 @@
 import { IS_IDE, BASE_FONT_SIZE } from '../constants.js';
-import { runButtonCommand } from '../helpers/editor-component.js';
+import { runButtonCommand, saveFile } from '../helpers/editor-component.js';
 import { isMac, isObject, mergeObjects, eventTargetMixin } from '../helpers/shared.js';
 import EditorComponent from './editor.component.js';
 import TerminalComponent from './term.component.js';
@@ -94,13 +94,13 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
   /**
    * References to all open tabs in the UI.
-   * @type {list[GoldenLayout.Tab]}
+   * @type {GoldenLayout.Tab[]}
    */
   tabs = [];
 
   /**
-   * Default terminal startup message. Each element in the array is written on a
-   * separateline.
+   * Default terminal startup message.
+   * Each element in the array is written on a separate line.
    * @type {array}
    */
   termStartupMessage = [
@@ -132,10 +132,48 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     });
 
     this.on('stackCreated', (stack) => this.onStackCreated(stack, options));
-    this.on('tabCreated', this.onTabCreated);
+    this.on('tabCreated', (tab) => this.onTabCreated(tab));
 
     this.registerComponent('editor', EditorComponent);
     this.registerComponent('terminal', TerminalComponent);
+  }
+
+  registerEditorCommands(editorComponent) {
+    editorComponent.addCommands([
+      {
+        name: 'run',
+        bindKey: { win: 'Ctrl+Enter', mac: 'Command+Enter' },
+        exec: () => this.onRunCodeButtonClick(),
+      },
+      {
+        name: 'save',
+        bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
+        exec: () => {
+          if (IS_IDE) {
+            saveFile();
+          }
+        }
+      },
+      {
+        name: 'moveLinesUp',
+        bindKey: { win: 'Ctrl+Alt+Up', mac: 'Command+Option+Up' },
+        exec: () => editorComponent.moveLinesUp(),
+      },
+      {
+        name: 'moveLinesDown',
+        bindKey: { win: 'Ctrl+Alt+Down', mac: 'Command+Option+Down' },
+        exec: () => editorComponent.moveLinesDown(),
+      }
+    ]);
+  }
+
+  /**
+   * Retrieve all editor components from the layout.
+   *
+   * @returns {EditorComponent[]} All editor components in the layout.
+   */
+  getEditorComponents() {
+    return this.tabs.map((tab) => tab.contentItem.instance);
   }
 
   /**
@@ -143,7 +181,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    *
    * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
    */
-  onTabCreated = (tab) => {
+  onTabCreated(tab) {
     if (tab.contentItem.isTerminal) {
       this.term = tab.contentItem.instance;
       tab.contentItem.container.on('destroy', () => {
@@ -159,8 +197,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       this.tabs.splice(index, 1);
     });
 
-
     const editorComponent = tab.contentItem.instance;
+
+    this.registerEditorCommands(editorComponent);
 
     // Bind event listeners to custom editor component events.
     // key = local editor event name
@@ -187,7 +226,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @param {GoldenLayout.Stack} stack - Object representing the root structure.
    * @param {object} options - Options passed to the layout.
    */
-  onStackCreated = (stack, options) => {
+  onStackCreated(stack, options) {
     if (this.initialised) return;
 
     this.initialised = true;
@@ -198,9 +237,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       this.setTheme(localStorageManager.getLocalStorageItem('theme') || 'light');
       this.renderButtons();
       this.showTermStartupMessage();
-      if (IS_IDE) {
-        pluginManager.triggerEvent('onLayoutLoaded');
-      }
+      pluginManager.triggerEvent('onLayoutLoaded');
 
       if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
         this.emitToEditorComponents('setCustomAutocompleter', options.autocomplete);
@@ -212,7 +249,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     }, 0);
   }
 
-  renderConfigButtons = () => {
+  renderConfigButtons() {
     if (this.proglang === 'py' && isObject(this.buttonConfig)) {
       Object.keys(this.buttonConfig).forEach((name) => {
         const id = name.replace(/\s/g, '-').toLowerCase();
@@ -231,7 +268,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     }
   }
 
-  addActiveStates = () => {
+  addActiveStates() {
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');
     const currentFontSize = localStorageManager.getLocalStorageItem('font-size') || BASE_FONT_SIZE;
@@ -243,7 +280,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
   }
 
-  showTermStartupMessage = () => {
+  showTermStartupMessage() {
     for (const line of this.termStartupMessage) {
       this.term.write(line + '\n');
     }
@@ -253,7 +290,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
   // Emit an event recursively to all components. Optionally the `fileId` can
   // be set to filter on only components with the given file ID.
-  _emit = (contentItem, event, data, fileId) => {
+  _emit(contentItem, event, data, fileId) {
     if (contentItem.isComponent) {
       if (fileId && contentItem.container.getState().fileId === fileId) {
         contentItem.container.emit(event, data);
@@ -267,31 +304,31 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     }
   }
 
-  emitToAllComponents = (event, data) => {
+  emitToAllComponents(event, data) {
     this.root.contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data);
     });
   }
 
-  emitToEditorComponents = (event, data) => {
+  emitToEditorComponents(event, data) {
     this.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data);
     });
   }
 
-  emitToEditorComponentWithFileId = (event, fileId, data) => {
+  emitToEditorComponentWithFileId(event, fileId, data) {
     this.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data, fileId);
     });
   }
 
-  onStateChanged = () => {
+  onStateChanged() {
     const config = this.toConfig();
     const state = JSON.stringify(config);
     localStorageManager.setLocalStorageItem('layout', state);
   }
 
-  setTheme = (theme) => {
+  setTheme(theme) {
     const isDarkMode = (theme === 'dark');
 
     if (isDarkMode) {
@@ -306,48 +343,52 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     localStorageManager.setLocalStorageItem('theme', theme);
   }
 
-  getRunCodeButtonHtml = () => {
+  getRunCodeButtonHtml() {
     const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
     return `<button id="run-code" class="button primary-btn run-user-code-btn" disabled>Run (${runCodeShortcut})</button>`;
   };
 
-  getClearTermButtonHtml = () => '<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>';
+  getClearTermButtonHtml() {
+    return '<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>'
+  }
 
-  getSettingsMenuHtml = () => `
-    <div class="settings-menu">
-      <button class="settings-btn"></button>
-      <ul class="settings-dropdown">
-        <li class="has-dropdown">
-          Editor theme
-          <ul class="settings-dropdown" id="editor-theme-menu">
-            <li data-val="light">Light</li>
-            <li data-val="dark">Dark</li>
-          </ul>
-        </li>
-        <li class="has-dropdown">
-          Font size
-          <ul class="settings-dropdown" id="font-size-menu">
-            <li data-val="10">10</li>
-            <li data-val="11">11</li>
-            <li data-val="12">12</li>
-            <li data-val="14">14</li>
-            <li data-val="16">16</li>
-            <li data-val="18">18</li>
-            <li data-val="24">24</li>
-            <li data-val="30">30</li>
-          </ul>
-        </li>
-      </ul>
-    </div>
-  `;
+  getSettingsMenuHtml() {
+    return `
+      <div class="settings-menu">
+        <button class="settings-btn"></button>
+        <ul class="settings-dropdown">
+          <li class="has-dropdown">
+            Editor theme
+            <ul class="settings-dropdown" id="editor-theme-menu">
+              <li data-val="light">Light</li>
+              <li data-val="dark">Dark</li>
+            </ul>
+          </li>
+          <li class="has-dropdown">
+            Font size
+            <ul class="settings-dropdown" id="font-size-menu">
+              <li data-val="10">10</li>
+              <li data-val="11">11</li>
+              <li data-val="12">12</li>
+              <li data-val="14">14</li>
+              <li data-val="16">16</li>
+              <li data-val="18">18</li>
+              <li data-val="24">24</li>
+              <li data-val="30">30</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    `;
+  }
 
-  renderButtons = () => {
+  renderButtons() {
     console.info('renderButtons() is not implemented');
   }
 
-  addButtonEventListeners = () => {
-    $('#run-code').click(this.onRunCodeButtonClick);
-    $('#clear-term').click(this.onClearTermButtonClick);
+  addButtonEventListeners() {
+    $('#run-code').click(() => this.onRunCodeButtonClick());
+    $('#clear-term').click(() => this.onClearTermButtonClick());
 
     // Update font-size for all components on change.
     $('#font-size-menu').find('li').click((event) => {
@@ -374,11 +415,13 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     });
   };
 
-  onRunCodeButtonClick = () => {
-    this.dispatchEvent(new Event('onRunCodeButtonClick'));
+  onRunCodeButtonClick() {
+    this.dispatchEvent(new CustomEvent('runCode', {
+      detail: { clearTerm: false },
+    }));
   }
 
-  onClearTermButtonClick = () => {
+  onClearTermButtonClick() {
     this.term.clear();
   }
 }

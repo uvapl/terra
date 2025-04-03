@@ -1,7 +1,7 @@
 import Layout from './layout.js';
 
 export default class ExamLayout extends Layout {
-  renderButtons = () => {
+  renderButtons() {
     const runCodeButtonHtml = this.getRunCodeButtonHtml();
     const clearTermButtonHtml = this.getClearTermButtonHtml();
     const settingsMenuHtml = this.getSettingsMenuHtml();

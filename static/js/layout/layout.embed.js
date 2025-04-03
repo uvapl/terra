@@ -6,7 +6,7 @@ export default class EmbedLayout extends Layout {
     'Click the "Run" button to execute code.',
   ];
 
-  renderButtons = () => {
+  renderButtons() {
     const runCodeButtonHtml = this.getRunCodeButtonHtml();
     const settingsMenuHtml = this.getSettingsMenuHtml();
 
@@ -32,7 +32,9 @@ export default class EmbedLayout extends Layout {
   }
 
 
-  onRunCodeButtonClick = () => {
-    Terra.app.runCode(null, true);
+  onRunCodeButtonClick() {
+    this.dispatchEvent(new CustomEvent('runCode', {
+      detail: { clearTerm: true },
+    }));
   }
 }

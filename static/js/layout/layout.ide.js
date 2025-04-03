@@ -2,11 +2,71 @@ import Layout from './layout.js';
 import { hasLFSApi } from '../helpers/shared.js';
 import LFS from '../lfs.js';
 import localStorageManager from '../local-storage-manager.js';
+import { closeFile } from '../helpers/editor-component.js';
+import fileTreeManager from '../file-tree-manager.js';
+import { LFS_MAX_FILE_SIZE } from '../constants.js';
 
 export default class IDELayout extends Layout {
   getClearTermButtonHtml = () => '<button id="clear-term" class="button clear-term-btn">Clear terminal</button>';
 
-  renderButtons = () => {
+  registerEditorCommands(editorComponent) {
+    super.registerEditorCommands(editorComponent);
+
+    editorComponent.addCommands([
+      {
+        name: 'closeFile',
+        bindKey: 'Ctrl+W',
+        exec: () => closeFile(),
+      },
+      {
+        name: 'createNewFileTreeFile',
+        bindKey: 'Ctrl+T',
+        exec: () => fileTreeManager.createFile(),
+      },
+      {
+        name: 'createNewFileTreeFolder',
+        bindKey: 'Ctrl+Shift+T',
+        exec: () => fileTreeManager.createFolder(),
+      },
+    ]);
+
+    editorComponent.onCommandExec(this._validateFileSizeLimit);
+  }
+
+  /**
+   * Validates whether the file size exceeds the maximum file size limit when
+   * the LFS is enabled.
+   *
+   * @param {Event} e - The event object.
+   */
+  _validateFileSizeLimit(e) {
+    // Verify whether the user exceeded the maximum file size when either
+    // pasting from the clipboard or inserting text (i.e. on each keystroke).
+    if (hasLFSApi() && LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
+      const inputText = e.args.text || '';
+      const filesize = new Blob([this.getContent() + inputText]).size;
+      if (filesize >= LFS_MAX_FILE_SIZE) {
+        // Prevent the event from happening.
+        e.preventDefault();
+
+        const $modal = createModal({
+          title: 'Exceeded maximum file size',
+          body: 'The file size exceeds the maximum file size. This limit is solely required when you are connected to your local filesystem. Please reduce the file size beforing adding more content.',
+          footer: ' <button type="button" class="button primary-btn confirm-btn">Go back</button>',
+          footerClass: 'flex-end',
+          attrs: {
+            id: 'ide-exceeded-file-size-modal',
+            class: 'modal-width-small',
+          }
+        });
+
+        showModal($modal);
+        $modal.find('.confirm-btn').click(() => hideModal($modal));
+      }
+    }
+  }
+
+  renderButtons() {
     const runCodeButtonHtml = this.getRunCodeButtonHtml();
     const clearTermButtonHtml = this.getClearTermButtonHtml();
 
@@ -18,7 +78,7 @@ export default class IDELayout extends Layout {
     this.addButtonEventListeners();
   };
 
-  onStateChanged = () => {
+  onStateChanged() {
     let config = this.toConfig();
 
     // Exclude the content from all editors for the IDE when LFS is enabled,
@@ -32,7 +92,7 @@ export default class IDELayout extends Layout {
     localStorageManager.setLocalStorageItem('layout', state);
   }
 
-  _removeEditorValue = (config) => {
+  _removeEditorValue(config) {
     if (config.content) {
       config.content.forEach((item) => {
         if (item.type === 'component') {

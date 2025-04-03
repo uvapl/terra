@@ -75,7 +75,7 @@ export default class App {
     // the subsequent init() function has finished.
     this.layout.on('initialised', this.postSetupLayout);
 
-    this.layout.addEventListener('onRunCodeButtonClick', this.onRunCodeButtonClick);
+    this.layout.addEventListener('runCode', this.onRunCode);
 
     // Listen for editor events being emitted.
     const editorEvents = [
@@ -88,16 +88,21 @@ export default class App {
     editorEvents.forEach((eventName) => {
       this.layout.addEventListener(eventName, (event) => {
         const { editorComponent } = event.detail;
-        this[eventName](editorComponent);
+        if (typeof this[eventName] === 'function') {
+          this[eventName](editorComponent);
+        }
       });
     });
   }
 
   /**
    * Callback when the user clicks on the run-code button in the UI.
+   *
+   * @param {Event} event - The event object.
    */
-  onRunCodeButtonClick() {
-    this.runCode();
+  onRunCode(event) {
+    const { clearTerm } = event.detail;
+    this.runCode(null, clearTerm);
   }
 
   /**

@@ -63,7 +63,6 @@ export default class EmbedApp extends App {
   postSetupLayout() {
     // Listen for the content of the file to be received.
     window.addEventListener('message', function(event) {
-      const tab = getActiveEditor();
       const editor = tab.instance.editor;
       const fileId = tab.instance.container.getState().fileId;
       const content = removeIndent(event.data);
