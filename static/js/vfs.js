@@ -610,7 +610,7 @@ class VirtualFileSystem {
     // We first obtain the current filepaths before clearing the VFS.
     const tabs = {};
     Terra.app.layout.getEditorComponents().forEach((editorComponent) => {
-      const fileId = editorComponent.getState().fileId;
+      const { fileId } = editorComponent.getState();
       if (fileId) {
         const filepath = VFS.getAbsoluteFilePath(fileId);
         tabs[filepath] = editorComponent;

@@ -183,7 +183,7 @@ class LocalFileSystem {
   async _importFolderToVFS(rootFolderHandle) {
     const editorComponents = Terra.app.layout.getEditorComponents();
     const prevOpenTabs = editorComponents.map((editorComponent) => {
-      const fileId = editorComponent.getState().fileId;
+      const { fileId } = editorComponent.getState();
       return {
         path: VFS.getAbsoluteFilePath(fileId),
         editorComponent,

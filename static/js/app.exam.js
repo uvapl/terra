@@ -462,7 +462,7 @@ export default class ExamApp extends App {
     // and append it to the form data.
     this.layout.getEditorComponents().forEach((editorComponent) => {
       const filename = editorComponent.getFilename();
-      const fileId = editorComponent.getState().fileId;
+      const { fileId } = editorComponent.getState();
       const file = VFS.findFileById(fileId);
       const blob = new Blob([file.content], { type: 'text/plain' });
       formData.append(`files[${filename}]`, blob, filename);

@@ -27,7 +27,7 @@ export default class EditorUnlinkKiller extends TerraPlugin {
     editorComponents.forEach((editorComponent) => {
       if (editorComponent.getFilename() == 'Untitled') return;
 
-      const fileId = editorComponent.getState().fileId;
+      const { fileId } = editorComponent.getState();
       if (!this.isValidFileId(fileId)) {
         console.error(`Invalid file ID detected: ${fileId}`);
         this.disableIDE(`The tab you were editing could not be saved. But whatever was

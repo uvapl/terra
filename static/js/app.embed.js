@@ -63,7 +63,7 @@ export default class EmbedApp extends App {
     // Listen for the content of the file to be received.
     window.addEventListener('message', (event) => {
       const editorComponent = this.layout.getActiveEditor();
-      const fileId = editorComponent.getState().fileId;
+      const { fileId } = editorComponent.getState();
       const content = removeIndent(event.data);
       if (content) {
         VFS.updateFile(fileId, { content });
