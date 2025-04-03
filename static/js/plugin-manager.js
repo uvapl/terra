@@ -174,18 +174,17 @@ export class TerraPlugin {
   // EVENT LISTENERS THAT CAN BE IMPLEMENTED FOR EACH PLUGIN.
   // ========================================================
   // onLayoutLoaded = () => { }
-  // onEditorContainerLoaded = (editorComponent) => { }
-  // onEditorContainerChange = (editorComponent) => { }
+  // onEditorChange = (editorComponent) => { }
   // onEditorFocus = (editorComponent) => { }
-  // onEditorContainerOpen = (editorComponent) => { }
-  // onEditorContainerLock = (editorComponent) => { }
-  // onEditorContainerSetCustomAutoCompleter = (completions, editorComponent) => { }
-  // onEditorContainerUnlock = (editorComponent) => { }
-  // setEditoContainerTheme = (theme, editorComponent) => { }
-  // setEditoContainerFontSize = (fontSize, editorComponent) => { }
+  // onEditorShow = (editorComponent) => { }
+  // onEditorLoad = (editorComponent) => { }
+  // onEditorLock = (editorComponent) => { }
+  // onEditorUnlock = (editorComponent) => { }
+  // setEditorTheme = (theme, editorComponent) => { }
+  // setEditorFontSize = (fontSize, editorComponent) => { }
   // onEditorContainerResize = (editorComponent) => { }
-  // onEditorContainerDestroy = (editorComponent) => { }
-  // onEditorContainerReloadContent = (editorComponent) => { }
+  // onEditorDestroy = (editorComponent) => { }
+  // onEditorContentChanged (editorComponent) => { }
   // onStorageChange = (storageName, prevStorageName) => { }
   // onPluginRegistered = (plugin) => { }
 }
@@ -195,11 +194,7 @@ class TerraPluginManager {
    * Contains a reference to all loaded plugins.
    * @type {object}
    */
-  plugins;
-
-  constructor() {
-    this.plugins = {};
-  }
+  plugins = {};
 
 
   /**

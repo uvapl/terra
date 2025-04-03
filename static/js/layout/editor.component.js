@@ -206,16 +206,6 @@ export default class EditorComponent extends EventTarget {
   }
 
   /**
-   * Callback when the editor is loaded.
-   */
-  onEditorLoad = () => {
-    this.editor.getSession().getUndoMananger().reset();
-    if (IS_IDE) {
-      pluginManager.call('onEditorLoad', this.editor);
-    }
-  }
-
-  /**
    * Callback when the editor content changes, triggered each keystroke.
    */
   onEditorChange = () => {
@@ -552,25 +542,14 @@ export default class EditorComponent extends EventTarget {
    * Bind all editor events with callbacks.
    */
   bindEditorEvents = () => {
-    this.editor.on('load', () => {
-      this.onEditorLoad();
-      if (IS_IDE) {
-        pluginManager.triggerEvent('onEditorLoad', this);
-      }
-    });
-
     this.editor.on('change', () => {
       this.onEditorChange();
-      if (IS_IDE) {
-        pluginManager.triggerEvent('onEditorChange', this);
-      }
+      pluginManager.triggerEvent('onEditorChange', this);
     });
 
     this.editor.on('focus', () => {
       this.onEditorFocus();
-      if (IS_IDE) {
-        pluginManager.triggerEvent('onEditorFocus', this);
-      }
+      pluginManager.triggerEvent('onEditorFocus', this);
     });
   }
 
@@ -582,73 +561,52 @@ export default class EditorComponent extends EventTarget {
     this.container.on('afterFirstRender', this.onContainerAfterFirstRender);
 
     this.container.on('onTabDragStop', ({ event, tab }) => {
-      if (IS_IDE) {
-        pluginManager.triggerEvent('onTabDragStop', event, tab);
-      }
+      pluginManager.triggerEvent('onTabDragStop', event, tab);
     });
 
     this.container.on('show', () => {
       this.onShow();
       this.dispatchEvent(new Event('onShow'));
-      if (IS_IDE) {
-        pluginManager.triggerEvent('onEditorContainerOpen', this);
-      }
+      pluginManager.triggerEvent('onEditorShow', this);
     });
 
     this.container.on('lock', () => {
       this.lock();
-      if (IS_IDE) {
-        pluginManager.triggerEvent('onEditorContainerLock', this);
-      }
-    });
-
-    this.container.on('setCustomAutocompleter', (completions) => {
-      this.onContainerSetCustomAutoCompleter(completions);
-      if (IS_IDE) {
-        pluginManager.triggerEvent('onEditorContainerSetCustomAutoCompleter', completions, this);
-      }
+      pluginManager.triggerEvent('onEditorLock', this);
     });
 
     this.container.on('unlock', () => {
       this.unlock();
-      if (IS_IDE) {
-        pluginManager.triggerEvent('onEditorContainerUnlock', this);
-      }
+      pluginManager.triggerEvent('onEditorUnlock', this);
+    });
+
+    this.container.on('setCustomAutocompleter', (completions) => {
+      this.onContainerSetCustomAutoCompleter(completions);
     });
 
     this.container.on('themeChanged', (theme) => {
       this.setTheme(theme);
-      if (IS_IDE) {
-        pluginManager.triggerEvent('setEditorTheme', theme, this);
-      }
+      pluginManager.triggerEvent('setEditorTheme', theme, this);
     });
 
     this.container.on('fontSizeChanged', (fontSize) => {
       this.setFontSize(fontSize);
-      if (IS_IDE) {
-        pluginManager.triggerEvent('setEditorFontSize', fontSize, this);
-      }
+      pluginManager.triggerEvent('setEditorFontSize', fontSize, this);
     });
 
     this.container.on('resize', () => {
       this.onContainerResize();
-      if (IS_IDE) {
-        pluginManager.triggerEvent('onEditorContainerResize', this);
-      }
+      pluginManager.triggerEvent('onEditorContainerResize', this);
     });
 
     this.container.on('destroy', () => {
       this.onContainerDestroy();
-      if (IS_IDE) {
-        pluginManager.triggerEvent('onEditorContainerDestroy', this);
-      }
+      pluginManager.triggerEvent('onEditorDestroy', this);
     });
 
     this.container.on('vfsChanged', () => {
       this.dispatchEvent(new Event('vfsChanged'));
-      if (IS_IDE) {
-        pluginManager.triggerEvent('onEditorContainerReloadContent', this);
-      }
+      pluginManager.triggerEvent('onEditorContentChanged', this);
     });
   }
 }
