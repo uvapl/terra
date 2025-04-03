@@ -208,7 +208,7 @@ class LocalFileSystem {
     prevOpenTabs.forEach(({ path, editorComponent }) => {
       const file = VFS.findFileByPath(path);
       if (file) {
-        editorComponent.setState({ fileId: file.id });
+        editorComponent.extendState({ fileId: file.id });
       }
     });
 

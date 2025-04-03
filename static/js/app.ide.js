@@ -71,7 +71,6 @@ export default class IDEApp extends App {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   onEditorStartEditing(editorComponent) {
-    super.onEditorStartEditing(editorComponent);
     Terra.v.blockLFSPolling = true;
   }
 

@@ -84,6 +84,7 @@ export default class App {
     const editorEvents = [
       'onEditorStartEditing',
       'onEditorStopEditing',
+      'onEditorChange',
       'onEditorShow',
       'onVFSChanged',
     ];
@@ -109,14 +110,14 @@ export default class App {
   }
 
   /**
-   * Callback function for when the editor starts editing.
+   * Callback function for when the content has changed of an editor.
    *
-   * This is default functionality and super.onEditorStartEditing() must be
+   * This is default functionality and super.onEditorChange() must be
    * called first in child classes before any additional functionality.
    *
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  onEditorStartEditing(editorComponent) {
+  onEditorChange(editorComponent) {
     const { fileId } = editorComponent.getState();
     if (fileId) {
       VFS.updateFile(fileId, {

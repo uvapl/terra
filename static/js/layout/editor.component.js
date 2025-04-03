@@ -159,6 +159,8 @@ export default class EditorComponent extends EventTarget {
       this.dispatchEvent(new Event('startEditing'));
     }
 
+    this.dispatchEvent(new Event('change'));
+
     clearTimeout(this.userIsTypingTimeoutId);
     this.userIsTypingTimeoutId = setTimeout(() => {
       this.userIsEditing = false;

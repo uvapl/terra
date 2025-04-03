@@ -144,6 +144,11 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     this.registerComponent('terminal', TerminalComponent);
   }
 
+  /**
+   * Register commands for the editor component.
+   *
+   * @param {EditorComponent} editorComponent - The editor component instance.
+   */
   registerEditorCommands(editorComponent) {
     editorComponent.addCommands([
       {
@@ -221,6 +226,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     const events = {
       'startEditing': 'onEditorStartEditing',
       'stopEditing': 'onEditorStopEditing',
+      'change': 'onEditorChange',
       'show': 'onEditorShow',
       'vfsChanged': 'onVFSChanged',
     }

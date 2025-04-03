@@ -30,7 +30,7 @@ export default class IDELayout extends Layout {
       },
     ]);
 
-    editorComponent.onCommandExec(this._validateFileSizeLimit);
+    editorComponent.onCommandExec((event) => this._validateFileSizeLimit(event, editorComponent));
   }
 
   /**
@@ -38,13 +38,14 @@ export default class IDELayout extends Layout {
    * the LFS is enabled.
    *
    * @param {Event} event - The event object.
+   * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  _validateFileSizeLimit(event) {
+  _validateFileSizeLimit(event, editorComponent) {
     // Verify whether the user exceeded the maximum file size when either
     // pasting from the clipboard or inserting text (i.e. on each keystroke).
     if (hasLFSApi() && LFS.loaded && ['paste', 'insertstring'].includes(event.command.name)) {
       const inputText = event.args.text || '';
-      const filesize = new Blob([this.getContent() + inputText]).size;
+      const filesize = new Blob([editorComponent.getContent() + inputText]).size;
       if (filesize >= LFS_MAX_FILE_SIZE) {
         // Prevent the event from happening.
         event.preventDefault();
