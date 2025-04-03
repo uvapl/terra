@@ -288,37 +288,14 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     this.term.write('\n');
   }
 
-  // Emit an event recursively to all components. Optionally the `fileId` can
-  // be set to filter on only components with the given file ID.
-  _emit(contentItem, event, data, fileId) {
-    if (contentItem.isComponent) {
-      if (fileId && contentItem.container.getState().fileId === fileId) {
-        contentItem.container.emit(event, data);
-      } else if (!fileId) {
-        contentItem.container.emit(event, data);
-      }
-    } else {
-      contentItem.contentItems.forEach((childContentItem) => {
-        this._emit(childContentItem, event, data);
-      });
-    }
-  }
-
   emitToAllComponents(event, data) {
-    this.root.contentItems[0].contentItems.forEach((contentItem) => {
-      this._emit(contentItem, event, data);
-    });
+    this.emitToEditorComponents(event, data);
+    this.term.container.emit(event, data);
   }
 
   emitToEditorComponents(event, data) {
-    this.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
-      this._emit(contentItem, event, data);
-    });
-  }
-
-  emitToEditorComponentWithFileId(event, fileId, data) {
-    this.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
-      this._emit(contentItem, event, data, fileId);
+    this.tabs.forEach((tab) => {
+      tab.contentItem.container.emit(event, data);
     });
   }
 
