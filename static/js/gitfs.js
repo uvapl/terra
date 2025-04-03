@@ -1,4 +1,4 @@
-import { closeAllFiles, getAllEditorTabs } from './helpers/editor-component.js';
+import { closeAllFiles } from './helpers/editor-component.js';
 import { getRepoInfo, hasGitFSWorker } from './helpers/shared.js';
 import { createModal, hideModal, showModal } from './modal.js';
 import VFS from './vfs.js';
@@ -216,7 +216,7 @@ export default class GitFS {
         fileTreeManager.removeLocalStorageWarning();
 
         VFS.importFromGit(payload.repoContents).then(() => {
-          getAllEditorTabs().forEach((tab) => tab.instance.unlock());
+          Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
           fileTreeManager.createFileTree();
         });
         break;
@@ -280,7 +280,7 @@ export function _createGitFSWorker() {
   }
 
   if (accessToken && repoLink) {
-    getAllEditorTabs().forEach((tab) => tab.instance.lock());
+    Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
 
     const gitfs = new GitFS(repoLink);
     Terra.gitfs = gitfs;

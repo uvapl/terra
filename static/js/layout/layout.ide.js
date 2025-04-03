@@ -37,17 +37,17 @@ export default class IDELayout extends Layout {
    * Validates whether the file size exceeds the maximum file size limit when
    * the LFS is enabled.
    *
-   * @param {Event} e - The event object.
+   * @param {Event} event - The event object.
    */
-  _validateFileSizeLimit(e) {
+  _validateFileSizeLimit(event) {
     // Verify whether the user exceeded the maximum file size when either
     // pasting from the clipboard or inserting text (i.e. on each keystroke).
-    if (hasLFSApi() && LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
-      const inputText = e.args.text || '';
+    if (hasLFSApi() && LFS.loaded && ['paste', 'insertstring'].includes(event.command.name)) {
+      const inputText = event.args.text || '';
       const filesize = new Blob([this.getContent() + inputText]).size;
       if (filesize >= LFS_MAX_FILE_SIZE) {
         // Prevent the event from happening.
-        e.preventDefault();
+        event.preventDefault();
 
         const $modal = createModal({
           title: 'Exceeded maximum file size',

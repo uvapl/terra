@@ -2,7 +2,7 @@
 // This file contains the local filesystem logic for the IDE app, using
 // https://developer.mozilla.org/en-US/docs/Web/API/File_System_API
 ////////////////////////////////////////////////////////////////////////////////
-import { closeAllFiles, getAllEditorTabs } from './helpers/editor-component.js';
+import { closeAllFiles } from './helpers/editor-component.js';
 import { hasGitFSWorker, seconds } from './helpers/shared.js';
 import VFS from './vfs.js';
 import pluginManager from './plugin-manager.js';
@@ -181,12 +181,12 @@ class LocalFileSystem {
    * @returns {Promise<void>}
    */
   async _importFolderToVFS(rootFolderHandle) {
-    const tabs = getAllEditorTabs();
-    const prevOpenTabs = tabs.map((tab) => {
-      const fileId = tab.container.getState().fileId;
+    const editorComponents = Terra.app.layout.getEditorComponents();
+    const prevOpenTabs = editorComponents.map((editorComponent) => {
+      const fileId = editorComponent.getState().fileId;
       return {
         path: VFS.getAbsoluteFilePath(fileId),
-        tab: tabs.find((tab) => tab.container.getState().fileId === fileId),
+        editorComponent,
       };
     });
 
@@ -205,10 +205,10 @@ class LocalFileSystem {
     fileTreeManager.createFileTree();
 
     // Sync the new imported VFS IDs with the currently open tabs.
-    prevOpenTabs.forEach(({ path, tab }) => {
+    prevOpenTabs.forEach(({ path, editorComponent }) => {
       const file = VFS.findFileByPath(path);
       if (file) {
-        tab.container.setState({ fileId: file.id });
+        editorComponent.setState({ fileId: file.id });
       }
     });
 

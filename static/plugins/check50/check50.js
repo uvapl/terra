@@ -1,5 +1,4 @@
 import { TerraPlugin } from '../../js/plugin-manager.js';
-import { getActiveEditor } from '../../js/helpers/editor-component.js';
 import { seconds } from '../../js/helpers/shared.js';
 import { createModal, hideModal, showModal } from '../../js/modal.js';
 import VFS from '../../js/vfs.js';
@@ -80,7 +79,7 @@ export default class Check50Plugin extends TerraPlugin {
   onButtonClick = () => {
     if (this.$button.is(':disabled')) return;
 
-    const tab = getActiveEditor();
+    const tab = Terra.app.layout.getActiveEditor();
     if (!tab || tab.instance.proglang !== 'c') return;
 
     const fileId = tab.container.getState().fileId;
@@ -163,7 +162,7 @@ export default class Check50Plugin extends TerraPlugin {
   }
 
   runCheck50 = () => {
-    const tab = getActiveEditor();
+    const tab = Terra.app.layout.getActiveEditor();
     const filename = tab.config.title;
     const code = tab.instance.getContent();
 

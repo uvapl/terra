@@ -93,12 +93,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   term = null;
 
   /**
-   * References to all open tabs in the UI.
-   * @type {GoldenLayout.Tab[]}
-   */
-  tabs = [];
-
-  /**
    * Default terminal startup message.
    * Each element in the array is written on a separate line.
    * @type {array}
@@ -107,6 +101,18 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     'Click the "Run" button to execute code.',
     'Click the "Clear terminal" button to clear this screen.'
   ];
+
+  /**
+   * References to all open tabs in the UI.
+   * @type {GoldenLayout.Tab[]}
+   */
+  tabs = [];
+
+  /**
+   * Reference to the current active editor instance in the layout.
+   * @type {EditorComponent}
+   */
+  activeEditor = null;
 
   constructor(additionalLayoutConfig, options = {}) {
     let layoutConfig = localStorageManager.getLocalStorageItem('layout');
@@ -190,11 +196,18 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       return;
     }
 
+    // If the current active tab is not set, set it to the current tab.
+    // When the layout is loaded from local storage, the first tab that will be
+    // created by GoldenLayout is the one the user has opened. Additionally, the
+    // active tab will be overridden when another editor becomes active.
+    if (!this.activeEditor) {
+      this.activeEditor = tab.contentItem.instance;
+    }
+
     // Add a regular editor component to the tabs list.
     this.tabs.push(tab);
-    const index = this.tabs.length - 1;
     tab.contentItem.container.on('destroy', () => {
-      this.tabs.splice(index, 1);
+      this.tabs.splice(this.tabs.indexOf(tab), 1);
     });
 
     const editorComponent = tab.contentItem.instance;
@@ -207,7 +220,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     const events = {
       'startEditing': 'onEditorStartEditing',
       'stopEditing': 'onEditorStopEditing',
-      'onShow': 'onEditorShow',
+      'show': 'onEditorShow',
       'vfsChanged': 'onVFSChanged',
     }
 
@@ -218,6 +231,14 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
         }));
       });
     }
+
+    editorComponent.addEventListener('focus', () => {
+      this.setActiveEditor(editorComponent);
+    });
+
+    editorComponent.addEventListener('destroy', () => {
+      this.setActiveEditor(null);
+    });
   }
 
   /**
@@ -400,5 +421,13 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
   onClearTermButtonClick() {
     this.term.clear();
+  }
+
+  setActiveEditor(tab) {
+    this.activeEditor = tab;
+  }
+
+  getActiveEditor() {
+    return this.activeEditor;
   }
 }

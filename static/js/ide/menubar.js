@@ -2,17 +2,9 @@
 // This file contains the logic for the menubar at the top of the IDE app.
 ////////////////////////////////////////////////////////////////////////////////
 import { MODAL_ANIM_DURATION } from '../constants.js';
-import {
-  closeAllFiles,
-  closeFile,
-  getActiveEditor
-} from '../helpers/editor-component.js';
+import { closeAllFiles, closeFile } from '../helpers/editor-component.js';
 import { isMac } from '../helpers/shared.js';
-import {
-  createModal,
-  hideModal,
-  showModal
-} from '../modal.js';
+import { createModal, hideModal, showModal } from '../modal.js';
 import VFS from '../vfs.js';
 import pluginManager from '../plugin-manager.js';
 import Terra from '../terra.js';
@@ -98,11 +90,11 @@ function closeActiveMenuBarMenu(event) {
   // and menu-item--new-folder.
   const isInsideMenu = $('.menubar > li.open').find($(event.target)).length > 0;
   const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
-  const editorComponent = getActiveEditor();
-  if (isInsideMenu && isNotNewFileOrFolderBtn && editorComponent && editorComponent.instance.editor) {
+  const editorComponent = Terra.app.layout.getActiveEditor();
+  if (isInsideMenu && isNotNewFileOrFolderBtn && editorComponent && editorComponent.ready) {
     // Set Terra.v.blockLFSPolling to prevent file contents being reloaded
     Terra.v.blockLFSPolling = true;
-    editorComponent.instance.editor.focus();
+    editorComponent.editor.focus();
     Terra.v.blockLFSPolling = false;
   }
 
@@ -220,15 +212,15 @@ Menubar.closeLFSFolder = (event) => {
 };
 
 Menubar.undo = () => {
-  getActiveEditor().instance.editor.undo();
+  Terra.app.layout.getActiveEditor().editor.undo();
 };
 
 Menubar.redo = () => {
-  getActiveEditor().instance.editor.redo();
+  Terra.app.layout.getActiveEditor().editor.redo();
 };
 
 Menubar.copyToClipboard = () => {
-  const editor = getActiveEditor().instance.editor;
+  const editor = Terra.app.layout.getActiveEditor().editor;
   if (!editor.selection.isEmpty()) {
     const text = editor.getSelectedText();
     navigator.clipboard.writeText(text);
@@ -239,53 +231,53 @@ Menubar.cut = () => {
   Menubar.copyToClipboard();
 
   // Cut the selected text.
-  getActiveEditor().instance.editor.insert('');
+  Terra.app.layout.getActiveEditor().editor.insert('');
 };
 
 Menubar.toggleComment = () => {
-  getActiveEditor().instance.editor.toggleCommentLines();
+  Terra.app.layout.getActiveEditor().editor.toggleCommentLines();
 }
 
 Menubar.moveLinesUp = () => {
-  getActiveEditor().instance.editor.moveLinesUp();
+  Terra.app.layout.getActiveEditor().editor.moveLinesUp();
 }
 
 Menubar.moveLinesDown = () => {
-  getActiveEditor().instance.editor.moveLinesDown();
+  Terra.app.layout.getActiveEditor().editor.moveLinesDown();
 }
 
 Menubar.pasteFromClipboard = () => {
   navigator.clipboard.readText().then((text) => {
-    getActiveEditor().instance.editor.insert(text);
+    Terra.app.layout.getActiveEditor().editor.insert(text);
   });
 };
 
 Menubar.indent = () => {
-  getActiveEditor().instance.editor.blockIndent();
+  Terra.app.layout.getActiveEditor().editor.blockIndent();
 };
 
 Menubar.outdent = () => {
-  getActiveEditor().instance.editor.blockOutdent();
+  Terra.app.layout.getActiveEditor().editor.blockOutdent();
 };
 
 Menubar.findNext = () => {
-  getActiveEditor().instance.editor.findNext();
+  Terra.app.layout.getActiveEditor().editor.findNext();
 }
 
 Menubar.findPrev = () => {
-  getActiveEditor().instance.editor.findPrevious();
+  Terra.app.layout.getActiveEditor().editor.findPrevious();
 }
 
 Menubar.search = () => {
-  getActiveEditor().instance.editor.execCommand('find');
+  Terra.app.layout.getActiveEditor().editor.execCommand('find');
 };
 
 Menubar.replace = () => {
-  getActiveEditor().instance.editor.execCommand('replace');
+  Terra.app.layout.getActiveEditor().editor.execCommand('replace');
 };
 
 Menubar.runTab = () => {
-  getActiveEditor().instance.editor.execCommand('run');
+  Terra.app.layout.getActiveEditor().editor.execCommand('run');
 };
 
 Menubar.addCredentials = () => {

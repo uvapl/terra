@@ -1,8 +1,6 @@
 import { TerraPlugin } from '../../js/plugin-manager.js';
-import { getActiveEditor } from '../../js/helpers/editor-component.js';
 import { createModal, hideModal, showModal } from '../../js/modal.js';
 import VFS from '../../js/vfs.js';
-import pluginManager from '../../js/plugin-manager.js';
 
 export default class FileArgsPlugin extends TerraPlugin {
   name = 'file-args';
@@ -61,10 +59,10 @@ export default class FileArgsPlugin extends TerraPlugin {
   onButtonClick = () => {
     if (this.$button.is(':disabled')) return;
 
-    const tab = getActiveEditor();
-    if (!tab || tab.instance.proglang !== 'c') return;
+    const editorComponent = Terra.app.layout.getActiveEditor();
+    if (!editorComponent || editorComponent.proglang !== 'c') return;
 
-    const fileId = tab.container.getState().fileId;
+    const fileId = editorComponent.container.getState().fileId;
     const filepath = VFS.getAbsoluteFilePath(fileId);
 
     const currentArgs = (this.getState('fileargs')[filepath] || '').replace(/"/g, '&quot;');

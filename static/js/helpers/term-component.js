@@ -91,7 +91,7 @@ export function waitForInput() {
  *   'Error: write data discarded, use flow control to avoid losing data'
  */
 export function clearTermWriteBuffer() {
-  if (Terra.app.layout.term) {
+  if (Terra.app.layout.term && Terra.app.layout.term._core) {
     Terra.app.layout.term._core._writeBuffer._writeBuffer = [];
   }
 }

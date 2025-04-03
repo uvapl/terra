@@ -2,10 +2,6 @@ import App from './app.js';
 import IDELayout from './layout/layout.ide.js';
 import { BASE_FONT_SIZE, LFS_MAX_FILE_SIZE } from './constants.js';
 import {
-  getActiveEditor,
-  getAllEditorTabs
-} from './helpers/editor-component.js';
-import {
   getFileExtension,
   hasGitFSWorker,
   hasLFSApi,
@@ -48,10 +44,10 @@ export default class IDEApp extends App {
    * Reset the layout to its initial state.
    */
   resetLayout() {
-    const oldContentConfig = getAllEditorTabs().map((tab) => ({
-      title: tab.config.title,
+    const oldContentConfig = Terra.app.layout.getEditorComponents().map((editorComponent) => ({
+      title: editorComponent.getFilename(),
       componentState: {
-        fileId: tab.container.getState().fileId,
+        fileId: editorComponent.getState().fileId,
       }
     }));
 
@@ -59,8 +55,8 @@ export default class IDEApp extends App {
     this.layout = this.createLayout(true, oldContentConfig);
     this.layout.on('initialised', () => {
       setTimeout(() => {
-        const currentTab = getActiveEditor();
-        const proglang = getFileExtension(currentTab.config.title);
+        const editorComponent = this.layout.getActiveEditor();
+        const proglang = getFileExtension(editorComponent.getFilename());
         if (hasWorker(proglang) && Terra.langWorkerApi) {
           Terra.langWorkerApi.restart();
         }

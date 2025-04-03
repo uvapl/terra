@@ -1,6 +1,5 @@
 import App from './app.js';
 import { BASE_FONT_SIZE } from './constants.js';
-import { getActiveEditor } from './helpers/editor-component.js'
 import {
   getFileExtension,
   makeLocalStorageKey,
@@ -62,14 +61,13 @@ export default class EmbedApp extends App {
 
   postSetupLayout() {
     // Listen for the content of the file to be received.
-    window.addEventListener('message', function(event) {
-      const editor = tab.instance.editor;
-      const fileId = tab.instance.container.getState().fileId;
+    window.addEventListener('message', (event) => {
+      const editorComponent = this.layout.getActiveEditor();
+      const fileId = editorComponent.getState().fileId;
       const content = removeIndent(event.data);
       if (content) {
         VFS.updateFile(fileId, { content });
-        editor.setValue(content);
-        editor.clearSelection();
+        editorComponent.setContent(content);
       }
     });
   }

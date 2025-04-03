@@ -1,7 +1,7 @@
 import { DROP_AREA_INDICATOR_CLASS } from './ide/constants.js';
 import { getFileExtension, hasLFSApi, isObject, isValidFilename } from './helpers/shared.js'
 import { createModal, hideModal, showModal } from './modal.js'
-import { getAllEditorTabs, openFile } from './helpers/editor-component.js'
+import { openFile } from './helpers/editor-component.js'
 import VFS from './vfs.js'
 import LFS from './lfs.js'
 import Terra from './terra.js'
@@ -284,9 +284,11 @@ class FileTreeManager {
    * @param {string} fileId - The file ID to close.
    */
   closeFileTab = (fileId) => {
-    const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === fileId);
-    if (tab) {
-      tab.parent.removeChild(tab);
+    const editorComponent = Terra.app.layout.getEditorComponents()
+      .find((editorComponent) => editorComponent.getState().fileId === fileId);
+
+    if (editorComponent) {
+      editorComponent.close();
     }
   }
 
@@ -564,11 +566,13 @@ class FileTreeManager {
 
     fn(data.node.key, { name });
 
-    const tab = getAllEditorTabs().find((tab) => tab.container.getState().fileId === data.node.key);
-    if (tab) {
-      tab.container.setTitle(name);
+    const editorComponent = Terra.app.layout.getEditorComponents()
+      .find((editorComponent) => editorComponent.getState().fileId === data.node.key);
+
+    if (editorComponent) {
+      editorComponent.container.setTitle(name);
       const proglang = name.includes('.') ? getFileExtension(name) : 'text';
-      tab.instance.setProgLang(proglang);
+      editorComponent.setProgLang(proglang);
 
       // For some reason no update is triggered, so we trigger an update.
       Terra.app.layout.emit('stateChanged');

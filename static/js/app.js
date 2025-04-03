@@ -1,5 +1,5 @@
 import { IS_IDE } from './constants.js';
-import { checkForStopCodeButton, getActiveEditor, getAllEditorFiles } from './helpers/editor-component.js';
+import { checkForStopCodeButton, getAllEditorFiles } from './helpers/editor-component.js';
 import { getFileExtension, hasLFSApi, uuidv4 } from './helpers/shared.js'
 import { createLangWorkerApi } from './lang-worker-api.js';
 import Terra from './terra.js';
@@ -211,7 +211,7 @@ export default class App {
    * printing the output.
    */
   async runCode(fileId = null, clearTerm = false) {
-    if (clearTerm) Terra.app.layout.term.reset();
+    if (clearTerm) this.term.clear();
 
     // TODO: maybe do if (!Terra.langWorkerApi.isReady) { ... } else { ... }
     if (Terra.langWorkerApi) {
@@ -240,9 +240,9 @@ export default class App {
         files = [{ ...file, content }];
       }
     } else {
-      const tab = getActiveEditor();
-      fileId = tab.container.getState().fileId;
-      filename = tab.config.title;
+      const editorComponent = this.layout.getActiveEditor();
+      fileId = editorComponent.getState().fileId;
+      filename = editorComponent.getFilename();
       files = await getAllEditorFiles();
     }
 

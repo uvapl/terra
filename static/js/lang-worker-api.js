@@ -1,4 +1,3 @@
-import { getActiveEditor } from './helpers/editor-component.js';
 import {
   clearTermWriteBuffer,
   disposeUserInput,
@@ -219,12 +218,11 @@ export default class LangWorkerAPI {
     // Only disable the button again if the current tab has a worker,
     // because users can still run code through the contextmenu in the
     // file-tree in the IDE app.
-    const tab = getActiveEditor();
+    const editorComponent = Terra.app.layout.getActiveEditor();
     let disableRunBtn = false;
-    if (!hasWorker(getFileExtension(tab.config.title))) {
+    if (editorComponent && !hasWorker(getFileExtension(editorComponent.getFilename()))) {
       disableRunBtn = true;
     }
-
 
     // Change the stop-code button back to a run-code button.
     const $button = $('#run-code');

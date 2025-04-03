@@ -4,7 +4,6 @@ import {
   AUTOSAVE_INTERVAL,
   AUTOSAVE_START_OFFSET,
 } from './constants.js';
-import { getAllEditorTabs } from './helpers/editor-component.js';
 import {
   formatDate,
   getFileExtension,
@@ -461,9 +460,9 @@ export default class ExamApp extends App {
 
     // Go through each tab and create a Blob with the file contents of that tab
     // and append it to the form data.
-    getAllEditorTabs().forEach((tab) => {
-      const filename = tab.config.title;
-      const fileId = tab.container.getState().fileId;
+    this.layout.getEditorComponents().forEach((editorComponent) => {
+      const filename = editorComponent.getFilename();
+      const fileId = editorComponent.getState().fileId;
       const file = VFS.findFileById(fileId);
       const blob = new Blob([file.content], { type: 'text/plain' });
       formData.append(`files[${filename}]`, blob, filename);

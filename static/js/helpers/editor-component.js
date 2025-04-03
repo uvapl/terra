@@ -1,4 +1,3 @@
-import { BASE_FONT_SIZE, IS_IDE } from '../constants.js';
 import {
   getFileExtension,
   hasLFSApi,
@@ -8,31 +7,9 @@ import {
 import { createModal, hideModal, showModal } from '../modal.js';
 import VFS from '../vfs.js';
 import LFS from '../lfs.js';
-import pluginManager from '../plugin-manager.js';
 import { createLangWorkerApi } from '../lang-worker-api.js';
 import Terra from '../terra.js';
 import fileTreeManager from '../file-tree-manager.js';
-import EditorComponent from '../layout/editor.component.js';
-
-/**
- * Get the active tab its editor instance.
- *
- * @returns {object} The active editor instance.
- */
-export function getActiveEditor() {
-  return Terra.app.layout._lastActiveEditor;
-}
-
-/**
-* Set the active tab its editor instance.
- *
- * @param {EditorComponent} editor - The editor instance to set as active.
- */
-export function setActiveEditor(editor) {
-  Terra.app.layout._lastActiveEditor = editor instanceof EditorComponent
-    ? editor.container.parent
-    : null;
-}
 
 /**
  * Gathers all files from the editor and returns them as an array of objects.
@@ -42,15 +19,15 @@ export function setActiveEditor(editor) {
  */
 export function getAllEditorFiles() {
   return Promise.all(
-    getAllEditorTabs().map(async (tab) => {
-      const containerState = tab.container.getState()
-      let content = containerState.value;
+    Terra.app.layout.getEditorComponents().map(async (editorComponent) => {
+      const containerState = editorComponent.getState()
+      let content = editorComponent.getContent();
       if (!content && hasLFSApi() && LFS.loaded) {
         content = await LFS.getFileContent(containerState.fileId);
       }
 
       return {
-        name: tab.config.title,
+        name: editorComponent.getFilename(),
         content,
       }
     })
@@ -58,39 +35,12 @@ export function getAllEditorFiles() {
 }
 
 /**
- * Gather all editor tab components recursively from the layout.
- *
- * @param {GoldenLayout.ContentItem} [contentItem] - Starting contentItem where
- * the recursive search will start.
- * @returns {array} List of all the editor tabs.
- */
-export function getAllEditorTabs(contentItem) {
-  if (!Terra.app) return [];
-
-  if (!contentItem) contentItem = Terra.app.layout.root;
-
-  if (contentItem.isComponent) {
-    return contentItem;
-  }
-
-  let files = [];
-  contentItem.contentItems.forEach((childContentItem) => {
-    if (!childContentItem.isTerminal) {
-      files = files.concat(getAllEditorTabs(childContentItem));
-    }
-  });
-
-  return files;
-}
-
-
-/**
- * Close the active tab in the editor, except when it is an untitled tab.
+ * Close the active tab in the editor.
  */
 export function closeFile() {
-  const currentTab = getActiveEditor();
-  if (currentTab) {
-    currentTab.parent.removeChild(currentTab);
+  const editorComponent = Terra.app.layout.getActiveEditor();
+  if (editorComponent) {
+    editorComponent.close();
   }
 }
 
@@ -98,8 +48,9 @@ export function closeFile() {
  * Close all tabs in the editor.
  */
 export function closeAllFiles() {
-  const tabs = getAllEditorTabs();
-  tabs.forEach((tab) => tab.parent.removeChild(tab));
+  Terra.app.layout.getEditorComponents().forEach((editorComponent) => {
+    editorComponent.close();
+  });
 }
 
 /**
@@ -110,46 +61,52 @@ export function closeAllFiles() {
  * @param {string} filename - The name of the file to open.
  */
 export function openFile(id, filename) {
-  const tabs = getAllEditorTabs();
-  const tab = tabs.filter((tab) =>
-    id === null
-      ? tab.config.title === filename
-      : tab.container.getState().fileId === id
-  )[0];
+  let editorComponents = Terra.app.layout.getEditorComponents();
 
+  // Try to find the editor component with the given filename or id.
+  const editorComponent = editorComponents.find(
+    (editorComponent) => id === null
+      ? editorComponent.getFilename() === filename
+      : editorComponent.getState().fileId === id
+  );
 
-  if (tab) {
-    // Switch to the active tab.
-    tab.parent.setActiveContentItem(tab);
-    tab.instance.editor.focus();
+  if (editorComponent) {
+    // Switch to the active tab that is already open.
+    editorComponent.setActive();
   } else {
     let removeFirstTab = false;
 
-    // Check if the current tab is an untitled tab with no content. If so,
-    // then remove it after we've inserted the new tab.
-    if (tabs.length === 1 && tabs[0].config.title === 'Untitled' && tabs[0].instance.getContent() === '') {
-      removeFirstTab = true;
+    // Check if first tab is an Untitled tab with no content. If so, then remove
+    // it after we've inserted the new tab.
+    if (editorComponents.length === 1 && editorComponents[0].getFilename() === 'Untitled') {
+      if (editorComponents[0].getContent() === '') {
+        removeFirstTab = true;
+      } else {
+        editorComponents[0].clearContent();
+        return;
+      }
     }
 
-    const currentTab = getActiveEditor();
-    if (currentTab) {
+    const activeEditorComponent = Terra.app.layout.getActiveEditor();
+    if (activeEditorComponent) {
       // Add a new tab next to the current active tab.
-      currentTab.parent.addChild({
-        type: 'component',
-        componentName: 'editor',
+      activeEditorComponent.addSiblingTab({
+        title: filename,
         componentState: {
-          fontSize: BASE_FONT_SIZE,
           fileId: id,
         },
-        title: filename,
       });
 
+      editorComponents = Terra.app.layout.getEditorComponents();
+
       if (removeFirstTab) {
-        getAllEditorTabs()[0].instance.fakeOnContainerOpenEvent = true;
-        getAllEditorTabs()[0].instance.fakeOnEditorFocusEvent = true;
-        getAllEditorTabs()[1].instance.fakeOnContainerOpenEvent = true;
-        getAllEditorTabs()[1].instance.fakeOnEditorFocusEvent = true;
-        currentTab.parent.removeChild(tabs[0]);
+        editorComponents[0].fakeOnContainerOpenEvent = true;
+        editorComponents[0].fakeOnEditorFocusEvent = true;
+        editorComponents[1].fakeOnContainerOpenEvent = true;
+        editorComponents[1].fakeOnEditorFocusEvent = true;
+
+        // Close Untitled tab.
+        editorComponents[0].close();
       }
     }
   }
@@ -177,13 +134,13 @@ export function createFolderOptionsHtml(html = '', parentId = null, indent = '--
  * This function get's triggered on each 'save' keystroke, i.e. <cmd/ctrl + s>.
  */
 export function saveFile() {
-  const tab = getActiveEditor();
+  const editorComponent = Terra.app.layout.getActiveEditor();
 
-  if (!tab) return;
+  if (!editorComponent) return;
 
   // If the file exists in the vfs, then return, because the contents will be
   // auto-saved already in another part of the codebase.
-  const existingFileId = tab.container.getState().fileId;
+  const existingFileId = editorComponent.getState().fileId;
   if (existingFileId) {
     const file = VFS.findFileById(existingFileId);
     if (file) return;
@@ -198,7 +155,7 @@ export function saveFile() {
       <div class="form-wrapper">
         <label>Enter a filename:</label>
         <div class="right-container">
-          <input class="text-input" placeholder="Enter a filename" value="${tab.config.title}" maxlength="30" />
+          <input class="text-input" placeholder="Enter a filename" value="${editorComponent.getFilename()}" maxlength="30" />
         </div>
       </div>
       <div class="form-wrapper">
@@ -279,15 +236,15 @@ export function saveFile() {
     const { id: nodeId } = VFS.createFile({
       parentId: folderId,
       name: filename,
-      content: tab.instance.getContent(),
+      content: editorComponent.getContent(),
     });
     fileTreeManager.createFileTree();
 
     // Change the Untitled tab to the new filename.
-    tab.container.setTitle(filename);
+    editorComponent.setFilename(filename);
 
     // Update the container state.
-    tab.container.setState({ fileId: nodeId });
+    editorComponent.extendState({ fileId: nodeId });
 
     // For some reason no layout update is triggered, so we trigger an update.
     Terra.app.layout.emit('stateChanged');
@@ -297,7 +254,7 @@ export function saveFile() {
     const proglang = getFileExtension(filename);
 
     // Set correct syntax highlighting.
-    tab.instance.setProgLang(proglang)
+    editorComponent.setProgLang(proglang)
 
     createLangWorkerApi(proglang);
   });
@@ -330,7 +287,7 @@ export async function runButtonCommand(selector, cmd) {
   if ($button.prop('disabled')) return;
   $button.prop('disabled', true);
 
-  const activeTabName = getActiveEditor().config.title;
+  const activeTabName = Terra.app.layout.getActiveEditor().getFilename();
   const files = await getAllEditorFiles();
 
   if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {

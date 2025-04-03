@@ -1,21 +1,21 @@
 import { BASE_FONT_SIZE } from '../constants.js';
-import {
-  getAceCompleters,
-  getAllEditorTabs,
-  setActiveEditor
-} from '../helpers/editor-component.js';
-import {
-  getFileExtension,
-  seconds
-} from '../helpers/shared.js';
+import { getAceCompleters } from '../helpers/editor-component.js';
+import { getFileExtension, seconds } from '../helpers/shared.js';
 import { createLangWorkerApi } from '../lang-worker-api.js';
 import pluginManager from '../plugin-manager.js';
 import localStorageManager from '../local-storage-manager.js';
+import Terra from '../terra.js';
 
 /**
  * Editor component for GoldenLayout.
  */
 export default class EditorComponent extends EventTarget {
+  /**
+   * Whether the editor has been rendered.
+   * @type {boolean}
+   */
+  ready = false;
+
   /**
    * Component container object.
    * @type {GoldenLayout.ItemContainer}
@@ -171,16 +171,12 @@ export default class EditorComponent extends EventTarget {
    * Callback when the user's cursor is focused on the editor.
    */
   onEditorFocus = () => {
-    console.log('onEditorFocus');
     if (this.fakeOnEditorFocusEvent) {
-      console.log('fakeOnEditorFocusEvent', this.fakeOnEditorFocusEvent);
       this.fakeOnEditorFocusEvent = false;
       return;
     }
 
-    console.log('SUCCESS');
-
-    setActiveEditor(this);
+    this.dispatchEvent(new Event('focus'));
 
     // Spawn a new worker if necessary.
     createLangWorkerApi(this.proglang);
@@ -257,6 +253,10 @@ export default class EditorComponent extends EventTarget {
     return this.container.parent.config.title;
   }
 
+  setFilename = (filename) => {
+    this.container.parent.setTitle(filename);
+  }
+
   /**
    * Disable the editor if the content is too large.
    */
@@ -284,7 +284,24 @@ export default class EditorComponent extends EventTarget {
    * @returns {string} All editor lines concatenated with \n characters.
    */
   getContent = () => {
+    if (!this.editor) return '';
+
     return this.editor.getValue();
+  }
+
+  /**
+   * Clear the content of the editor.
+   */
+  clearContent = () => {
+    this.editor.setValue('');
+    this.editor.clearSelection();
+  }
+
+  /**
+   * Close the current editor, which will completely destroy the editor.
+   */
+  close = () => {
+    this.container.close();
   }
 
   /**
@@ -313,6 +330,24 @@ export default class EditorComponent extends EventTarget {
       highlightGutterLine: true,
       highlightSelectedWord: true,
       highlightIndentGuides: true,
+    });
+  }
+
+  /**
+   * Add a new Untitled sibling tab next to the current editor.
+   *
+   * @param {GoldenLayout.ContentItem} config - Content item config object.
+   */
+  addSiblingTab = (config = {}) => {
+    this.container.parent.parent.addChild({
+      type: 'component',
+      componentName: 'editor',
+      title: 'Untitled',
+      componentState: {
+        fontSize: BASE_FONT_SIZE,
+        ...config.componentState
+      },
+      ...config,
     });
   }
 
@@ -360,35 +395,28 @@ export default class EditorComponent extends EventTarget {
     });
   }
 
+  setActive = () => {
+    if (!this.fakeOnEditorOpenEvent) {
+      this.container.parent.parent.setActiveContentItem(this.container.parent);
+    }
+  }
+
   /**
    * Callback before the container is destroyed.
    */
-  onContainerDestroy = () => {
+  onDestroy = () => {
+    this.dispatchEvent(new Event('destroy'));
+
     if (!this.editor) return;
 
     // If it's the last tab being closed, then we insert another 'Untitled' tab,
     // because we always need at least one tab open.
-    const tabs = getAllEditorTabs();
-    const totalTabs = tabs.length;
+    const editorComponents = Terra.app.layout.getEditorComponents();
+    const totalTabs = editorComponents.length;
 
-    if (totalTabs >= 2) {
-      // Switch to the first tab.
-      tabs[0].parent.setActiveContentItem(tabs[0]);
-      if (tabs[0].instance.editor) {
-        tabs[0].instance.editor.focus();
-      }
-    } else if (totalTabs === 1) {
-      const currentTab = tabs[0];
-      currentTab.parent.addChild({
-        type: 'component',
-        componentName: 'editor',
-        componentState: {
-          fontSize: BASE_FONT_SIZE,
-        },
-        title: 'Untitled',
-      });
-    } else {
-      setActiveEditor(null);
+    if (totalTabs === 1) {
+      const firstEditorComponent = editorComponents[0];
+      firstEditorComponent.addSiblingTab();
     }
 
     this.editor.destroy();
@@ -514,7 +542,7 @@ export default class EditorComponent extends EventTarget {
 
     this.container.on('show', () => {
       this.onShow();
-      this.dispatchEvent(new Event('onShow'));
+      this.dispatchEvent(new Event('show'));
       pluginManager.triggerEvent('onEditorShow', this);
     });
 
@@ -548,7 +576,7 @@ export default class EditorComponent extends EventTarget {
     });
 
     this.container.on('destroy', () => {
-      this.onContainerDestroy();
+      this.onDestroy();
       pluginManager.triggerEvent('onEditorDestroy', this);
     });
 

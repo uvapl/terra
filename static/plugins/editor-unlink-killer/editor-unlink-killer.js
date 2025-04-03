@@ -3,7 +3,11 @@
  * a tab is linked to a fileID that cannot be found in the VFS (anymore).
  */
 
-class EditorUnlinkKiller extends TerraPlugin {
+import Terra from '../terra.js';
+import VFS from '../vfs.js';
+import { createModal, showModal } from '../modal.js';
+
+export default class EditorUnlinkKiller extends TerraPlugin {
   constructor() {
     super();
     this.name = 'tab-watcher';
@@ -19,10 +23,11 @@ class EditorUnlinkKiller extends TerraPlugin {
   }
 
   checkTabs() {
-    const tabs = Terra.f.getAllEditorTabs();
-    tabs.forEach((tab) => {
-      if(tab.config.title == 'Untitled') return;
-      const fileId = tab.container.getState().fileId;
+    const editorComponents = Terra.app.layout.getEditorComponents();
+    editorComponents.forEach((editorComponent) => {
+      if (editorComponent.getFilename() == 'Untitled') return;
+
+      const fileId = editorComponent.getState().fileId;
       if (!this.isValidFileId(fileId)) {
         console.error(`Invalid file ID detected: ${fileId}`);
         this.disableIDE(`The tab you were editing could not be saved. But whatever was
@@ -33,21 +38,21 @@ class EditorUnlinkKiller extends TerraPlugin {
   }
 
   isValidFileId(fileId) {
-    return !!Terra.vfs.findFileById(fileId);
+    return !!VFS.findFileById(fileId);
   }
 
   disableIDE(errorMessage) {
     // Disable all ace editors
-    const tabs = Terra.f.getAllEditorTabs();
-    tabs.forEach((tab) => {
-      tab.instance.lock();
+    const editorComponents = Terra.app.layout.getEditorComponents();
+    editorComponents.forEach((editorComponent) => {
+      editorComponent.lock();
     });
 
     // Disable the file tree
     $('#file-tree').addClass('disabled');
 
     // Show a modal that disallows input anywhere in the IDE
-    const $modal = Terra.f.createModal({
+    const $modal = createModal({
       title: 'IDE Disabled',
       body: `<p>${errorMessage}</p>`,
       footer: '',
@@ -57,8 +62,6 @@ class EditorUnlinkKiller extends TerraPlugin {
       }
     });
 
-    Terra.f.showModal($modal);
+    showModal($modal);
   }
 }
-
-(() => Terra.pluginManager.register(new EditorUnlinkKiller()))();
