@@ -51,15 +51,7 @@ export default class App {
     // Await the setupLayout because some apps might need to do async work.
     await this.setupLayout();
 
-    // Register the editor tab created callback *before* the layout is
-    // initialised to ensure it is always called properly.
-    this.layout.on('tabCreated', this.onEditorTabCreated);
-
-    // We register the postSetupLayout as a callback, which will be called when
-    // the subsequent init() function has finished.
-    this.layout.on('initialised', this.postSetupLayout);
-
-    // Start initialising the layout.
+    this.registerLayoutEvents();
     this.layout.init();
   }
 
@@ -76,34 +68,36 @@ export default class App {
   }
 
   /**
-   * Callback function when a new tab has been created in the layout.
-   *
-   * This is default functionality and super.onEditorTabCreated() must be called
-   * first in child classes before any additional functionality.
-   *
-   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
+   * Add event listeners to the layout instance.
    */
-  onEditorTabCreated(tab) {
-    if (tab.contentItem.isTerminal) return;
+  registerLayoutEvents() {
+    // We register the postSetupLayout as a callback, which will be called when
+    // the subsequent init() function has finished.
+    this.layout.on('initialised', this.postSetupLayout);
 
-    const editorComponent = tab.contentItem.instance;
+    this.layout.addEventListener('onRunCodeButtonClick', this.onRunCodeButtonClick);
 
-    // Bind event listeners to custom editor component events.
-    // key = event name
-    // value = callback function
-    const events = {
-      'startEditing': 'onEditorStartEditing',
-      'stopEditing': 'onEditorStopEditing',
-      'onShow': 'onEditorShow',
-      'vfsChanged': 'onVFSChanged',
-    }
+    // Listen for editor events being emitted.
+    const editorEvents = [
+      'onEditorStartEditing',
+      'onEditorStopEditing',
+      'onEditorShow',
+      'onVFSChanged',
+    ];
 
-    for (const [eventName, fn] of Object.entries(events)) {
-      const callback = this[fn];
-      if (typeof callback === 'function') {
-        editorComponent.addEventListener(eventName, () => callback(editorComponent));
-      }
-    }
+    editorEvents.forEach((eventName) => {
+      this.layout.addEventListener(eventName, (event) => {
+        const { editorComponent } = event.detail;
+        this[eventName](editorComponent);
+      });
+    });
+  }
+
+  /**
+   * Callback when the user clicks on the run-code button in the UI.
+   */
+  onRunCodeButtonClick() {
+    this.runCode();
   }
 
   /**

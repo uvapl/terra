@@ -320,3 +320,32 @@ export function registerTimeoutHandler(id, timeout, callback) {
     delete Terra.timeoutHandlers[id];
   }, timeout);
 }
+
+/**
+ * Creates a mixin that adds event target functionality to a class.
+ *
+ * @param {class} base - The base class where the mixin will be applied to.
+ * @returns {EventTargetMixin} New class with event target functionality.
+ */
+export function eventTargetMixin(base) {
+  class EventTargetMixin extends base {
+    constructor(...args) {
+      super(...args);
+      this._eventTarget = new EventTarget();
+    }
+
+    addEventListener(...args) {
+      this._eventTarget.addEventListener(...args);
+    }
+
+    removeEventListener(...args) {
+      this._eventTarget.removeEventListener(...args);
+    }
+
+    dispatchEvent(...args) {
+      return this._eventTarget.dispatchEvent(...args);
+    }
+  }
+
+  return EventTargetMixin;
+}

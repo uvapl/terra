@@ -27,6 +27,12 @@ export default class TerminalComponent {
    */
   state = null;
 
+  /**
+   * Reference to the xterm.js component.
+   * @type {Terminal}
+   */
+  term = null;
+
   constructor(container, state) {
     this.container = container;
     this.state = state;
@@ -40,6 +46,22 @@ export default class TerminalComponent {
   }
 
   /**
+   * Write a message to the terminal.
+   *
+   * @param {string} msg - The message to write.
+   */
+  write = (msg) => {
+    this.term.write(msg);
+  }
+
+  /**
+   * Clear the terminal screen.
+   */
+  clear = () => {
+    this.term.reset();
+  }
+
+  /**
    * Callback when the editor is opened for the first time or it is already open
    * and becomes active (i.e. the user clicks on the tab in the UI).
    */
@@ -49,15 +71,15 @@ export default class TerminalComponent {
 
     const fontSize = this.state.fontSize || BASE_FONT_SIZE;
 
-    Terra.app.layout.term = new Terminal({
+    this.term = new Terminal({
       convertEol: true,
       disableStdin: true,
       cursorBlink: true,
       fontSize,
       lineHeight: 1.2
     });
-    Terra.app.layout.term.loadAddon(this.fitAddon);
-    Terra.app.layout.term.open(this.container.getElement()[0]);
+    this.term.loadAddon(this.fitAddon);
+    this.term.open(this.container.getElement()[0]);
     this.fitAddon.fit();
 
     // Trigger a single resize after the terminal has rendered to make sure it
@@ -82,11 +104,11 @@ export default class TerminalComponent {
    * Callback when the container is destroyed.
    */
   onContainerDestroy = () => {
-    if (Terra.app.layout.term && typeof Terra.app.layout.term.destroy === 'function') {
-      Terra.app.layout.term.destroy();
+    if (this.term && typeof this.term.destroy === 'function') {
+      this.term.destroy();
     }
 
-    Terra.app.layout.term = null;
+    this.term = null;
   }
 
   /**
@@ -103,7 +125,7 @@ export default class TerminalComponent {
    */
   setFontSize = (fontSize) => {
     this.container.extendState({ fontSize });
-    Terra.app.layout.term.options.fontSize = fontSize;
+    this.term.options.fontSize = fontSize;
     this.fitAddon.fit();
   };
 

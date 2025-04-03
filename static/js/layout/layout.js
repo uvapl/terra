@@ -1,6 +1,6 @@
 import { IS_IDE, BASE_FONT_SIZE } from '../constants.js';
 import { runButtonCommand } from '../helpers/editor-component.js';
-import { isMac, isObject, mergeObjects } from '../helpers/shared.js';
+import { isMac, isObject, mergeObjects, eventTargetMixin } from '../helpers/shared.js';
 import EditorComponent from './editor.component.js';
 import TerminalComponent from './term.component.js';
 import pluginManager from '../plugin-manager.js';
@@ -49,9 +49,11 @@ const DEFAULT_LAYOUT_CONFIG = {
   ]
 };
 
-export default class Layout extends GoldenLayout {
+export default class Layout extends eventTargetMixin(GoldenLayout) {
   /**
-   * Whether the layout has been initialised or not.
+   * Whether the layout has been initialised. This is different from the
+   * GoldenLayout `this.isInitialised` property, which is true when the layout
+   * is created. We use this to check whether the layout has been rendered.
    * @type {boolean}
    */
   initialised = false;
@@ -91,6 +93,12 @@ export default class Layout extends GoldenLayout {
   term = null;
 
   /**
+   * References to all open tabs in the UI.
+   * @type {list[GoldenLayout.Tab]}
+   */
+  tabs = [];
+
+  /**
    * Default terminal startup message. Each element in the array is written on a
    * separateline.
    * @type {array}
@@ -123,33 +131,85 @@ export default class Layout extends GoldenLayout {
       }
     });
 
-    this.on('stackCreated', (stack) => {
-      if (!this.initialised) {
-        this.initialised = true;
-        // Do a set-timeout trick to make sure the components are registered
-        // through the registerComponent() function, prior to calling this part.
-        setTimeout(() => {
-          this.emitToAllComponents('afterFirstRender');
-          this.setTheme(localStorageManager.getLocalStorageItem('theme') || 'light');
-          this.renderButtons();
-          this.showTermStartupMessage();
-          if (IS_IDE) {
-            pluginManager.triggerEvent('onLayoutLoaded');
-          }
-
-          if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
-            this.emitToEditorComponents('setCustomAutocompleter', options.autocomplete);
-          }
-
-          if (this.vertical) {
-            this.emitToAllComponents('verticalLayout');
-          }
-        }, 0);
-      }
-    });
+    this.on('stackCreated', (stack) => this.onStackCreated(stack, options));
+    this.on('tabCreated', this.onTabCreated);
 
     this.registerComponent('editor', EditorComponent);
     this.registerComponent('terminal', TerminalComponent);
+  }
+
+  /**
+   * Callback function when a new tab has been created in the layout.
+   *
+   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
+   */
+  onTabCreated = (tab) => {
+    if (tab.contentItem.isTerminal) {
+      this.term = tab.contentItem.instance;
+      tab.contentItem.container.on('destroy', () => {
+        this.term = null;
+      });
+      return;
+    }
+
+    // Add a regular editor component to the tabs list.
+    this.tabs.push(tab);
+    const index = this.tabs.length - 1;
+    tab.contentItem.container.on('destroy', () => {
+      this.tabs.splice(index, 1);
+    });
+
+
+    const editorComponent = tab.contentItem.instance;
+
+    // Bind event listeners to custom editor component events.
+    // key = local editor event name
+    // value = external event name that the app will listen to
+    const events = {
+      'startEditing': 'onEditorStartEditing',
+      'stopEditing': 'onEditorStopEditing',
+      'onShow': 'onEditorShow',
+      'vfsChanged': 'onVFSChanged',
+    }
+
+    for (const [internalEventName, externalEventName] of Object.entries(events)) {
+      editorComponent.addEventListener(internalEventName, () => {
+        this.dispatchEvent(new CustomEvent(externalEventName, {
+          detail: { editorComponent }
+        }));
+      });
+    }
+  }
+
+  /**
+   * Callback when the layout is initialised and the stack is created.
+   *
+   * @param {GoldenLayout.Stack} stack - Object representing the root structure.
+   * @param {object} options - Options passed to the layout.
+   */
+  onStackCreated = (stack, options) => {
+    if (this.initialised) return;
+
+    this.initialised = true;
+    // Do a set-timeout trick to make sure the components are registered
+    // through the registerComponent() function, prior to calling this part.
+    setTimeout(() => {
+      this.emitToAllComponents('afterFirstRender');
+      this.setTheme(localStorageManager.getLocalStorageItem('theme') || 'light');
+      this.renderButtons();
+      this.showTermStartupMessage();
+      if (IS_IDE) {
+        pluginManager.triggerEvent('onLayoutLoaded');
+      }
+
+      if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
+        this.emitToEditorComponents('setCustomAutocompleter', options.autocomplete);
+      }
+
+      if (this.vertical) {
+        this.emitToAllComponents('verticalLayout');
+      }
+    }, 0);
   }
 
   renderConfigButtons = () => {
@@ -315,10 +375,10 @@ export default class Layout extends GoldenLayout {
   };
 
   onRunCodeButtonClick = () => {
-    Terra.app.runCode();
+    this.dispatchEvent(new Event('onRunCodeButtonClick'));
   }
 
   onClearTermButtonClick = () => {
-    this.term.reset();
+    this.term.clear();
   }
 }

@@ -17,6 +17,7 @@ import LFS from '../lfs.js';
 import pluginManager from '../plugin-manager.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
+import Terra from '../terra.js';
 
 /**
  * Editor component for GoldenLayout.
