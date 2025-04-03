@@ -7,11 +7,24 @@ import Terra from '../terra.js';
  */
 export default class TerminalComponent {
   /**
-   * [TODO:description]
-   * @type {[TODO:type]}
+   * An addon for xterm.js that enables fitting the terminal's dimensions to a
+   * containing element. This addon requires xterm.js v4+.
+   * @see https://github.com/xtermjs/xterm.js/blob/a260f7d2889142d6566a66cb9856a07050dea611/addons/addon-fit/README.md
+   *
+   * @type {FitAddon}
    */
   fitAddon = new FitAddon.FitAddon();
+
+  /**
+   * Component container object.
+   * @type {GoldenLayout.ItemContainer}
+   */
   container = null;
+
+  /**
+   * Initialization state.
+   * @type {object}
+   */
   state = null;
 
   constructor(container, state) {
@@ -27,9 +40,10 @@ export default class TerminalComponent {
   }
 
   /**
-   * Callback for the container open event.
+   * Callback when the editor is opened for the first time or it is already open
+   * and becomes active (i.e. the user clicks on the tab in the UI).
    */
-  onContainerOpen = () => {
+  onShow = () => {
     // Add custom class for styling purposes.
     this.getParentComponentElement().classList.add('component-container', 'terminal-component-container');
 
@@ -104,7 +118,7 @@ export default class TerminalComponent {
    * Bind all container events with callbacks.
    */
   bindContainerEvents = () => {
-    this.container.on('open', this.onContainerOpen);
+    this.container.on('open', this.onShow);
     this.container.on('verticalLayout', this.onVerticalLayout);
     this.container.on('fontSizeChanged', this.setFontSize);
     this.container.on('resize', this.onContainerResize);
