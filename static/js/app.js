@@ -211,7 +211,7 @@ export default class App {
    * printing the output.
    */
   async runCode(fileId = null, clearTerm = false) {
-    if (clearTerm) this.term.clear();
+    if (clearTerm) this.layout.term.clear();
 
     // TODO: maybe do if (!Terra.langWorkerApi.isReady) { ... } else { ... }
     if (Terra.langWorkerApi) {
