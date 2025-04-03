@@ -165,7 +165,7 @@ export default class Check50Plugin extends TerraPlugin {
   runCheck50 = () => {
     const tab = getActiveEditor();
     const filename = tab.config.title;
-    const code = tab.instance.editor.getValue();
+    const code = tab.instance.getContent();
 
     const zip = new JSZip();
     zip.file(filename, code);

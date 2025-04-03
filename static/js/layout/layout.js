@@ -85,7 +85,7 @@ export default class Layout extends GoldenLayout {
 
   /**
    * Reference to the terminal component.
-   * There can only be one terminal component inside any app.
+   * There can only be one terminal component inside an app.
    * @type {Terminal}
    */
   term = null;
@@ -185,10 +185,10 @@ export default class Layout extends GoldenLayout {
 
   showTermStartupMessage = () => {
     for (const line of this.termStartupMessage) {
-      Terra.app.layout.term.write(line + '\n');
+      this.term.write(line + '\n');
     }
 
-    Terra.app.layout.term.write('\n');
+    this.term.write('\n');
   }
 
   // Emit an event recursively to all components. Optionally the `fileId` can
@@ -208,19 +208,19 @@ export default class Layout extends GoldenLayout {
   }
 
   emitToAllComponents = (event, data) => {
-    Terra.app.layout.root.contentItems[0].contentItems.forEach((contentItem) => {
+    this.root.contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data);
     });
   }
 
   emitToEditorComponents = (event, data) => {
-    Terra.app.layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
+    this.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data);
     });
   }
 
   emitToEditorComponentWithFileId = (event, fileId, data) => {
-    Terra.app.layout.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
+    this.root.contentItems[0].contentItems[0].contentItems.forEach((contentItem) => {
       this._emit(contentItem, event, data, fileId);
     });
   }
@@ -282,7 +282,7 @@ export default class Layout extends GoldenLayout {
   `;
 
   renderButtons = () => {
-    console.log('renderButtons() is not implemented');
+    console.info('renderButtons() is not implemented');
   }
 
   addButtonEventListeners = () => {
@@ -319,6 +319,6 @@ export default class Layout extends GoldenLayout {
   }
 
   onClearTermButtonClick = () => {
-    Terra.app.layout.term.reset();
+    this.term.reset();
   }
 }

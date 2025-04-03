@@ -127,7 +127,7 @@ export function openFile(id, filename) {
 
     // Check if the current tab is an untitled tab with no content. If so,
     // then remove it after we've inserted the new tab.
-    if (tabs.length === 1 && tabs[0].config.title === 'Untitled' && tabs[0].instance.editor.getValue() === '') {
+    if (tabs.length === 1 && tabs[0].config.title === 'Untitled' && tabs[0].instance.getContent() === '') {
       removeFirstTab = true;
     }
 
@@ -279,7 +279,7 @@ export function saveFile() {
     const { id: nodeId } = VFS.createFile({
       parentId: folderId,
       name: filename,
-      content: tab.instance.editor.getValue(),
+      content: tab.instance.getContent(),
     });
     fileTreeManager.createFileTree();
 

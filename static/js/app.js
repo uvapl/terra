@@ -115,10 +115,10 @@ export default class App {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   onEditorStartEditing(editorComponent) {
-    const { fileId } = editorComponent.container.getState();
+    const { fileId } = editorComponent.getState();
     if (fileId) {
       VFS.updateFile(fileId, {
-        content: editorComponent.editor.getValue(),
+        content: editorComponent.getContent(),
       });
     }
   }

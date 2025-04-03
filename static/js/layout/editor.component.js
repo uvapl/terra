@@ -181,7 +181,7 @@ export default class EditorComponent extends EventTarget {
       // pasting from the clipboard or inserting text (i.e. on each keystroke).
       if (hasLFSApi() && LFS.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
         const inputText = e.args.text || '';
-        const filesize = new Blob([this.editor.getValue() + inputText]).size;
+        const filesize = new Blob([this.getContent() + inputText]).size;
         if (filesize >= LFS_MAX_FILE_SIZE) {
           // Prevent the event from happening.
           e.preventDefault();
@@ -218,7 +218,7 @@ export default class EditorComponent extends EventTarget {
    * Callback when the editor content changes, triggered each keystroke.
    */
   onEditorChange = () => {
-    this.container.extendState({ value: this.editor.getValue() });
+    this.container.extendState({ value: this.getContent() });
 
     if (!this.userIsEditing) {
       this.userIsEditing = true;
@@ -248,7 +248,8 @@ export default class EditorComponent extends EventTarget {
   }
 
   /**
-   * Callback when the editor container is opened.
+   * Callback when the editor is opened for the first time or it is already open
+   * and becomes active (i.e. the user clicks on the tab in the UI).
    */
   onShow = () => {
     if (!this.editor) return;
@@ -332,10 +333,19 @@ export default class EditorComponent extends EventTarget {
    * @param {string} content - The content to set.
    */
   setContent = (content) => {
-    if (typeof content === 'string' && this.editor.getValue() !== content) {
+    if (typeof content === 'string' && this.getContent() !== content) {
       this.editor.setValue(content);
       this.editor.clearSelection();
     }
+  }
+
+  /**
+   * Retrieve the current content of the editor.
+   *
+   * @returns {string} All editor lines concatenated with \n characters.
+   */
+  getContent = () => {
+    return this.editor.getValue();
   }
 
   /**
@@ -352,8 +362,6 @@ export default class EditorComponent extends EventTarget {
 
     this.editor.clearSelection();
     this.editor.blur();
-
-    // this.editor.renderer.$cursorLayer.element.style.opacity = 0;
   }
 
   /**
@@ -367,8 +375,6 @@ export default class EditorComponent extends EventTarget {
       highlightSelectedWord: true,
       highlightIndentGuides: true,
     });
-
-    // this.editor.renderer.$cursorLayer.element.style.opacity = 1;
   }
 
   /**
@@ -379,7 +385,10 @@ export default class EditorComponent extends EventTarget {
   onContainerSetCustomAutoCompleter = (completions) => {
     this.editor.completers.push({
       getCompletions: (editor, session, pos, prefix, callback) => {
-        if (prefix.length === 0) { callback(null, []); return }
+        if (prefix.length === 0) {
+          callback(null, []);
+          return;
+        }
 
         callback(null, completions);
       }
