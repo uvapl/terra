@@ -25,6 +25,7 @@ export default class IDEApp extends App {
     if (repoLink) {
       VFS.createGitFSWorker();
     } else {
+      LFS.init();
       fileTreeManager.createFileTree();
     }
 

@@ -29,16 +29,7 @@ class LocalFileSystem {
    */
   busy = false;
 
-  constructor() {
-    // Only initialise if the user is not connected to git and if we're inside
-    // the IDE.
-    const gitRepoLink = localStorageManager.getLocalStorageItem('git-repo');
-    if (IS_IDE && !gitRepoLink) {
-      this._init();
-    }
-  }
-
-  async _init() {
+  async init() {
     const lastTimeUsedLFS = localStorageManager.getLocalStorageItem('use-lfs', false);
     if (!lastTimeUsedLFS) {
       fileTreeManager.showLocalStorageWarning();
