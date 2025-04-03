@@ -1,7 +1,16 @@
+import {
+  clearTermWriteBuffer,
+  disposeUserInput,
+  hideTermCursor,
+  waitForInput
+} from './helpers/term-component.js';
+import { getFileExtension } from './helpers/shared.js';
+import Terra from './terra.js';
+
 /**
  * Bridge class between the main app and the currently loaded language worker.
  */
-class LangWorkerAPI {
+export default class LangWorkerAPI {
   /**
    * The current programming language that is being used.
    * @type {string}
@@ -87,15 +96,15 @@ class LangWorkerAPI {
     // once it has been loaded.
     $('#run-code').prop('disabled', true);
 
-    Terra.f.hideTermCursor();
-    Terra.f.clearTermWriteBuffer();
+    hideTermCursor();
+    clearTermWriteBuffer();
 
     if (showTerminateMsg) {
-      term.writeln('\x1b[1;31mProcess terminated\x1b[0m');
+      Terra.app.layout.term.writeln('\x1b[1;31mProcess terminated\x1b[0m');
     }
 
     // Dispose any active user input.
-    Terra.f.disposeUserInput();
+    disposeUserInput();
   }
 
   /**
@@ -209,12 +218,11 @@ class LangWorkerAPI {
     // Only disable the button again if the current tab has a worker,
     // because users can still run code through the contextmenu in the
     // file-tree in the IDE app.
-    const tab = Terra.f.getActiveEditor();
+    const editorComponent = Terra.app.layout.getActiveEditor();
     let disableRunBtn = false;
-    if (!hasWorker(Terra.f.getFileExtension(tab.config.title))) {
+    if (editorComponent && !hasWorker(getFileExtension(editorComponent.getFilename()))) {
       disableRunBtn = true;
     }
-
 
     // Change the stop-code button back to a run-code button.
     const $button = $('#run-code');
@@ -255,10 +263,10 @@ class LangWorkerAPI {
           // with print statements to continue printing after the worker has
           // terminated when the user has pressed the stop button.
           if (this.isReady) {
-            term.write(event.data.data);
+            Terra.app.layout.term.write(event.data.data);
           }
         } catch (e) {
-          Terra.f.clearTermWriteBuffer();
+          clearTermWriteBuffer();
         }
         break;
 
@@ -266,7 +274,7 @@ class LangWorkerAPI {
       // input, this event will be triggered. The user input will be requested
       // and sent back to the worker through the usage of shared memory.
       case 'readStdin':
-        Terra.f.waitForInput().then((value) => {
+        waitForInput().then((value) => {
           const view = new Uint8Array(this.sharedMem.buffer);
           for (let i = 0; i < value.length; i++) {
             // To the shared memory.
@@ -302,7 +310,7 @@ class LangWorkerAPI {
  * @param {string} proglang - The proglang to check for.
  * @returns {boolean} True if proglang is valid, false otherwise.
  */
-function hasWorker(proglang) {
+export function hasWorker(proglang) {
   const whitelist = ['c', 'py'];
   return whitelist.some((lang) => proglang === lang);
 }
@@ -313,7 +321,7 @@ function hasWorker(proglang) {
  *
  * @param {string} proglang - The proglang to spawn the related worker for.
  */
-function createLangWorkerApi(proglang) {
+export function createLangWorkerApi(proglang) {
   // Situation 1: no worker, thus spawn a new one.
   if (!Terra.langWorkerApi && hasWorker(proglang)) {
     Terra.langWorkerApi = new LangWorkerAPI(proglang);

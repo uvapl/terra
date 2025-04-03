@@ -1,8 +1,17 @@
+import { closeAllFiles } from './helpers/editor-component.js';
+import { getRepoInfo, hasGitFSWorker } from './helpers/shared.js';
+import { createModal, hideModal, showModal } from './modal.js';
+import VFS from './vfs.js';
+import pluginManager from './plugin-manager.js';
+import Terra from './terra.js';
+import localStorageManager from './local-storage-manager.js';
+import fileTreeManager from './file-tree-manager.js';
+
 /**
  * GitFS worker class that handles all Git operations.
  * This is the bridge class between the app and the git.worker.js.
  */
-class GitFS {
+export default class GitFS {
   /**
    * The repository link that the user is connected to.
    * @type {string}
@@ -48,7 +57,7 @@ class GitFS {
       data: {
         accessToken: accessToken,
         repoLink: this._repoLink,
-        branch: Terra.f.getLocalStorageItem('git-branch'),
+        branch: localStorageManager.getLocalStorageItem('git-branch'),
       },
     });
   }
@@ -58,8 +67,8 @@ class GitFS {
    */
   terminate() {
     console.log('Terminating existing GitFS worker')
-    Terra.f.setLocalStorageItem('git-repo', '');
-    Terra.f.setLocalStorageItem('git-branch', '');
+    localStorageManager.setLocalStorageItem('git-repo', '');
+    localStorageManager.setLocalStorageItem('git-branch', '');
     $('#menu-item--branch')
       .removeClass('has-dropdown').addClass('disabled')
       .find('ul').remove();
@@ -169,7 +178,7 @@ class GitFS {
         const retryAfter = Math.ceil(payload.retryAfter / 60);
         $('#file-tree').html('<div class="info-msg error">Exceeded GitHub API limit.</div>');
 
-        const $modal = Terra.f.createModal({
+        const $modal = createModal({
           title: 'Exceeded GitHub API limit',
           body: `
             <p>
@@ -187,21 +196,28 @@ class GitFS {
           }
         });
 
-        Terra.f.showModal($modal);
+        showModal($modal);
 
-        $modal.find('.primary-btn').click(() => Terra.f.hideModal($modal));
+        $modal.find('.primary-btn').click(() => hideModal($modal));
         break;
 
       case 'fetch-branches-success':
-        renderGitRepoBranches(payload.branches);
+        // Import the renderGitRepoBranches dynamically, because if we put this
+        // at the top then the menubar.js will also be loaded for the Exam and
+        // Embed application, which is something we do not want.
+        import('./ide/menubar.js').then((module) => {
+          const { renderGitRepoBranches } = module;
+          renderGitRepoBranches(payload.branches);
+        });
         break;
 
       case 'clone-success':
         $('#file-tree .info-msg').remove();
-        Terra.f.removeLocalStorageWarning();
+        fileTreeManager.removeLocalStorageWarning();
 
-        Terra.vfs.importFromGit(payload.repoContents).then(() => {
-          Terra.f.createFileTree();
+        VFS.importFromGit(payload.repoContents).then(() => {
+          Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
+          fileTreeManager.createFileTree();
         });
         break;
 
@@ -210,7 +226,7 @@ class GitFS {
         // recreate the file tree.
         if (this.isReady && $('#file-tree .info-msg').length > 0) {
           $('#file-tree .info-msg').remove();
-          Terra.f.createFileTree(true);
+          fileTreeManager.createFileTree(true);
         }
         break;
 
@@ -225,7 +241,7 @@ class GitFS {
       case 'move-folder-success':
         // Update all sha in the new files in the VFS.
         payload.updatedFiles.forEach((fileObj) => {
-          const file = Terra.vfs.findFileByPath(fileObj.filepath);
+          const file = VFS.findFileByPath(fileObj.filepath);
           file.sha = fileObj.sha;
         });
         break;
@@ -233,7 +249,7 @@ class GitFS {
       case 'move-file-success':
       case 'commit-success':
         // Update the file's sha in the VFS.
-        const file = Terra.vfs.findFileByPath(payload.filepath);
+        const file = VFS.findFileByPath(payload.filepath);
         file.sha = payload.sha;
         break;
     }
@@ -246,36 +262,34 @@ class GitFS {
  * Otherwise, a worker will be created automatically when the user adds a new
  * repository.
  *
- * This is considered a private function invoked from Terra.vfs.createGitFSWorker.
+ * This is considered a private function invoked from VFS.createGitFSWorker.
  */
-Terra.f._createGitFSWorker = () => {
-  Terra.f.closeAllFiles();
+export function _createGitFSWorker() {
 
-  const accessToken = Terra.f.getLocalStorageItem('git-access-token');
-  const repoLink = Terra.f.getLocalStorageItem('git-repo');
-  const repoInfo = Terra.f.getRepoInfo(repoLink);
+  const accessToken = localStorageManager.getLocalStorageItem('git-access-token');
+  const repoLink = localStorageManager.getLocalStorageItem('git-repo');
+  const repoInfo = getRepoInfo(repoLink);
   if (repoInfo) {
-    Terra.f.setFileTreeTitle(`${repoInfo.user}/${repoInfo.repo}`)
+    fileTreeManager.setTitle(`${repoInfo.user}/${repoInfo.repo}`)
   }
 
-  if (Terra.f.hasGitFSWorker()) {
+  if (hasGitFSWorker()) {
     Terra.gitfs.terminate();
     Terra.gitfs = null;
+    closeAllFiles();
   }
 
   if (accessToken && repoLink) {
+    Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
+
     const gitfs = new GitFS(repoLink);
     Terra.gitfs = gitfs;
     gitfs._createWorker(accessToken);
 
-    const tree = Terra.f.getFileTreeInstance();
-    if (tree) {
-      $('#file-tree').fancytree('destroy');
-      Terra.filetree = null;
-    }
+    fileTreeManager.destroyTree();
 
     console.log('Creating gitfs worker');
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
-    Terra.pluginManager.triggerEvent('onStorageChange', 'git');
+    pluginManager.triggerEvent('onStorageChange', 'git');
   }
 }
