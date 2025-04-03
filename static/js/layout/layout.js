@@ -242,8 +242,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   onEditorDestroy(editorComponent) {
-    this.setActiveEditor(null);
-
     // If it's the last tab being closed, then we insert another 'Untitled' tab,
     // because we always need at least one tab open.
     const editorComponents = this.getEditorComponents();
@@ -437,8 +435,8 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     this.term.clear();
   }
 
-  setActiveEditor(tab) {
-    this.activeEditor = tab;
+  setActiveEditor(editorComponent) {
+    this.activeEditor = editorComponent;
   }
 
   getActiveEditor() {

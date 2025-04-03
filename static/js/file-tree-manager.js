@@ -570,7 +570,7 @@ class FileTreeManager {
       .find((editorComponent) => editorComponent.getState().fileId === data.node.key);
 
     if (editorComponent) {
-      editorComponent.container.setTitle(name);
+      editorComponent.setFilename(name);
       const proglang = name.includes('.') ? getFileExtension(name) : 'text';
       editorComponent.setProgLang(proglang);
 

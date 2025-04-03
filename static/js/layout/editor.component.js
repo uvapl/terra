@@ -244,7 +244,7 @@ export default class EditorComponent extends EventTarget {
   }
 
   /**
-   * Get the filename of the tab that corresponds with this editor.
+   * Get the filename of the corresponding tab.
    *
    * @returns {string} The name of the tab.
    */
@@ -252,6 +252,11 @@ export default class EditorComponent extends EventTarget {
     return this.container.parent.config.title;
   }
 
+  /**
+   * Set the filename of the corresponding tab.
+   *
+   * @param {string} filename - The new name of the tab.
+   */
   setFilename = (filename) => {
     this.container.parent.setTitle(filename);
   }
@@ -395,9 +400,7 @@ export default class EditorComponent extends EventTarget {
   }
 
   setActive = () => {
-    if (!this.fakeOnEditorOpenEvent) {
-      this.container.parent.parent.setActiveContentItem(this.container.parent);
-    }
+    this.container.parent.parent.setActiveContentItem(this.container.parent);
   }
 
   /**
@@ -481,6 +484,7 @@ export default class EditorComponent extends EventTarget {
         mode = 'markdown';
         break;
 
+      case 'txt':
       case 'untitled':
         mode = 'text';
         break;
