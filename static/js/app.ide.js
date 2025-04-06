@@ -1,6 +1,6 @@
 import App from './app.js';
 import IDELayout from './layout/layout.ide.js';
-import { BASE_FONT_SIZE, LFS_MAX_FILE_SIZE } from './constants.js';
+import { LFS_MAX_FILE_SIZE } from './constants.js';
 import {
   getFileExtension,
   hasGitFSWorker,
@@ -120,58 +120,7 @@ export default class IDEApp extends App {
    * @returns {Layout} The layout instance.
    */
   createLayout(forceDefaultLayout = false, contentConfig = []) {
-    const defaultContentConfig = contentConfig.map((tab) => ({
-      type: 'component',
-      componentName: 'editor',
-      componentState: {
-        fontSize: BASE_FONT_SIZE,
-        ...tab.componentState,
-      },
-      title: 'Untitled',
-      ...tab,
-    }))
-
-    const defaultLayoutConfig = {
-      settings: {
-        showCloseIcon: false,
-        showPopoutIcon: false,
-        showMaximiseIcon: true,
-        reorderEnabled: true,
-      },
-      dimensions: {
-        headerHeight: 30,
-        borderWidth: 10,
-      },
-      content: [
-        {
-          type: 'column',
-          content: [
-            {
-              type: 'stack',
-              content: defaultContentConfig.length > 0 ? defaultContentConfig : [
-                {
-                  type: 'component',
-                  componentName: 'editor',
-                  componentState: {
-                    fontSize: BASE_FONT_SIZE,
-                  },
-                  title: 'Untitled',
-                },
-              ],
-            },
-            {
-              type: 'component',
-              componentName: 'terminal',
-              componentState: { fontSize: BASE_FONT_SIZE },
-              isClosable: false,
-              reorderEnabled: false,
-            }
-          ]
-        }
-      ]
-    };
-
-    return new IDELayout(defaultLayoutConfig, { forceDefaultLayout });
+    return new IDELayout(forceDefaultLayout = false, contentConfig = []);
   }
 
   /**

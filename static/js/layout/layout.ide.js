@@ -4,10 +4,64 @@ import LFS from '../lfs.js';
 import localStorageManager from '../local-storage-manager.js';
 import { closeFile } from '../helpers/editor-component.js';
 import fileTreeManager from '../file-tree-manager.js';
-import { LFS_MAX_FILE_SIZE } from '../constants.js';
+import { BASE_FONT_SIZE, LFS_MAX_FILE_SIZE } from '../constants.js';
 
 export default class IDELayout extends Layout {
-  getClearTermButtonHtml = () => '<button id="clear-term" class="button clear-term-btn">Clear terminal</button>';
+  /**
+   * Create the layout.
+   *
+   * @param {boolean} [forceDefaultLayout=false] Whether to force the default layout.
+   * @param {Array} [contentConfig=[]] The content configuration for the layout.
+   */
+  constructor(forceDefaultLayout = false, contentConfig = []) {
+    const defaultContentConfig = contentConfig.map((tab) => ({
+      type: 'component',
+      componentName: 'editor',
+      componentState: {
+        fontSize: BASE_FONT_SIZE,
+        ...tab.componentState,
+      },
+      title: 'Untitled',
+      ...tab,
+    }))
+
+    const defaultLayoutConfig = {
+      content: [
+        {
+          type: 'column',
+          isClosable: false,
+          content: [
+            {
+              type: 'stack',
+              content: defaultContentConfig.length > 0 ? defaultContentConfig : [
+                {
+                  type: 'component',
+                  componentName: 'editor',
+                  componentState: {
+                    fontSize: BASE_FONT_SIZE,
+                  },
+                  title: 'Untitled',
+                },
+              ],
+            },
+            {
+              type: 'component',
+              componentName: 'terminal',
+              componentState: { fontSize: BASE_FONT_SIZE },
+              isClosable: false,
+              reorderEnabled: false,
+            }
+          ]
+        }
+      ]
+    };
+
+    super(defaultLayoutConfig, { forceDefaultLayout });
+  }
+
+  getClearTermButtonHtml() {
+    return '<button id="clear-term" class="button clear-term-btn">Clear terminal</button>';
+  }
 
   registerEditorCommands(editorComponent) {
     super.registerEditorCommands(editorComponent);

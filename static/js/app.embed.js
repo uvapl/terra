@@ -83,25 +83,6 @@ export default class EmbedApp extends App {
    * @returns {EmbedLayout} The layout instance.
    */
   createLayout(content, fontSize, options = {}) {
-    const defaultLayoutConfig = {
-      dimensions: {
-        borderWidth: 0,
-      },
-      content: [
-        {
-          type: options.vertical ? 'column' : 'row',
-          content: [
-            {
-              content,
-            },
-            {
-              componentState: { fontSize },
-            }
-          ]
-        }
-      ]
-    };
-
-    return new EmbedLayout(defaultLayoutConfig, options);
+    return new EmbedLayout(content, fontSize, options);
   }
 }

@@ -15,7 +15,7 @@ $(window).on('resize', () => {
 
 /**
  * Default layout config that is used when the layout is created for the first
- * time (and thus not saved in local storage) or when the layout is reset.
+ * time (and thus not saved in local storage yet) or when the layout is reset.
  * @type {object}
  */
 const DEFAULT_LAYOUT_CONFIG = {

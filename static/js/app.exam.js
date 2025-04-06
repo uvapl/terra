@@ -95,20 +95,7 @@ export default class ExamApp extends App {
    * @returns {ExamLayout} The layout instance.
    */
   createLayout(content, fontSize, options = {}) {
-    const defaultLayoutConfig = {
-      content: [
-        {
-          content: [
-            { content },
-            {
-              componentState: { fontSize },
-            }
-          ]
-        }
-      ]
-    };
-
-    return new ExamLayout(defaultLayoutConfig, options);
+    return new ExamLayout(content, fontSize, options);
   }
 
   postSetupLayout() {
