@@ -28,7 +28,7 @@ export default class ExamApp extends App {
    */
   config = null;
 
-  onEditorChange() {
+  onEditorStartEditing(editorComponent) {
     Terra.v.editorIsDirty = true;
   }
 
