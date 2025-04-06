@@ -331,9 +331,11 @@ Menubar.addCredentials = () => {
 Menubar.connectRepo = () => {
   if (!localStorageManager.getLocalStorageItem('git-access-token')) return;
 
-  const initialRepoLink = localStorageManager.getLocalStorageItem('git-repo', '');
+  // When the current repo link exists, the user was already connected and they
+  // want to connect to another repository.
+  const currentRepoLink = localStorageManager.getLocalStorageItem('git-repo', '');
 
-  const localFilesNotice = initialRepoLink
+  const localFilesNotice = currentRepoLink
     ? '<p class="text-small">Leave empty to disconnect from the repository.</p>'
     : `
       <p class="text-small">
@@ -346,7 +348,7 @@ Menubar.connectRepo = () => {
     title: 'Connect repository',
     body: `
       <p>Only GitHub repostory links are supported. Leave empty to disconnect from the repository.</p>
-      <input class="text-input full-width-input repo-link" value="${initialRepoLink}" placeholder="https://github.com/{owner}/{repo}"></textarea>
+      <input class="text-input full-width-input repo-link" value="${currentRepoLink}" placeholder="https://github.com/{owner}/{repo}"></textarea>
       ${localFilesNotice}
 
     `,
@@ -365,7 +367,7 @@ Menubar.connectRepo = () => {
   });
 
   // Change the connect to a disconnect button when the repo link is removed.
-  if (initialRepoLink) {
+  if (currentRepoLink) {
     $connectModal.find('.repo-link').on('keyup', (event) => {
       const repoLink = event.target.value;
       if (!repoLink) {
@@ -380,7 +382,7 @@ Menubar.connectRepo = () => {
   $connectModal.find('.confirm-btn').click(() => {
     const repoLink = $connectModal.find('.repo-link').val().trim();
 
-    // For now, we only allow GitHub repo links.
+    // For now, we only allow GitHub-HTTPS repo links.
     if (repoLink && !/^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/.test(repoLink)) {
       alert('Invalid GitHub repository');
       return;
@@ -410,12 +412,13 @@ Menubar.connectRepo = () => {
 
     hideModal($connectModal);
 
-    if (initialRepoLink || VFS.isEmpty()) {
-      VFS.createGitFSWorker();
-    } else if (!VFS.isEmpty()) {
-      // Confirms with the user whether they want to discard their local files
-      // permanently before connecting to a new repository.
-
+    // Confirms with the user whether they want to discard their local files
+    // permanently before connecting to a new repository.
+    // This happens in two cases:
+    // 1) The user is connected to a repo and wants to connect to another one,
+    //    so we are certain that there are files in the VFS.
+    // 2) The user is not connected to a repo, but there are files in the VFS.
+    if (!currentRepoLink && !VFS.isEmpty()) {
       // Create a new modal after the previous one is hidden.
       setTimeout(() => {
         const $confirmModal = createModal({
@@ -451,9 +454,15 @@ Menubar.connectRepo = () => {
         $confirmModal.find('.confirm-btn').click(() => {
           hideModal($confirmModal);
           VFS.createGitFSWorker();
+
+          // Close all tabs, because we know we will change from either local
+          // storage to git, or from one git repo to another.
+          closeAllFiles();
         });
 
       }, MODAL_ANIM_DURATION);
+    } else {
+      VFS.createGitFSWorker();
     }
   });
 };
