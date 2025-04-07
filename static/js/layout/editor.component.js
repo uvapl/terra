@@ -88,6 +88,8 @@ export default class EditorComponent extends EventTarget {
     editorContainer.classList.add('editor');
     contentContainer.appendChild(editorContainer);
 
+    console.log('initEditor state', this.state);
+
     this.editor = ace.edit(editorContainer);
     this.editor.setKeyboardHandler('ace/keyboard/sublime');
     this.editor.setOption('fontSize');
@@ -348,6 +350,7 @@ export default class EditorComponent extends EventTarget {
     this.container.parent.parent.addChild({
       type: 'component',
       componentName: 'editor',
+      reorderEnabled: true,
       title: 'Untitled',
       componentState: {
         fontSize: BASE_FONT_SIZE,
@@ -416,8 +419,8 @@ export default class EditorComponent extends EventTarget {
    * Callback before the container is destroyed.
    */
   onDestroy = () => {
-    this.dispatchEvent(new Event('destroy'));
     if (!this.editor) return;
+    this.dispatchEvent(new Event('destroy'));
 
     this.editor.destroy();
     this.editor = null;

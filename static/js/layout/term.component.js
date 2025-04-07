@@ -62,6 +62,23 @@ export default class TerminalComponent {
   }
 
   /**
+   * Focus the terminal component.
+   */
+  focus = () => {
+    this.term.focus();
+  }
+
+  /**
+   * Emit an event to the container.
+   *
+   * @param {string} event - The name of the event.
+   * @param {object} data - Data to pass to the event handler.
+   */
+  emit = (event, data) => {
+    this.container.emit(event, data);
+  }
+
+  /**
    * Callback when the editor is opened for the first time or it is already open
    * and becomes active (i.e. the user clicks on the tab in the UI).
    */
@@ -109,6 +126,15 @@ export default class TerminalComponent {
     }
 
     this.term = null;
+  }
+
+  /**
+   * Add a listener for key events in the terminal.
+   *
+   * @param {Function} callback - The callback to execute when a key event occurs.
+   */
+  onKey = (callback) => {
+    this.term.onKey(callback);
   }
 
   /**

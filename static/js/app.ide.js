@@ -49,6 +49,7 @@ export default class IDEApp extends App {
       title: editorComponent.getFilename(),
       componentState: {
         fileId: editorComponent.getState().fileId,
+        value: editorComponent.getContent(),
       }
     }));
 
@@ -120,7 +121,7 @@ export default class IDEApp extends App {
    * @returns {Layout} The layout instance.
    */
   createLayout(forceDefaultLayout = false, contentConfig = []) {
-    return new IDELayout(forceDefaultLayout = false, contentConfig = []);
+    return new IDELayout(forceDefaultLayout, contentConfig);
   }
 
   /**

@@ -17,6 +17,7 @@ export default class IDELayout extends Layout {
     const defaultContentConfig = contentConfig.map((tab) => ({
       type: 'component',
       componentName: 'editor',
+      reorderEnabled: true,
       componentState: {
         fontSize: BASE_FONT_SIZE,
         ...tab.componentState,
@@ -26,10 +27,13 @@ export default class IDELayout extends Layout {
     }))
 
     const defaultLayoutConfig = {
+      settings: {
+        reorderEnabled: true,
+      },
       content: [
         {
           type: 'column',
-          isClosable: false,
+          // isClosable: false,
           content: [
             {
               type: 'stack',
@@ -56,6 +60,7 @@ export default class IDELayout extends Layout {
       ]
     };
 
+    console.log('defaultLayoutConfig', defaultLayoutConfig);
     super(defaultLayoutConfig, { forceDefaultLayout });
   }
 

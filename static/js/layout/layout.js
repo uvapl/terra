@@ -209,6 +209,15 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       this.activeEditor = tab.contentItem.instance;
     }
 
+    // The onTabCreated is *also* triggered when a user is dragging tabs around,
+    // thus if the tab is already in the list, we return early.
+    const newTabFileId = tab.contentItem.instance.getState().fileId;
+    const tabExists = this.tabs.some((existingTab) => {
+      const { fileId } = existingTab.contentItem.instance.getState();
+      return fileId === newTabFileId;
+    });
+    if (tabExists) return;
+
     // Add a regular editor component to the tabs list.
     // Remove the tab from the list when it is destroyed.
     this.tabs.push(tab);
@@ -354,7 +363,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    */
   emitToAllComponents(event, data) {
     this.emitToEditorComponents(event, data);
-    this.term.container.emit(event, data);
+    this.term.emit(event, data);
   }
 
   /**
