@@ -3,9 +3,10 @@
  * a tab is linked to a fileID that cannot be found in the VFS (anymore).
  */
 
-import Terra from '../terra.js';
-import VFS from '../vfs.js';
-import { createModal, showModal } from '../modal.js';
+import Terra from '../../js/terra.js';
+import VFS from '../../js/vfs.js';
+import { createModal, showModal } from '../../js/modal.js';
+import { TerraPlugin } from '../../js/plugin-manager.js';
 
 export default class EditorUnlinkKiller extends TerraPlugin {
   constructor() {
@@ -25,7 +26,7 @@ export default class EditorUnlinkKiller extends TerraPlugin {
   checkTabs() {
     const editorComponents = Terra.app.layout.getEditorComponents();
     editorComponents.forEach((editorComponent) => {
-      if (editorComponent.getFilename() == 'Untitled') return;
+      if (editorComponent.getFilename() === 'Untitled') return;
 
       const { fileId } = editorComponent.getState();
       if (!this.isValidFileId(fileId)) {

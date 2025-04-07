@@ -8,6 +8,7 @@ const plugins = [
   'check50',
   'file-args',
   'right-sidebar',
+  'editor-unlink-killer',
 ];
 
 pluginManager.loadPlugins(plugins).then(() => {
