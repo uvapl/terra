@@ -33,7 +33,6 @@ export default class IDELayout extends Layout {
       content: [
         {
           type: 'column',
-          // isClosable: false,
           content: [
             {
               type: 'stack',
@@ -60,7 +59,6 @@ export default class IDELayout extends Layout {
       ]
     };
 
-    console.log('defaultLayoutConfig', defaultLayoutConfig);
     super(defaultLayoutConfig, { forceDefaultLayout });
   }
 

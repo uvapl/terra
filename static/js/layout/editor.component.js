@@ -350,7 +350,6 @@ export default class EditorComponent extends EventTarget {
     this.container.parent.parent.addChild({
       type: 'component',
       componentName: 'editor',
-      reorderEnabled: true,
       title: 'Untitled',
       componentState: {
         fontSize: BASE_FONT_SIZE,
