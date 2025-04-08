@@ -1,11 +1,15 @@
-/**
- * Get the active tab its editor instance.
- *
- * @returns {object} The active editor instance.
- */
-Terra.f.getActiveEditor = () => {
-  return Terra.layout._lastActiveEditor;
-}
+import {
+  getFileExtension,
+  hasLFSApi,
+  isObject,
+  isValidFilename
+} from './shared.js';
+import { createModal, hideModal, showModal } from '../modal.js';
+import VFS from '../vfs.js';
+import LFS from '../lfs.js';
+import { createLangWorkerApi } from '../lang-worker-api.js';
+import Terra from '../terra.js';
+import fileTreeManager from '../file-tree-manager.js';
 
 /**
  * Gathers all files from the editor and returns them as an array of objects.
@@ -13,17 +17,17 @@ Terra.f.getActiveEditor = () => {
  * @returns {Promise<array>} List of objects, each containing the filename and
  * content of the corresponding editor tab.
  */
-Terra.f.getAllEditorFiles = () => {
+export function getAllEditorFiles() {
   return Promise.all(
-    Terra.f.getAllEditorTabs().map(async (tab) => {
-      const containerState = tab.container.getState()
-      let content = containerState.value;
-      if (!content && Terra.f.hasLFS() && Terra.lfs.loaded) {
-        content = await Terra.lfs.getFileContent(containerState.fileId);
+    Terra.app.layout.getEditorComponents().map(async (editorComponent) => {
+      const containerState = editorComponent.getState()
+      let content = editorComponent.getContent();
+      if (!content && hasLFSApi() && LFS.loaded) {
+        content = await LFS.getFileContent(containerState.fileId);
       }
 
       return {
-        name: tab.config.title,
+        name: editorComponent.getFilename(),
         content,
       }
     })
@@ -31,44 +35,22 @@ Terra.f.getAllEditorFiles = () => {
 }
 
 /**
- * Gather all editor tab components recursively from the layout.
- *
- * @param {GoldenLayout.ContentItem} [contentItem] - Starting contentItem where
- * the recursive search will start.
- * @returns {array} List of all the editor tabs.
+ * Close the active tab in the editor.
  */
-Terra.f.getAllEditorTabs = (contentItem = Terra.layout.root) => {
-  if (contentItem.isComponent) {
-    return contentItem;
-  }
-
-  let files = [];
-  contentItem.contentItems.forEach((childContentItem) => {
-    if (!childContentItem.isTerminal) {
-      files = files.concat(Terra.f.getAllEditorTabs(childContentItem));
-    }
-  });
-
-  return files;
-}
-
-
-/**
- * Close the active tab in the editor, except when it is an untitled tab.
- */
-Terra.f.closeFile = () => {
-  const currentTab = Terra.f.getActiveEditor();
-  if (currentTab) {
-    currentTab.parent.removeChild(currentTab);
+export function closeFile() {
+  const editorComponent = Terra.app.layout.getActiveEditor();
+  if (editorComponent) {
+    editorComponent.close();
   }
 }
 
 /**
  * Close all tabs in the editor.
  */
-Terra.f.closeAllFiles = () => {
-  const tabs = Terra.f.getAllEditorTabs();
-  tabs.forEach((tab) => tab.parent.removeChild(tab));
+export function closeAllFiles() {
+  Terra.app.layout.getEditorComponents().forEach((editorComponent) => {
+    editorComponent.close();
+  });
 }
 
 /**
@@ -78,59 +60,65 @@ Terra.f.closeAllFiles = () => {
  * @param {string} id - The file id. Leave empty to create new file.
  * @param {string} filename - The name of the file to open.
  */
-Terra.f.openFile = (id, filename) => {
-  const tabs = Terra.f.getAllEditorTabs();
-  const tab = tabs.filter((tab) =>
-    id === null
-      ? tab.config.title === filename
-      : tab.container.getState().fileId === id
-  )[0];
+export function openFile(id, filename) {
+  let editorComponents = Terra.app.layout.getEditorComponents();
 
+  // Try to find the editor component with the given filename or id.
+  const editorComponent = editorComponents.find(
+    (editorComponent) => id === null
+      ? editorComponent.getFilename() === filename
+      : editorComponent.getState().fileId === id
+  );
 
-  if (tab) {
-    // Switch to the active tab.
-    tab.parent.setActiveContentItem(tab);
-    tab.instance.editor.focus();
+  if (editorComponent) {
+    // Switch to the active tab that is already open.
+    editorComponent.setActive();
   } else {
     let removeFirstTab = false;
 
-    // Check if the current tab is an untitled tab with no content. If so,
-    // then remove it after we've inserted the new tab.
-    if (tabs.length === 1 && tabs[0].config.title === 'Untitled' && tabs[0].instance.editor.getValue() === '') {
-      removeFirstTab = true;
+    // Check if first tab is an Untitled tab with no content. If so, then remove
+    // it after we've inserted the new tab.
+    if (editorComponents.length === 1 && editorComponents[0].getFilename() === 'Untitled') {
+      if (editorComponents[0].getContent() === '') {
+        removeFirstTab = true;
+      } else {
+        editorComponents[0].clearContent();
+        return;
+      }
     }
 
-    const currentTab = Terra.f.getActiveEditor();
-    if (currentTab) {
+    const activeEditorComponent = Terra.app.layout.getActiveEditor();
+    if (activeEditorComponent) {
       // Add a new tab next to the current active tab.
-      currentTab.parent.addChild({
-        type: 'component',
-        componentName: 'editor',
+      activeEditorComponent.addSiblingTab({
+        title: filename,
         componentState: {
-          fontSize: Terra.c.BASE_FONT_SIZE,
           fileId: id,
         },
-        title: filename,
       });
 
+      editorComponents = Terra.app.layout.getEditorComponents();
+
       if (removeFirstTab) {
-        Terra.f.getAllEditorTabs()[0].instance.fakeOnContainerOpenEvent = true;
-        Terra.f.getAllEditorTabs()[0].instance.fakeOnEditorFocusEvent = true;
-        Terra.f.getAllEditorTabs()[1].instance.fakeOnContainerOpenEvent = true;
-        Terra.f.getAllEditorTabs()[1].instance.fakeOnEditorFocusEvent = true;
-        currentTab.parent.removeChild(tabs[0]);
+        editorComponents[0].fakeOnContainerOpenEvent = true;
+        editorComponents[0].fakeOnEditorFocusEvent = true;
+        editorComponents[1].fakeOnContainerOpenEvent = true;
+        editorComponents[1].fakeOnEditorFocusEvent = true;
+
+        // Close Untitled tab.
+        editorComponents[0].close();
       }
     }
   }
 
-  const proglang = Terra.f.getFileExtension(filename);
+  const proglang = getFileExtension(filename);
   createLangWorkerApi(proglang);
 }
 
-Terra.f.createFolderOptionsHtml = (html = '', parentId = null, indent = '--') => {
-  Terra.vfs.findFoldersWhere({ parentId }).forEach((folder, index) => {
+export function createFolderOptionsHtml(html = '', parentId = null, indent = '--') {
+  VFS.findFoldersWhere({ parentId }).forEach((folder, index) => {
     html += `<option value="${folder.id}">${indent} ${folder.name}</option>`;
-    html += Terra.f.createFolderOptionsHtml('', folder.id, indent + '--');
+    html += createFolderOptionsHtml('', folder.id, indent + '--');
   });
 
   return html;
@@ -145,29 +133,29 @@ Terra.f.createFolderOptionsHtml = (html = '', parentId = null, indent = '--') =>
  *
  * This function get's triggered on each 'save' keystroke, i.e. <cmd/ctrl + s>.
  */
-Terra.f.saveFile = () => {
-  const tab = Terra.f.getActiveEditor();
+export function saveFile() {
+  const editorComponent = Terra.app.layout.getActiveEditor();
 
-  if (!tab) return;
+  if (!editorComponent) return;
 
   // If the file exists in the vfs, then return, because the contents will be
   // auto-saved already in another part of the codebase.
-  const existingFileId = tab.container.getState().fileId;
+  const existingFileId = editorComponent.getState().fileId;
   if (existingFileId) {
-    const file = Terra.vfs.findFileById(existingFileId);
+    const file = VFS.findFileById(existingFileId);
     if (file) return;
   }
 
-  const folderOptions = Terra.f.createFolderOptionsHtml();
+  const folderOptions = createFolderOptionsHtml();
 
-  const $modal = Terra.f.createModal({
+  const $modal = createModal({
     title: 'Save file',
     body: `
     <div class="form-grid">
       <div class="form-wrapper">
         <label>Enter a filename:</label>
         <div class="right-container">
-          <input class="text-input" placeholder="Enter a filename" value="${tab.config.title}" maxlength="30" />
+          <input class="text-input" placeholder="Enter a filename" value="${editorComponent.getFilename()}" maxlength="30" />
         </div>
       </div>
       <div class="form-wrapper">
@@ -191,7 +179,7 @@ Terra.f.saveFile = () => {
     }
   });
 
-  Terra.f.showModal($modal);
+  showModal($modal);
   $modal.find('.text-input').focus().select();
 
   $modal.find('.cancel-btn').click(() => {
@@ -200,7 +188,7 @@ Terra.f.saveFile = () => {
       Terra.v.saveFileTippy = null;
     }
 
-    Terra.f.hideModal($modal);
+    hideModal($modal);
   });
 
   $modal.find('.primary-btn').click(() => {
@@ -212,14 +200,14 @@ Terra.f.saveFile = () => {
     }
 
     let errorMsg;
-    if (!Terra.f.isValidFilename(filename)) {
+    if (!isValidFilename(filename)) {
       errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
-    } else if (Terra.vfs.existsWhere({ parentId: folderId, name: filename })) {
+    } else if (VFS.existsWhere({ parentId: folderId, name: filename })) {
       errorMsg = `There already exists a "${filename}" file or folder`;
     }
 
     if (errorMsg) {
-      if (Terra.f.isObject(Terra.v.saveFileTippy)) {
+      if (isObject(Terra.v.saveFileTippy)) {
         Terra.v.saveFileTippy.destroy();
         Terra.v.saveFileTippy = null;
       }
@@ -239,119 +227,44 @@ Terra.f.saveFile = () => {
     }
 
     // Remove the tooltip if it exists.
-    if (Terra.f.isObject(Terra.v.saveFileTippy)) {
+    if (isObject(Terra.v.saveFileTippy)) {
       Terra.v.saveFileTippy.destroy();
       Terra.v.saveFileTippy = null;
     }
 
     // Create a new file in the VFS and then refresh the file tree.
-    const { id: nodeId } = Terra.vfs.createFile({
+    const { id: nodeId } = VFS.createFile({
       parentId: folderId,
       name: filename,
-      content: tab.instance.editor.getValue(),
+      content: editorComponent.getContent(),
     });
-    Terra.f.createFileTree();
+    fileTreeManager.createFileTree();
 
     // Change the Untitled tab to the new filename.
-    tab.container.setTitle(filename);
+    editorComponent.setFilename(filename);
 
     // Update the container state.
-    tab.container.setState({ fileId: nodeId });
+    editorComponent.extendState({ fileId: nodeId });
 
     // For some reason no layout update is triggered, so we trigger an update.
-    Terra.layout.emit('stateChanged');
+    Terra.app.layout.emit('stateChanged');
 
-    Terra.f.hideModal($modal);
+    hideModal($modal);
 
-    const proglang = Terra.f.getFileExtension(filename);
+    const proglang = getFileExtension(filename);
 
     // Set correct syntax highlighting.
-    tab.instance.setProgLang(proglang)
+    editorComponent.setProgLang(proglang)
 
     createLangWorkerApi(proglang);
   });
 }
 
 /**
- * Runs the code inside the worker by sending all files to the worker along with
- * the current active tab name. If the `fileId` is set, then solely that file
- * will be run.
- *
- * @param {string} [id] - The ID of the file to run.
- * @param {boolean} [clearTerm=false] Whether to clear the terminal before
- * printing the output.
- */
-Terra.f.runCode = async (fileId = null, clearTerm = false) => {
-  if (clearTerm) term.reset();
-
-  if (Terra.langWorkerApi) {
-    if (!Terra.langWorkerApi.isReady) {
-      // Worker API is busy, wait for it to be done.
-      return;
-    } else if (Terra.langWorkerApi.isRunningCode) {
-      // Terminate worker in cases of infinite loops.
-      return Terra.langWorkerApi.restart(true);
-    }
-  }
-
-  $('#run-code').prop('disabled', true);
-
-  let filename = null;
-  let files = null;
-
-  if (fileId) {
-    // Run given file id.
-    const file = Terra.vfs.findFileById(fileId);
-    filename = file.name;
-    files = [file];
-
-    if (!file.content && Terra.f.hasLFS() && Terra.lfs.loaded) {
-      const content = await Terra.lfs.getFileContent(file.id);
-      files = [{ ...file, content }];
-    }
-  } else {
-    const tab = Terra.f.getActiveEditor();
-    fileId = tab.container.getState().fileId;
-    filename = tab.config.title;
-    files = await Terra.f.getAllEditorFiles();
-  }
-
-  // Create a new worker instance if needed.
-  const proglang = Terra.f.getFileExtension(filename);
-  createLangWorkerApi(proglang);
-
-  // Get file args (IDE only).
-  let args = [];
-  if (Terra.c.IS_IDE) {
-    const filepath = Terra.vfs.getAbsoluteFilePath(fileId);
-    const fileArgsPlugin = Terra.f.getPlugin('file-args').getState('fileargs');
-    const fileArgs = fileArgsPlugin[filepath];
-
-    const parseArgsRegex = /("[^"]*"|'[^']*'|\S+)/g;
-    args = (fileArgs !== undefined && fileArgs.match(parseArgsRegex)) || [];
-  }
-
-  // Wait for the worker to be ready before running the code.
-  if (Terra.langWorkerApi && !Terra.langWorkerApi.isReady) {
-    const runFileIntervalId = setInterval(() => {
-      if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {
-        Terra.langWorkerApi.runUserCode(filename, files, args);
-        Terra.f.checkForStopCodeButton();
-        clearInterval(runFileIntervalId);
-      }
-    }, 200);
-  } else if (Terra.langWorkerApi) {
-    // If the worker is ready, run the code immediately.
-    Terra.langWorkerApi.runUserCode(filename, files, args);
-    Terra.f.checkForStopCodeButton();
-  }
-}
-
-/**
  * Change the run-code button to a stop-code button if after 1 second the code
  * has not finished running (potentially infinite loop scenario).
  */
-Terra.f.checkForStopCodeButton = () => {
+export function checkForStopCodeButton() {
   Terra.v.showStopCodeButtonTimeoutId = setTimeout(() => {
     const $button = $('#run-code');
     const newText = $button.text().replace('Run', 'Stop');
@@ -369,13 +282,13 @@ Terra.f.checkForStopCodeButton = () => {
  * disable it when running and disable it when it's done running.
  * @param {array} cmd - List of commands to execute.
  */
-Terra.f.runButtonCommand = async (selector, cmd) => {
+export async function runButtonCommand(selector, cmd) {
   const $button = $(selector);
   if ($button.prop('disabled')) return;
   $button.prop('disabled', true);
 
-  const activeTabName = Terra.f.getActiveEditor().config.title;
-  const files = await Terra.f.getAllEditorFiles();
+  const activeTabName = Terra.app.layout.getActiveEditor().getFilename();
+  const files = await getAllEditorFiles();
 
   if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {
     Terra.langWorkerApi.runButtonCommand(selector, activeTabName, cmd, files);
@@ -391,7 +304,7 @@ Terra.f.runButtonCommand = async (selector, cmd) => {
  *
  * @returns {array} List of completers.
  */
-Terra.f.getAceCompleters = () => {
+export function getAceCompleters() {
   const Range = ace.Range;
 
   const splitRegex = /[^a-zA-Z_0-9\$\-\u00C0-\u1FFF\u2C00-\uD7FF\w]+/;

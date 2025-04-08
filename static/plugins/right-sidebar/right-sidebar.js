@@ -1,36 +1,33 @@
-(() => {
-  class RightSidebarPlugin extends TerraPlugin {
-    name = 'rightSidebar';
-    css = ['static/plugins/right-sidebar/right-sidebar.css'];
+import { TerraPlugin } from '../../js/plugin-manager.js';
 
-    /**
-     * Container a reference to the $('.right-sidebar') container.
-     * @type {jQuery.Element}
-     */
-    $container = jQuery.noop();
+export default class RightSidebarPlugin extends TerraPlugin {
+  name = 'rightSidebar';
+  css = ['static/plugins/right-sidebar/right-sidebar.css'];
 
-    setContent = (content) => {
-      if (!this.$container) {
-        this.$container = $('<div class="right-sidebar"></div>');
-        this.$container.html(content);
-        $('.layout-outer-container').append(this.$container);
-      } else {
-        this.$container.html(content);
-      }
+  /**
+   * Container a reference to the $('.right-sidebar') container.
+   * @type {jQuery.Element}
+   */
+  $container = jQuery.noop();
 
-      // Trigger a resize such that the golden layout is rendered again.
-      $(window).resize();
+  setContent = (content) => {
+    if (!this.$container) {
+      this.$container = $('<div class="right-sidebar"></div>');
+      this.$container.html(content);
+      $('.layout-outer-container').append(this.$container);
+    } else {
+      this.$container.html(content);
     }
 
-    destroy = () => {
-      this.$container.remove();
-      this.$container = null;
-
-      // Trigger a resize such that the golden layout is rendered again.
-      $(window).resize();
-    }
+    // Trigger a resize such that the golden layout is rendered again.
+    $(window).resize();
   }
 
-  Terra.pluginManager.register(new RightSidebarPlugin());
+  destroy = () => {
+    this.$container.remove();
+    this.$container = null;
 
-})();
+    // Trigger a resize such that the golden layout is rendered again.
+    $(window).resize();
+  }
+}

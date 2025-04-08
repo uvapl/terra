@@ -1,7 +1,20 @@
+import { BASE_FONT_SIZE } from '../constants.js';
+import { getAceCompleters } from '../helpers/editor-component.js';
+import { getFileExtension, seconds } from '../helpers/shared.js';
+import { createLangWorkerApi } from '../lang-worker-api.js';
+import pluginManager from '../plugin-manager.js';
+import localStorageManager from '../local-storage-manager.js';
+
 /**
  * Editor component for GoldenLayout.
  */
-class EditorComponent {
+export default class EditorComponent extends EventTarget {
+  /**
+   * Whether the editor has been rendered.
+   * @type {boolean}
+   */
+  ready = false;
+
   /**
    * Component container object.
    * @type {GoldenLayout.ItemContainer}
@@ -33,7 +46,14 @@ class EditorComponent {
   fakeOnContainerOpenEvent = false;
   fakeOnEditorFocusEvent = false;
 
+  /**
+   * Indicates whether the user is currently typing in the editor.
+   * @type {boolean}
+   */
+  userIsEditing = false;
+
   constructor(container, state) {
+    super();
     this.container = container;
     this.state = state;
 
@@ -43,16 +63,18 @@ class EditorComponent {
   init = () => {
     this.bindContainerEvents();
     this.initEditor();
-    this.bindEditorCommands();
     this.bindEditorEvents();
 
-    this.setTheme(Terra.f.getLocalStorageItem('theme') || 'light');
-    this.setFontSize(this.state.fontSize || Terra.c.BASE_FONT_SIZE);
+    this.setTheme(localStorageManager.getLocalStorageItem('theme') || 'light');
+    this.setFontSize(this.state.fontSize || BASE_FONT_SIZE);
 
     // Set the proglang, or use 'text' as the filetype if there's no file ext.
-    const filename = this.container.parent.config.title;
-    const proglang = filename.includes('.') ? Terra.f.getFileExtension(filename) : 'text';
+    const filename = this.getFilename();
+    const proglang = filename.includes('.') ? getFileExtension(filename) : 'text';
     this.setProgLang(proglang);
+
+    // Remove default sublime Ctrl+Enter command.
+    this.editor.commands.removeCommand('addLineAfter');
   }
 
   /**
@@ -66,6 +88,8 @@ class EditorComponent {
     editorContainer.classList.add('editor');
     contentContainer.appendChild(editorContainer);
 
+    console.log('initEditor state', this.state);
+
     this.editor = ace.edit(editorContainer);
     this.editor.setKeyboardHandler('ace/keyboard/sublime');
     this.editor.setOption('fontSize');
@@ -74,136 +98,76 @@ class EditorComponent {
     this.editor.setOption('enableLiveAutocompletion', true);
     this.editor.setValue(this.state.value || '');
     this.editor.clearSelection();
-    this.editor.completers = Terra.f.getAceCompleters();
+    this.editor.completers = getAceCompleters();
   }
 
   /**
    * Bind all custom editor commands.
    */
   bindEditorCommands = () => {
-    // remove default sublime Ctrl+Enter command
-    this.editor.commands.removeCommand('addLineAfter');
-
-    // add custom commands
-    this.editor.commands.addCommand({
-      name: 'run',
-      bindKey: { win: 'Ctrl+Enter', mac: 'Command+Enter' },
-      exec: () => Terra.f.runCode(),
-    });
-
-    this.editor.commands.addCommand({
-      name: 'save',
-      bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
-      exec: () => {
-        if (Terra.c.IS_IDE) {
-          Terra.f.saveFile();
-        }
-      }
-    });
-
-    this.editor.commands.addCommand({
-      name: 'moveLinesUp',
-      bindKey: { win: 'Ctrl+Alt+Up', mac: 'Command+Option+Up' },
-      exec: () => this.editor.moveLinesUp(),
-    });
-
-    this.editor.commands.addCommand({
-      name: 'moveLinesDown',
-      bindKey: { win: 'Ctrl+Alt+Down', mac: 'Command+Option+Down' },
-      exec: () => this.editor.moveLinesDown(),
-    });
-
-    if (Terra.c.IS_IDE) {
-      this.bindEditorIDECommands();
-    }
-
-    if (Terra.f.hasLFSApi()) {
-      this.bindEditorLFSCommands();
-    }
   }
 
   /**
-   * Bind all editor comments specific to the IDE.
+   * Register a new single command to the editor.
+   *
+   * @param {Ace.Command} command - Object with the command properties.
+   * See https://ajaxorg.github.io/ace-api-docs/interfaces/ace.Ace.Command.html
    */
-  bindEditorIDECommands = () => {
-    this.editor.commands.addCommand({
-      name: 'closeFile',
-      bindKey: 'Ctrl+W',
-      exec: () => Terra.f.closeFile(),
-    });
-
-    this.editor.commands.addCommand({
-      name: 'createNewFileTreeFile',
-      bindKey: 'Ctrl+T',
-      exec: () => Terra.f.createNewFileTreeFile(),
-    });
-
-    this.editor.commands.addCommand({
-      name: 'createNewFileTreeFolder',
-      bindKey: 'Ctrl+Shift+T',
-      exec: () => Terra.f.createNewFileTreeFolder(),
-    });
+  addCommand = (command) => {
+    this.editor.commands.addCommand(command);
   }
 
   /**
-   * Bind all editor commands specific to the LFS when the LFS API is enabled.
+   * Register multiple new commands to the editor.
+   *
+   * @param {Ace.Command} command - Object with the command properties.
+   * See https://ajaxorg.github.io/ace-api-docs/interfaces/ace.Ace.Command.html
    */
-  bindEditorLFSCommands = () => {
-    this.editor.commands.on('exec', (e) => {
-      if (Terra.f.hasLFS() && Terra.lfs.loaded && ['paste', 'insertstring'].includes(e.command.name)) {
-        const inputText = e.args.text || '';
-        const filesize = new Blob([this.editor.getValue() + inputText]).size;
-        if (filesize >= Terra.c.LFS_MAX_FILE_SIZE) {
-          // Prevent the event from happening.
-          e.preventDefault();
-
-          const $modal = Terra.f.createModal({
-            title: 'Exceeded maximum file size',
-            body: 'The file size exceeds the maximum file size. This limit is solely required when you are connected to your local filesystem. Please reduce the file size beforing adding more content.',
-            footer: ' <button type="button" class="button primary-btn confirm-btn">Go back</button>',
-            footerClass: 'flex-end',
-            attrs: {
-              id: 'ide-exceeded-file-size-modal',
-              class: 'modal-width-small',
-            }
-          });
-
-          Terra.f.showModal($modal);
-          $modal.find('.confirm-btn').click(() => Terra.f.hideModal($modal));
-        }
-      }
-    });
+  addCommands = (commands) => {
+    this.editor.commands.addCommands(commands);
   }
 
   /**
-   * Callback when the editor is loaded.
+   * Register a callback function when a command is executed.
+   *
+   * @param {Function} callback - Function to be invoked.
    */
-  onEditorLoad = () => {
-    this.editor.getSession().getUndoMananger().reset();
-    if (Terra.c.IS_IDE) {
-      Terra.pluginManager.call('onEditorLoad', this.editor);
-    }
+  onCommandExec = (callback) => {
+    this.editor.commands.on('exec', callback);
   }
 
   /**
-   * Callback when the editor content changes, triggered per keystroke.
+   * Move the current line under the cursor up.
+   */
+  moveLinesUp = () => {
+    this.editor.moveLinesUp();
+  }
+
+  /**
+   * Move the current line under the cursor down.
+   */
+  moveLinesDown = () => {
+    this.editor.moveLinesDown();
+  }
+
+  /**
+   * Callback when the editor content changes, triggered each keystroke.
    */
   onEditorChange = () => {
-    Terra.v.blockLFSPolling = true;
-    Terra.v.editorIsDirty = true;
-    this.container.extendState({ value: this.editor.getValue() });
+    this.container.extendState({ value: this.getContent() });
 
-    const { fileId } = this.container.getState();
-    if (fileId) {
-      Terra.vfs.updateFile(fileId, {
-        content: this.editor.getValue(),
-      });
+    if (!this.userIsEditing) {
+      this.userIsEditing = true;
+      this.dispatchEvent(new Event('startEditing'));
     }
+
+    this.dispatchEvent(new Event('change'));
 
     clearTimeout(this.userIsTypingTimeoutId);
     this.userIsTypingTimeoutId = setTimeout(() => {
-      Terra.v.blockLFSPolling = false;
-    }, Terra.f.seconds(2));
+      this.userIsEditing = false;
+      this.dispatchEvent(new Event('stopEditing'));
+    }, seconds(2));
   }
 
   /**
@@ -215,16 +179,17 @@ class EditorComponent {
       return;
     }
 
-    this.setActiveEditor();
+    this.dispatchEvent(new Event('focus'));
 
     // Spawn a new worker if necessary.
     createLangWorkerApi(this.proglang);
   }
 
   /**
-   * Callback when the editor container is opened.
+   * Callback when the editor is opened for the first time or it is already open
+   * and becomes active (i.e. the user clicks on the tab in the UI).
    */
-  onContainerOpen = () => {
+  onShow = () => {
     if (!this.editor) return;
 
     if (this.fakeOnContainerOpenEvent) {
@@ -236,86 +201,162 @@ class EditorComponent {
       if (this.editor) {
         this.editor.focus();
       }
-    }, 0)
-
-    // If we ran into a layout state from localStorage that doesn't have
-    // a file ID, or the file ID is not the same, then we should sync the
-    // filesystem ID with this tab state's file ID. We can only do this for
-    // non-IDE versions, because the ID always uses IDs properly and can have
-    // multiple filenames. It can be assumed that both the exam and iframe will
-    // not have duplicate filenames.
-    if (!Terra.c.IS_IDE) {
-      const file = Terra.vfs.findFileWhere({ name: this.container.parent.config.title });
-      const { fileId } = this.container.getState();
-      if (!fileId || (file && fileId !== file.id)) {
-        this.container.extendState({ fileId: file.id });
-      }
-    }
+    }, 0);
 
     // Add custom class for styling purposes.
     this.getParentComponentElement().classList.add('component-container', 'editor-component-container');
-
-    if (!Terra.f.getActiveEditor()) {
-      this.setActiveEditor();
-    }
-
-    if (Terra.c.IS_IDE) {
-      this.reloadFileContent(true);
-    }
-
-    // Spawn a new worker if necessary.
-    if (this.ready) {
-      createLangWorkerApi(this.proglang);
-    }
   }
 
   /**
-   * Reload the file content either from VFS or LFS.
-   * This only applies for the IDE.
+   * Get the cursor position in the editor.
    *
-   * @param {boolen} [force] - True to force reload the file content from LFS.
+   * @returns {Ace.Point} Contains the row and column of the cursor.
    */
-  reloadFileContent = (force = false) => {
-    if (Terra.v.blockLFSPolling && !force) return;
-
-    const file = Terra.vfs.findFileById(this.container.getState().fileId);
-    if (file) {
-      if (Terra.f.hasLFS() && Terra.lfs.loaded && typeof file.size === 'number' && file.size > Terra.c.LFS_MAX_FILE_SIZE) {
-        // Disable the editor if the file is too large.
-        this.editor.container.classList.add('exceeded-filesize');
-        this.editor.setReadOnly(true);
-        this.editor.clearSelection();
-        this.editor.blur();
-      } else if (Terra.f.hasLFS() && !Terra.f.hasGitFSWorker() && !file.content) {
-        // Load the file content from LFS.
-        const cursorPos = this.editor.getCursorPosition()
-        Terra.lfs.getFileContent(file.id).then((content) => {
-          // Only update the content if it has changed.
-          if (this.editor && typeof content === 'string' && this.editor.getValue() !== content) {
-            this.editor.setValue(content);
-            this.editor.clearSelection();
-            this.editor.moveCursorToPosition(cursorPos);
-          }
-        });
-      } else if (typeof file.content === 'string' && this.editor.getValue() !== file.content) {
-        this.editor.setValue(file.content);
-        this.editor.clearSelection();
-      }
+  getCursorPosition = () => {
+    if (this.editor) {
+      return this.editor.getCursorPosition();
     }
   }
 
   /**
-   * Callback to lock the current editor.
+   * Set the cursor position in the editor.
+   *
+   * @param {Ace.Point} point - Contains the row and column of the cursor.
    */
-  onContainerLock = () => {
-    this.editor.setReadOnly(true);
+  setCursorPosition = (point) => {
+    if (this.editor) {
+      this.editor.moveCursorToPosition(point);
+    }
   }
 
   /**
-   * Callback to unlock the current editor.
+   * Get the current state of the editor.
+   *
+   * @returns {object} The state of the editor.
    */
-  onContainerUnlock = () => {
-    this.editor.setReadOnly(false);
+  getState = () => {
+    return this.container.getState();
+  }
+
+  /**
+   * Extend the curent state of the editor.
+   *
+   * @param {object} state - Additional values to overwrite or set.
+   */
+  extendState = (state) => {
+    this.container.extendState(state);
+  }
+
+  /**
+   * Get the filename of the corresponding tab.
+   *
+   * @returns {string} The name of the tab.
+   */
+  getFilename = () => {
+    return this.container.parent.config.title;
+  }
+
+  /**
+   * Set the filename of the corresponding tab.
+   *
+   * @param {string} filename - The new name of the tab.
+   */
+  setFilename = (filename) => {
+    this.container.parent.setTitle(filename);
+  }
+
+  /**
+   * Disable the editor if the content is too large.
+   */
+  exceededFileSize = () => {
+    this.editor.container.classList.add('exceeded-filesize');
+    this.lock();
+  }
+
+  /**
+   * Set the file content only when it has changed to prevent triggering
+   * unnecessary or redundant events.
+   *
+   * @param {string} content - The content to set.
+   */
+  setContent = (content) => {
+    if (typeof content === 'string' && this.getContent() !== content) {
+      this.editor.setValue(content);
+      this.editor.clearSelection();
+    }
+  }
+
+  /**
+   * Retrieve the current content of the editor.
+   *
+   * @returns {string} All editor lines concatenated with \n characters.
+   */
+  getContent = () => {
+    if (!this.editor) return '';
+
+    return this.editor.getValue();
+  }
+
+  /**
+   * Clear the content of the editor.
+   */
+  clearContent = () => {
+    this.editor.setValue('');
+    this.editor.clearSelection();
+  }
+
+  /**
+   * Close the current editor, which will completely destroy the editor.
+   */
+  close = () => {
+    this.container.close();
+  }
+
+  /**
+   * Lock the current editor by disabling any user input and any selection.
+   */
+  lock = () => {
+    this.editor.setOptions({
+      readOnly: true,
+      highlightActiveLine: false,
+      highlightGutterLine: false,
+      highlightSelectedWord: false,
+      highlightIndentGuides: false,
+    });
+
+    this.editor.clearSelection();
+    this.editor.blur();
+  }
+
+  /**
+   * Unlock the current editor, allowing user input and selection.
+   */
+  unlock = () => {
+    this.editor.setOptions({
+      readOnly: false,
+      highlightActiveLine: true,
+      highlightGutterLine: true,
+      highlightSelectedWord: true,
+      highlightIndentGuides: true,
+    });
+  }
+
+  /**
+   * Add a new Untitled sibling tab next to the current editor.
+   *
+   * @param {GoldenLayout.ContentItem} config - Content item config object.
+   */
+  addSiblingTab = (config = {}) => {
+    this.container.parent.parent.addChild({
+      type: 'component',
+      componentName: 'editor',
+      title: 'Untitled',
+      componentState: {
+        fontSize: BASE_FONT_SIZE,
+        ...config.componentState
+      },
+      ...config,
+    });
   }
 
   /**
@@ -326,7 +367,10 @@ class EditorComponent {
   onContainerSetCustomAutoCompleter = (completions) => {
     this.editor.completers.push({
       getCompletions: (editor, session, pos, prefix, callback) => {
-        if (prefix.length === 0) { callback(null, []); return }
+        if (prefix.length === 0) {
+          callback(null, []);
+          return;
+        }
 
         callback(null, completions);
       }
@@ -349,40 +393,33 @@ class EditorComponent {
 
     // Reset the session after the first initial page render to prevent the
     // initial content is removed when users hit ctrl+z or cmd+z.
+    this.clearUndoStack();
+
+    // Prevent the user from selecting text when the editor is locked.
+    this.editor.getSession().selection.on('changeSelection', (e) => {
+      if (this.editor.getReadOnly()) {
+        this.editor.getSession().selection.clearSelection();
+      }
+    });
+  }
+
+  /**
+   * Clear the undo stack of the editor.
+   */
+  clearUndoStack = () => {
     this.editor.getSession().getUndoManager().reset();
+  }
+
+  setActive = () => {
+    this.container.parent.parent.setActiveContentItem(this.container.parent);
   }
 
   /**
    * Callback before the container is destroyed.
    */
-  onContainerDestroy = () => {
+  onDestroy = () => {
     if (!this.editor) return;
-
-    // If it's the last tab being closed, then we insert another 'Untitled' tab,
-    // because we always need at least one tab open.
-    const tabs = Terra.f.getAllEditorTabs();
-    const totalTabs = tabs.length;
-
-    if (totalTabs >= 2) {
-      // Switch to the first tab.
-      tabs[0].parent.setActiveContentItem(tabs[0]);
-      if (tabs[0].instance.editor) {
-        tabs[0].instance.editor.focus();
-      }
-    }
-    else if (totalTabs === 1) {
-      const currentTab = tabs[0];
-      currentTab.parent.addChild({
-        type: 'component',
-        componentName: 'editor',
-        componentState: {
-          fontSize: Terra.c.BASE_FONT_SIZE,
-        },
-        title: 'Untitled',
-      });
-    } else {
-      this.setActiveEditor(null);
-    }
+    this.dispatchEvent(new Event('destroy'));
 
     this.editor.destroy();
     this.editor = null;
@@ -393,17 +430,6 @@ class EditorComponent {
    */
   getParentComponentElement = () => {
     return this.container.parent.parent.element[0];
-  }
-
-  /**
-   * Set the active editor.
-   *
-   * @param {*} value - The editor instance to set as active.
-   */
-  setActiveEditor = (value) => {
-    Terra.layout._lastActiveEditor = (typeof value !== 'undefined')
-      ? value
-      : this.container.parent;
   }
 
   /**
@@ -469,6 +495,7 @@ class EditorComponent {
         mode = 'markdown';
         break;
 
+      case 'txt':
       case 'untitled':
         mode = 'text';
         break;
@@ -494,25 +521,14 @@ class EditorComponent {
    * Bind all editor events with callbacks.
    */
   bindEditorEvents = () => {
-    this.editor.on('load', () => {
-      this.onEditorLoad();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorLoad', this);
-      }
-    });
-
     this.editor.on('change', () => {
       this.onEditorChange();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorChange', this);
-      }
+      pluginManager.triggerEvent('onEditorChange', this);
     });
 
     this.editor.on('focus', () => {
       this.onEditorFocus();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorFocus', this);
-      }
+      pluginManager.triggerEvent('onEditorFocus', this);
     });
   }
 
@@ -524,72 +540,52 @@ class EditorComponent {
     this.container.on('afterFirstRender', this.onContainerAfterFirstRender);
 
     this.container.on('onTabDragStop', ({ event, tab }) => {
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onTabDragStop', event, tab);
-      }
+      pluginManager.triggerEvent('onTabDragStop', event, tab);
     });
 
     this.container.on('show', () => {
-      this.onContainerOpen();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerOpen', this);
-      }
+      this.onShow();
+      this.dispatchEvent(new Event('show'));
+      pluginManager.triggerEvent('onEditorShow', this);
     });
 
     this.container.on('lock', () => {
-      this.onContainerLock();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerLock', this);
-      }
+      this.lock();
+      pluginManager.triggerEvent('onEditorLock', this);
+    });
+
+    this.container.on('unlock', () => {
+      this.unlock();
+      pluginManager.triggerEvent('onEditorUnlock', this);
     });
 
     this.container.on('setCustomAutocompleter', (completions) => {
       this.onContainerSetCustomAutoCompleter(completions);
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerSetCustomAutoCompleter', completions, this);
-      }
-    });
-
-    this.container.on('unlock', () => {
-      this.onContainerUnlock();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerUnlock', this);
-      }
     });
 
     this.container.on('themeChanged', (theme) => {
       this.setTheme(theme);
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('setEditorTheme', theme, this);
-      }
+      pluginManager.triggerEvent('setEditorTheme', theme, this);
     });
 
     this.container.on('fontSizeChanged', (fontSize) => {
       this.setFontSize(fontSize);
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('setEditorFontSize', fontSize, this);
-      }
+      pluginManager.triggerEvent('setEditorFontSize', fontSize, this);
     });
 
     this.container.on('resize', () => {
       this.onContainerResize();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerResize', this);
-      }
+      pluginManager.triggerEvent('onEditorContainerResize', this);
     });
 
     this.container.on('destroy', () => {
-      this.onContainerDestroy();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerDestroy', this);
-      }
+      this.onDestroy();
+      pluginManager.triggerEvent('onEditorDestroy', this);
     });
 
-    this.container.on('reloadContent', () => {
-      this.reloadFileContent();
-      if (Terra.c.IS_IDE) {
-        Terra.pluginManager.triggerEvent('onEditorContainerReloadContent', this);
-      }
+    this.container.on('vfsChanged', () => {
+      this.dispatchEvent(new Event('vfsChanged'));
+      pluginManager.triggerEvent('onEditorContentChanged', this);
     });
   }
 }
