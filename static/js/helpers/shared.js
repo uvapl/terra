@@ -295,33 +295,6 @@ export function isValidFilename(filename) {
 }
 
 /**
- * Register a timeout handler based on an ID. This is mainly used for
- * files/folders where a user could potentially trigger another file onchange
- * event, while the previous file change of another file hasn't been synced. In
- * that case, it shouldn't overwrite the previous file it's timeout. Therefore,
- * we use this function to register a timeout handler per file/folder.
- *
- * @param {string} id - Some unique identifier, like uuidv4.
- * @param {number} timeout - The amount of time in milliseconds to wait.
- * @param {function} callback - Callback function that will be invoked.
- */
-export function registerTimeoutHandler(id, timeout, callback) {
-  if (!isObject(Terra.timeoutHandlers)) {
-    Terra.timeoutHandlers = {};
-  }
-
-  if (typeof Terra.timeoutHandlers[id] !== 'undefined') {
-    clearTimeout(Terra.timeoutHandlers[id]);
-  }
-
-  Terra.timeoutHandlers[id] = setTimeout(() => {
-    callback();
-    clearTimeout(Terra.timeoutHandlers[id]);
-    delete Terra.timeoutHandlers[id];
-  }, timeout);
-}
-
-/**
  * Creates a mixin that adds event target functionality to a class.
  *
  * @param {class} base - The base class where the mixin will be applied to.

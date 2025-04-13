@@ -1,15 +1,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 // This file contains the virtual filesystem logic for the IDE app.
-//
-// The methods listed below should be called from the layout, which in here
-// determines whether to save it local storage, LFS or GitFS.
 ////////////////////////////////////////////////////////////////////////////////
 
 import {
   addNewLineCharacter,
   hasGitFSWorker,
   hasLFSApi,
-  registerTimeoutHandler,
+  isObject,
   seconds,
   uuidv4
 } from './helpers/shared.js';
@@ -20,10 +17,30 @@ import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 
 class VirtualFileSystem {
-  constructor() {
-    this.files = {};
-    this.folders = {};
+  /**
+   * Contains all the files in the virtual filesystem.
+   * The key is the file id and the value is the file object.
+   * @type {object<string, object>}
+   */
+  files = {};
 
+  /**
+   * Contains all the folders in the virtual filesystem.
+   * The key is the folder id and the value is the folder object.
+   * @type {object<string, object>}
+   */
+  folders = {};
+
+  /**
+   * This is mainly used for files/folders where a user could potentially
+   * trigger another file onchange event, while the previous file change of
+   * another file hasn't been synced. In that case, it shouldn't overwrite the
+   * previous file its timeout handler.
+   * @type {object<string, number>}
+   */
+  timeoutHandlers = {};
+
+  constructor() {
     this.loadFromLocalStorage();
   }
 
@@ -58,6 +75,29 @@ class VirtualFileSystem {
     if (!hasLFSApi() || (hasLFSApi() && !LFS.loaded && fn !== 'openFolderPicker')) return;
 
     return LFS[fn](...payload);
+  }
+
+  /**
+   * Register a timeout handler based on an ID.
+   *
+   * @param {string} id - Some unique identifier, like uuidv4.
+   * @param {number} timeout - The amount of time in milliseconds to wait.
+   * @param {function} callback - Callback function that will be invoked.
+   */
+  registerTimeoutHandler(id, timeout, callback) {
+    if (!isObject(this.timeoutHandlers)) {
+      this.timeoutHandlers = {};
+    }
+
+    if (typeof this.timeoutHandlers[id] !== 'undefined') {
+      clearTimeout(this.timeoutHandlers[id]);
+    }
+
+    this.timeoutHandlers[id] = setTimeout(() => {
+      callback();
+      clearTimeout(this.timeoutHandlers[id]);
+      delete this.timeoutHandlers[id];
+    }, timeout);
   }
 
   /**
@@ -404,12 +444,12 @@ class VirtualFileSystem {
       // Just commit the changes to the file.
       if (isContentChanged && userInvoked) {
         // Only commit changes after 2 seconds of inactivity.
-        registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
+        this.registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
           this._git('commit', newPath, file.content, file.sha);
         });
 
         // Update the file content in the LFS after a second of inactivity.
-        registerTimeoutHandler(`lfs-sync-${file.id}`, seconds(1), () => {
+        this.registerTimeoutHandler(`lfs-sync-${file.id}`, seconds(1), () => {
           this._lfs('writeFileToFolder', file.parentId, file.id, file.name, file.content);
         });
       }

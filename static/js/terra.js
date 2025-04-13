@@ -5,13 +5,4 @@ const Terra = {};
 // is an abbreviation for 'variables'.
 Terra.v = {};
 
-// ===========================================================================
-// IDE-only properties.
-// ===========================================================================
-
-if ($('body').hasClass('terra-ide')) {
-  // Contains timeout handlers.
-  Terra.timeoutHandlers = {};
-}
-
 export default Terra;

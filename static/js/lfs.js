@@ -8,7 +8,6 @@ import pluginManager from './plugin-manager.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
-import { IS_IDE } from './constants.js';
 
 class LocalFileSystem {
   IDB_VERSION = 1;
