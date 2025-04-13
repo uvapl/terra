@@ -1,7 +1,6 @@
 import { DROP_AREA_INDICATOR_CLASS } from './ide/constants.js';
 import { getFileExtension, hasLFSApi, isObject, isValidFilename } from './helpers/shared.js'
 import { createModal, hideModal, showModal } from './modal.js'
-import { openFile } from './helpers/editor-component.js'
 import VFS from './vfs.js'
 import LFS from './lfs.js'
 import Terra from './terra.js'
@@ -608,7 +607,7 @@ class FileTreeManager {
   _onClickNodeCallback = (event, data) => {
     // Prevent default behavior for folders.
     if (data.node.data.isFile) {
-      openFile(data.node.key, data.node.title);
+      Terra.app.layout.openFile(data.node.key, data.node.title);
     } else if (data.node.data.isFolder) {
       clearTimeout(Terra.v.fileTreeToggleTimeout);
 

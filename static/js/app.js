@@ -1,5 +1,4 @@
 import { IS_IDE } from './constants.js';
-import { checkForStopCodeButton, getAllEditorFiles } from './helpers/editor-component.js';
 import { getFileExtension, hasLFSApi, uuidv4 } from './helpers/shared.js'
 import { createLangWorkerApi } from './lang-worker-api.js';
 import Terra from './terra.js';
@@ -247,7 +246,7 @@ export default class App {
       const editorComponent = this.layout.getActiveEditor();
       fileId = editorComponent.getState().fileId;
       filename = editorComponent.getFilename();
-      files = await getAllEditorFiles();
+      files = await this.layout.getAllEditorFiles();
     }
 
     // Create a new worker instance if needed.
@@ -262,14 +261,14 @@ export default class App {
       const runFileIntervalId = setInterval(() => {
         if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {
           Terra.langWorkerApi.runUserCode(filename, files, args);
-          checkForStopCodeButton();
+          Terra.app.layout.checkForStopCodeButton();
           clearInterval(runFileIntervalId);
         }
       }, 200);
     } else if (Terra.langWorkerApi) {
       // If the worker is ready, run the code immediately.
       Terra.langWorkerApi.runUserCode(filename, files, args);
-      checkForStopCodeButton();
+      Terra.app.layout.checkForStopCodeButton();
     }
   }
 
@@ -278,10 +277,30 @@ export default class App {
    * This is executed just before the user runs the code from an editor.
    * By default this returns an empty array if not implemented in child classes.
    *
-   * @param {string} FileId - The ID of the file to get the arguments for.
+   * @param {string} fileId - The ID of the file to get the arguments for.
    * @returns {array} The arguments for the current file.
    */
   getCurrentFileArgs(fileId) {
     return [];
+  }
+
+  /**
+   * Run the command of a custom config button.
+   *
+   * @param {string} selector - Unique selector for the button, used to disable
+   * it when running and disable it when it's done running.
+   * @param {array} cmd - List of commands to execute.
+   */
+  async runButtonCommand(selector, cmd) {
+    const $button = $(selector);
+    if ($button.prop('disabled')) return;
+    $button.prop('disabled', true);
+
+    const activeTabName = this.layout.getActiveEditor().getFilename();
+    const files = await this.layout.getAllEditorFiles();
+
+    if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {
+      Terra.langWorkerApi.runButtonCommand(selector, activeTabName, cmd, files);
+    }
   }
 }

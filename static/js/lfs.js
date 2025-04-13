@@ -2,7 +2,6 @@
 // This file contains the local filesystem logic for the IDE app, using
 // https://developer.mozilla.org/en-US/docs/Web/API/File_System_API
 ////////////////////////////////////////////////////////////////////////////////
-import { closeAllFiles } from './helpers/editor-component.js';
 import { hasGitFSWorker, seconds } from './helpers/shared.js';
 import VFS from './vfs.js';
 import pluginManager from './plugin-manager.js';
@@ -157,7 +156,7 @@ class LocalFileSystem {
       // Remove local file storage warning if present.
       fileTreeManager.removeLocalStorageWarning();
 
-      closeAllFiles();
+      Terra.app.layout.closeAllFiles();
       await this._importFolderToVFS(rootFolderHandle);
       this._watchRootFolder();
       pluginManager.triggerEvent('onStorageChange', 'lfs');

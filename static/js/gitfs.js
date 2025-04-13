@@ -1,4 +1,3 @@
-import { closeAllFiles } from './helpers/editor-component.js';
 import { getRepoInfo, hasGitFSWorker } from './helpers/shared.js';
 import { createModal, hideModal, showModal } from './modal.js';
 import VFS from './vfs.js';
@@ -265,7 +264,6 @@ export default class GitFS {
  * This is considered a private function invoked from VFS.createGitFSWorker.
  */
 export function _createGitFSWorker() {
-
   const accessToken = localStorageManager.getLocalStorageItem('git-access-token');
   const repoLink = localStorageManager.getLocalStorageItem('git-repo');
   const repoInfo = getRepoInfo(repoLink);
@@ -276,7 +274,7 @@ export function _createGitFSWorker() {
   if (hasGitFSWorker()) {
     Terra.gitfs.terminate();
     Terra.gitfs = null;
-    closeAllFiles();
+    Terra.app.layout.closeAllFiles();
   }
 
   if (accessToken && repoLink) {

@@ -2,7 +2,6 @@ import Layout from './layout.js';
 import { hasLFSApi } from '../helpers/shared.js';
 import LFS from '../lfs.js';
 import localStorageManager from '../local-storage-manager.js';
-import { closeFile } from '../helpers/editor-component.js';
 import fileTreeManager from '../file-tree-manager.js';
 import { BASE_FONT_SIZE, LFS_MAX_FILE_SIZE } from '../constants.js';
 
@@ -73,7 +72,7 @@ export default class IDELayout extends Layout {
       {
         name: 'closeFile',
         bindKey: 'Ctrl+W',
-        exec: () => closeFile(),
+        exec: () => this.closeFile(),
       },
       {
         name: 'createNewFileTreeFile',

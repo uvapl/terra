@@ -1,5 +1,5 @@
 import { BASE_FONT_SIZE } from '../constants.js';
-import Terra from '../terra.js';
+import { isObject } from '../helpers/shared.js';
 
 /**
  * Terminal component for GoldenLayout.

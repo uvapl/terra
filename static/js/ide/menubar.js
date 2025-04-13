@@ -2,7 +2,6 @@
 // This file contains the logic for the menubar at the top of the IDE app.
 ////////////////////////////////////////////////////////////////////////////////
 import { MODAL_ANIM_DURATION } from '../constants.js';
-import { closeAllFiles, closeFile } from '../helpers/editor-component.js';
 import { isMac } from '../helpers/shared.js';
 import { createModal, hideModal, showModal } from '../modal.js';
 import VFS from '../vfs.js';
@@ -55,7 +54,7 @@ export function renderGitRepoBranches(branches) {
 
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
     VFS._git('clone');
-    closeAllFiles();
+    Terra.app.layout.closeAllFiles();
   });
 }
 
@@ -149,8 +148,8 @@ function registerMenubarEventListeners() {
   $('#menu-item--new-folder').click(() => fileTreeManager.createFolder());
   Mousetrap.bind(['ctrl+shift+t'], () => fileTreeManager.createFolder());
 
-  $('#menu-item--close-file').click(closeFile);
-  Mousetrap.bind(['ctrl+w'], closeFile);
+  $('#menu-item--close-file').click(() => Terra.app.layout.closeFile());
+  Mousetrap.bind(['ctrl+w'], () => Terra.app.layout.closeFile());
 
   $('#menu-item--comment').click(Menubar.toggleComment);
 
@@ -207,7 +206,7 @@ Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-folder').hasClass('disabled')) return;
 
   VFS._lfs('closeFolder');
-  closeAllFiles();
+  Terra.app.layout.closeAllFiles();
   closeActiveMenuBarMenu(event);
 };
 
@@ -457,7 +456,7 @@ Menubar.connectRepo = () => {
 
           // Close all tabs, because we know we will change from either local
           // storage to git, or from one git repo to another.
-          closeAllFiles();
+          Terra.app.layout.closeAllFiles();
         });
 
       }, MODAL_ANIM_DURATION);
