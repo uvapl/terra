@@ -252,7 +252,7 @@ export function seconds(secs) {
  * @returns {boolean} True if the worker has been initialised, false otherwise.
  */
 export function hasGitFSWorker() {
-  return IS_IDE && Terra.gitfs instanceof GitFS;
+  return IS_IDE && Terra.app.gitfs instanceof GitFS;
 }
 
 /**

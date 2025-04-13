@@ -5,6 +5,7 @@ import {
   getFileExtension,
   hasGitFSWorker,
   hasLFSApi,
+  getRepoInfo,
 } from './helpers/shared.js';
 import VFS from './vfs.js';
 import Terra from './terra.js';
@@ -13,6 +14,9 @@ import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
 import LFS from './lfs.js';
 import pluginManager from './plugin-manager.js';
+
+import {} from './helpers/shared.js';
+import GitFS from './gitfs.js';
 
 export default class IDEApp extends App {
   setupLayout() {
@@ -23,7 +27,7 @@ export default class IDEApp extends App {
     // Fetch the repo files or the local storage files (vfs) otherwise.
     const repoLink = localStorageManager.getLocalStorageItem('git-repo');
     if (repoLink) {
-      VFS.createGitFSWorker();
+      this.createGitFSWorker();
     } else {
       LFS.init();
       fileTreeManager.createFileTree();
@@ -138,5 +142,44 @@ export default class IDEApp extends App {
 
     const parseArgsRegex = /("[^"]*"|'[^']*'|\S+)/g;
     return fileArgs !== undefined ? fileArgs.match(parseArgsRegex) : [];
+  }
+
+  /**
+   * Create a new GitFSWorker instance if it doesn't exist yet and only if the
+   * the user provided an ssh-key and repository link that are saved in local
+   * storage. Otherwise, a worker will be created automatically when the user
+   * adds a new repository.
+   */
+  createGitFSWorker() {
+    if (LFS.loaded) {
+      LFS.terminate();
+    }
+
+    const accessToken = localStorageManager.getLocalStorageItem('git-access-token');
+    const repoLink = localStorageManager.getLocalStorageItem('git-repo');
+    const repoInfo = getRepoInfo(repoLink);
+    if (repoInfo) {
+      fileTreeManager.setTitle(`${repoInfo.user}/${repoInfo.repo}`)
+    }
+
+    if (hasGitFSWorker()) {
+      this.gitfs.terminate();
+      this.gitfs = null;
+      Terra.app.layout.closeAllFiles();
+    }
+
+    if (accessToken && repoLink) {
+      Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
+
+      const gitfs = new GitFS(repoLink);
+      this.gitfs = gitfs;
+      gitfs._createWorker(accessToken);
+
+      fileTreeManager.destroyTree();
+
+      console.log('Creating gitfs worker');
+      $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
+      pluginManager.triggerEvent('onStorageChange', 'git');
+    }
   }
 }

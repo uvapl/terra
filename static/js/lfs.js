@@ -149,8 +149,8 @@ class LocalFileSystem {
     if (hasPermission) {
       // Make sure GitFS is stopped.
       if (hasGitFSWorker()) {
-        Terra.gitfs.terminate();
-        Terra.gitfs = null;
+        Terra.app.gitfs.terminate();
+        Terra.app.gitfs = null;
       }
 
       // Remove local file storage warning if present.

@@ -16,7 +16,6 @@ import {
 import { IS_IDE } from './constants.js';
 import VFS from './vfs.js';
 import LFS from './lfs.js';
-import { _createGitFSWorker } from './gitfs.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 
@@ -38,7 +37,7 @@ class VirtualFileSystem {
     if (!hasGitFSWorker()) return;
 
     try {
-      Terra.gitfs[fn](...payload);
+      Terra.app.gitfs[fn](...payload);
     } catch (TypeError) {
       console.error(`GitFS.${fn}() is not a function`);
     }
@@ -664,20 +663,6 @@ class VirtualFileSystem {
     }
 
     this.saveState();
-  }
-
-  /**
-   * Create a new GitFSWorker instance if it doesn't exist yet and terminate the
-   * LFS if it's currently active. This is only allow in the IDE app.
-   */
-  createGitFSWorker = () => {
-    if (!IS_IDE) return;
-
-    if (LFS.loaded) {
-      LFS.terminate();
-    }
-
-    _createGitFSWorker();
   }
 
   /**

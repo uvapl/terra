@@ -1,7 +1,5 @@
-import { getRepoInfo, hasGitFSWorker } from './helpers/shared.js';
 import { createModal, hideModal, showModal } from './modal.js';
 import VFS from './vfs.js';
-import pluginManager from './plugin-manager.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
@@ -252,42 +250,5 @@ export default class GitFS {
         file.sha = payload.sha;
         break;
     }
-  }
-}
-
-/**
- * Create a new GitFSWorker instance if it doesn't exist yet and only if the the
- * user provided an ssh-key and repository link that are saved in local storage.
- * Otherwise, a worker will be created automatically when the user adds a new
- * repository.
- *
- * This is considered a private function invoked from VFS.createGitFSWorker.
- */
-export function _createGitFSWorker() {
-  const accessToken = localStorageManager.getLocalStorageItem('git-access-token');
-  const repoLink = localStorageManager.getLocalStorageItem('git-repo');
-  const repoInfo = getRepoInfo(repoLink);
-  if (repoInfo) {
-    fileTreeManager.setTitle(`${repoInfo.user}/${repoInfo.repo}`)
-  }
-
-  if (hasGitFSWorker()) {
-    Terra.gitfs.terminate();
-    Terra.gitfs = null;
-    Terra.app.layout.closeAllFiles();
-  }
-
-  if (accessToken && repoLink) {
-    Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
-
-    const gitfs = new GitFS(repoLink);
-    Terra.gitfs = gitfs;
-    gitfs._createWorker(accessToken);
-
-    fileTreeManager.destroyTree();
-
-    console.log('Creating gitfs worker');
-    $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
-    pluginManager.triggerEvent('onStorageChange', 'git');
   }
 }

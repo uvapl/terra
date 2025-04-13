@@ -452,7 +452,7 @@ Menubar.connectRepo = () => {
         });
         $confirmModal.find('.confirm-btn').click(() => {
           hideModal($confirmModal);
-          VFS.createGitFSWorker();
+          Terra.app.createGitFSWorker();
 
           // Close all tabs, because we know we will change from either local
           // storage to git, or from one git repo to another.
@@ -461,7 +461,7 @@ Menubar.connectRepo = () => {
 
       }, MODAL_ANIM_DURATION);
     } else {
-      VFS.createGitFSWorker();
+      Terra.app.createGitFSWorker();
     }
   });
 };

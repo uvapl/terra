@@ -10,9 +10,6 @@ Terra.v = {};
 // ===========================================================================
 
 if ($('body').hasClass('terra-ide')) {
-  // Reference to the git filesystem if loaded.
-  Terra.gitfs = null;
-
   // Contains timeout handlers.
   Terra.timeoutHandlers = {};
 }
