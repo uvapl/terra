@@ -8,7 +8,7 @@ import {
 } from './helpers/shared.js';
 import VFS from './vfs.js';
 import Terra from './terra.js';
-import { hasWorker } from './lang-worker-api.js';
+import LangWorker from './lang-worker.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
 import LFS from './lfs.js';
@@ -59,8 +59,8 @@ export default class IDEApp extends App {
       setTimeout(() => {
         const editorComponent = this.layout.getActiveEditor();
         const proglang = getFileExtension(editorComponent.getFilename());
-        if (hasWorker(proglang) && Terra.langWorkerApi) {
-          Terra.langWorkerApi.restart();
+        if (Terra.app.langWorker && LangWorker.hasWorker(proglang)) {
+          Terra.app.langWorker.restart();
         }
       }, 10);
     });

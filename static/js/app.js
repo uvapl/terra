@@ -1,6 +1,6 @@
 import { IS_IDE } from './constants.js';
 import { getFileExtension, hasLFSApi, uuidv4 } from './helpers/shared.js'
-import { createLangWorkerApi } from './lang-worker-api.js';
+import LangWorker from './lang-worker.js';
 import Terra from './terra.js';
 import VFS from './vfs.js';
 
@@ -13,6 +13,12 @@ export default class App {
    * @type {GoldenLayout.Layout}
    */
   layout = null;
+
+  /**
+   * Reference to the current programming language worker.
+   * @type {LangWorker}
+   */
+  langWorker = null;
 
   constructor() {
     this._bindThis();
@@ -150,7 +156,7 @@ export default class App {
     }
 
     if (editorComponent.ready) {
-      createLangWorkerApi(editorComponent.proglang);
+      this.createLangWorker(editorComponent.proglang);
     }
 
     this.setEditorFileContent(editorComponent);
@@ -216,14 +222,13 @@ export default class App {
   async runCode(fileId = null, clearTerm = false) {
     if (clearTerm) this.layout.term.clear();
 
-    // TODO: maybe do if (!Terra.langWorkerApi.isReady) { ... } else { ... }
-    if (Terra.langWorkerApi) {
-      if (!Terra.langWorkerApi.isReady) {
+    if (this.langWorker) {
+      if (!this.langWorker.isReady) {
         // Worker API is busy, wait for it to be done.
         return;
-      } else if (Terra.langWorkerApi.isRunningCode) {
+      } else if (this.langWorker.isRunningCode) {
         // Terminate worker in cases of infinite loops.
-        return Terra.langWorkerApi.restart(true);
+        return this.langWorker.restart(true);
       }
     }
 
@@ -251,23 +256,23 @@ export default class App {
 
     // Create a new worker instance if needed.
     const proglang = getFileExtension(filename);
-    createLangWorkerApi(proglang);
+    this.createLangWorker(proglang);
 
     // Get file args, if any.
     const args = this.getCurrentFileArgs(fileId);
 
     // Wait for the worker to be ready before running the code.
-    if (Terra.langWorkerApi && !Terra.langWorkerApi.isReady) {
+    if (this.langWorker && !this.langWorker.isReady) {
       const runFileIntervalId = setInterval(() => {
-        if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {
-          Terra.langWorkerApi.runUserCode(filename, files, args);
+        if (this.langWorker && this.langWorker.isReady) {
+          this.langWorker.runUserCode(filename, files, args);
           Terra.app.layout.checkForStopCodeButton();
           clearInterval(runFileIntervalId);
         }
       }, 200);
-    } else if (Terra.langWorkerApi) {
+    } else if (this.langWorker) {
       // If the worker is ready, run the code immediately.
-      Terra.langWorkerApi.runUserCode(filename, files, args);
+      this.langWorker.runUserCode(filename, files, args);
       Terra.app.layout.checkForStopCodeButton();
     }
   }
@@ -299,8 +304,32 @@ export default class App {
     const activeTabName = this.layout.getActiveEditor().getFilename();
     const files = await this.layout.getAllEditorFiles();
 
-    if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {
-      Terra.langWorkerApi.runButtonCommand(selector, activeTabName, cmd, files);
+    if (this.langWorker && this.langWorker.isReady) {
+      this.langWorker.runButtonCommand(selector, activeTabName, cmd, files);
+    }
+  }
+
+  /**
+   * Create a new worker instance if none exists already. The existing instance
+   * will be terminated and restarted if necessary.
+   *
+   * @param {string} proglang - The proglang to spawn the related worker for.
+   */
+  createLangWorker(proglang) {
+    // Situation 1: no worker, thus spawn a new one.
+    if (!this.langWorker && LangWorker.hasWorker(proglang)) {
+      this.langWorker = new LangWorker(proglang);
+    } else if (this.langWorker && this.langWorker.proglang !== proglang) {
+      this.langWorker.proglang = proglang;
+
+      // Situation 2: existing worker but new proglang is invalid.
+      if (!LangWorker.hasWorker(proglang)) {
+        this.langWorker.terminate();
+        this.langWorker = null;
+      } else {
+        // Situation 3: existing worker and new proglang is valid.
+        this.langWorker.restart();
+      }
     }
   }
 }

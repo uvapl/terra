@@ -1,8 +1,8 @@
 import { BASE_FONT_SIZE } from '../constants.js';
 import { getFileExtension, seconds } from '../helpers/shared.js';
-import { createLangWorkerApi } from '../lang-worker-api.js';
 import pluginManager from '../plugin-manager.js';
 import localStorageManager from '../local-storage-manager.js';
+import Terra from '../terra.js';
 
 /**
  * Editor component for GoldenLayout.
@@ -173,7 +173,7 @@ export default class EditorComponent extends EventTarget {
     this.dispatchEvent(new Event('focus'));
 
     // Spawn a new worker if necessary.
-    createLangWorkerApi(this.proglang);
+    Terra.app.createLangWorker(this.proglang);
   }
 
   /**

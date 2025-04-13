@@ -8,7 +8,7 @@ import {
 } from './helpers/shared.js';
 import VFS from './vfs.js';
 import Terra from './terra.js';
-import LangWorkerAPI from './lang-worker-api.js';
+import LangWorker from './lang-worker.js';
 import localStorageManager from './local-storage-manager.js';
 import EmbedLayout from './layout/layout.embed.js';
 
@@ -37,7 +37,7 @@ export default class EmbedApp extends App {
     const proglang = getFileExtension(queryParams.filename);
 
     // Initialise the programming language specific worker API.
-    Terra.langWorkerApi = new LangWorkerAPI(proglang);
+    Terra.app.langWorker = new LangWorker(proglang);
 
     // Get the font-size stored in local storage or use fallback value.
     const fontSize = localStorageManager.getLocalStorageItem('font-size', BASE_FONT_SIZE);

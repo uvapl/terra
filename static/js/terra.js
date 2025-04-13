@@ -5,9 +5,6 @@ const Terra = {};
 // is an abbreviation for 'variables'.
 Terra.v = {};
 
-// Reference to the language worker API class instance.
-Terra.langWorkerApi = null;
-
 // ===========================================================================
 // IDE-only properties.
 // ===========================================================================

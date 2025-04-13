@@ -4,7 +4,7 @@ import { createModal, hideModal, showModal } from './modal.js'
 import VFS from './vfs.js'
 import LFS from './lfs.js'
 import Terra from './terra.js'
-import { hasWorker } from './lang-worker-api.js';
+import LangWorker from './lang-worker.js';
 
 class FileTreeManager {
   /**
@@ -362,7 +362,7 @@ class FileTreeManager {
         };
       }
 
-      if (hasWorker(getFileExtension(node.title))) {
+      if (LangWorker.hasWorker(getFileExtension(node.title))) {
         menu.run = {
           name: 'Run',
           callback: () => {

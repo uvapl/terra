@@ -17,7 +17,6 @@ import fileTreeManager from '../file-tree-manager.js';
 import { createModal, hideModal, showModal } from '../modal.js';
 import VFS from '../vfs.js';
 import LFS from '../lfs.js';
-import { createLangWorkerApi } from '../lang-worker-api.js';
 import Terra from '../terra.js';
 
 $(window).on('resize', () => {
@@ -665,7 +664,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     }
 
     const proglang = getFileExtension(filename);
-    createLangWorkerApi(proglang);
+    Terra.app.createLangWorker(proglang);
   }
 
   /**
@@ -817,7 +816,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       // Set correct syntax highlighting.
       editorComponent.setProgLang(proglang)
 
-      createLangWorkerApi(proglang);
+      Terra.app.createLangWorker(proglang);
     });
   }
 }
