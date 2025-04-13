@@ -1,9 +1,3 @@
-import {
-  clearTermWriteBuffer,
-  disposeUserInput,
-  hideTermCursor,
-  waitForInput
-} from './helpers/term-component.js';
 import { getFileExtension } from './helpers/shared.js';
 import Terra from './terra.js';
 
@@ -96,15 +90,15 @@ export default class LangWorkerAPI {
     // once it has been loaded.
     $('#run-code').prop('disabled', true);
 
-    hideTermCursor();
-    clearTermWriteBuffer();
+    Terra.app.layout.term.hideTermCursor();
+    Terra.app.layout.term.clearTermWriteBuffer();
 
     if (showTerminateMsg) {
       Terra.app.layout.term.writeln('\x1b[1;31mProcess terminated\x1b[0m');
     }
 
     // Dispose any active user input.
-    disposeUserInput();
+    Terra.app.layout.term.disposeUserInput();
   }
 
   /**
@@ -266,7 +260,7 @@ export default class LangWorkerAPI {
             Terra.app.layout.term.write(event.data.data);
           }
         } catch (e) {
-          clearTermWriteBuffer();
+          Terra.app.layout.term.clearTermWriteBuffer();
         }
         break;
 
@@ -274,7 +268,7 @@ export default class LangWorkerAPI {
       // input, this event will be triggered. The user input will be requested
       // and sent back to the worker through the usage of shared memory.
       case 'readStdin':
-        waitForInput().then((value) => {
+        Terra.app.layout.term.waitForInput().then((value) => {
           const view = new Uint8Array(this.sharedMem.buffer);
           for (let i = 0; i < value.length; i++) {
             // To the shared memory.
