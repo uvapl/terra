@@ -1,5 +1,5 @@
 import { IS_IDE } from './constants.js';
-import { getFileExtension, hasLFSApi, uuidv4 } from './helpers/shared.js'
+import { getFileExtension, uuidv4 } from './helpers/shared.js'
 import LangWorker from './lang-worker.js';
 import Terra from './terra.js';
 import VirtualFileSystem from './vfs.js';
@@ -251,7 +251,7 @@ export default class App {
       filename = file.name;
       files = [file];
 
-      if (!file.content && hasLFSApi() && LFS.loaded) {
+      if (!file.content && this.hasLFSProjectLoaded) {
         const content = await LFS.getFileContent(file.id);
         files = [{ ...file, content }];
       }

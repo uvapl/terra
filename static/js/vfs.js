@@ -5,13 +5,11 @@
 import {
   addNewLineCharacter,
   hasGitFSWorker,
-  hasLFSApi,
   isObject,
   seconds,
   uuidv4
 } from './helpers/shared.js';
 import { IS_IDE } from './constants.js';
-import LFS from './lfs.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 
@@ -67,13 +65,14 @@ export default class VirtualFileSystem {
    * @returns {*} The return value of the function.
    */
   _lfs = (fn, ...payload) => {
-    // Return early if either:
-    // - The browser doesn't support the LFS class.
-    // - The LFS class is not loaded yet. We make an exception for the
-    //   openFolderPicker, because this function is used to load the LFS class.
-    if (!hasLFSApi() || (hasLFSApi() && !LFS.loaded && fn !== 'openFolderPicker')) return;
+    // Return early if the user hasn't loaded an LFS project. We make an
+    // exception for the openFolderPicker, because this function is used to load
+    // the LFS class.
+    if (!Terra.app.hasLFSProjectLoaded && fn !== 'openFolderPicker') {
+      return;
+    }
 
-    return LFS[fn](...payload);
+    return Terra.app.lfs[fn](...payload);
   }
 
   /**
@@ -137,7 +136,7 @@ export default class VirtualFileSystem {
 
     // Remove the content from all files when LFS or Git is used, because LFS uses
     // lazy loading and GitFS is being cloned when refreshed anyway.
-    if (IS_IDE && ((hasLFSApi() && LFS.loaded) || hasGitFSWorker())) {
+    if (IS_IDE && (Terra.app.hasLFSProjectLoaded || hasGitFSWorker())) {
       const keys = ['sha', 'content'];
       Object.keys(files).forEach((fileId) => {
         files[fileId] = { ...files[fileId] };

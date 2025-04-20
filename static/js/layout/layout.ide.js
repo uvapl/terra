@@ -1,9 +1,8 @@
 import Layout from './layout.js';
-import { hasLFSApi } from '../helpers/shared.js';
-import LFS from '../lfs.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
 import { BASE_FONT_SIZE, LFS_MAX_FILE_SIZE } from '../constants.js';
+import Terra from '../terra.js';
 
 export default class IDELayout extends Layout {
   /**
@@ -99,7 +98,7 @@ export default class IDELayout extends Layout {
   _validateFileSizeLimit(event, editorComponent) {
     // Verify whether the user exceeded the maximum file size when either
     // pasting from the clipboard or inserting text (i.e. on each keystroke).
-    if (hasLFSApi() && LFS.loaded && ['paste', 'insertstring'].includes(event.command.name)) {
+    if (Terra.app.hasLFSProjectLoaded && ['paste', 'insertstring'].includes(event.command.name)) {
       const inputText = event.args.text || '';
       const filesize = new Blob([editorComponent.getContent() + inputText]).size;
       if (filesize >= LFS_MAX_FILE_SIZE) {
@@ -141,7 +140,7 @@ export default class IDELayout extends Layout {
     // Exclude the content from all editors for the IDE when LFS is enabled,
     // because for LFS we use lazy loading, i.e. only load the content when
     // opening the file.
-    if (hasLFSApi() && LFS.loaded) {
+    if (Terra.app.hasLFSProjectLoaded) {
       config = this._removeEditorValue(config);
     }
 

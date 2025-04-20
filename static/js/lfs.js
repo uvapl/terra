@@ -8,7 +8,7 @@ import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
 
-class LocalFileSystem {
+export default class LocalFileSystem {
   IDB_VERSION = 1;
   IDB_NAME = 'terra';
   FILE_HANDLES_STORE_NAME = 'file-handles';
@@ -754,5 +754,3 @@ class LocalFileSystem {
     )
   }
 }
-
-export default new LocalFileSystem();

@@ -6,7 +6,6 @@ import {
   eventTargetMixin,
   seconds,
   getFileExtension,
-  hasLFSApi,
   isValidFilename
 } from '../helpers/shared.js';
 import EditorComponent from './editor.component.js';
@@ -15,7 +14,6 @@ import pluginManager from '../plugin-manager.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
 import { createModal, hideModal, showModal } from '../modal.js';
-import LFS from '../lfs.js';
 import Terra from '../terra.js';
 
 $(window).on('resize', () => {
@@ -573,8 +571,8 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       this.getEditorComponents().map(async (editorComponent) => {
         const containerState = editorComponent.getState();
         let content = editorComponent.getContent();
-        if (!content && hasLFSApi() && LFS.loaded) {
-          content = await LFS.getFileContent(containerState.fileId);
+        if (!content && Terra.app.hasLFSProjectLoaded) {
+          content = await Terra.app.lfs.getFileContent(containerState.fileId);
         }
 
         return {

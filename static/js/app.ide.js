@@ -4,17 +4,14 @@ import { LFS_MAX_FILE_SIZE } from './constants.js';
 import {
   getFileExtension,
   hasGitFSWorker,
-  hasLFSApi,
   getRepoInfo,
 } from './helpers/shared.js';
 import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
-import LFS from './lfs.js';
+import LocalFileSystem from './lfs.js';
 import pluginManager from './plugin-manager.js';
-
-import {} from './helpers/shared.js';
 import GitFS from './gitfs.js';
 
 export default class IDEApp extends App {
@@ -30,8 +27,34 @@ export default class IDEApp extends App {
    */
   lfs = null;
 
+  constructor() {
+    super();
+
+    if (this.browserHasLFSApi()) {
+      this.lfs = new LocalFileSystem();
+    }
+  }
+
+  /**
+   * Whether the LFS has been initialized (which only happens in the IDE) and
+   * the user subsequently loaded a project. This instance variable remains
+   *
+   * @returns {boolean} True if an LFS project is loaded.
+   */
+  get hasLFSProjectLoaded() {
+    return this.lfs && this.lfs.loaded;
+  }
+
+  /**
+   * Check whether the browser has support for the Local Filesystem API.
+   *
+   * @returns {boolean} True if the browser supports the api.
+   */
+  browserHasLFSApi() {
+    return 'showOpenFilePicker' in window;
+  }
+
   setupLayout() {
-    // this.lfs = new LocalFileSystem();
     this.layout = this.createLayout();
   }
 
@@ -41,16 +64,16 @@ export default class IDEApp extends App {
     if (repoLink) {
       this.createGitFSWorker();
     } else {
-      LFS.init();
+      this.lfs.init();
       fileTreeManager.createFileTree();
     }
 
-    if (!hasLFSApi()) {
+    if (!this.browserHasLFSApi()) {
       // Disable open-folder if the FileSystemAPI is not supported.
       $('#menu-item--open-folder').remove();
     }
 
-    if (!repoLink && !hasLFSApi()) {
+    if (!repoLink && !this.browserHasLFSApi()) {
       fileTreeManager.showLocalStorageWarning();
     }
 
@@ -111,12 +134,12 @@ export default class IDEApp extends App {
     const file = this.vfs.findFileById(editorComponent.getState().fileId);
     if (!file) return;
 
-    if (hasLFSApi() && LFS.loaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
+    if (Terra.app.hasLFSProjectLoaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
       editorComponent.exceededFileSize();
-    } else if (hasLFSApi() && LFS.loaded && !hasGitFSWorker() && !file.content) {
+    } else if (Terra.app.hasLFSProjectLoaded && !hasGitFSWorker() && !file.content) {
       // Load the file content from LFS.
       const cursorPos = editorComponent.getCursorPosition();
-      LFS.getFileContent(file.id).then((content) => {
+      this.lfs.getFileContent(file.id).then((content) => {
         editorComponent.setContent(content);
         editorComponent.setCursorPosition(cursorPos);
 
@@ -163,8 +186,8 @@ export default class IDEApp extends App {
    * adds a new repository.
    */
   createGitFSWorker() {
-    if (LFS.loaded) {
-      LFS.terminate();
+    if (this.haLFSProjectLoaded) {
+      this.lfs.terminate();
     }
 
     const accessToken = localStorageManager.getLocalStorageItem('git-access-token');

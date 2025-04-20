@@ -1,5 +1,4 @@
 import { IS_IDE } from '../constants.js';
-import LFS from '../lfs.js';
 import GitFS from '../gitfs.js';
 import Terra from '../terra.js';
 
@@ -253,15 +252,6 @@ export function seconds(secs) {
  */
 export function hasGitFSWorker() {
   return IS_IDE && Terra.app.gitfs instanceof GitFS;
-}
-
-/**
- * Check whether the browser has support for the Local Filesystem API.
- *
- * @returns {boolean} True if the browser supports the api.
- */
-export function hasLFSApi() {
-  return 'showOpenFilePicker' in window;
 }
 
 /**

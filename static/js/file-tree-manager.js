@@ -1,7 +1,6 @@
 import { DROP_AREA_INDICATOR_CLASS } from './ide/constants.js';
-import { getFileExtension, hasLFSApi, isObject, isValidFilename } from './helpers/shared.js'
+import { getFileExtension, isObject, isValidFilename } from './helpers/shared.js'
 import { createModal, hideModal, showModal } from './modal.js'
-import LFS from './lfs.js'
 import Terra from './terra.js'
 import LangWorker from './lang-worker.js';
 
@@ -84,7 +83,7 @@ class FileTreeManager {
    * @param {string|null} [parentId] - The parent folder id.
    */
   createFile = (parentId = null) => {
-    if (LFS.busy) return;
+    if (!Terra.app.hasLFSProjectLoaded || Terra.app.lfs.busy) return;
 
     // Create a new unique filename.
     let filename = 'Untitled';
@@ -141,7 +140,7 @@ class FileTreeManager {
    * @param {string|null} [parentId] - The parent id of the new folder.
    */
   createFolder = (parentId = null) => {
-    if (LFS.busy) return;
+    if (!Terra.app.hasLFSProjectLoaded || Terra.app.lfs.busy) return;
 
     // Create a new unique foldername.
     let foldername = 'Untitled';
@@ -337,7 +336,7 @@ class FileTreeManager {
         },
       };
 
-      if (!hasLFSApi() || (hasLFSApi() && !LFS.loaded)) {
+      if (!Terra.app.hasLFSProjectLoaded) {
         menu.downloadFolder = {
           name: 'Download',
           callback: () => {
@@ -350,7 +349,7 @@ class FileTreeManager {
     }
 
     if (isFile) {
-      if (!hasLFSApi() || (hasLFSApi() && !LFS.loaded)) {
+      if (!Terra.app.hasLFSProjectLoaded) {
         menu.downloadFile = {
           name: 'Download',
           callback: () => {

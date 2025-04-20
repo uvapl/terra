@@ -92,7 +92,9 @@ function closeActiveMenuBarMenu(event) {
   if (isInsideMenu && isNotNewFileOrFolderBtn && editorComponent && editorComponent.ready) {
     // Set Terra.v.blockLFSPolling to prevent file contents being reloaded
     Terra.v.blockLFSPolling = true;
-    editorComponent.editor.focus();
+    if (editorComponent.editor) {
+      editorComponent.editor.focus();
+    }
     Terra.v.blockLFSPolling = false;
   }
 
