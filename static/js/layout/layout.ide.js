@@ -141,6 +141,7 @@ export default class IDELayout extends Layout {
     $terminalContainer.find('.lm_header > .lm_controls').prepend(clearTermButtonHtml)
 
     this.addButtonEventListeners();
+    this.addActiveStates();
   };
 
   onStateChanged() {

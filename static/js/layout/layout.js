@@ -349,7 +349,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   addActiveStates() {
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');
-    const currentFontSize = localStorageManager.getLocalStorageItem('font-size') || BASE_FONT_SIZE;
+    const currentFontSize = localStorageManager.getLocalStorageItem('font-size', BASE_FONT_SIZE);
     $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
 
     // Add active state to theme dropdown.
