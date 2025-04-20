@@ -6,6 +6,12 @@
   padding: 10px;
   height: 100%;
   width: 100%;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Source Code Pro',
+  'source-code-pro', monospace;
+}
+
+.xterm-dom-renderer-owner-1 .xterm-rows {
+  font-family: inherit !important;
 }
 
 .terminal-component-container .lm_content {
