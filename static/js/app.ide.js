@@ -19,6 +19,12 @@ import {} from './helpers/shared.js';
 import GitFS from './gitfs.js';
 
 export default class IDEApp extends App {
+  /**
+   * Reference to the Git filesystem, if loaded.
+   * @type {GitFS}
+   */
+  gitfs = null;
+
   setupLayout() {
     this.layout = this.createLayout();
   }

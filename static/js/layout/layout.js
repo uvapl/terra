@@ -572,7 +572,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   getAllEditorFiles() {
     return Promise.all(
       this.getEditorComponents().map(async (editorComponent) => {
-        const containerState = editorComponent.getState()
+        const containerState = editorComponent.getState();
         let content = editorComponent.getContent();
         if (!content && hasLFSApi() && LFS.loaded) {
           content = await LFS.getFileContent(containerState.fileId);

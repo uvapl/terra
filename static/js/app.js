@@ -20,12 +20,6 @@ export default class App {
    */
   langWorker = null;
 
-  /**
-   * Reference to the Git filesystem, if loaded.
-   * @type {GitFS}
-   */
-  gitfs = null;
-
   constructor() {
     this._bindThis();
   }
