@@ -98,7 +98,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    */
   termStartupMessage = [
     'Click the "Run" button to execute code.',
-    'Click the "Clear terminal" button to clear this screen.'
+    'Click the trash bin icon to clear this terminal screen.'
   ];
 
   /**
@@ -438,7 +438,11 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @returns {string}
    */
   getClearTermButtonHtml() {
-    return '<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>'
+    return `
+      <button id="clear-term" class="button clear-term-btn" title="Clear terminal">
+        <img src="static/img/icons/trash-bin.png" alt="trash bin" />
+      </button>
+    `;
   }
 
   /**

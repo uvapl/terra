@@ -62,10 +62,6 @@ export default class IDELayout extends Layout {
     super(defaultLayoutConfig, { forceDefaultLayout });
   }
 
-  getClearTermButtonHtml() {
-    return '<button id="clear-term" class="button clear-term-btn">Clear terminal</button>';
-  }
-
   registerEditorCommands(editorComponent) {
     super.registerEditorCommands(editorComponent);
 
@@ -137,8 +133,9 @@ export default class IDELayout extends Layout {
 
     // Add run-code and clear-term to the DOM.
     const $terminalContainer = $('.terminal-component-container');
-    $terminalContainer.find('.lm_header').append(runCodeButtonHtml);
-    $terminalContainer.find('.lm_header > .lm_controls').prepend(clearTermButtonHtml)
+    $terminalContainer.find('.lm_header')
+      .append(clearTermButtonHtml)
+      .append(runCodeButtonHtml);
 
     this.addButtonEventListeners();
     this.addActiveStates();
