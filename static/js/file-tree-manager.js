@@ -1,7 +1,6 @@
 import { DROP_AREA_INDICATOR_CLASS } from './ide/constants.js';
 import { getFileExtension, hasLFSApi, isObject, isValidFilename } from './helpers/shared.js'
 import { createModal, hideModal, showModal } from './modal.js'
-import VFS from './vfs.js'
 import LFS from './lfs.js'
 import Terra from './terra.js'
 import LangWorker from './lang-worker.js';
@@ -89,12 +88,12 @@ class FileTreeManager {
 
     // Create a new unique filename.
     let filename = 'Untitled';
-    while (VFS.existsWhere({ parentId, name: filename })) {
+    while (Terra.app.vfs.existsWhere({ parentId, name: filename })) {
       filename = this._incrementString(filename);
     }
 
     // Create the new file in the filesystem.
-    const { id } = VFS.createFile({ name: filename, parentId });
+    const { id } = Terra.app.vfs.createFile({ name: filename, parentId });
 
     // Create the new node in the file tree.
     const newChildProps = {
@@ -146,12 +145,12 @@ class FileTreeManager {
 
     // Create a new unique foldername.
     let foldername = 'Untitled';
-    while (VFS.existsWhere({ parentId, name: foldername })) {
+    while (Terra.app.vfs.existsWhere({ parentId, name: foldername })) {
       foldername = this._incrementString(foldername);
     }
 
     // Create the new folder in the filesystem.
-    const { id } = VFS.createFolder({ name: foldername, parentId });
+    const { id } = Terra.app.vfs.createFolder({ name: foldername, parentId });
 
     // Create the new node in the file tree.
     const newChildProps = {
@@ -200,7 +199,7 @@ class FileTreeManager {
    * @returns {array} List with file tree objects.
    */
   createFromVFS = (parentId = null) => {
-    const folders = VFS.findFoldersWhere({ parentId }).map((folder) => ({
+    const folders = Terra.app.vfs.findFoldersWhere({ parentId }).map((folder) => ({
       key: folder.id,
       title: folder.name,
       folder: true,
@@ -211,7 +210,7 @@ class FileTreeManager {
       children: this.createFromVFS(folder.id),
     }));
 
-    const files = VFS.findFilesWhere({ parentId }).map((file) => ({
+    const files = Terra.app.vfs.findFilesWhere({ parentId }).map((file) => ({
       key: file.id,
       title: file.name,
       folder: false,
@@ -254,15 +253,15 @@ class FileTreeManager {
     $modal.find('.confirm-btn').click(() => {
       if (node.data.isFile) {
         this.closeFileTab(node.key);
-        VFS.deleteFile(node.key);
+        Terra.app.vfs.deleteFile(node.key);
       } else if (node.data.isFolder) {
         this.closeFilesInFolderRecursively(node.key);
       }
 
       // Delete from the VFS.
       const fn = node.data.isFolder
-        ? VFS.deleteFolder
-        : VFS.deleteFile;
+        ? Terra.app.vfs.deleteFolder
+        : Terra.app.vfs.deleteFile;
       fn(node.key);
 
       // Delete from the file tree.
@@ -297,12 +296,12 @@ class FileTreeManager {
    * @param {string} folderId - The folder ID to close all files from.
    */
   closeFilesInFolderRecursively = (folderId) => {
-    const files = VFS.findFilesWhere({ parentId: folderId });
+    const files = Terra.app.vfs.findFilesWhere({ parentId: folderId });
     for (const file of files) {
       this.closeFileTab(file.id);
     }
 
-    const folders = VFS.findFoldersWhere({ parentId: folderId });
+    const folders = Terra.app.vfs.findFoldersWhere({ parentId: folderId });
     for (const folder of folders) {
       this.closeFilesInFolderRecursively(folder.id);
     }
@@ -343,7 +342,7 @@ class FileTreeManager {
           name: 'Download',
           callback: () => {
             Terra.v.userClickedContextMenuItem = true;
-            VFS.downloadFolder(node.key);
+            Terra.app.vfs.downloadFolder(node.key);
             Terra.v.blockLFSPolling = false;
           },
         };
@@ -356,7 +355,7 @@ class FileTreeManager {
           name: 'Download',
           callback: () => {
             Terra.v.userClickedContextMenuItem = true;
-            VFS.downloadFile(node.key);
+            Terra.app.vfs.downloadFile(node.key);
             Terra.v.blockLFSPolling = false;
           },
         };
@@ -536,7 +535,7 @@ class FileTreeManager {
     // If so, trigger edit mode again and show error tooltip.
     if (!isValidFilename(name)) {
       errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
-    } else if (VFS.existsWhere({ parentId, name }, { ignoreIds: data.node.key })) {
+    } else if (Terra.app.vfs.existsWhere({ parentId, name }, { ignoreIds: data.node.key })) {
       errorMsg = `There already exists a "${name}" file or folder`;
     }
 
@@ -560,8 +559,8 @@ class FileTreeManager {
     }
 
     const fn = data.node.data.isFolder
-      ? VFS.updateFolder
-      : VFS.updateFile;
+      ? Terra.app.vfs.updateFolder
+      : Terra.app.vfs.updateFile;
 
     fn(data.node.key, { name });
 
@@ -655,7 +654,7 @@ class FileTreeManager {
     const containsDuplicate = (
       (
         targetNode.data.isFile &&
-        VFS.existsWhere({
+        Terra.app.vfs.existsWhere({
           parentId: targetNode.parent.title === 'root' ? null : targetNode.parent.key,
           name: sourceNode.title
         }, { ignoreIds: sourceNode.key })
@@ -663,7 +662,7 @@ class FileTreeManager {
         ||
       (
         targetNode.data.isFolder &&
-        VFS.existsWhere({
+        Terra.app.vfs.existsWhere({
           parentId: targetNode.key,
           name: sourceNode.title
         }, { ignoreIds: sourceNode.key })
@@ -741,8 +740,8 @@ class FileTreeManager {
 
     const id = sourceNode.key;
     const fn = sourceNode.data.isFolder
-      ? VFS.updateFolder
-      : VFS.updateFile;
+      ? Terra.app.vfs.updateFolder
+      : Terra.app.vfs.updateFile;
 
     fn(id, { parentId });
 
@@ -776,7 +775,7 @@ class FileTreeManager {
 
     tree.visit((node) => {
       if (node.data.isFolder && node.expanded) {
-        prevExpandedFolderPaths.push(VFS.getAbsoluteFolderPath(node.key));
+        prevExpandedFolderPaths.push(Terra.app.vfs.getAbsoluteFolderPath(node.key));
       }
     });
 
@@ -784,7 +783,7 @@ class FileTreeManager {
 
     // Expand all folder nodes again that were open (if they still exist).
     this.getInstance().visit((node) => {
-      if (node.data.isFolder && prevExpandedFolderPaths.includes(VFS.getAbsoluteFolderPath(node.key))) {
+      if (node.data.isFolder && prevExpandedFolderPaths.includes(Terra.app.vfs.getAbsoluteFolderPath(node.key))) {
         node.setExpanded(true, { noAnimation: true });
       }
     });

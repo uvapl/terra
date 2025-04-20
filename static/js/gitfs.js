@@ -1,5 +1,4 @@
 import { createModal, hideModal, showModal } from './modal.js';
-import VFS from './vfs.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
@@ -212,7 +211,7 @@ export default class GitFS {
         $('#file-tree .info-msg').remove();
         fileTreeManager.removeLocalStorageWarning();
 
-        VFS.importFromGit(payload.repoContents).then(() => {
+        Terra.app.vfs.importFromGit(payload.repoContents).then(() => {
           Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
           fileTreeManager.createFileTree();
         });
@@ -238,7 +237,7 @@ export default class GitFS {
       case 'move-folder-success':
         // Update all sha in the new files in the VFS.
         payload.updatedFiles.forEach((fileObj) => {
-          const file = VFS.findFileByPath(fileObj.filepath);
+          const file = Terra.app.vfs.findFileByPath(fileObj.filepath);
           file.sha = fileObj.sha;
         });
         break;
@@ -246,7 +245,7 @@ export default class GitFS {
       case 'move-file-success':
       case 'commit-success':
         // Update the file's sha in the VFS.
-        const file = VFS.findFileByPath(payload.filepath);
+        const file = Terra.app.vfs.findFileByPath(payload.filepath);
         file.sha = payload.sha;
         break;
     }

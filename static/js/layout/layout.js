@@ -15,7 +15,6 @@ import pluginManager from '../plugin-manager.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
 import { createModal, hideModal, showModal } from '../modal.js';
-import VFS from '../vfs.js';
 import LFS from '../lfs.js';
 import Terra from '../terra.js';
 
@@ -676,7 +675,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @returns {string} The HTML string with the folder options.
    */
   createFolderOptionsHtml(html = '', parentId = null, indent = '--') {
-    VFS.findFoldersWhere({ parentId }).forEach((folder, index) => {
+    Terra.app.vfs.findFoldersWhere({ parentId }).forEach((folder, index) => {
       html += `<option value="${folder.id}">${indent} ${folder.name}</option>`;
       html += createFolderOptionsHtml('', folder.id, indent + '--');
     });
@@ -702,7 +701,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     // auto-saved already by the editor component.
     const existingFileId = editorComponent.getState().fileId;
     if (existingFileId) {
-      const file = VFS.findFileById(existingFileId);
+      const file = Terra.app.vfs.findFileById(existingFileId);
       if (file) return;
     }
 
@@ -762,7 +761,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       let errorMsg;
       if (!isValidFilename(filename)) {
         errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
-      } else if (VFS.existsWhere({ parentId: folderId, name: filename })) {
+      } else if (Terra.app.vfs.existsWhere({ parentId: folderId, name: filename })) {
         errorMsg = `There already exists a "${filename}" file or folder`;
       }
 
@@ -793,7 +792,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       }
 
       // Create a new file in the VFS and then refresh the file tree.
-      const { id: nodeId } = VFS.createFile({
+      const { id: nodeId } = Terra.app.vfs.createFile({
         parentId: folderId,
         name: filename,
         content: editorComponent.getContent(),

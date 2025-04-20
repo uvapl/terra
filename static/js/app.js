@@ -2,7 +2,7 @@ import { IS_IDE } from './constants.js';
 import { getFileExtension, hasLFSApi, uuidv4 } from './helpers/shared.js'
 import LangWorker from './lang-worker.js';
 import Terra from './terra.js';
-import VFS from './vfs.js';
+import VirtualFileSystem from './vfs.js';
 
 /**
  * Base class that is extended for each of the apps.
@@ -20,8 +20,16 @@ export default class App {
    */
   langWorker = null;
 
+  /**
+   * Reference to the Virtual File System (VFS) instance.
+   * @type {VirtualFileSystem}
+   */
+  vfs = null;
+
   constructor() {
     this._bindThis();
+
+    this.vfs = new VirtualFileSystem();
   }
 
   /**
@@ -125,7 +133,7 @@ export default class App {
   onEditorChange(editorComponent) {
     const { fileId } = editorComponent.getState();
     if (fileId) {
-      VFS.updateFile(fileId, {
+      this.vfs.updateFile(fileId, {
         content: editorComponent.getContent(),
       });
     }
@@ -148,7 +156,7 @@ export default class App {
     // not have duplicate filenames.
     if (!IS_IDE) {
       const filename = editorComponent.getFilename();
-      const file = VFS.findFileWhere({ name: filename });
+      const file = this.vfs.findFileWhere({ name: filename });
       const { fileId } = editorComponent.getState();
       if (!fileId || (file && fileId !== file.id)) {
         editorComponent.extendState({ fileId: file.id });
@@ -182,7 +190,7 @@ export default class App {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   setEditorFileContent(editorComponent) {
-    const file = VFS.findFileById(editorComponent.getState().fileId);
+    const file = this.vfs.findFileById(editorComponent.getState().fileId);
     if (!file) return;
 
     editorComponent.setContent(file.content);
@@ -239,7 +247,7 @@ export default class App {
 
     if (fileId) {
       // Run given file id.
-      const file = VFS.findFileById(fileId);
+      const file = this.vfs.findFileById(fileId);
       filename = file.name;
       files = [file];
 

@@ -7,7 +7,6 @@ import {
   hasLFSApi,
   getRepoInfo,
 } from './helpers/shared.js';
-import VFS from './vfs.js';
 import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
 import localStorageManager from './local-storage-manager.js';
@@ -25,7 +24,14 @@ export default class IDEApp extends App {
    */
   gitfs = null;
 
+  /**
+   * Reference to the Local File System (LFS) instance.
+   * @type {LocalFileSystem}
+   */
+  lfs = null;
+
   setupLayout() {
+    // this.lfs = new LocalFileSystem();
     this.layout = this.createLayout();
   }
 
@@ -102,7 +108,7 @@ export default class IDEApp extends App {
    * @param {boolean} clearUndoStack - Whether to clear the undo stack or not.
    */
   setEditorFileContent(editorComponent, clearUndoStack = false) {
-    const file = VFS.findFileById(editorComponent.getState().fileId);
+    const file = this.vfs.findFileById(editorComponent.getState().fileId);
     if (!file) return;
 
     if (hasLFSApi() && LFS.loaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
@@ -142,7 +148,7 @@ export default class IDEApp extends App {
    * @returns {array} The arguments for the current file.
    */
   getCurrentFileArgs(fileId) {
-    const filepath = VFS.getAbsoluteFilePath(fileId);
+    const filepath = this.vfs.getAbsoluteFilePath(fileId);
     const fileArgsPlugin = pluginManager.getPlugin('file-args').getState('fileargs');
     const fileArgs = fileArgsPlugin[filepath];
 

@@ -4,7 +4,6 @@
 import { MODAL_ANIM_DURATION } from '../constants.js';
 import { isMac } from '../helpers/shared.js';
 import { createModal, hideModal, showModal } from '../modal.js';
-import VFS from '../vfs.js';
 import pluginManager from '../plugin-manager.js';
 import Terra from '../terra.js';
 import localStorageManager from '../local-storage-manager.js';
@@ -48,12 +47,12 @@ export function renderGitRepoBranches(branches) {
     localStorageManager.setLocalStorageItem('git-branch', newBranch);
     $element.addClass('active').siblings().removeClass('active');
 
-    VFS._git('setRepoBranch', newBranch);
+    Terra.app.vfs._git('setRepoBranch', newBranch);
 
     fileTreeManager.destroyTree();
 
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
-    VFS._git('clone');
+    Terra.app.vfs._git('clone');
     Terra.app.layout.closeAllFiles();
   });
 }
@@ -196,7 +195,7 @@ Menubar.openNewFile = () => {
 };
 
 Menubar.openLFSFolder = () => {
-  VFS._lfs('openFolderPicker').then(() => {
+  Terra.app.vfs._lfs('openFolderPicker').then(() => {
     $('#file-tree .info-msg').remove();
     $('#menu-item--close-folder').removeClass('disabled');
   });
@@ -205,7 +204,7 @@ Menubar.openLFSFolder = () => {
 Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-folder').hasClass('disabled')) return;
 
-  VFS._lfs('closeFolder');
+  Terra.app.vfs._lfs('closeFolder');
   Terra.app.layout.closeAllFiles();
   closeActiveMenuBarMenu(event);
 };
@@ -401,7 +400,7 @@ Menubar.connectRepo = () => {
       fileTreeManager.showLocalStorageWarning();
 
       // Clear all files after disconnecting.
-      VFS.clear();
+      Terra.app.vfs.clear();
       fileTreeManager.createFileTree();
       fileTreeManager.setTitle('local storage');
       $('#file-tree .info-msg').remove();
@@ -417,7 +416,7 @@ Menubar.connectRepo = () => {
     // 1) The user is connected to a repo and wants to connect to another one,
     //    so we are certain that there are files in the VFS.
     // 2) The user is not connected to a repo, but there are files in the VFS.
-    if (!currentRepoLink && !VFS.isEmpty()) {
+    if (!currentRepoLink && !Terra.app.vfs.isEmpty()) {
       // Create a new modal after the previous one is hidden.
       setTimeout(() => {
         const $confirmModal = createModal({

@@ -19,7 +19,6 @@ import LangWorker from './lang-worker.js';
 import ExamLayout from './layout/layout.exam.js';
 import localStorageManager from './local-storage-manager.js';
 import Terra from './terra.js';
-import VFS from './vfs.js';
 
 export default class ExamApp extends App {
   /**
@@ -51,11 +50,11 @@ export default class ExamApp extends App {
         // Create the content objects that represent each tab in the editor.
         const content = this.generateConfigContent(this.config.tabs, fontSize);
 
-        const hasPersistedState = Object.keys(VFS.files).length > 0;
+        const hasPersistedState = Object.keys(Terra.app.vfs.files).length > 0;
         if (!hasPersistedState) {
           // Create the files inside the virtual file system.
           content.forEach((file) => {
-            VFS.createFile({
+            Terra.app.vfs.createFile({
               id: file.componentState.fileId,
               name: file.title,
               content: file.componentState.value,
@@ -210,7 +209,7 @@ export default class ExamApp extends App {
         reject('Invalid config file');
       } else {
         this.config = config;
-        VFS.loadFromLocalStorage();
+        Terra.app.vfs.loadFromLocalStorage();
         resolve();
       }
     });
@@ -450,7 +449,7 @@ export default class ExamApp extends App {
     this.layout.getEditorComponents().forEach((editorComponent) => {
       const filename = editorComponent.getFilename();
       const { fileId } = editorComponent.getState();
-      const file = VFS.findFileById(fileId);
+      const file = Terra.app.vfs.findFileById(fileId);
       const blob = new Blob([file.content], { type: 'text/plain' });
       formData.append(`files[${filename}]`, blob, filename);
     });

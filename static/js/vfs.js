@@ -11,12 +11,11 @@ import {
   uuidv4
 } from './helpers/shared.js';
 import { IS_IDE } from './constants.js';
-import VFS from './vfs.js';
 import LFS from './lfs.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 
-class VirtualFileSystem {
+export default class VirtualFileSystem {
   /**
    * Contains all the files in the virtual filesystem.
    * The key is the file id and the value is the file object.
@@ -651,7 +650,7 @@ class VirtualFileSystem {
     Terra.app.layout.getEditorComponents().forEach((editorComponent) => {
       const { fileId } = editorComponent.getState();
       if (fileId) {
-        const filepath = VFS.getAbsoluteFilePath(fileId);
+        const filepath = this.getAbsoluteFilePath(fileId);
         tabs[filepath] = editorComponent;
       }
     });
@@ -679,7 +678,7 @@ class VirtualFileSystem {
         const path = fileOrFolder.path.split('/')
         const name = path.pop();
 
-        const parentId = path.length > 0 ? VFS.findFolderByPath(path.join('/')).id : null;
+        const parentId = path.length > 0 ? this.findFolderByPath(path.join('/')).id : null;
 
         if (fileOrFolder.type === 'tree') {
           this.createFolder({ name, parentId, sha });
@@ -734,5 +733,3 @@ class VirtualFileSystem {
     return paths;
   }
 }
-
-export default new VirtualFileSystem();

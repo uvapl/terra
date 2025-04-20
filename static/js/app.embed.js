@@ -6,7 +6,6 @@ import {
   parseQueryParams,
   removeIndent,
 } from './helpers/shared.js';
-import VFS from './vfs.js';
 import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
 import localStorageManager from './local-storage-manager.js';
@@ -27,7 +26,7 @@ export default class EmbedApp extends App {
     localStorageManager.updateLocalStoragePrefix(currentStorageKey);
 
     // Create the tab in the virtual filesystem.
-    VFS.createFile({ name: queryParams.filename });
+    this.vfs.createFile({ name: queryParams.filename });
 
     // Create tabs with the filename as key and empty string as the content.
     const tabs = {}
@@ -66,7 +65,7 @@ export default class EmbedApp extends App {
       const { fileId } = editorComponent.getState();
       const content = removeIndent(event.data);
       if (content) {
-        VFS.updateFile(fileId, { content });
+        this.vfs.updateFile(fileId, { content });
         editorComponent.setContent(content);
       }
     });

@@ -4,7 +4,6 @@
  */
 
 import Terra from '../../js/terra.js';
-import VFS from '../../js/vfs.js';
 import { createModal, showModal } from '../../js/modal.js';
 import { TerraPlugin } from '../../js/plugin-manager.js';
 
@@ -39,7 +38,7 @@ export default class EditorUnlinkKiller extends TerraPlugin {
   }
 
   isValidFileId(fileId) {
-    return !!VFS.findFileById(fileId);
+    return !!Terra.app.vfs.findFileById(fileId);
   }
 
   disableIDE(errorMessage) {
