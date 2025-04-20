@@ -31,7 +31,7 @@ export default class IDEApp extends App {
     super();
 
     if (this.browserHasLFSApi()) {
-      this.lfs = new LocalFileSystem();
+      this.lfs = new LocalFileSystem(this.vfs);
     }
   }
 
