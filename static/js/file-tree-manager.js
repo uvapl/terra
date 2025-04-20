@@ -83,7 +83,7 @@ class FileTreeManager {
    * @param {string|null} [parentId] - The parent folder id.
    */
   createFile = (parentId = null) => {
-    if (!Terra.app.hasLFSProjectLoaded || Terra.app.lfs.busy) return;
+    if (Terra.app.hasLFSProjectLoaded && Terra.app.lfs.busy) return;
 
     // Create a new unique filename.
     let filename = 'Untitled';
@@ -140,7 +140,7 @@ class FileTreeManager {
    * @param {string|null} [parentId] - The parent id of the new folder.
    */
   createFolder = (parentId = null) => {
-    if (!Terra.app.hasLFSProjectLoaded || Terra.app.lfs.busy) return;
+    if (Terra.app.hasLFSProjectLoaded && Terra.app.lfs.busy) return;
 
     // Create a new unique foldername.
     let foldername = 'Untitled';
