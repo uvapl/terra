@@ -217,4 +217,29 @@ export default class IDEApp extends App {
       pluginManager.triggerEvent('onStorageChange', 'git');
     }
   }
+
+  /**
+   * Save the current file. Another part in the codebase is responsible for
+   * auto-saving the file. This function will be used mainly for any file that
+   * doesn't exist in th vfs yet. It will prompt the user with a modal for a
+   * filename and in which folder to save the file. Finally, the file will be
+   * created in the file-tree which automatically creates the file in the vfs.
+   *
+   * This function gets triggered on each 'save' keystroke, i.e. <cmd/ctrl + s>.
+   */
+  saveFile() {
+    const editorComponent = this.layout.getActiveEditor();
+
+    if (!editorComponent) return;
+
+    // If the file exists in the vfs, then return, because the contents will be
+    // auto-saved already by the editor component.
+    const existingFileId = editorComponent.getState().fileId;
+    if (existingFileId) {
+      const file = this.vfs.findFileById(existingFileId);
+      if (file) return;
+    }
+
+    this.layout.promptSaveFile(editorComponent);
+  }
 }
