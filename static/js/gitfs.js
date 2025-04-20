@@ -9,6 +9,12 @@ import fileTreeManager from './file-tree-manager.js';
  */
 export default class GitFS {
   /**
+   * Local reference to the VFS instance.
+   * @type {VirtualFileSystem}
+   */
+  vfs = null;
+
+  /**
    * The repository link that the user is connected to.
    * @type {string}
    */
@@ -26,7 +32,8 @@ export default class GitFS {
    */
   worker = null;
 
-  constructor(repoLink) {
+  constructor(vfs, repoLink) {
+    this.vfs = vfs;
     this._repoLink = repoLink;
   }
 
@@ -211,7 +218,7 @@ export default class GitFS {
         $('#file-tree .info-msg').remove();
         fileTreeManager.removeLocalStorageWarning();
 
-        Terra.app.vfs.importFromGit(payload.repoContents).then(() => {
+        this.vfs.importFromGit(payload.repoContents).then(() => {
           Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
           fileTreeManager.createFileTree();
         });
@@ -237,7 +244,7 @@ export default class GitFS {
       case 'move-folder-success':
         // Update all sha in the new files in the VFS.
         payload.updatedFiles.forEach((fileObj) => {
-          const file = Terra.app.vfs.findFileByPath(fileObj.filepath);
+          const file = this.vfs.findFileByPath(fileObj.filepath);
           file.sha = fileObj.sha;
         });
         break;
@@ -245,7 +252,7 @@ export default class GitFS {
       case 'move-file-success':
       case 'commit-success':
         // Update the file's sha in the VFS.
-        const file = Terra.app.vfs.findFileByPath(payload.filepath);
+        const file = this.vfs.findFileByPath(payload.filepath);
         file.sha = payload.sha;
         break;
     }

@@ -206,7 +206,7 @@ export default class IDEApp extends App {
     if (accessToken && repoLink) {
       Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
 
-      const gitfs = new GitFS(repoLink);
+      const gitfs = new GitFS(this.vfs, repoLink);
       this.gitfs = gitfs;
       gitfs._createWorker(accessToken);
 
