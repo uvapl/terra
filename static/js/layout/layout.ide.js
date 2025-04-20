@@ -310,12 +310,11 @@ export default class IDELayout extends Layout {
 
   /**
    * Open a file in the editor, otherwise switch to the tab of the filename.
-   * Next, spawn a new worker based on the file extension.
    *
    * @param {string} id - The file id. Leave empty to create new file.
    * @param {string} filename - The name of the file to open.
    */
-  openFile(id, filename) {
+  addFileTab(id, filename) {
     let editorComponents = this.getEditorComponents();
 
     // Try to find the editor component with the given filename or id.
@@ -365,8 +364,6 @@ export default class IDELayout extends Layout {
         }
       }
     }
-
-    const proglang = getFileExtension(filename);
-    Terra.app.createLangWorker(proglang);
   }
+
 }

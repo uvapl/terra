@@ -242,4 +242,18 @@ export default class IDEApp extends App {
 
     this.layout.promptSaveFile(editorComponent);
   }
+
+  /**
+   * Open a file in the editor and if necessary, spawn a new worker based on the
+   * file extension.
+   *
+   * @param {string} id - The file id. Leave empty to create new file.
+   * @param {string} filename - The name of the file to open.
+   */
+  openFile(id, filename) {
+    this.layout.addFileTab(id, filename);
+
+    const proglang = getFileExtension(filename);
+    this.createLangWorker(proglang);
+  }
 }

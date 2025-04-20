@@ -605,7 +605,7 @@ class FileTreeManager {
   _onClickNodeCallback = (event, data) => {
     // Prevent default behavior for folders.
     if (data.node.data.isFile) {
-      Terra.app.layout.openFile(data.node.key, data.node.title);
+      Terra.app.openFile(data.node.key, data.node.title);
     } else if (data.node.data.isFolder) {
       clearTimeout(Terra.v.fileTreeToggleTimeout);
 
