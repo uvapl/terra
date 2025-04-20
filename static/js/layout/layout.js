@@ -191,6 +191,17 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   /**
+   * Get all file IDs from the open tabs in the layout.
+   *
+   * @returns {string[]} List of file IDs.
+   */
+  getAllOpenTabFileIds() {
+    return this.getEditorComponents().map(
+      (editorComponent) => editorComponent.getState().fileId
+    );
+  }
+
+  /**
    * Callback function when a new tab has been created in the layout.
    *
    * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
@@ -552,29 +563,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
         .removeClass('primary-btn')
         .addClass('danger-btn');
     }, seconds(1));
-  }
-
-  /**
-   * Gathers all files from the editor and returns them as an array of objects.
-   *
-   * @returns {Promise<array>} List of objects, each containing the filename and
-   * content of the corresponding editor tab.
-   */
-  getAllEditorFiles() {
-    return Promise.all(
-      this.getEditorComponents().map(async (editorComponent) => {
-        const containerState = editorComponent.getState();
-        let content = editorComponent.getContent();
-        if (!content && Terra.app.hasLFSProjectLoaded) {
-          content = await Terra.app.lfs.getFileContent(containerState.fileId);
-        }
-
-        return {
-          name: editorComponent.getFilename(),
-          content,
-        }
-      })
-    );
   }
 
   /**

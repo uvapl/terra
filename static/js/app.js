@@ -259,7 +259,7 @@ export default class App {
       const editorComponent = this.layout.getActiveEditor();
       fileId = editorComponent.getState().fileId;
       filename = editorComponent.getFilename();
-      files = await this.layout.getAllEditorFiles();
+      files = await this.getAllEditorFiles();
     }
 
     // Create a new worker instance if needed.
@@ -310,7 +310,7 @@ export default class App {
     $button.prop('disabled', true);
 
     const activeTabName = this.layout.getActiveEditor().getFilename();
-    const files = await this.layout.getAllEditorFiles();
+    const files = await this.getAllEditorFiles();
 
     if (this.langWorker && this.langWorker.isReady) {
       this.langWorker.runButtonCommand(selector, activeTabName, cmd, files);
@@ -339,5 +339,25 @@ export default class App {
         this.langWorker.restart();
       }
     }
+  }
+
+  /**
+   * Gathers all files from the editor and returns them as an array of objects.
+   *
+   * @returns {Promise<array>} List of objects, each containing the filename and
+   * content of the corresponding editor tab.
+   */
+  getAllEditorFiles() {
+    return Promise.all(
+      this.layout.getAllOpenTabFileIds().map(async (fileId) => {
+        const { name, content } = this.vfs.findFileById(fileId);
+
+        if (!content && this.hasLFSProjectLoaded) {
+          content = await this.lfs.getFileContent(fileId);
+        }
+
+        return { name, content };
+      })
+    );
   }
 }
