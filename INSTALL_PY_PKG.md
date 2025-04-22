@@ -120,11 +120,12 @@ package that you want to install.
 Let's say you want to import `mypy`, then you should do the following:
 
 - Locally `cd` into `./static/wasm/py/`
+- Run `python3 -m venv env && source env/bin/activate` to create a virtual env to prevent your local python packages conflicting with the package you're trying to install
 - Run `unzip custom_stdlib.zip -d stdlib && cd stdlib` to extract the files into a `stdlib` directory
 - Run `pip3 install -t . mypy` to install `mypy` and all its dependencies in the current directory
 - Run `rm -rf *.so __pycache__ **/__pycache__ bin` to remove unnecessary files
 - Run `rm ../custom_stdlib.zip && zip -vr ../custom_stdlib.zip .` to create a new zip
-- Run `cd .. && rm -rf stdlib` to remove the folder we just created
+- Run `cd .. && deactivate && rm -rf stdlib env` to remove the folder we just created
 
 Continue to [Running it in the browser](#running-it-in-the-browser)
 
