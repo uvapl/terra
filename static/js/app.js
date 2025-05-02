@@ -249,11 +249,10 @@ export default class App {
       // Run given file id.
       const file = this.vfs.findFileById(fileId);
       filename = file.name;
-      files = [file];
-
-      if (!file.content && this.hasLFSProjectLoaded) {
-        const content = await LFS.getFileContent(file.id);
-        files = [{ ...file, content }];
+      files = await this.getAllEditorFiles();
+      if (!files.some((file) => file.name === filename)) {
+        fileInfo = await this.getFileInfo(file.id);
+        files.append(fileInfo);
       }
     } else {
       const editorComponent = this.layout.getActiveEditor();
@@ -342,6 +341,23 @@ export default class App {
   }
 
   /**
+   * Gather the editor file content based on the fileId.
+   *
+   * @async
+   * @param {string} fileId - The ID of the file.
+   * @returns {Promise<object>} Object containing the filename and content.
+   */
+  async getFileInfo(fileId) {
+    const { name, content } = this.vfs.findFileById(fileId);
+
+    if (this.hasLFSProjectLoaded && !content) {
+      content = await this.lfs.getFileContent(fileId);
+    }
+
+    return { name, content };
+  }
+
+  /**
    * Gathers all files from the editor and returns them as an array of objects.
    *
    * @returns {Promise<array>} List of objects, each containing the filename and
@@ -349,15 +365,7 @@ export default class App {
    */
   getAllEditorFiles() {
     return Promise.all(
-      this.layout.getAllOpenTabFileIds().map(async (fileId) => {
-        const { name, content } = this.vfs.findFileById(fileId);
-
-        if (this.hasLFSProjectLoaded && !content) {
-          content = await this.lfs.getFileContent(fileId);
-        }
-
-        return { name, content };
-      })
+      this.layout.getAllOpenTabFileIds().map(this.getFileInfo)
     );
   }
 }
