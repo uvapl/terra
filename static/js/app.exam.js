@@ -65,6 +65,7 @@ export default class ExamApp extends App {
         // Create the layout object.
         const layout = this.createLayout(content, fontSize, {
           proglang,
+          hiddenFiles: this.config.hidden_tabs,
           buttonConfig: this.config.buttons,
           autocomplete: this.config.autocomplete,
           forceDefaultLayout: !hasPersistedState,

@@ -261,6 +261,15 @@ export default class App {
       files = await this.getAllEditorFiles();
     }
 
+    const hiddenFileKeys = Object.keys(this.layout.hiddenFiles);
+    if (hiddenFileKeys.length > 0) {
+      const hiddenFiles = hiddenFileKeys.map((filename) => ({
+        name: filename,
+        content: this.layout.hiddenFiles[filename],
+      }));
+      files = files.concat(hiddenFiles);
+    }
+
     // Create a new worker instance if needed.
     const proglang = getFileExtension(filename);
     this.createLangWorker(proglang);

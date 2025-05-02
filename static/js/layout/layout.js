@@ -108,6 +108,13 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   tabs = [];
 
   /**
+   * Reference to all hidden files which will *never* be shown in the UI, but
+   * will be sent to the workers and written to worker's filesystem.
+   * @type {object<string, string>}
+   */
+  hiddenFiles = {};
+
+  /**
    * Reference to the current active editor instance in the layout.
    * @type {EditorComponent}
    */
@@ -125,6 +132,10 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
     this.proglang = options.proglang;
     this.vertical = options.vertical;
+
+    if (isObject(options.hiddenFiles)) {
+      this.hiddenFiles = options.hiddenFiles;
+    }
 
     if (isObject(options.buttonConfig)) {
       this.buttonConfig = options.buttonConfig;
