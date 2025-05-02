@@ -12,26 +12,6 @@ class FileTreeManager {
   tree = null;
 
   /**
-   * Increment the number in a string with the pattern `XXXXXX (N)`.
-   *
-   * @example _this._incrementString('Untitled')     -> 'Untitled (1)'
-   * @example _this._incrementString('Untitled (1)') -> 'Untitled (2)'
-   *
-   * @param {string} string - The string to update.
-   * @returns {string} The updated string containing the number.
-   */
-  _incrementString = (string) => {
-    const match = /\((\d+)\)$/g.exec(string);
-
-    if (match) {
-      const num = parseInt(match[1]) + 1;
-      return string.replace(/\d+/, num);
-    }
-
-    return `${string} (1)`;
-  }
-
-  /**
    * Set the file tree title.
    *
    * @param {string} title - The title to set.
@@ -85,18 +65,12 @@ class FileTreeManager {
   createFile = (parentId = null) => {
     if (Terra.app.hasLFSProjectLoaded && Terra.app.lfs.busy) return;
 
-    // Create a new unique filename.
-    let filename = 'Untitled';
-    while (Terra.app.vfs.existsWhere({ parentId, name: filename })) {
-      filename = this._incrementString(filename);
-    }
-
     // Create the new file in the filesystem.
-    const { id } = Terra.app.vfs.createFile({ name: filename, parentId });
+    const { id, name } = Terra.app.vfs.createFile({ parentId });
 
     // Create the new node in the file tree.
     const newChildProps = {
-      title: filename,
+      title: name,
       folder: false,
       key: id,
       data: {
@@ -142,18 +116,12 @@ class FileTreeManager {
   createFolder = (parentId = null) => {
     if (Terra.app.hasLFSProjectLoaded && Terra.app.lfs.busy) return;
 
-    // Create a new unique foldername.
-    let foldername = 'Untitled';
-    while (Terra.app.vfs.existsWhere({ parentId, name: foldername })) {
-      foldername = this._incrementString(foldername);
-    }
-
     // Create the new folder in the filesystem.
-    const { id } = Terra.app.vfs.createFolder({ name: foldername, parentId });
+    const { id, name } = Terra.app.vfs.createFolder({ parentId });
 
     // Create the new node in the file tree.
     const newChildProps = {
-      title: foldername,
+      title: name,
       folder: true,
       key: id,
       data: {
@@ -251,7 +219,7 @@ class FileTreeManager {
 
     $modal.find('.confirm-btn').click(() => {
       if (node.data.isFile) {
-        this.closeFileTab(node.key);
+        Terra.app.layout.closeFile(node.key);
         Terra.app.vfs.deleteFile(node.key);
       } else if (node.data.isFolder) {
         this.closeFilesInFolderRecursively(node.key);
@@ -276,20 +244,6 @@ class FileTreeManager {
   }
 
   /**
-   * Close a single file tab by its fileId.
-   *
-   * @param {string} fileId - The file ID to close.
-   */
-  closeFileTab = (fileId) => {
-    const editorComponent = Terra.app.layout.getEditorComponents()
-      .find((editorComponent) => editorComponent.getState().fileId === fileId);
-
-    if (editorComponent) {
-      editorComponent.close();
-    }
-  }
-
-  /**
    * Close all files inside a folder, including nested files in subfolders.
    *
    * @param {string} folderId - The folder ID to close all files from.
@@ -297,7 +251,7 @@ class FileTreeManager {
   closeFilesInFolderRecursively = (folderId) => {
     const files = Terra.app.vfs.findFilesWhere({ parentId: folderId });
     for (const file of files) {
-      this.closeFileTab(file.id);
+      Terra.app.layout.closeFile(file.id);
     }
 
     const folders = Terra.app.vfs.findFoldersWhere({ parentId: folderId });

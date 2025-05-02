@@ -76,6 +76,26 @@ export default class VirtualFileSystem {
   }
 
   /**
+   * Increment the number in a string with the pattern `XXXXXX (N)`.
+   *
+   * @example this._incrementString('Untitled')     -> 'Untitled (1)'
+   * @example this._incrementString('Untitled (1)') -> 'Untitled (2)'
+   *
+   * @param {string} string - The string to update.
+   * @returns {string} The updated string containing the number.
+   */
+  _incrementString = (string) => {
+    const match = /\((\d+)\)$/g.exec(string);
+
+    if (match) {
+      const num = parseInt(match[1]) + 1;
+      return string.replace(/\d+/, num);
+    }
+
+    return `${string} (1)`;
+  }
+
+  /**
    * Register a timeout handler based on an ID.
    *
    * @param {string} id - Some unique identifier, like uuidv4.
@@ -356,6 +376,11 @@ export default class VirtualFileSystem {
       ...fileObj,
     };
 
+    // Ensure a unique file name.
+    while (this.existsWhere({ parentId: newFile.parentId, name: newFile.name })) {
+      newFile.name = this._incrementString(newFile.name);
+    }
+
     this.files[newFile.id] = newFile;
 
     if (userInvoked) {
@@ -383,6 +408,11 @@ export default class VirtualFileSystem {
       updatedAt: new Date().toISOString(),
       ...folderObj,
     };
+
+    // Ensure the folder name is unique.
+    while (this.existsWhere({ parentId: newFolder.parentId, name: newFolder.name })) {
+      newFolder.name = this._incrementString(newFolder.name);
+    }
 
     this.folders[newFolder.id] = newFolder;
 
