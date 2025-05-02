@@ -284,6 +284,12 @@ export default class App {
     }
   }
 
+  handleControlC(event) {
+    if (event.key === 'c' && event.ctrlKey && this.langWorker && this.langWorker.isRunningCode) {
+      this.langWorker.restart(true);
+    }
+  }
+
   /**
    * Get the arguments for the current file.
    * This is executed just before the user runs the code from an editor.

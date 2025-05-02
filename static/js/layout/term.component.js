@@ -1,5 +1,6 @@
 import { BASE_FONT_SIZE } from '../constants.js';
 import { isObject } from '../helpers/shared.js';
+import Terra from '../terra.js';
 
 /**
  * Terminal component for GoldenLayout.
@@ -62,6 +63,15 @@ export default class TerminalComponent {
   }
 
   /**
+   * Write a line to the terminal.
+   *
+   * @param {string} msg - The message to write.
+   */
+  writeln = (msg) => {
+    this.term.writeln(msg);
+  }
+
+  /**
    * Clear the terminal screen.
    */
   clear = () => {
@@ -105,6 +115,8 @@ export default class TerminalComponent {
     this.term.loadAddon(this.fitAddon);
     this.term.open(this.container.getElement()[0]);
     this.fitAddon.fit();
+
+    this.term._core._customKeyEventHandler = Terra.app.handleControlC;
 
     // Trigger a single resize after the terminal has rendered to make sure it
     // fits the whole parent width and doesn't leave any gaps near the edges.

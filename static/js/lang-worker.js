@@ -107,7 +107,6 @@ export default class LangWorker {
     // once it has been loaded.
     $('#run-code').prop('disabled', true);
 
-    Terra.app.layout.term.hideTermCursor();
     Terra.app.layout.term.clearTermWriteBuffer();
 
     if (showTerminateMsg) {
@@ -116,6 +115,8 @@ export default class LangWorker {
 
     // Dispose any active user input.
     Terra.app.layout.term.disposeUserInput();
+
+    Terra.app.layout.term.hideTermCursor();
   }
 
   /**
