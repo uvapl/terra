@@ -352,7 +352,7 @@ export default class App {
       this.layout.getAllOpenTabFileIds().map(async (fileId) => {
         const { name, content } = this.vfs.findFileById(fileId);
 
-        if (!content && this.hasLFSProjectLoaded) {
+        if (this.hasLFSProjectLoaded && !content) {
           content = await this.lfs.getFileContent(fileId);
         }
 
