@@ -218,7 +218,7 @@ export default class GitFS {
         $('#file-tree .info-msg').remove();
         fileTreeManager.removeLocalStorageWarning();
 
-        this.vfs.importFromGit(payload.repoContents).then(() => {
+        this.importToVFS(payload.repoContents).then(() => {
           Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
           fileTreeManager.createFileTree();
         });
@@ -256,5 +256,75 @@ export default class GitFS {
         file.sha = payload.sha;
         break;
     }
+  }
+
+  /**
+   * Import files and folders from a git repository into the virtual filesystem.
+   *
+   * Each entry in the repoContents has a path property which contains the whole
+   * relative path from the root of the repository.
+   *
+   * @param {array} repoContents - List of files from the repository.
+   * @async
+   */
+  importToVFS = async (repoContents) => {
+    // Preserve all currently open tabs after refreshing.
+    // We first obtain the current filepaths before clearing the VFS.
+    const tabs = {};
+    Terra.app.layout.getEditorComponents().forEach((editorComponent) => {
+      const { fileId } = editorComponent.getState();
+      if (fileId) {
+        const filepath = this.vfs.getAbsoluteFilePath(fileId);
+        tabs[filepath] = editorComponent;
+      }
+    });
+
+    // Remove all files from the virtual filesystem.
+    this.vfs.clear();
+
+    // First create all root files.
+    repoContents
+      .filter((fileOrFolder) => fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/'))
+      .forEach(async (fileOrFolder) => {
+        this.vfs.createFile({
+          name: fileOrFolder.path.split('/').pop(),
+          sha: fileOrFolder.sha,
+          isNew: false,
+          content: fileOrFolder.content,
+        }, false);
+      });
+
+    // Then create all root folders and their nested files.
+    repoContents
+      .filter((fileOrFolder) => !(fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/')))
+      .forEach((fileOrFolder) => {
+        const { sha } = fileOrFolder;
+        const path = fileOrFolder.path.split('/')
+        const name = path.pop();
+
+        const parentId = path.length > 0 ? this.vfs.findFolderByPath(path.join('/')).id : null;
+
+        if (fileOrFolder.type === 'tree') {
+          this.vfs.createFolder({ name, parentId, sha });
+        } else if (fileOrFolder.type === 'blob') {
+          this.vfs.createFile({
+            name,
+            parentId,
+            sha,
+            content: fileOrFolder.content,
+          }, false);
+        }
+      });
+
+    // Finally, we sync the current tabs with their new file IDs.
+    for (const [filepath, editorComponent] of Object.entries(tabs)) {
+      const file = this.vfs.findFileByPath(filepath);
+      if (file) {
+        editorComponent.extendState({ fileId: file.id });
+        Terra.app.layout.emitToAllComponents('vfsChanged');
+      }
+    }
+
+    this.vfs.saveState();
   }
 }

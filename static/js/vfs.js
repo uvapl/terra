@@ -404,6 +404,8 @@ export default class VirtualFileSystem {
    */
   updateFile = async (id, obj, userInvoked = true) => {
     const file = this.findFileById(id);
+    if (!file) return;
+
     const oldPath = this.getAbsoluteFilePath(file.id);
 
     // These extra checks is needed because in the UI, the user can trigger a
@@ -412,48 +414,46 @@ export default class VirtualFileSystem {
     const isMoved = typeof obj.parentId !== 'undefined' && file.parentId !== obj.parentId;
     const isContentChanged = typeof obj.content === 'string' && file.content !== obj.content;
 
-    if (file) {
-      // Move the file to the new location before updating the file object,
-      // because the LFS.moveFile needs to use the absolute paths from VFS.
-      if (isRenamed || isMoved) {
-        await this._lfs(
-          'moveFile',
-          file.id,
-          obj.name || file.name,
-          typeof obj.parentId !== 'undefined' ? obj.parentId : file.parentId,
-        );
-      }
-
-      for (const [key, value] of Object.entries(obj)) {
-        if (file.hasOwnProperty(key) && key !== 'id') {
-          file[key] = value;
-        }
-      }
-
-      file.updatedAt = new Date().toISOString();
-
-      const newPath = this.getAbsoluteFilePath(file.id);
-
-      if (isRenamed || isMoved) {
-        // Move the file to the new location.
-        this._git('moveFile', oldPath, file.sha, newPath, file.content);
-      }
-
-      // Just commit the changes to the file.
-      if (isContentChanged && userInvoked) {
-        // Only commit changes after 2 seconds of inactivity.
-        this.registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
-          this._git('commit', newPath, file.content, file.sha);
-        });
-
-        // Update the file content in the LFS after a second of inactivity.
-        this.registerTimeoutHandler(`lfs-sync-${file.id}`, seconds(1), () => {
-          this._lfs('writeFileToFolder', file.parentId, file.id, file.name, file.content);
-        });
-      }
-
-      this.saveState();
+    // Move the file to the new location before updating the file object,
+    // because the LFS.moveFile needs to use the absolute paths from VFS.
+    if (isRenamed || isMoved) {
+      await this._lfs(
+        'moveFile',
+        file.id,
+        obj.name || file.name,
+        typeof obj.parentId !== 'undefined' ? obj.parentId : file.parentId,
+      );
     }
+
+    for (const [key, value] of Object.entries(obj)) {
+      if (file.hasOwnProperty(key) && key !== 'id') {
+        file[key] = value;
+      }
+    }
+
+    file.updatedAt = new Date().toISOString();
+
+    const newPath = this.getAbsoluteFilePath(file.id);
+
+    if (isRenamed || isMoved) {
+      // Move the file to the new location.
+      this._git('moveFile', oldPath, file.sha, newPath, file.content);
+    }
+
+    // Just commit the changes to the file.
+    if (isContentChanged && userInvoked) {
+      // Only commit changes after 2 seconds of inactivity.
+      this.registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
+        this._git('commit', newPath, file.content, file.sha);
+      });
+
+      // Update the file content in the LFS after a second of inactivity.
+      this.registerTimeoutHandler(`lfs-sync-${file.id}`, seconds(1), () => {
+        this._lfs('writeFileToFolder', file.parentId, file.id, file.name, file.content);
+      });
+    }
+
+    this.saveState();
 
     return file;
   }
@@ -467,6 +467,8 @@ export default class VirtualFileSystem {
    */
    updateFolder = async (id, obj) => {
     const folder = this.findFolderById(id);
+    if (!folder) return;
+
     const oldPath = this.getAbsoluteFolderPath(folder.id);
 
     // This extra check is needed because in the UI, the user can trigger a
@@ -474,35 +476,33 @@ export default class VirtualFileSystem {
     const isRenamed = typeof obj.name === 'string' && folder.name !== obj.name;
     const isMoved = typeof obj.parentId !== 'undefined' && folder.parentId !== obj.parentId;
 
-    if (folder) {
-      // Move the folder to the new location before updating the folder object,
-      // because the LFS.moveFolder needs to use the absolute paths from VFS.
-      if (isRenamed || isMoved) {
-        await this._lfs(
-          'moveFolder',
-          folder.id,
-          obj.name || folder.name,
-          typeof obj.parentId !== 'undefined' ? obj.parentId : folder.parentId,
-        );
-      }
-
-      for (const [key, value] of Object.entries(obj)) {
-        if (folder.hasOwnProperty(key) && key !== 'id') {
-          folder[key] = value;
-        }
-      }
-
-      folder.updatedAt = new Date().toISOString();
-
-      // Check whether the file is renamed or moved, in either case we
-      // just need to move the file to the new location.
-      if (isRenamed || isMoved) {
-        const filesToMove = this.getOldNewFilePathsRecursively(folder.id, oldPath);
-        this._git('moveFolder', filesToMove);
-      }
-
-      this.saveState();
+    // Move the folder to the new location before updating the folder object,
+    // because the LFS.moveFolder needs to use the absolute paths from VFS.
+    if (isRenamed || isMoved) {
+      await this._lfs(
+        'moveFolder',
+        folder.id,
+        obj.name || folder.name,
+        typeof obj.parentId !== 'undefined' ? obj.parentId : folder.parentId,
+      );
     }
+
+    for (const [key, value] of Object.entries(obj)) {
+      if (folder.hasOwnProperty(key) && key !== 'id') {
+        folder[key] = value;
+      }
+    }
+
+    folder.updatedAt = new Date().toISOString();
+
+    // Check whether the file is renamed or moved, in either case we
+    // just need to move the file to the new location.
+    if (isRenamed || isMoved) {
+      const filesToMove = this.getOldNewFilePathsRecursively(folder.id, oldPath);
+      this._git('moveFolder', filesToMove);
+    }
+
+    this.saveState();
 
     return folder;
   }
@@ -631,76 +631,6 @@ export default class VirtualFileSystem {
     zip.generateAsync({ type: 'blob' }).then((content) => {
       saveAs(content, `${folder.name}.zip`);
     });
-  }
-
-  /**
-   * Import files and folders from a git repository into the virtual filesystem.
-   *
-   * Each entry in the repoContents has a path property which contains the whole
-   * relative path from the root of the repository.
-   *
-   * @param {array} repoContents - List of files from the repository.
-   * @async
-   */
-  importFromGit = async (repoContents) => {
-    // Preserve all currently open tabs after refreshing.
-    // We first obtain the current filepaths before clearing the VFS.
-    const tabs = {};
-    Terra.app.layout.getEditorComponents().forEach((editorComponent) => {
-      const { fileId } = editorComponent.getState();
-      if (fileId) {
-        const filepath = this.getAbsoluteFilePath(fileId);
-        tabs[filepath] = editorComponent;
-      }
-    });
-
-    // Remove all files from the virtual filesystem.
-    this.clear();
-
-    // First create all root files.
-    repoContents
-      .filter((fileOrFolder) => fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/'))
-      .forEach(async (fileOrFolder) => {
-        this.createFile({
-          name: fileOrFolder.path.split('/').pop(),
-          sha: fileOrFolder.sha,
-          isNew: false,
-          content: fileOrFolder.content,
-        }, false);
-      });
-
-    // Then create all root folders and their nested files.
-    repoContents
-      .filter((fileOrFolder) => !(fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/')))
-      .forEach((fileOrFolder) => {
-        const { sha } = fileOrFolder;
-        const path = fileOrFolder.path.split('/')
-        const name = path.pop();
-
-        const parentId = path.length > 0 ? this.findFolderByPath(path.join('/')).id : null;
-
-        if (fileOrFolder.type === 'tree') {
-          this.createFolder({ name, parentId, sha });
-        } else if (fileOrFolder.type === 'blob') {
-          this.createFile({
-            name,
-            parentId,
-            sha,
-            content: fileOrFolder.content,
-          }, false);
-        }
-      });
-
-    // Finally, we sync the current tabs with their new file IDs.
-    for (const [filepath, editorComponent] of Object.entries(tabs)) {
-      const file = this.findFileByPath(filepath);
-      if (file) {
-        editorComponent.extendState({ fileId: file.id });
-        Terra.app.layout.emitToAllComponents('vfsChanged');
-      }
-    }
-
-    this.saveState();
   }
 
   /**
