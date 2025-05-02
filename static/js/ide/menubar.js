@@ -186,6 +186,9 @@ function registerMenubarEventListeners() {
 
   $('#menu-item--reset-layout').click(() => Terra.app.resetLayout());
 
+  $('#menu-item--kill-process').click(Menubar.killTermProcess);
+  $('#menu-item--clear-term').click(() => Terra.app.layout.term.clear());
+
   // Prevent the default browser save dialog when pressing ctrl+s or cmd+s.
   Mousetrap.bind(['ctrl+s', 'meta+s'], (event) => event.preventDefault());
 }
@@ -466,3 +469,8 @@ Menubar.connectRepo = () => {
     }
   });
 };
+
+Menubar.killTermProcess = () => {
+  const event = { key: 'c', ctrlKey: true };
+  Terra.app.handleControlC(event);
+}

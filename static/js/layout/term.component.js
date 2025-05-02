@@ -1,5 +1,5 @@
 import { BASE_FONT_SIZE } from '../constants.js';
-import { isObject } from '../helpers/shared.js';
+import { isMac, isObject } from '../helpers/shared.js';
 import Terra from '../terra.js';
 
 /**
@@ -116,7 +116,7 @@ export default class TerminalComponent {
     this.term.open(this.container.getElement()[0]);
     this.fitAddon.fit();
 
-    this.term._core._customKeyEventHandler = Terra.app.handleControlC;
+    this.term._core._customKeyEventHandler = this.globalKeyEventHandler;
 
     // Trigger a single resize after the terminal has rendered to make sure it
     // fits the whole parent width and doesn't leave any gaps near the edges.
@@ -127,6 +127,14 @@ export default class TerminalComponent {
 
     this.setFontSize(fontSize);
     this.hideTermCursor();
+  }
+
+  globalKeyEventHandler = (event) => {
+    if (event.key === 'c' && event.ctrlKey) {
+      Terra.app.handleControlC;
+    } else if (event.key === 'k' && (isMac() ? event.metaKey : event.ctrlKey)) {
+      this.clear();
+    }
   }
 
   /**
