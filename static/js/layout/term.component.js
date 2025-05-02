@@ -136,15 +136,6 @@ export default class TerminalComponent {
   }
 
   /**
-   * Add a listener for key events in the terminal.
-   *
-   * @param {Function} callback - The callback to execute when a key event occurs.
-   */
-  onKey = (callback) => {
-    this.term.onKey(callback);
-  }
-
-  /**
    * Callback when the container is resized.
    */
   onContainerResize = () => {
@@ -179,6 +170,8 @@ export default class TerminalComponent {
       this.userInputDisposable.dispose();
       this.userInputDisposable = null;
     }
+
+    this.term.textarea.removeEventListener('paste', this.handleUserPaste);
   }
 
   /**
@@ -195,6 +188,20 @@ export default class TerminalComponent {
     this.term.write('\x1b[?25h');
   }
 
+  handleUserPaste = (event) => {
+    // Get the pasted text from the clipboard.
+    const clipboardData = event.clipboardData || window.clipboardData;
+    let pastedData = clipboardData.getData('Text').replace(/[\r\n]/g, '');
+
+    // Remove blacklisted characters from the pasted text.
+    const blacklistedCharsPattern = new RegExp(`[${this.blacklistedKeys.join('')}]`, 'g');
+    pastedData = pastedData.replace(blacklistedCharsPattern, '');
+
+    this.term.write(pastedData);
+    this.userInput += pastedData;
+  }
+
+
   /**
    * Enable stdin in the terminal and record the user's keystrokes. Once the
    * user presses ENTER, the promise is resolved with the user's input.
@@ -208,20 +215,23 @@ export default class TerminalComponent {
       this.term.focus();
 
       // Keep track of the value that is typed by the user.
-      let value = '';
+      this.userInput = '';
+
+      this.term.textarea.addEventListener('paste', this.handleUserPaste);
+
       this.userInputDisposable = this.term.onKey(e => {
         // Only append allowed characters.
         if (!this.blacklistedKeys.includes(e.key)) {
           this.term.write(e.key);
-          value += e.key;
+          this.userInput += e.key;
         }
 
         // Remove the last character when pressing backspace. This is done by
         // triggering a backspace '\b' character and then insert a space at that
         // position to clear the character.
-        if (e.key === '\u007f' && value.length > 0) {
+        if (e.key === '\u007f' && this.userInput.length > 0) {
           this.term.write('\b \b');
-          value = value.slice(0, -1);
+          this.userInput = this.userInput.slice(0, -1);
         }
 
         // If the user presses enter, resolve the promise.
@@ -230,10 +240,10 @@ export default class TerminalComponent {
 
           // Trigger a real enter in the terminal.
           this.term.write('\n');
-          value += '\n';
+          this.userInput += '\n';
 
           this.hideTermCursor();
-          resolve(value);
+          resolve(this.userInput);
         }
       });
     });
