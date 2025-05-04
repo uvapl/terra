@@ -2,6 +2,7 @@ import { createModal, hideModal, showModal } from './modal.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
+import { seconds } from './helpers/shared.js';
 
 /**
  * GitFS worker class that handles all Git operations.
@@ -35,6 +36,83 @@ export default class GitFS {
   constructor(vfs, repoLink) {
     this.vfs = vfs;
     this._repoLink = repoLink;
+
+    this.bindVFSEvents();
+  }
+
+  bindVFSEvents = () => {
+    this.vfs.addEventListener('fileCreated', this.vfsFileCreatedHandler);
+    this.vfs.addEventListener('fileMoved', this.vfsFileMovedHandler);
+    this.vfs.addEventListener('fileContentChanged', this.vfsFileContentChangedHandler);
+    this.vfs.addEventListener('beforeFileDeleted', this.vfsBeforeFileDeletedHandler);
+
+    this.vfs.addEventListener('folderMoved', this.vfsFolderMovedHandler);
+  }
+
+  vfsFileCreatedHandler = (event) => {
+    const { file } = event.detail;
+    const newPath = this.vfs.getAbsoluteFilePath(file.id)
+    this.commit(newPath, file.content, file.sha);
+  }
+
+  vfsFileMovedHandler = (event) => {
+    const { file, oldPath } = event.detail;
+    const newPath = this.vfs.getAbsoluteFilePath(file.id);
+    this.moveFile(oldPath, file.sha, newPath, file.content);
+  }
+
+  vfsFileContentChangedHandler = (event) => {
+    const { file } = event.detail;
+    const newPath = this.vfs.getAbsoluteFilePath(file.id);
+
+    // Only commit changes after 2 seconds of inactivity.
+    Terra.app.registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
+      this.commit(newPath, file.content, file.sha);
+    });
+  }
+
+  vfsBeforeFileDeletedHandler = (event) => {
+    const  { file } = event.detail;
+    const newPath = this.vfs.getAbsoluteFilePath(file.id);
+    this.rm(newPath, file.sha);
+  }
+
+  vfsFolderMovedHandler = (event) => {
+    const { folder, oldPath } = event.detail;
+    const filesToMove = this.getOldNewFilePathsRecursively(folder.id, oldPath);
+    this.moveFolder(filesToMove);
+  }
+
+  /**
+   * Get all file paths recursively from a folder. Invoked when a folder is
+   * being renamed or moved and updated in the UI when connected to Git.
+   *
+   * @param {string} folderId - The folder id to get the file paths from.
+   * @returns {array} List of objects with the old and new file paths.
+   */
+  getOldNewFilePathsRecursively(folderId, oldPath) {
+    const files = this.vfs.findFilesWhere({ parentId: folderId });
+    const folders = this.vfs.findFoldersWhere({ parentId: folderId });
+
+    let paths = files.map((file) => {
+      const newPath = this.vfs.getAbsoluteFilePath(file.id);
+      const filename = newPath.split('/').pop();
+      return {
+        oldPath: `${oldPath}/${filename}`,
+        newPath,
+        content: file.content,
+        sha: file.sha,
+      }
+    });
+
+    for (const folder of folders) {
+      paths = [
+        ...paths,
+        ...this.getOldNewFilePathsRecursively(folder.id, oldPath)
+      ];
+    }
+
+    return paths;
   }
 
   /**

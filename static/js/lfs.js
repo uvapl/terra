@@ -34,6 +34,79 @@ export default class LocalFileSystem {
 
   constructor(vfs) {
     this.vfs = vfs;
+
+    this.bindVFSEvents();
+  }
+
+  bindVFSEvents = () => {
+    // Only call the specified event if the user loaded a project.
+    const listener = (fn) => (event) => this.loaded ? fn(event) : false;
+
+    this.vfs.addEventListener('fileCreated', listener(this.vfsFileCreatedHandler));
+    this.vfs.addEventListener('beforeFileMoved', listener(this.vfsBeforeFileMovedHandler));
+    this.vfs.addEventListener('fileContentChanged', listener(this.vfsFileContentChangedHandler));
+    this.vfs.addEventListener('beforeFileDeleted', listener(this.vfsFileDeletedHandler));
+
+    this.vfs.addEventListener('folderCreated', listener(this.vfsFolderCreatedHandler));
+    this.vfs.addEventListener('beforeFolderMoved', listener(this.vfsBeforeFolderMovedHandler));
+    this.vfs.addEventListener('beforeFolderDeleted', listener(this.vfsBeforeFolderDeletedHandler));
+  }
+
+  vfsFileCreatedHandler = (event) => {
+    const { file } = event.detail;
+    this.writeFileToFolder(file.parentId, file.id, file.name, file.content);
+  }
+
+  vfsBeforeFileMovedHandler = async (event) => {
+    const { file, values } = event.detail;
+    await this.moveFile(
+      file.id,
+      values.name || file.name,
+      typeof values.parentId !== 'undefined' ? values.parentId : file.parentId,
+    );
+  }
+
+  vfsFileContentChangedHandler = (event) => {
+    const { file } = event.detail;
+
+    // Update the file content in the LFS after a second of inactivity.
+    Terra.app.registerTimeoutHandler(`lfs-sync-${file.id}`, seconds(1), () => {
+      this.writeFileToFolder(file.parentId, file.id, file.name, file.content);
+    });
+  }
+
+  vfsFileDeletedHandler = (event) => {
+    const  { file, isSingleFileDelete } = event.detail;
+
+    if (isSingleFileDelete) {
+      this.deleteFile(file.id);
+    }
+
+    this.removeFileHandle(file.id);
+  }
+
+  vfsBeforeFolderMovedHandler = async (event) => {
+    const { folder, values } = event.detail;
+    await this.moveFolder(
+      folder.id,
+      values.name || folder.name,
+      typeof values.parentId !== 'undefined' ? values.parentId : folder.parentId,
+    );
+  }
+
+  vfsFolderCreatedHandler = (event) => {
+    const { folder } = event.detail;
+    this.createFolder(folder.id, folder.parentId, folder.name);
+  }
+
+  vfsBeforeFolderDeletedHandler = (event) => {
+    const { folder, isRootFolder } = event.detail;
+
+    if (isRootFolder) {
+      this.deleteFolder(folder.id);
+    } else {
+      this.removeFolderHandle(folder.id);
+    }
   }
 
   async init() {

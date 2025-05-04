@@ -5,15 +5,13 @@
 import {
   addNewLineCharacter,
   hasGitFSWorker,
-  isObject,
-  seconds,
   uuidv4
 } from './helpers/shared.js';
 import { IS_IDE } from './constants.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 
-export default class VirtualFileSystem {
+export default class VirtualFileSystem extends EventTarget {
   /**
    * Contains all the files in the virtual filesystem.
    * The key is the file id and the value is the file object.
@@ -28,51 +26,9 @@ export default class VirtualFileSystem {
    */
   folders = {};
 
-  /**
-   * This is mainly used for files/folders where a user could potentially
-   * trigger another file onchange event, while the previous file change of
-   * another file hasn't been synced. In that case, it shouldn't overwrite the
-   * previous file its timeout handler.
-   * @type {object<string, number>}
-   */
-  timeoutHandlers = {};
-
   constructor() {
+    super();
     this.loadFromLocalStorage();
-  }
-
-  /**
-   * Call a function on the git filesystem worker.
-   *
-   * @param {string} fn - Name of the function to call.
-   * @param {array} payload - Arguments to pass to the function.
-   */
-  _git = (fn, ...payload) => {
-    if (!hasGitFSWorker()) return;
-
-    try {
-      Terra.app.gitfs[fn](...payload);
-    } catch (TypeError) {
-      console.error(`GitFS.${fn}() is not a function`);
-    }
-  }
-
-  /**
-   * Call a function to the local filesystem class.
-   *
-   * @param {string} fn - Name of the function to call.
-   * @param {array} payload - Arguments to pass to the function.
-   * @returns {*} The return value of the function.
-   */
-  _lfs = (fn, ...payload) => {
-    // Return early if the user hasn't loaded an LFS project. We make an
-    // exception for the openFolderPicker, because this function is used to load
-    // the LFS class.
-    if (!Terra.app.hasLFSProjectLoaded && fn !== 'openFolderPicker') {
-      return;
-    }
-
-    return Terra.app.lfs[fn](...payload);
   }
 
   /**
@@ -93,29 +49,6 @@ export default class VirtualFileSystem {
     }
 
     return `${string} (1)`;
-  }
-
-  /**
-   * Register a timeout handler based on an ID.
-   *
-   * @param {string} id - Some unique identifier, like uuidv4.
-   * @param {number} timeout - The amount of time in milliseconds to wait.
-   * @param {function} callback - Callback function that will be invoked.
-   */
-  registerTimeoutHandler(id, timeout, callback) {
-    if (!isObject(this.timeoutHandlers)) {
-      this.timeoutHandlers = {};
-    }
-
-    if (typeof this.timeoutHandlers[id] !== 'undefined') {
-      clearTimeout(this.timeoutHandlers[id]);
-    }
-
-    this.timeoutHandlers[id] = setTimeout(() => {
-      callback();
-      clearTimeout(this.timeoutHandlers[id]);
-      delete this.timeoutHandlers[id];
-    }, timeout);
   }
 
   /**
@@ -362,10 +295,10 @@ export default class VirtualFileSystem {
    * Create a new file in the virtual filesystem.
    *
    * @param {object} fileObj - The file object to create.
-   * @param {boolean} [userInvoked] - Whether to user invoked the action.
+   * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
    * @returns {object} The new file object.
    */
-  createFile = (fileObj, userInvoked = true) => {
+  createFile = (fileObj, isUserInvoked = true) => {
     const newFile = {
       id: uuidv4(),
       name: 'Untitled',
@@ -383,9 +316,10 @@ export default class VirtualFileSystem {
 
     this.files[newFile.id] = newFile;
 
-    if (userInvoked) {
-      this._git('commit', this.getAbsoluteFilePath(newFile.id), newFile.content, newFile.sha);
-      this._lfs('writeFileToFolder', newFile.parentId, newFile.id, newFile.name, newFile.content);
+    if (isUserInvoked) {
+      this.dispatchEvent(new CustomEvent('fileCreated', {
+        detail: { file: newFile },
+      }));
     }
 
     this.saveState();
@@ -396,10 +330,10 @@ export default class VirtualFileSystem {
    * Create a new folder in the virtual filesystem.
    *
    * @param {object} folderObj - The folder object to create.
-   * @param {boolean} [userInvoked] - Whether to user invoked the action.
+   * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
    * @returns {object} The new folder object.
    */
-  createFolder = (folderObj, userInvoked = true) => {
+  createFolder = (folderObj, isUserInvoked = true) => {
     const newFolder = {
       id: uuidv4(),
       name: 'Untitled',
@@ -416,8 +350,10 @@ export default class VirtualFileSystem {
 
     this.folders[newFolder.id] = newFolder;
 
-    if (userInvoked) {
-      this._lfs('createFolder', newFolder.id, newFolder.parentId, newFolder.name);
+    if (isUserInvoked) {
+      this.dispatchEvent(new CustomEvent('folderCreated', {
+        detail: { folder: newFolder },
+      }));
     }
 
     this.saveState();
@@ -428,11 +364,11 @@ export default class VirtualFileSystem {
    * Update a file in the virtual filesystem.
    *
    * @param {string} id - The file id.
-   * @param {object} obj - Key-value pairs to update in the file object.
-   * @param {boolean} [userInvoked] - Whether to user invoked the action.
+   * @param {object} values - Key-value pairs to update in the file object.
+   * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
    * @returns {object} The updated file object.
    */
-  updateFile = async (id, obj, userInvoked = true) => {
+  updateFile = async (id, values, isUserInvoked = true) => {
     const file = this.findFileById(id);
     if (!file) return;
 
@@ -440,22 +376,17 @@ export default class VirtualFileSystem {
 
     // These extra checks is needed because in the UI, the user can trigger a
     // rename but not actually change the name.
-    const isRenamed = typeof obj.name === 'string' && file.name !== obj.name;
-    const isMoved = typeof obj.parentId !== 'undefined' && file.parentId !== obj.parentId;
-    const isContentChanged = typeof obj.content === 'string' && file.content !== obj.content;
+    const isRenamed = typeof values.name === 'string' && file.name !== values.name;
+    const isMoved = typeof values.parentId !== 'undefined' && file.parentId !== values.parentId;
+    const isContentChanged = typeof values.content === 'string' && file.content !== values.content;
 
-    // Move the file to the new location before updating the file object,
-    // because the LFS.moveFile needs to use the absolute paths from VFS.
     if (isRenamed || isMoved) {
-      await this._lfs(
-        'moveFile',
-        file.id,
-        obj.name || file.name,
-        typeof obj.parentId !== 'undefined' ? obj.parentId : file.parentId,
-      );
+      this.dispatchEvent(new CustomEvent('beforeFileMoved', {
+        detail: { file, values },
+      }));
     }
 
-    for (const [key, value] of Object.entries(obj)) {
+    for (const [key, value] of Object.entries(values)) {
       if (file.hasOwnProperty(key) && key !== 'id') {
         file[key] = value;
       }
@@ -463,24 +394,17 @@ export default class VirtualFileSystem {
 
     file.updatedAt = new Date().toISOString();
 
-    const newPath = this.getAbsoluteFilePath(file.id);
-
     if (isRenamed || isMoved) {
       // Move the file to the new location.
-      this._git('moveFile', oldPath, file.sha, newPath, file.content);
+      this.dispatchEvent(new CustomEvent('fileMoved', {
+        detail: { file, oldPath },
+      }));
     }
 
-    // Just commit the changes to the file.
-    if (isContentChanged && userInvoked) {
-      // Only commit changes after 2 seconds of inactivity.
-      this.registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
-        this._git('commit', newPath, file.content, file.sha);
-      });
-
-      // Update the file content in the LFS after a second of inactivity.
-      this.registerTimeoutHandler(`lfs-sync-${file.id}`, seconds(1), () => {
-        this._lfs('writeFileToFolder', file.parentId, file.id, file.name, file.content);
-      });
+    if (isContentChanged && isUserInvoked) {
+      this.dispatchEvent(new CustomEvent('fileContentChanged', {
+        detail: { file },
+      }));
     }
 
     this.saveState();
@@ -492,10 +416,10 @@ export default class VirtualFileSystem {
    * Update a folder in the virtual filesystem.
    *
    * @param {string} id - The folder id.
-   * @param {object} obj - Key-value pairs to update in the folder object.
+   * @param {object} values - Key-value pairs to update in the folder object.
    * @returns {object} The updated folder object.
    */
-   updateFolder = async (id, obj) => {
+   updateFolder = async (id, values) => {
     const folder = this.findFolderById(id);
     if (!folder) return;
 
@@ -503,21 +427,16 @@ export default class VirtualFileSystem {
 
     // This extra check is needed because in the UI, the user can trigger a
     // rename but not actually change the name.
-    const isRenamed = typeof obj.name === 'string' && folder.name !== obj.name;
-    const isMoved = typeof obj.parentId !== 'undefined' && folder.parentId !== obj.parentId;
+    const isRenamed = typeof values.name === 'string' && folder.name !== values.name;
+    const isMoved = typeof values.parentId !== 'undefined' && folder.parentId !== values.parentId;
 
-    // Move the folder to the new location before updating the folder object,
-    // because the LFS.moveFolder needs to use the absolute paths from VFS.
     if (isRenamed || isMoved) {
-      await this._lfs(
-        'moveFolder',
-        folder.id,
-        obj.name || folder.name,
-        typeof obj.parentId !== 'undefined' ? obj.parentId : folder.parentId,
-      );
+      this.dispatchEvent(new CustomEvent('beforeFolderMoved', {
+        detail: { folder, values },
+      }));
     }
 
-    for (const [key, value] of Object.entries(obj)) {
+    for (const [key, value] of Object.entries(values)) {
       if (folder.hasOwnProperty(key) && key !== 'id') {
         folder[key] = value;
       }
@@ -525,11 +444,10 @@ export default class VirtualFileSystem {
 
     folder.updatedAt = new Date().toISOString();
 
-    // Check whether the file is renamed or moved, in either case we
-    // just need to move the file to the new location.
     if (isRenamed || isMoved) {
-      const filesToMove = this.getOldNewFilePathsRecursively(folder.id, oldPath);
-      this._git('moveFolder', filesToMove);
+      this.dispatchEvent(new CustomEvent('folderMoved', {
+        detail: { folder, oldPath },
+      }));
     }
 
     this.saveState();
@@ -541,19 +459,17 @@ export default class VirtualFileSystem {
    * Delete a file from the virtual filesystem.
    *
    * @param {string} id - The file id.
-   * @param {boolean} [deleteInLFS] - Whether to delete the file in the LFS.
+   * @param {boolean} [isSingleFileDelete] - whether this function is called for
+   * a single file or is called from the `deleteFolder` function.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFile = (id, deleteInLFS = true) => {
+  deleteFile = (id, isSingleFileDelete = true) => {
     const file = this.findFileById(id);
     if (file) {
-      this._git('rm', this.getAbsoluteFilePath(file.id), file.sha);
+      this.dispatchEvent(new CustomEvent('beforeFileDeleted', {
+        detail: { file, isSingleFileDelete },
+      }));
 
-      if (deleteInLFS) {
-        this._lfs('deleteFile', id);
-      }
-
-      this._lfs('removeFileHandle', id);
       delete this.files[id];
       this.saveState();
       return true;
@@ -563,17 +479,18 @@ export default class VirtualFileSystem {
   }
 
   /**
-   * Delete a folder from the virtual filesystem, including its nested files and
-   * folders. The deleteInLFS parameter will only be true on the first call to
-   * it. All subsequent calls will have it set to false, because the LFS uses
-   * async and thus needs to wait for nested files and folders to be deleted
-   * before deleting the parent folder itself.
+   * Delete a folder from the VFS, including nested files and folders.
+   *
+   * The isRootFolder parameter will only be true on the first call because the
+   * LFS will delete the folder with all of its children at once. Therefore, all
+   * subsequent calls will have it set to false, because we don't want to remove
+   * the those nested files by ourselves.
    *
    * @param {string} id - The folder id.
-   * @param {boolean} [deleteInLFS] - Whether to delete the folder in the LFS.
+   * @param {boolean} [isRootFolder] - Whether it is the root folder.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFolder = (id, deleteInLFS = true) => {
+  deleteFolder = (id, isRootFolder = true) => {
     // Delete all the files inside the current folder.
     const files = this.findFilesWhere({ parentId: id });
     for (const file of files) {
@@ -587,15 +504,9 @@ export default class VirtualFileSystem {
     }
 
     if (this.folders[id]) {
-      // The deleteInLFS is only true on the first call to this function.
-      // Inside the LFS class we'll delete everything properly including the
-      // root folder handle.
-      if (deleteInLFS) {
-        this._lfs('deleteFolder', id);
-      } else {
-        // If it's not the root folder, then delete the folder handle.
-        this._lfs('removeFolderHandle', id);
-      }
+      this.dispatchEvent(new CustomEvent('beforeFolderDeleted', {
+        detail: { folder: this.folders[id], isRootFolder },
+      }));
 
       delete this.folders[id];
       this.saveState();
@@ -661,34 +572,5 @@ export default class VirtualFileSystem {
     zip.generateAsync({ type: 'blob' }).then((content) => {
       saveAs(content, `${folder.name}.zip`);
     });
-  }
-
-  /**
-   * Get all file paths recursively from a folder. This function is used when a
-   * folder is being renamed or moved and updated in the Git repository.
-   *
-   * @param {string} folderId - The folder id to get the file paths from.
-   * @returns {array} List of objects with the old and new file paths.
-   */
-  getOldNewFilePathsRecursively(folderId, oldPath) {
-    const files = this.findFilesWhere({ parentId: folderId });
-    const folders = this.findFoldersWhere({ parentId: folderId });
-
-    let paths = files.map((file) => {
-      const newPath = this.getAbsoluteFilePath(file.id);
-      const filename = newPath.split('/').pop();
-      return {
-        oldPath: `${oldPath}/${filename}`,
-        newPath,
-        content: file.content,
-        sha: file.sha,
-      }
-    });
-
-    for (const folder of folders) {
-      paths = [...paths, ...this.getOldNewFilePathsRecursively(folder.id, oldPath)];
-    }
-
-    return paths;
   }
 }

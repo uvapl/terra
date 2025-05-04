@@ -5,6 +5,7 @@ import {
   getFileExtension,
   hasGitFSWorker,
   getRepoInfo,
+  isObject,
 } from './helpers/shared.js';
 import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
@@ -27,12 +28,45 @@ export default class IDEApp extends App {
    */
   lfs = null;
 
+  /**
+   * This is mainly used for files/folders where a user could potentially
+   * trigger another file onchange event, while the previous file change of
+   * another file hasn't been synced. In that case, it shouldn't overwrite the
+   * previous file its timeout handler. This happens when a user made a change
+   * in file and immediately switches to another file.
+   * @type {object<string, number>}
+   */
+  timeoutHandlers = {};
+
   constructor() {
     super();
 
     if (this.browserHasLFSApi()) {
       this.lfs = new LocalFileSystem(this.vfs);
     }
+  }
+
+  /**
+   * Register a timeout handler based on an ID.
+   *
+   * @param {string} id - Some unique identifier, like uuidv4.
+   * @param {number} timeout - The amount of time in milliseconds to wait.
+   * @param {function} callback - Callback function that will be invoked.
+   */
+  registerTimeoutHandler(id, timeout, callback) {
+    if (!isObject(this.timeoutHandlers)) {
+      this.timeoutHandlers = {};
+    }
+
+    if (typeof this.timeoutHandlers[id] !== 'undefined') {
+      clearTimeout(this.timeoutHandlers[id]);
+    }
+
+    this.timeoutHandlers[id] = setTimeout(() => {
+      callback();
+      clearTimeout(this.timeoutHandlers[id]);
+      delete this.timeoutHandlers[id];
+    }, timeout);
   }
 
   /**
