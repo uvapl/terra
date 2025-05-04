@@ -109,7 +109,7 @@ export default class LocalFileSystem {
     }
   }
 
-  async init() {
+  init = async () => {
     const lastTimeUsedLFS = localStorageManager.getLocalStorageItem('use-lfs', false);
     if (!lastTimeUsedLFS) {
       fileTreeManager.showLocalStorageWarning();
@@ -138,7 +138,7 @@ export default class LocalFileSystem {
   /**
    * Disconnect the LFS from the current folder.
    */
-  async terminate() {
+  terminate = async () => {
     this.loaded = false;
     localStorageManager.setLocalStorageItem('use-lfs', false);
     clearTimeout(this._watchRootFolderInterval);
@@ -149,7 +149,7 @@ export default class LocalFileSystem {
   /**
    * Close the current folder and clear the VFS.
    */
-  closeFolder() {
+  closeFolder = () => {
     this.terminate();
     this.vfs.clear();
     fileTreeManager.createFileTree(); // show empty file tree
@@ -168,7 +168,7 @@ export default class LocalFileSystem {
    * file/folder IDs every time. It's not a problem, but just something to be
    * aware of.
    */
-  _watchRootFolder() {
+  _watchRootFolder = () => {
     if (this._watchRootFolderInterval) {
       clearInterval(this._watchRootFolderInterval);
     }
@@ -192,7 +192,7 @@ export default class LocalFileSystem {
    * @param {string} [mode] - The mode to request permission for.
    * @returns {Promise<boolean>} True if permission is granted, false otherwise.
    */
-  _verifyPermission(handle, mode = 'readwrite') {
+  _verifyPermission = (handle, mode = 'readwrite') => {
     const opts = { mode };
 
     return new Promise(async (resolve, reject) => {
@@ -217,7 +217,7 @@ export default class LocalFileSystem {
    * @async
    * @returns {Promise<void>}
    */
-  async openFolderPicker() {
+  openFolderPicker = async () => {
     let rootFolderHandle;
     try {
       rootFolderHandle = await window.showDirectoryPicker();
@@ -251,7 +251,7 @@ export default class LocalFileSystem {
    * @param {FileSystemDirectoryHandle} rootFolderHandle
    * @returns {Promise<void>}
    */
-  async _importFolderToVFS(rootFolderHandle) {
+  _importFolderToVFS = async (rootFolderHandle) => {
     const editorComponents = Terra.app.layout.getEditorComponents();
     const prevOpenTabs = editorComponents.map((editorComponent) => {
       const { fileId } = editorComponent.getState();
@@ -295,7 +295,7 @@ export default class LocalFileSystem {
    * @param {string} id - The VFS file id.
    * @returns {Promise<string>} The file content.
    */
-  async getFileContent(id) {
+  getFileContent = async (id) => {
     try {
       const path = this.vfs.getAbsoluteFilePath(id)
       const fileHandle = await this.getFileHandle(path);
@@ -315,7 +315,7 @@ export default class LocalFileSystem {
    * @param {string} parentId - The ID of the parent folder.
    * @returns {Promise<void>}
    */
-  async _readFolder(dirHandle, parentId) {
+  _readFolder = async (dirHandle, parentId) => {
     const blacklistedPaths = [
       'site-packages',           // when user folder has python virtual env
       '__pycache__',             // Python cache directory
@@ -353,7 +353,7 @@ export default class LocalFileSystem {
    * @async
    * @returns {Promise<void>}
    */
-  async rebuildIndexedDB() {
+  rebuildIndexedDB = async () => {
     const rootFolderHandle = await this.getFolderHandle('root');
     await this._clearStores();
     await this.saveFolderHandle('root', null, rootFolderHandle.handle);
@@ -368,7 +368,7 @@ export default class LocalFileSystem {
    * @param {string} [pathPrefix] - Absolute path to this file/folder of its parents.
    * @returns {Promise<void>}
    */
-  async _rebuildIndexedDB(dirHandle, pathPrefix) {
+  _rebuildIndexedDB = async (dirHandle, pathPrefix) => {
     for await (const [name, handle] of dirHandle) {
       if (handle.kind === 'file') {
         const fileKey = pathPrefix ? `${pathPrefix}/${name}` : name;
@@ -407,7 +407,7 @@ export default class LocalFileSystem {
    *
    * @returns {Promise<IDBRequest>} The IDB request object.
    */
-  _openDB() {
+  _openDB = () => {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
       request.onupgradeneeded = this.indexedDBOnUpgradeNeededCallback;
@@ -427,7 +427,7 @@ export default class LocalFileSystem {
    *
    * @returns {Promise<void>}
    */
-  _clearStores() {
+  _clearStores = () => {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
       request.onupgradeneeded = this.indexedDBOnUpgradeNeededCallback;
@@ -475,7 +475,7 @@ export default class LocalFileSystem {
    * @param {*} value - The value to save under the key.
    * @returns {Promise<void>}
    */
-  async _saveHandle(storeName, key, value) {
+  _saveHandle = async (storeName, key, value) => {
     const db = await this._openDB();
 
     return new Promise((resolve, reject) => {
@@ -497,7 +497,7 @@ export default class LocalFileSystem {
    * @param {FileSystemFileHandle} handle - The file handle to save.
    * @returns {Promise<FileSystemFileHandle>}
    */
-  saveFileHandle(path, id, handle) {
+  saveFileHandle = (path, id, handle) => {
     return this._saveHandle(this.FILE_HANDLES_STORE_NAME, path, { id, handle });
   }
 
@@ -509,7 +509,7 @@ export default class LocalFileSystem {
    * @param {FileSystemDirectoryHandle} handle - The folder handle to save.
    * @returns {Promise<FileSystemDirectoryHandle>}
    */
-  saveFolderHandle(path, id, handle) {
+  saveFolderHandle = (path, id, handle) => {
     return this._saveHandle(this.FOLDER_HANDLES_STORE_NAME, path, { id, handle });
   }
 
@@ -521,7 +521,7 @@ export default class LocalFileSystem {
    * @param {string} key - A unique key to identify the handle.
    * @returns {Promise<FileSystemDirectoryHandle|FileSystemFileHandle>}
    */
-  async _getHandle(storeName, key) {
+  _getHandle = async (storeName, key) => {
     const db = await this._openDB();
 
     return new Promise((resolve, reject) => {
@@ -537,7 +537,7 @@ export default class LocalFileSystem {
    * @param {string} key - The VFS absolute filepath.
    * @returns {Promise<FileSystemFileHandle>}
    */
-  getFileHandle(key) {
+  getFileHandle = (key) => {
     return this._getHandle(this.FILE_HANDLES_STORE_NAME, key);
   }
 
@@ -547,7 +547,7 @@ export default class LocalFileSystem {
    * @param {string} key - The VFS absolute folderpath.
    * @returns {Promise<FileSystemDirectoryHandle>}
    */
-  getFolderHandle(key) {
+  getFolderHandle = (key) => {
     return this._getHandle(this.FOLDER_HANDLES_STORE_NAME, key);
   }
 
@@ -559,7 +559,7 @@ export default class LocalFileSystem {
    * @param {string} key - A unique key to identify the handle.
    * @returns {Promise<void>}
    */
-  async _removeHandle(storeName, key) {
+  _removeHandle = async (storeName, key) => {
     const db = await this._openDB();
 
     return new Promise((resolve, reject) => {
@@ -579,7 +579,7 @@ export default class LocalFileSystem {
    * @param {string} key - The VFS absolute filepath.
    * @returns {Promise<void>}
    */
-  async removeFileHandle(key) {
+  removeFileHandle = async (key) => {
     await this._removeHandle(this.FILE_HANDLES_STORE_NAME, key);
   }
 
@@ -590,7 +590,7 @@ export default class LocalFileSystem {
    * @param {string} key - The VFS absolute folderpath.
    * @returns {Promise<void>}
    */
-  async removeFolderHandle(key) {
+  removeFolderHandle = async (key) => {
     await this._removeHandle(this.FOLDER_HANDLES_STORE_NAME, key);
   }
 
@@ -605,7 +605,7 @@ export default class LocalFileSystem {
    * @param {string} content - The file contents to write.
    * @returns {Promise<void>}
    */
-  async writeFileToFolder(folderId, fileId, filename, content) {
+  writeFileToFolder = async (folderId, fileId, filename, content) => {
     try {
       this.busy = true;
       const fileKey = this.vfs.getAbsoluteFilePath(fileId);
@@ -640,7 +640,7 @@ export default class LocalFileSystem {
    * @param {string} folderName - The name of the folder to create.
    * @returns {Promise<void>}
    */
-  async createFolder(folderId, parentId, folderName) {
+  createFolder = async (folderId, parentId, folderName) => {
     try {
       this.busy = true;
 
@@ -659,7 +659,7 @@ export default class LocalFileSystem {
    * @param {string} id - Unique VFS file id.
    * @returns {Promise<boolean>} True if deleted successfully, otherwise false.
    */
-  async deleteFile(id) {
+  deleteFile = async (id) => {
     try {
       this.busy = true;
 
@@ -686,7 +686,7 @@ export default class LocalFileSystem {
    * @param {string} id - Unique VFS folder id.
    * @returns {Promise<boolean>} True if deleted successfully, otherwise false.
    */
-  async deleteFolder(id) {
+  deleteFolder = async (id) => {
     try {
       this.busy = true;
       const folderKey = this.vfs.getAbsoluteFolderPath(id);
@@ -709,7 +709,7 @@ export default class LocalFileSystem {
    * @param {FileSystemDirectoryHandle} folderHandle - Handle to the folder.
    * @returns {Promise<void>}
    */
-  async _recursivelyDeleteFolder(folderHandle) {
+  _recursivelyDeleteFolder = async (folderHandle) => {
     for await (const [name, handle] of folderHandle.entries()) {
       if (handle.kind === 'directory') {
         // Delete nested directory.
@@ -733,7 +733,7 @@ export default class LocalFileSystem {
    * @param {string} newParentId - Unique VFS parent folder id (can be unchanged).
    * @returns {Promise<void>}
    */
-  async moveFile(id, newName, newParentId) {
+  moveFile = async (id, newName, newParentId) => {
     try {
       this.busy = true;
 
@@ -761,7 +761,7 @@ export default class LocalFileSystem {
    * @param {string|null} newParentId - Unique VFS parent folder id.
    * @returns {Promise<void>}
    */
-  async moveFolder(id, newName, newParentId) {
+  moveFolder = async (id, newName, newParentId) => {
     try {
       this.busy = true;
       const folder = this.vfs.findFolderById(id);
@@ -795,7 +795,7 @@ export default class LocalFileSystem {
    * @param {string} [newName] - New folder name for root folder.
    * @returns {Promise<void>}
    */
-  async _moveFolderRecursively(folderId, parentFolderId, newName) {
+  _moveFolderRecursively = async (folderId, parentFolderId, newName) => {
     const folderKey = this.vfs.getAbsoluteFolderPath(folderId);
     const folderHandle = await this.getFolderHandle(folderKey);
     const parentFolderHandle = await this.getFolderHandle(

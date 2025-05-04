@@ -90,7 +90,7 @@ export default class GitFS {
    * @param {string} folderId - The folder id to get the file paths from.
    * @returns {array} List of objects with the old and new file paths.
    */
-  getOldNewFilePathsRecursively(folderId, oldPath) {
+  getOldNewFilePathsRecursively = (folderId, oldPath) => {
     const files = this.vfs.findFilesWhere({ parentId: folderId });
     const folders = this.vfs.findFoldersWhere({ parentId: folderId });
 
@@ -120,7 +120,7 @@ export default class GitFS {
    *
    * @param {string} accessToken - The user's personal access token.
    */
-  _createWorker(accessToken) {
+  _createWorker = (accessToken) => {
     if (this.worker instanceof Worker) {
       console.error('[GitFS] failed to create a new worker as an instance is already running');
       return;
@@ -146,7 +146,7 @@ export default class GitFS {
   /**
    * Terminate the current worker instance.
    */
-  terminate() {
+  terminate = () => {
     console.log('Terminating existing GitFS worker')
     localStorageManager.setLocalStorageItem('git-repo', '');
     localStorageManager.setLocalStorageItem('git-branch', '');
@@ -159,7 +159,7 @@ export default class GitFS {
   /**
    * Set the current repository link that is cloned in the UI.
    */
-  setRepoLink() {
+  setRepoLink = () => {
     this.worker.postMessage({
       id: 'setRepoLink',
       data: {
@@ -168,7 +168,7 @@ export default class GitFS {
     });
   }
 
-  setRepoBranch(branch) {
+  setRepoBranch = (branch) => {
     this.worker.postMessage({
       id: 'setRepoBranch',
       data: { branch },
@@ -178,7 +178,7 @@ export default class GitFS {
   /**
    * Clone the current repository.
    */
-  clone() {
+  clone = () => {
     this.worker.postMessage({ id: 'clone' });
   }
 
@@ -189,7 +189,7 @@ export default class GitFS {
    * @param {string} filecontents - The new contents to commit.
    * @param {string} sha - The sha of the file to commit.
    */
-  commit(filepath, filecontents, sha) {
+  commit = (filepath, filecontents, sha) => {
     this.worker.postMessage({
       id: 'commit',
       data: { filepath, filecontents, sha },
@@ -202,7 +202,7 @@ export default class GitFS {
    * @param {string} filepath - The absolute filepath within the git repo.
    * @param {string} sha - The sha of the file to delete.
    */
-  rm(filepath, sha) {
+  rm = (filepath, sha) => {
     this.worker.postMessage({
       id: 'rm',
       data: { filepath, sha },
@@ -217,7 +217,7 @@ export default class GitFS {
    * @param {string} newPath - The absolute filepath to the new file.
    * @param {string} newContent - The new content of the file.
    */
-  moveFile(oldPath, oldSha, newPath, newContent) {
+  moveFile = (oldPath, oldSha, newPath, newContent) => {
     this.worker.postMessage({
       id: 'moveFile',
       data: { oldPath, oldSha, newPath, newContent },
@@ -233,7 +233,7 @@ export default class GitFS {
    * @param {string} files[].newPath - The filepath to the new file.
    * @param {string} files[].content - The new content of the file.
    */
-  moveFolder(files) {
+  moveFolder = (files) => {
     this.worker.postMessage({
       id: 'moveFolder',
       data: { files },
@@ -245,7 +245,7 @@ export default class GitFS {
    *
    * @param {object} event - Event object coming from the UI.
    */
-  onmessage(event) {
+  onmessage = (event) => {
     const payload = event.data.data;
 
     switch (event.data.id) {
