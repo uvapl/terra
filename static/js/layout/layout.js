@@ -582,9 +582,15 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
   /**
    * Close the active tab in the editor.
+   *
+   * @param {string} fileId - The file ID of the tab to close. If not provided,
+   * the active tab will be closed.
    */
-  closeFile() {
-    const editorComponent = this.getActiveEditor();
+  closeFile(fileId) {
+    const editorComponent = fileId
+      ? this.getEditorComponents().find((editorComponent) => editorComponent.getState().fileId === fileId)
+      : this.getActiveEditor();
+
     if (editorComponent) {
       editorComponent.close();
     }
