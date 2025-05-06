@@ -1,17 +1,16 @@
-import { IS_IDE, BASE_FONT_SIZE } from '../constants.js';
-import { runButtonCommand, saveFile } from '../helpers/editor-component.js';
-import { isMac, isObject, mergeObjects, eventTargetMixin } from '../helpers/shared.js';
+import { BASE_FONT_SIZE } from '../constants.js';
+import {
+  isMac,
+  isObject,
+  mergeObjects,
+  eventTargetMixin,
+  seconds,
+} from '../helpers/shared.js';
 import EditorComponent from './editor.component.js';
 import TerminalComponent from './term.component.js';
 import pluginManager from '../plugin-manager.js';
-import Terra from '../terra.js';
 import localStorageManager from '../local-storage-manager.js';
-
-$(window).on('resize', () => {
-  if (Terra.app.layout) {
-    Terra.app.layout.updateSize(window.innerWidth, window.innerHeight);
-  }
-});
+import Terra from '../terra.js';
 
 /**
  * Default layout config that is used when the layout is created for the first
@@ -99,7 +98,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    */
   termStartupMessage = [
     'Click the "Run" button to execute code.',
-    'Click the "Clear terminal" button to clear this screen.'
+    'Click the trash bin icon to clear this terminal screen.'
   ];
 
   /**
@@ -107,6 +106,13 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @type {GoldenLayout.Tab[]}
    */
   tabs = [];
+
+  /**
+   * Reference to all hidden files which will *never* be shown in the UI, but
+   * will be sent to the workers and written to worker's filesystem.
+   * @type {object<string, string>}
+   */
+  hiddenFiles = {};
 
   /**
    * Reference to the current active editor instance in the layout.
@@ -127,6 +133,10 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     this.proglang = options.proglang;
     this.vertical = options.vertical;
 
+    if (isObject(options.hiddenFiles)) {
+      this.hiddenFiles = options.hiddenFiles;
+    }
+
     if (isObject(options.buttonConfig)) {
       this.buttonConfig = options.buttonConfig;
     }
@@ -142,6 +152,10 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
     this.registerComponent('editor', EditorComponent);
     this.registerComponent('terminal', TerminalComponent);
+
+    $(window).on('resize', () => {
+      this.updateSize(window.innerWidth, window.innerHeight);
+    });
   }
 
   /**
@@ -160,9 +174,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
         name: 'save',
         bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
         exec: () => {
-          if (IS_IDE) {
-            saveFile();
-          }
+          // Literally do nothing here, because by default, we want to prevent
+          // the user (accidentally) saving the file with <cmd/ctrl + s>, which
+          // triggers the native browser save-file popup window.
         }
       },
       {
@@ -185,6 +199,17 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    */
   getEditorComponents() {
     return this.tabs.map((tab) => tab.contentItem.instance);
+  }
+
+  /**
+   * Get all file IDs from the open tabs in the layout.
+   *
+   * @returns {string[]} List of file IDs.
+   */
+  getAllOpenTabFileIds() {
+    return this.getEditorComponents().map(
+      (editorComponent) => editorComponent.getState().fileId
+    );
   }
 
   /**
@@ -324,7 +349,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
         $('.terminal-component-container .lm_header')
           .append(`<button id="${id}" class="button config-btn ${id}-btn" disabled>${name}</button>`);
 
-        $(selector).click(() => runButtonCommand(selector, cmd));
+        $(selector).click(() => Terra.app.runButtonCommand(selector, cmd));
       });
     }
   }
@@ -335,7 +360,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   addActiveStates() {
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');
-    const currentFontSize = localStorageManager.getLocalStorageItem('font-size') || BASE_FONT_SIZE;
+    const currentFontSize = localStorageManager.getLocalStorageItem('font-size', BASE_FONT_SIZE);
     $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
 
     // Add active state to theme dropdown.
@@ -424,7 +449,11 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @returns {string}
    */
   getClearTermButtonHtml() {
-    return '<button id="clear-term" class="button clear-term-btn" disabled>Clear terminal</button>'
+    return `
+      <button id="clear-term" class="button clear-term-btn" title="Clear terminal">
+        <img src="static/img/icons/trash-bin.png" alt="trash bin" />
+      </button>
+    `;
   }
 
   /**
@@ -534,5 +563,45 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    */
   getActiveEditor() {
     return this.activeEditor;
+  }
+
+  /**
+   * Change the run-code button to a stop-code button if after 1 second the code
+   * has not finished running (potentially infinite loop scenario).
+   */
+  checkForStopCodeButton() {
+    Terra.v.showStopCodeButtonTimeoutId = setTimeout(() => {
+      const $button = $('#run-code');
+      const newText = $button.text().replace('Run', 'Stop');
+      $button.text(newText)
+        .prop('disabled', false)
+        .removeClass('primary-btn')
+        .addClass('danger-btn');
+    }, seconds(1));
+  }
+
+  /**
+   * Close the active tab in the editor.
+   *
+   * @param {string} fileId - The file ID of the tab to close. If not provided,
+   * the active tab will be closed.
+   */
+  closeFile(fileId) {
+    const editorComponent = fileId
+      ? this.getEditorComponents().find((editorComponent) => editorComponent.getState().fileId === fileId)
+      : this.getActiveEditor();
+
+    if (editorComponent) {
+      editorComponent.close();
+    }
+  }
+
+  /**
+   * Close all tabs in the editor.
+   */
+  closeAllFiles() {
+    this.getEditorComponents().forEach((editorComponent) => {
+      editorComponent.close();
+    });
   }
 }

@@ -1,5 +1,5 @@
 import { BASE_FONT_SIZE } from '../constants.js';
-import { hideTermCursor } from '../helpers/term-component.js';
+import { isMac, isObject } from '../helpers/shared.js';
 import Terra from '../terra.js';
 
 /**
@@ -33,6 +33,14 @@ export default class TerminalComponent {
    */
   term = null;
 
+  // Disable some special characters when input is enabled.
+  // For all input sequences, see http://xtermjs.org/docs/api/vtfeatures/#c0
+  blacklistedKeys = [
+    '\u007f', // Backspace
+    '\t',     // Tab
+    '\r',     // Enter
+  ]
+
   constructor(container, state) {
     this.container = container;
     this.state = state;
@@ -52,6 +60,15 @@ export default class TerminalComponent {
    */
   write = (msg) => {
     this.term.write(msg);
+  }
+
+  /**
+   * Write a line to the terminal.
+   *
+   * @param {string} msg - The message to write.
+   */
+  writeln = (msg) => {
+    this.term.writeln(msg);
   }
 
   /**
@@ -99,6 +116,8 @@ export default class TerminalComponent {
     this.term.open(this.container.getElement()[0]);
     this.fitAddon.fit();
 
+    this.term._core._customKeyEventHandler = this.globalKeyEventHandler;
+
     // Trigger a single resize after the terminal has rendered to make sure it
     // fits the whole parent width and doesn't leave any gaps near the edges.
     setTimeout(() => {
@@ -107,7 +126,15 @@ export default class TerminalComponent {
 
 
     this.setFontSize(fontSize);
-    hideTermCursor();
+    this.hideTermCursor();
+  }
+
+  globalKeyEventHandler = (event) => {
+    if (event.key === 'c' && event.ctrlKey) {
+      Terra.app.handleControlC;
+    } else if (event.key === 'k' && (isMac() ? event.metaKey : event.ctrlKey)) {
+      this.clear();
+    }
   }
 
   /**
@@ -126,15 +153,6 @@ export default class TerminalComponent {
     }
 
     this.term = null;
-  }
-
-  /**
-   * Add a listener for key events in the terminal.
-   *
-   * @param {Function} callback - The callback to execute when a key event occurs.
-   */
-  onKey = (callback) => {
-    this.term.onKey(callback);
   }
 
   /**
@@ -160,6 +178,112 @@ export default class TerminalComponent {
    */
   getParentComponentElement = () => {
     return this.container.parent.parent.element[0];
+  }
+
+  /**
+   * Disposes the user input when active. This is actived once user input is
+   * requested through the `waitForInput` function in order to remove the onKey
+   * event listener that is binded by the `waitForInput` function.
+   */
+  disposeUserInput = () => {
+    if (isObject(this.userInputDisposable) && typeof this.userInputDisposable.dispose === 'function') {
+      this.userInputDisposable.dispose();
+      this.userInputDisposable = null;
+    }
+
+    this.term.textarea.removeEventListener('paste', this.handleUserPaste);
+  }
+
+  /**
+   * Hide the cursor inside the terminal component.
+   */
+  hideTermCursor = () => {
+    this.term.write('\x1b[?25l');
+  }
+
+  /**
+   * Show the cursor inside the terminal component.
+   */
+  showTermCursor = () => {
+    this.term.write('\x1b[?25h');
+  }
+
+  handleUserPaste = (event) => {
+    // Get the pasted text from the clipboard.
+    const clipboardData = event.clipboardData || window.clipboardData;
+    let pastedData = clipboardData.getData('Text').replace(/[\r\n]/g, '');
+
+    // Remove blacklisted characters from the pasted text.
+    const blacklistedCharsPattern = new RegExp(`[${this.blacklistedKeys.join('')}]`, 'g');
+    pastedData = pastedData.replace(blacklistedCharsPattern, '');
+
+    this.term.write(pastedData);
+    this.userInput += pastedData;
+  }
+
+
+  /**
+   * Enable stdin in the terminal and record the user's keystrokes. Once the
+   * user presses ENTER, the promise is resolved with the user's input.
+   *
+   * @returns {Promise<string>} The user's input.
+   */
+  waitForInput = () => {
+    return new Promise((resolve) => {
+      // Immediately focus the terminal when user input is requested.
+      this.showTermCursor();
+      this.term.focus();
+
+      // Keep track of the value that is typed by the user.
+      this.userInput = '';
+
+      this.term.textarea.addEventListener('paste', this.handleUserPaste);
+
+      this.userInputDisposable = this.term.onKey(e => {
+        // Only append allowed characters.
+        if (!this.blacklistedKeys.includes(e.key)) {
+          this.term.write(e.key);
+          this.userInput += e.key;
+        }
+
+        // Remove the last character when pressing backspace. This is done by
+        // triggering a backspace '\b' character and then insert a space at that
+        // position to clear the character.
+        if (e.key === '\u007f' && this.userInput.length > 0) {
+          this.term.write('\b \b');
+          this.userInput = this.userInput.slice(0, -1);
+        }
+
+        // If the user presses enter, resolve the promise.
+        if (e.key === '\r') {
+          this.disposeUserInput();
+
+          // Trigger a real enter in the terminal.
+          this.term.write('\n');
+          this.userInput += '\n';
+
+          this.hideTermCursor();
+          resolve(this.userInput);
+        }
+      });
+    });
+  }
+
+  /**
+   * If the writing goes wrong, this might be due to an infinite loop that
+   * contains a print statement to the terminal. This results in the write
+   * buffer 'exploding' with data that is queued for printing. This function
+   * clears the write buffer which stops (most of the) printing immediately.
+   *
+   * Furthermore, this function is called either when the user pressed the
+   * 'stop' button or when the xtermjs component throws the error:
+   *
+   *   'Error: write data discarded, use flow control to avoid losing data'
+   */
+  clearTermWriteBuffer = () => {
+    if (this.term && this.term._core) {
+      this.term._core._writeBuffer._writeBuffer = [];
+    }
   }
 
   /**

@@ -1,6 +1,6 @@
 import { TerraPlugin } from '../../js/plugin-manager.js';
 import { createModal, hideModal, showModal } from '../../js/modal.js';
-import VFS from '../../js/vfs.js';
+import Terra from '../../js/terra.js';
 
 export default class FileArgsPlugin extends TerraPlugin {
   name = 'file-args';
@@ -63,7 +63,7 @@ export default class FileArgsPlugin extends TerraPlugin {
     if (!editorComponent || editorComponent.proglang !== 'c') return;
 
     const fileId = editorComponent.container.getState().fileId;
-    const filepath = VFS.getAbsoluteFilePath(fileId);
+    const filepath = Terra.app.vfs.getAbsoluteFilePath(fileId);
 
     const currentArgs = (this.getState('fileargs')[filepath] || '').replace(/"/g, '&quot;');
 

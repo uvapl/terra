@@ -1,5 +1,4 @@
 import { IS_IDE } from '../constants.js';
-import LFS from '../lfs.js';
 import GitFS from '../gitfs.js';
 import Terra from '../terra.js';
 
@@ -252,16 +251,7 @@ export function seconds(secs) {
  * @returns {boolean} True if the worker has been initialised, false otherwise.
  */
 export function hasGitFSWorker() {
-  return IS_IDE && Terra.gitfs instanceof GitFS;
-}
-
-/**
- * Check whether the browser has support for the Local Filesystem API.
- *
- * @returns {boolean} True if the browser supports the api.
- */
-export function hasLFSApi() {
-  return 'showOpenFilePicker' in window;
+  return IS_IDE && Terra.app.gitfs instanceof GitFS;
 }
 
 /**
@@ -292,33 +282,6 @@ export function getRepoInfo(repoLink) {
  */
 export function isValidFilename(filename) {
   return !/[\/\\:*?"<>|]/.test(filename) && !['&lt;', '&gt;'].includes(filename);
-}
-
-/**
- * Register a timeout handler based on an ID. This is mainly used for
- * files/folders where a user could potentially trigger another file onchange
- * event, while the previous file change of another file hasn't been synced. In
- * that case, it shouldn't overwrite the previous file it's timeout. Therefore,
- * we use this function to register a timeout handler per file/folder.
- *
- * @param {string} id - Some unique identifier, like uuidv4.
- * @param {number} timeout - The amount of time in milliseconds to wait.
- * @param {function} callback - Callback function that will be invoked.
- */
-export function registerTimeoutHandler(id, timeout, callback) {
-  if (!isObject(Terra.timeoutHandlers)) {
-    Terra.timeoutHandlers = {};
-  }
-
-  if (typeof Terra.timeoutHandlers[id] !== 'undefined') {
-    clearTimeout(Terra.timeoutHandlers[id]);
-  }
-
-  Terra.timeoutHandlers[id] = setTimeout(() => {
-    callback();
-    clearTimeout(Terra.timeoutHandlers[id]);
-    delete Terra.timeoutHandlers[id];
-  }, timeout);
 }
 
 /**

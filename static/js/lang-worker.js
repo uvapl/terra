@@ -1,16 +1,17 @@
-import {
-  clearTermWriteBuffer,
-  disposeUserInput,
-  hideTermCursor,
-  waitForInput
-} from './helpers/term-component.js';
 import { getFileExtension } from './helpers/shared.js';
 import Terra from './terra.js';
 
 /**
+ * List of supported programming languages that have a corresponding worker.
+ * @type {string[]}
+ */
+const supportedLangs = ['c', 'py'];
+
+
+/**
  * Bridge class between the main app and the currently loaded language worker.
  */
-export default class LangWorkerAPI {
+export default class LangWorker {
   /**
    * The current programming language that is being used.
    * @type {string}
@@ -50,6 +51,16 @@ export default class LangWorkerAPI {
   constructor(proglang) {
     this.proglang = proglang;
     this._createWorker();
+  }
+
+  /**
+   * Check whether a given proglang has a corresponding worker implementation.
+   *
+   * @param {string} proglang - The proglang to check for.
+   * @returns {boolean} True if proglang is valid, false otherwise.
+   */
+  static hasWorker(proglang) {
+    return supportedLangs.some((lang) => proglang === lang);
   }
 
   /**
@@ -96,15 +107,16 @@ export default class LangWorkerAPI {
     // once it has been loaded.
     $('#run-code').prop('disabled', true);
 
-    hideTermCursor();
-    clearTermWriteBuffer();
+    Terra.app.layout.term.clearTermWriteBuffer();
 
     if (showTerminateMsg) {
       Terra.app.layout.term.writeln('\x1b[1;31mProcess terminated\x1b[0m');
     }
 
     // Dispose any active user input.
-    disposeUserInput();
+    Terra.app.layout.term.disposeUserInput();
+
+    Terra.app.layout.term.hideTermCursor();
   }
 
   /**
@@ -220,7 +232,7 @@ export default class LangWorkerAPI {
     // file-tree in the IDE app.
     const editorComponent = Terra.app.layout.getActiveEditor();
     let disableRunBtn = false;
-    if (editorComponent && !hasWorker(getFileExtension(editorComponent.getFilename()))) {
+    if (editorComponent && !this.constructor.hasWorker(getFileExtension(editorComponent.getFilename()))) {
       disableRunBtn = true;
     }
 
@@ -266,7 +278,7 @@ export default class LangWorkerAPI {
             Terra.app.layout.term.write(event.data.data);
           }
         } catch (e) {
-          clearTermWriteBuffer();
+          Terra.app.layout.term.clearTermWriteBuffer();
         }
         break;
 
@@ -274,7 +286,7 @@ export default class LangWorkerAPI {
       // input, this event will be triggered. The user input will be requested
       // and sent back to the worker through the usage of shared memory.
       case 'readStdin':
-        waitForInput().then((value) => {
+        Terra.app.layout.term.waitForInput().then((value) => {
           const view = new Uint8Array(this.sharedMem.buffer);
           for (let i = 0; i < value.length; i++) {
             // To the shared memory.
@@ -300,41 +312,6 @@ export default class LangWorkerAPI {
       case 'runUserCodeCallback':
         this.runUserCodeCallback();
         break;
-    }
-  }
-}
-
-/**
- * Check whether a given proglang has a corresponding worker implementation.
- *
- * @param {string} proglang - The proglang to check for.
- * @returns {boolean} True if proglang is valid, false otherwise.
- */
-export function hasWorker(proglang) {
-  const whitelist = ['c', 'py'];
-  return whitelist.some((lang) => proglang === lang);
-}
-
-/**
- * Create a new worker API instance if none exists already. The existing
- * instance will be terminated and restarted if necessary.
- *
- * @param {string} proglang - The proglang to spawn the related worker for.
- */
-export function createLangWorkerApi(proglang) {
-  // Situation 1: no worker, thus spawn a new one.
-  if (!Terra.langWorkerApi && hasWorker(proglang)) {
-    Terra.langWorkerApi = new LangWorkerAPI(proglang);
-  } else if (Terra.langWorkerApi && Terra.langWorkerApi.proglang !== proglang) {
-    Terra.langWorkerApi.proglang = proglang;
-
-    // Situation 2: existing worker but new proglang is invalid.
-    if (!hasWorker(proglang)) {
-      Terra.langWorkerApi.terminate();
-      Terra.langWorkerApi = null;
-    } else {
-      // Situation 3: existing worker and new proglang is valid.
-      Terra.langWorkerApi.restart();
     }
   }
 }

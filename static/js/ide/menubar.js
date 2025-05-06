@@ -2,10 +2,8 @@
 // This file contains the logic for the menubar at the top of the IDE app.
 ////////////////////////////////////////////////////////////////////////////////
 import { MODAL_ANIM_DURATION } from '../constants.js';
-import { closeAllFiles, closeFile } from '../helpers/editor-component.js';
 import { isMac } from '../helpers/shared.js';
 import { createModal, hideModal, showModal } from '../modal.js';
-import VFS from '../vfs.js';
 import pluginManager from '../plugin-manager.js';
 import Terra from '../terra.js';
 import localStorageManager from '../local-storage-manager.js';
@@ -49,13 +47,13 @@ export function renderGitRepoBranches(branches) {
     localStorageManager.setLocalStorageItem('git-branch', newBranch);
     $element.addClass('active').siblings().removeClass('active');
 
-    VFS._git('setRepoBranch', newBranch);
+    Terra.app.vfs._git('setRepoBranch', newBranch);
 
     fileTreeManager.destroyTree();
 
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
-    VFS._git('clone');
-    closeAllFiles();
+    Terra.app.vfs._git('clone');
+    Terra.app.layout.closeAllFiles();
   });
 }
 
@@ -94,7 +92,9 @@ function closeActiveMenuBarMenu(event) {
   if (isInsideMenu && isNotNewFileOrFolderBtn && editorComponent && editorComponent.ready) {
     // Set Terra.v.blockLFSPolling to prevent file contents being reloaded
     Terra.v.blockLFSPolling = true;
-    editorComponent.editor.focus();
+    if (editorComponent.editor) {
+      editorComponent.editor.focus();
+    }
     Terra.v.blockLFSPolling = false;
   }
 
@@ -149,8 +149,8 @@ function registerMenubarEventListeners() {
   $('#menu-item--new-folder').click(() => fileTreeManager.createFolder());
   Mousetrap.bind(['ctrl+shift+t'], () => fileTreeManager.createFolder());
 
-  $('#menu-item--close-file').click(closeFile);
-  Mousetrap.bind(['ctrl+w'], closeFile);
+  $('#menu-item--close-file').click(() => Terra.app.layout.closeFile());
+  Mousetrap.bind(['ctrl+w'], () => Terra.app.layout.closeFile());
 
   $('#menu-item--comment').click(Menubar.toggleComment);
 
@@ -186,6 +186,9 @@ function registerMenubarEventListeners() {
 
   $('#menu-item--reset-layout').click(() => Terra.app.resetLayout());
 
+  $('#menu-item--kill-process').click(Menubar.killTermProcess);
+  $('#menu-item--clear-term').click(() => Terra.app.layout.term.clear());
+
   // Prevent the default browser save dialog when pressing ctrl+s or cmd+s.
   Mousetrap.bind(['ctrl+s', 'meta+s'], (event) => event.preventDefault());
 }
@@ -197,7 +200,7 @@ Menubar.openNewFile = () => {
 };
 
 Menubar.openLFSFolder = () => {
-  VFS._lfs('openFolderPicker').then(() => {
+  Terra.app.vfs._lfs('openFolderPicker').then(() => {
     $('#file-tree .info-msg').remove();
     $('#menu-item--close-folder').removeClass('disabled');
   });
@@ -206,8 +209,8 @@ Menubar.openLFSFolder = () => {
 Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-folder').hasClass('disabled')) return;
 
-  VFS._lfs('closeFolder');
-  closeAllFiles();
+  Terra.app.vfs._lfs('closeFolder');
+  Terra.app.layout.closeAllFiles();
   closeActiveMenuBarMenu(event);
 };
 
@@ -402,7 +405,7 @@ Menubar.connectRepo = () => {
       fileTreeManager.showLocalStorageWarning();
 
       // Clear all files after disconnecting.
-      VFS.clear();
+      Terra.app.vfs.clear();
       fileTreeManager.createFileTree();
       fileTreeManager.setTitle('local storage');
       $('#file-tree .info-msg').remove();
@@ -418,7 +421,7 @@ Menubar.connectRepo = () => {
     // 1) The user is connected to a repo and wants to connect to another one,
     //    so we are certain that there are files in the VFS.
     // 2) The user is not connected to a repo, but there are files in the VFS.
-    if (!currentRepoLink && !VFS.isEmpty()) {
+    if (!currentRepoLink && !Terra.app.vfs.isEmpty()) {
       // Create a new modal after the previous one is hidden.
       setTimeout(() => {
         const $confirmModal = createModal({
@@ -453,16 +456,21 @@ Menubar.connectRepo = () => {
         });
         $confirmModal.find('.confirm-btn').click(() => {
           hideModal($confirmModal);
-          VFS.createGitFSWorker();
+          Terra.app.createGitFSWorker();
 
           // Close all tabs, because we know we will change from either local
           // storage to git, or from one git repo to another.
-          closeAllFiles();
+          Terra.app.layout.closeAllFiles();
         });
 
       }, MODAL_ANIM_DURATION);
     } else {
-      VFS.createGitFSWorker();
+      Terra.app.createGitFSWorker();
     }
   });
 };
+
+Menubar.killTermProcess = () => {
+  const event = { key: 'c', ctrlKey: true };
+  Terra.app.handleControlC(event);
+}

@@ -1,9 +1,8 @@
 import { BASE_FONT_SIZE } from '../constants.js';
-import { getAceCompleters } from '../helpers/editor-component.js';
 import { getFileExtension, seconds } from '../helpers/shared.js';
-import { createLangWorkerApi } from '../lang-worker-api.js';
 import pluginManager from '../plugin-manager.js';
 import localStorageManager from '../local-storage-manager.js';
+import Terra from '../terra.js';
 
 /**
  * Editor component for GoldenLayout.
@@ -88,8 +87,6 @@ export default class EditorComponent extends EventTarget {
     editorContainer.classList.add('editor');
     contentContainer.appendChild(editorContainer);
 
-    console.log('initEditor state', this.state);
-
     this.editor = ace.edit(editorContainer);
     this.editor.setKeyboardHandler('ace/keyboard/sublime');
     this.editor.setOption('fontSize');
@@ -98,13 +95,7 @@ export default class EditorComponent extends EventTarget {
     this.editor.setOption('enableLiveAutocompletion', true);
     this.editor.setValue(this.state.value || '');
     this.editor.clearSelection();
-    this.editor.completers = getAceCompleters();
-  }
-
-  /**
-   * Bind all custom editor commands.
-   */
-  bindEditorCommands = () => {
+    this.editor.completers = this.getAceCompleters();
   }
 
   /**
@@ -182,7 +173,7 @@ export default class EditorComponent extends EventTarget {
     this.dispatchEvent(new Event('focus'));
 
     // Spawn a new worker if necessary.
-    createLangWorkerApi(this.proglang);
+    Terra.app.createLangWorker(this.proglang);
   }
 
   /**
@@ -453,6 +444,88 @@ export default class EditorComponent extends EventTarget {
       : 'ace/theme/textmate'
 
     this.editor.setTheme(newTheme);
+  }
+
+  /**
+   * Create local text completer.
+   *
+   * Largely based on text_completer.js from ajaxorg/ace
+   * under the BSD license included in the ace project
+   * https://github.com/ajaxorg/ace/blob/master/LICENSE
+   *
+   * @returns {array} List of completers.
+   */
+  getAceCompleters = () => {
+    const Range = ace.Range;
+
+    const splitRegex = /[^a-zA-Z_0-9\$\-\u00C0-\u1FFF\u2C00-\uD7FF\w]+/;
+
+    function getWordIndex(doc, pos) {
+      const textBefore = doc.getTextRange(Range.fromPoints({
+        row: 0,
+        column: 0
+      }, pos));
+      return textBefore.split(splitRegex).length - 1;
+    }
+
+    /**
+     * Does a distance analysis of the word `prefix` at position `pos` in `doc`.
+     * @return Map
+     */
+    function wordDistance(doc, pos) {
+      const prefixPos = getWordIndex(doc, pos);
+      const words = [];
+      const wordScores = Object.create(null);
+      const rowCount = doc.getLength();
+
+      // Extract tokens via the ace tokenizer
+      for (let row = 0; row < rowCount; row++) {
+        const tokens = doc.getTokens(row);
+
+        tokens.forEach(token => {
+          // Only include non-comment tokens
+          if (!['string', 'comment'].includes(token.type)) {
+            const tokenWords = token.value.split(splitRegex);
+            words.push(...tokenWords);
+          }
+        });
+      }
+
+      // Create a score list
+      const currentWord = words[prefixPos];
+
+      words.forEach(function(word, idx) {
+        if (!word || word === currentWord) return;
+        if (/^[0-9]/.test(word)) return; // Custom: exclude numbers
+
+        const distance = Math.abs(prefixPos - idx);
+        const score = words.length - distance;
+        if (wordScores[word]) {
+          wordScores[word] = Math.max(score, wordScores[word]);
+        }
+        else {
+          wordScores[word] = score;
+        }
+      });
+      return wordScores;
+    }
+
+    const customCompleter = {
+      getCompletions: function(editor, session, pos, prefix, callback) {
+        const wordScore = wordDistance(session, pos);
+        const wordList = Object.keys(wordScore);
+        callback(null, wordList.map(function(word) {
+          return {
+            caption: word,
+            value: word,
+            score: wordScore[word],
+            meta: "" // note: this used to be "local" but is removed to make UI cleaner
+          };
+        }));
+      }
+    }
+
+    return [customCompleter];
   }
 
   /**

@@ -1,9 +1,8 @@
 import { IS_IDE } from './constants.js';
-import { checkForStopCodeButton, getAllEditorFiles } from './helpers/editor-component.js';
-import { getFileExtension, hasLFSApi, uuidv4 } from './helpers/shared.js'
-import { createLangWorkerApi } from './lang-worker-api.js';
+import { getFileExtension, uuidv4 } from './helpers/shared.js'
+import LangWorker from './lang-worker.js';
 import Terra from './terra.js';
-import VFS from './vfs.js';
+import VirtualFileSystem from './vfs.js';
 
 /**
  * Base class that is extended for each of the apps.
@@ -15,8 +14,22 @@ export default class App {
    */
   layout = null;
 
+  /**
+   * Reference to the current programming language worker.
+   * @type {LangWorker}
+   */
+  langWorker = null;
+
+  /**
+   * Reference to the Virtual File System (VFS) instance.
+   * @type {VirtualFileSystem}
+   */
+  vfs = null;
+
   constructor() {
     this._bindThis();
+
+    this.vfs = new VirtualFileSystem();
   }
 
   /**
@@ -120,7 +133,7 @@ export default class App {
   onEditorChange(editorComponent) {
     const { fileId } = editorComponent.getState();
     if (fileId) {
-      VFS.updateFile(fileId, {
+      this.vfs.updateFile(fileId, {
         content: editorComponent.getContent(),
       });
     }
@@ -143,7 +156,7 @@ export default class App {
     // not have duplicate filenames.
     if (!IS_IDE) {
       const filename = editorComponent.getFilename();
-      const file = VFS.findFileWhere({ name: filename });
+      const file = this.vfs.findFileWhere({ name: filename });
       const { fileId } = editorComponent.getState();
       if (!fileId || (file && fileId !== file.id)) {
         editorComponent.extendState({ fileId: file.id });
@@ -151,7 +164,7 @@ export default class App {
     }
 
     if (editorComponent.ready) {
-      createLangWorkerApi(editorComponent.proglang);
+      this.createLangWorker(editorComponent.proglang);
     }
 
     this.setEditorFileContent(editorComponent);
@@ -177,7 +190,7 @@ export default class App {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   setEditorFileContent(editorComponent) {
-    const file = VFS.findFileById(editorComponent.getState().fileId);
+    const file = this.vfs.findFileById(editorComponent.getState().fileId);
     if (!file) return;
 
     editorComponent.setContent(file.content);
@@ -217,14 +230,13 @@ export default class App {
   async runCode(fileId = null, clearTerm = false) {
     if (clearTerm) this.layout.term.clear();
 
-    // TODO: maybe do if (!Terra.langWorkerApi.isReady) { ... } else { ... }
-    if (Terra.langWorkerApi) {
-      if (!Terra.langWorkerApi.isReady) {
+    if (this.langWorker) {
+      if (!this.langWorker.isReady) {
         // Worker API is busy, wait for it to be done.
         return;
-      } else if (Terra.langWorkerApi.isRunningCode) {
+      } else if (this.langWorker.isRunningCode) {
         // Terminate worker in cases of infinite loops.
-        return Terra.langWorkerApi.restart(true);
+        return this.langWorker.restart(true);
       }
     }
 
@@ -235,41 +247,55 @@ export default class App {
 
     if (fileId) {
       // Run given file id.
-      const file = VFS.findFileById(fileId);
+      const file = this.vfs.findFileById(fileId);
       filename = file.name;
-      files = [file];
-
-      if (!file.content && hasLFSApi() && LFS.loaded) {
-        const content = await LFS.getFileContent(file.id);
-        files = [{ ...file, content }];
+      files = await this.getAllEditorFiles();
+      if (!files.some((file) => file.name === filename)) {
+        fileInfo = await this.getFileInfo(file.id);
+        files.append(fileInfo);
       }
     } else {
       const editorComponent = this.layout.getActiveEditor();
       fileId = editorComponent.getState().fileId;
       filename = editorComponent.getFilename();
-      files = await getAllEditorFiles();
+      files = await this.getAllEditorFiles();
+    }
+
+    const hiddenFileKeys = Object.keys(this.layout.hiddenFiles);
+    if (hiddenFileKeys.length > 0) {
+      const hiddenFiles = hiddenFileKeys.map((filename) => ({
+        name: filename,
+        content: this.layout.hiddenFiles[filename],
+      }));
+      files = files.concat(hiddenFiles);
     }
 
     // Create a new worker instance if needed.
     const proglang = getFileExtension(filename);
-    createLangWorkerApi(proglang);
+    this.createLangWorker(proglang);
 
     // Get file args, if any.
     const args = this.getCurrentFileArgs(fileId);
 
     // Wait for the worker to be ready before running the code.
-    if (Terra.langWorkerApi && !Terra.langWorkerApi.isReady) {
+    if (this.langWorker && !this.langWorker.isReady) {
       const runFileIntervalId = setInterval(() => {
-        if (Terra.langWorkerApi && Terra.langWorkerApi.isReady) {
-          Terra.langWorkerApi.runUserCode(filename, files, args);
-          checkForStopCodeButton();
+        if (this.langWorker && this.langWorker.isReady) {
+          this.langWorker.runUserCode(filename, files, args);
+          Terra.app.layout.checkForStopCodeButton();
           clearInterval(runFileIntervalId);
         }
       }, 200);
-    } else if (Terra.langWorkerApi) {
+    } else if (this.langWorker) {
       // If the worker is ready, run the code immediately.
-      Terra.langWorkerApi.runUserCode(filename, files, args);
-      checkForStopCodeButton();
+      this.langWorker.runUserCode(filename, files, args);
+      Terra.app.layout.checkForStopCodeButton();
+    }
+  }
+
+  handleControlC(event) {
+    if (event.key === 'c' && event.ctrlKey && this.langWorker && this.langWorker.isRunningCode) {
+      this.langWorker.restart(true);
     }
   }
 
@@ -278,10 +304,83 @@ export default class App {
    * This is executed just before the user runs the code from an editor.
    * By default this returns an empty array if not implemented in child classes.
    *
-   * @param {string} FileId - The ID of the file to get the arguments for.
+   * @param {string} fileId - The ID of the file to get the arguments for.
    * @returns {array} The arguments for the current file.
    */
   getCurrentFileArgs(fileId) {
     return [];
+  }
+
+  /**
+   * Run the command of a custom config button.
+   *
+   * @param {string} selector - Unique selector for the button, used to disable
+   * it when running and disable it when it's done running.
+   * @param {array} cmd - List of commands to execute.
+   */
+  async runButtonCommand(selector, cmd) {
+    const $button = $(selector);
+    if ($button.prop('disabled')) return;
+    $button.prop('disabled', true);
+
+    const activeTabName = this.layout.getActiveEditor().getFilename();
+    const files = await this.getAllEditorFiles();
+
+    if (this.langWorker && this.langWorker.isReady) {
+      this.langWorker.runButtonCommand(selector, activeTabName, cmd, files);
+    }
+  }
+
+  /**
+   * Create a new worker instance if none exists already. The existing instance
+   * will be terminated and restarted if necessary.
+   *
+   * @param {string} proglang - The proglang to spawn the related worker for.
+   */
+  createLangWorker(proglang) {
+    // Situation 1: no worker, thus spawn a new one.
+    if (!this.langWorker && LangWorker.hasWorker(proglang)) {
+      this.langWorker = new LangWorker(proglang);
+    } else if (this.langWorker && this.langWorker.proglang !== proglang) {
+      this.langWorker.proglang = proglang;
+
+      // Situation 2: existing worker but new proglang is invalid.
+      if (!LangWorker.hasWorker(proglang)) {
+        this.langWorker.terminate();
+        this.langWorker = null;
+      } else {
+        // Situation 3: existing worker and new proglang is valid.
+        this.langWorker.restart();
+      }
+    }
+  }
+
+  /**
+   * Gather the editor file content based on the fileId.
+   *
+   * @async
+   * @param {string} fileId - The ID of the file.
+   * @returns {Promise<object>} Object containing the filename and content.
+   */
+  async getFileInfo(fileId) {
+    const { name, content } = this.vfs.findFileById(fileId);
+
+    if (this.hasLFSProjectLoaded && !content) {
+      content = await this.lfs.getFileContent(fileId);
+    }
+
+    return { name, content };
+  }
+
+  /**
+   * Gathers all files from the editor and returns them as an array of objects.
+   *
+   * @returns {Promise<array>} List of objects, each containing the filename and
+   * content of the corresponding editor tab.
+   */
+  getAllEditorFiles() {
+    return Promise.all(
+      this.layout.getAllOpenTabFileIds().map(this.getFileInfo)
+    );
   }
 }

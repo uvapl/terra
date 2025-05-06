@@ -57,3 +57,15 @@
 .danger-btn:active {
   background: var(--color-error-hover);
 }
+
+.clear-term-btn img {
+  pointer-events: none;
+  width: 15px;
+  height: 16px;
+  opacity: 0.65;
+}
+
+.clear-term-btn:hover img,
+.clear-term-btn:focus img {
+  opacity: 1;
+}

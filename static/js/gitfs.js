@@ -1,17 +1,20 @@
-import { closeAllFiles } from './helpers/editor-component.js';
-import { getRepoInfo, hasGitFSWorker } from './helpers/shared.js';
 import { createModal, hideModal, showModal } from './modal.js';
-import VFS from './vfs.js';
-import pluginManager from './plugin-manager.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
+import { seconds } from './helpers/shared.js';
 
 /**
  * GitFS worker class that handles all Git operations.
  * This is the bridge class between the app and the git.worker.js.
  */
 export default class GitFS {
+  /**
+   * Local reference to the VFS instance.
+   * @type {VirtualFileSystem}
+   */
+  vfs = null;
+
   /**
    * The repository link that the user is connected to.
    * @type {string}
@@ -30,8 +33,86 @@ export default class GitFS {
    */
   worker = null;
 
-  constructor(repoLink) {
+  constructor(vfs, repoLink) {
+    this.vfs = vfs;
     this._repoLink = repoLink;
+
+    this.bindVFSEvents();
+  }
+
+  bindVFSEvents = () => {
+    this.vfs.addEventListener('fileCreated', this.vfsFileCreatedHandler);
+    this.vfs.addEventListener('fileMoved', this.vfsFileMovedHandler);
+    this.vfs.addEventListener('fileContentChanged', this.vfsFileContentChangedHandler);
+    this.vfs.addEventListener('beforeFileDeleted', this.vfsBeforeFileDeletedHandler);
+
+    this.vfs.addEventListener('folderMoved', this.vfsFolderMovedHandler);
+  }
+
+  vfsFileCreatedHandler = (event) => {
+    const { file } = event.detail;
+    const newPath = this.vfs.getAbsoluteFilePath(file.id)
+    this.commit(newPath, file.content, file.sha);
+  }
+
+  vfsFileMovedHandler = (event) => {
+    const { file, oldPath } = event.detail;
+    const newPath = this.vfs.getAbsoluteFilePath(file.id);
+    this.moveFile(oldPath, file.sha, newPath, file.content);
+  }
+
+  vfsFileContentChangedHandler = (event) => {
+    const { file } = event.detail;
+    const newPath = this.vfs.getAbsoluteFilePath(file.id);
+
+    // Only commit changes after 2 seconds of inactivity.
+    Terra.app.registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
+      this.commit(newPath, file.content, file.sha);
+    });
+  }
+
+  vfsBeforeFileDeletedHandler = (event) => {
+    const  { file } = event.detail;
+    const newPath = this.vfs.getAbsoluteFilePath(file.id);
+    this.rm(newPath, file.sha);
+  }
+
+  vfsFolderMovedHandler = (event) => {
+    const { folder, oldPath } = event.detail;
+    const filesToMove = this.getOldNewFilePathsRecursively(folder.id, oldPath);
+    this.moveFolder(filesToMove);
+  }
+
+  /**
+   * Get all file paths recursively from a folder. Invoked when a folder is
+   * being renamed or moved and updated in the UI when connected to Git.
+   *
+   * @param {string} folderId - The folder id to get the file paths from.
+   * @returns {array} List of objects with the old and new file paths.
+   */
+  getOldNewFilePathsRecursively = (folderId, oldPath) => {
+    const files = this.vfs.findFilesWhere({ parentId: folderId });
+    const folders = this.vfs.findFoldersWhere({ parentId: folderId });
+
+    let paths = files.map((file) => {
+      const newPath = this.vfs.getAbsoluteFilePath(file.id);
+      const filename = newPath.split('/').pop();
+      return {
+        oldPath: `${oldPath}/${filename}`,
+        newPath,
+        content: file.content,
+        sha: file.sha,
+      }
+    });
+
+    for (const folder of folders) {
+      paths = [
+        ...paths,
+        ...this.getOldNewFilePathsRecursively(folder.id, oldPath)
+      ];
+    }
+
+    return paths;
   }
 
   /**
@@ -39,7 +120,7 @@ export default class GitFS {
    *
    * @param {string} accessToken - The user's personal access token.
    */
-  _createWorker(accessToken) {
+  _createWorker = (accessToken) => {
     if (this.worker instanceof Worker) {
       console.error('[GitFS] failed to create a new worker as an instance is already running');
       return;
@@ -65,7 +146,7 @@ export default class GitFS {
   /**
    * Terminate the current worker instance.
    */
-  terminate() {
+  terminate = () => {
     console.log('Terminating existing GitFS worker')
     localStorageManager.setLocalStorageItem('git-repo', '');
     localStorageManager.setLocalStorageItem('git-branch', '');
@@ -78,7 +159,7 @@ export default class GitFS {
   /**
    * Set the current repository link that is cloned in the UI.
    */
-  setRepoLink() {
+  setRepoLink = () => {
     this.worker.postMessage({
       id: 'setRepoLink',
       data: {
@@ -87,7 +168,7 @@ export default class GitFS {
     });
   }
 
-  setRepoBranch(branch) {
+  setRepoBranch = (branch) => {
     this.worker.postMessage({
       id: 'setRepoBranch',
       data: { branch },
@@ -97,7 +178,7 @@ export default class GitFS {
   /**
    * Clone the current repository.
    */
-  clone() {
+  clone = () => {
     this.worker.postMessage({ id: 'clone' });
   }
 
@@ -108,7 +189,7 @@ export default class GitFS {
    * @param {string} filecontents - The new contents to commit.
    * @param {string} sha - The sha of the file to commit.
    */
-  commit(filepath, filecontents, sha) {
+  commit = (filepath, filecontents, sha) => {
     this.worker.postMessage({
       id: 'commit',
       data: { filepath, filecontents, sha },
@@ -121,7 +202,7 @@ export default class GitFS {
    * @param {string} filepath - The absolute filepath within the git repo.
    * @param {string} sha - The sha of the file to delete.
    */
-  rm(filepath, sha) {
+  rm = (filepath, sha) => {
     this.worker.postMessage({
       id: 'rm',
       data: { filepath, sha },
@@ -136,7 +217,7 @@ export default class GitFS {
    * @param {string} newPath - The absolute filepath to the new file.
    * @param {string} newContent - The new content of the file.
    */
-  moveFile(oldPath, oldSha, newPath, newContent) {
+  moveFile = (oldPath, oldSha, newPath, newContent) => {
     this.worker.postMessage({
       id: 'moveFile',
       data: { oldPath, oldSha, newPath, newContent },
@@ -152,7 +233,7 @@ export default class GitFS {
    * @param {string} files[].newPath - The filepath to the new file.
    * @param {string} files[].content - The new content of the file.
    */
-  moveFolder(files) {
+  moveFolder = (files) => {
     this.worker.postMessage({
       id: 'moveFolder',
       data: { files },
@@ -164,7 +245,7 @@ export default class GitFS {
    *
    * @param {object} event - Event object coming from the UI.
    */
-  onmessage(event) {
+  onmessage = (event) => {
     const payload = event.data.data;
 
     switch (event.data.id) {
@@ -215,7 +296,7 @@ export default class GitFS {
         $('#file-tree .info-msg').remove();
         fileTreeManager.removeLocalStorageWarning();
 
-        VFS.importFromGit(payload.repoContents).then(() => {
+        this.importToVFS(payload.repoContents).then(() => {
           Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
           fileTreeManager.createFileTree();
         });
@@ -241,7 +322,7 @@ export default class GitFS {
       case 'move-folder-success':
         // Update all sha in the new files in the VFS.
         payload.updatedFiles.forEach((fileObj) => {
-          const file = VFS.findFileByPath(fileObj.filepath);
+          const file = this.vfs.findFileByPath(fileObj.filepath);
           file.sha = fileObj.sha;
         });
         break;
@@ -249,47 +330,79 @@ export default class GitFS {
       case 'move-file-success':
       case 'commit-success':
         // Update the file's sha in the VFS.
-        const file = VFS.findFileByPath(payload.filepath);
+        const file = this.vfs.findFileByPath(payload.filepath);
         file.sha = payload.sha;
         break;
     }
   }
-}
 
-/**
- * Create a new GitFSWorker instance if it doesn't exist yet and only if the the
- * user provided an ssh-key and repository link that are saved in local storage.
- * Otherwise, a worker will be created automatically when the user adds a new
- * repository.
- *
- * This is considered a private function invoked from VFS.createGitFSWorker.
- */
-export function _createGitFSWorker() {
+  /**
+   * Import files and folders from a git repository into the virtual filesystem.
+   *
+   * Each entry in the repoContents has a path property which contains the whole
+   * relative path from the root of the repository.
+   *
+   * @param {array} repoContents - List of files from the repository.
+   * @async
+   */
+  importToVFS = async (repoContents) => {
+    // Preserve all currently open tabs after refreshing.
+    // We first obtain the current filepaths before clearing the VFS.
+    const tabs = {};
+    Terra.app.layout.getEditorComponents().forEach((editorComponent) => {
+      const { fileId } = editorComponent.getState();
+      if (fileId) {
+        const filepath = this.vfs.getAbsoluteFilePath(fileId);
+        tabs[filepath] = editorComponent;
+      }
+    });
 
-  const accessToken = localStorageManager.getLocalStorageItem('git-access-token');
-  const repoLink = localStorageManager.getLocalStorageItem('git-repo');
-  const repoInfo = getRepoInfo(repoLink);
-  if (repoInfo) {
-    fileTreeManager.setTitle(`${repoInfo.user}/${repoInfo.repo}`)
-  }
+    // Remove all files from the virtual filesystem.
+    this.vfs.clear();
 
-  if (hasGitFSWorker()) {
-    Terra.gitfs.terminate();
-    Terra.gitfs = null;
-    closeAllFiles();
-  }
+    // First create all root files.
+    repoContents
+      .filter((fileOrFolder) => fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/'))
+      .forEach(async (fileOrFolder) => {
+        this.vfs.createFile({
+          name: fileOrFolder.path.split('/').pop(),
+          sha: fileOrFolder.sha,
+          isNew: false,
+          content: fileOrFolder.content,
+        }, false);
+      });
 
-  if (accessToken && repoLink) {
-    Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
+    // Then create all root folders and their nested files.
+    repoContents
+      .filter((fileOrFolder) => !(fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/')))
+      .forEach((fileOrFolder) => {
+        const { sha } = fileOrFolder;
+        const path = fileOrFolder.path.split('/')
+        const name = path.pop();
 
-    const gitfs = new GitFS(repoLink);
-    Terra.gitfs = gitfs;
-    gitfs._createWorker(accessToken);
+        const parentId = path.length > 0 ? this.vfs.findFolderByPath(path.join('/')).id : null;
 
-    fileTreeManager.destroyTree();
+        if (fileOrFolder.type === 'tree') {
+          this.vfs.createFolder({ name, parentId, sha });
+        } else if (fileOrFolder.type === 'blob') {
+          this.vfs.createFile({
+            name,
+            parentId,
+            sha,
+            content: fileOrFolder.content,
+          }, false);
+        }
+      });
 
-    console.log('Creating gitfs worker');
-    $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
-    pluginManager.triggerEvent('onStorageChange', 'git');
+    // Finally, we sync the current tabs with their new file IDs.
+    for (const [filepath, editorComponent] of Object.entries(tabs)) {
+      const file = this.vfs.findFileByPath(filepath);
+      if (file) {
+        editorComponent.extendState({ fileId: file.id });
+        Terra.app.layout.emitToAllComponents('vfsChanged');
+      }
+    }
+
+    this.vfs.saveState();
   }
 }

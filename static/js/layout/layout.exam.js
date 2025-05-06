@@ -27,6 +27,7 @@ export default class ExamLayout extends Layout {
 
     super(defaultLayoutConfig, options);
   }
+
   renderButtons() {
     const runCodeButtonHtml = this.getRunCodeButtonHtml();
     const clearTermButtonHtml = this.getClearTermButtonHtml();

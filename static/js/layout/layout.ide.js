@@ -1,10 +1,10 @@
 import Layout from './layout.js';
-import { hasLFSApi } from '../helpers/shared.js';
-import LFS from '../lfs.js';
 import localStorageManager from '../local-storage-manager.js';
-import { closeFile } from '../helpers/editor-component.js';
 import fileTreeManager from '../file-tree-manager.js';
+import { isValidFilename, isObject, getFileExtension } from '../helpers/shared.js';
 import { BASE_FONT_SIZE, LFS_MAX_FILE_SIZE } from '../constants.js';
+import { createModal, hideModal, showModal } from '../modal.js';
+import Terra from '../terra.js';
 
 export default class IDELayout extends Layout {
   /**
@@ -62,18 +62,21 @@ export default class IDELayout extends Layout {
     super(defaultLayoutConfig, { forceDefaultLayout });
   }
 
-  getClearTermButtonHtml() {
-    return '<button id="clear-term" class="button clear-term-btn">Clear terminal</button>';
-  }
-
   registerEditorCommands(editorComponent) {
     super.registerEditorCommands(editorComponent);
 
     editorComponent.addCommands([
       {
+        name: 'save',
+        bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
+        exec: () => {
+          Terra.app.saveFile();
+        }
+      },
+      {
         name: 'closeFile',
         bindKey: 'Ctrl+W',
-        exec: () => closeFile(),
+        exec: () => this.closeFile(),
       },
       {
         name: 'createNewFileTreeFile',
@@ -100,7 +103,7 @@ export default class IDELayout extends Layout {
   _validateFileSizeLimit(event, editorComponent) {
     // Verify whether the user exceeded the maximum file size when either
     // pasting from the clipboard or inserting text (i.e. on each keystroke).
-    if (hasLFSApi() && LFS.loaded && ['paste', 'insertstring'].includes(event.command.name)) {
+    if (Terra.app.hasLFSProjectLoaded && ['paste', 'insertstring'].includes(event.command.name)) {
       const inputText = event.args.text || '';
       const filesize = new Blob([editorComponent.getContent() + inputText]).size;
       if (filesize >= LFS_MAX_FILE_SIZE) {
@@ -130,10 +133,12 @@ export default class IDELayout extends Layout {
 
     // Add run-code and clear-term to the DOM.
     const $terminalContainer = $('.terminal-component-container');
-    $terminalContainer.find('.lm_header').append(runCodeButtonHtml);
-    $terminalContainer.find('.lm_header > .lm_controls').prepend(clearTermButtonHtml)
+    $terminalContainer.find('.lm_header')
+      .append(clearTermButtonHtml)
+      .append(runCodeButtonHtml);
 
     this.addButtonEventListeners();
+    this.addActiveStates();
   };
 
   onStateChanged() {
@@ -142,7 +147,7 @@ export default class IDELayout extends Layout {
     // Exclude the content from all editors for the IDE when LFS is enabled,
     // because for LFS we use lazy loading, i.e. only load the content when
     // opening the file.
-    if (hasLFSApi() && LFS.loaded) {
+    if (Terra.app.hasLFSProjectLoaded) {
       config = this._removeEditorValue(config);
     }
 
@@ -162,4 +167,201 @@ export default class IDELayout extends Layout {
     }
     return config;
   }
+
+  /**
+   * Creates the HTML recursively for the folder options in the save file modal.
+   *
+   * @param {string} [html] - The HTML string to append to.
+   * @param {string} [parentId] - The parent folder ID where subfolders will be fetched from.
+   * @param {string} [indent] - The visual indent indicator.
+   * @returns {string} The HTML string with the folder options.
+   */
+  createFolderOptionsHtml(html = '', parentId = null, indent = '--') {
+    Terra.app.vfs.findFoldersWhere({ parentId }).forEach((folder, index) => {
+      html += `<option value="${folder.id}">${indent} ${folder.name}</option>`;
+      html += this.createFolderOptionsHtml('', folder.id, indent + '--');
+    });
+
+    return html;
+  }
+
+  /**
+   * Prompt the user with a modal for a filename and in which folder to save it.
+   * This function gets triggered on each 'save' keystroke, i.e. <cmd/ctrl + s>.
+   *
+   * @param {EditorComponent} editorComponent - The editor component instance.
+   */
+  promptSaveFile(editorComponent) {
+    const folderOptions = this.createFolderOptionsHtml();
+
+    const $modal = createModal({
+      title: 'Save file',
+      body: `
+      <div class="form-grid">
+        <div class="form-wrapper">
+          <label>Enter a filename:</label>
+          <div class="right-container">
+            <input class="text-input" placeholder="Enter a filename" value="${editorComponent.getFilename()}" maxlength="30" />
+          </div>
+        </div>
+        <div class="form-wrapper">
+          <label>Select a folder:</label>
+          <div class="right-container">
+            <select class="select">
+              <option value="root">/</option>
+              ${folderOptions}
+            </select>
+          </div>
+        </div>
+      </div>
+      `,
+      footer: `
+        <button type="button" class="button cancel-btn">Cancel</button>
+        <button type="button" class="button confirm-btn primary-btn">Save</button>
+      `,
+      attrs: {
+        id: 'ide-save-file-modal',
+        class: 'modal-width-small'
+      }
+    });
+
+    showModal($modal);
+    $modal.find('.text-input').focus().select();
+
+    $modal.find('.cancel-btn').click(() => {
+      if (Terra.v.saveFileTippy) {
+        Terra.v.saveFileTippy.destroy();
+        Terra.v.saveFileTippy = null;
+      }
+
+      hideModal($modal);
+    });
+
+    $modal.find('.primary-btn').click(() => {
+      const filename = $modal.find('.text-input').val();
+
+      let folderId = $modal.find('.select').val();
+      if (folderId === 'root') {
+        folderId = null;
+      }
+
+      let errorMsg;
+      if (!isValidFilename(filename)) {
+        errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
+      } else if (Terra.app.vfs.existsWhere({ parentId: folderId, name: filename })) {
+        errorMsg = `There already exists a "${filename}" file or folder`;
+      }
+
+      if (errorMsg) {
+        if (isObject(Terra.v.saveFileTippy)) {
+          Terra.v.saveFileTippy.destroy();
+          Terra.v.saveFileTippy = null;
+        }
+
+        // Create new tooltip.
+        Terra.v.saveFileTippy = tippy($modal.find('input').parent()[0], {
+          content: errorMsg,
+          animation: false,
+          showOnCreate: true,
+          placement: 'top',
+          theme: 'error',
+        });
+
+        $modal.find('input').focus().select();
+
+        return;
+      }
+
+      // Remove the tooltip if it exists.
+      if (isObject(Terra.v.saveFileTippy)) {
+        Terra.v.saveFileTippy.destroy();
+        Terra.v.saveFileTippy = null;
+      }
+
+      // Create a new file in the VFS and then refresh the file tree.
+      const { id: nodeId } = Terra.app.vfs.createFile({
+        parentId: folderId,
+        name: filename,
+        content: editorComponent.getContent(),
+      });
+      fileTreeManager.createFileTree();
+
+      // Change the Untitled tab to the new filename.
+      editorComponent.setFilename(filename);
+
+      // Update the container state.
+      editorComponent.extendState({ fileId: nodeId });
+
+      // For some reason no layout update is triggered, so we trigger an update.
+      this.emit('stateChanged');
+
+      hideModal($modal);
+
+      const proglang = getFileExtension(filename);
+
+      // Set correct syntax highlighting.
+      editorComponent.setProgLang(proglang)
+
+      Terra.app.createLangWorker(proglang);
+    });
+  }
+
+  /**
+   * Open a file in the editor, otherwise switch to the tab of the filename.
+   *
+   * @param {string} id - The file id. Leave empty to create new file.
+   * @param {string} filename - The name of the file to open.
+   */
+  addFileTab(id, filename) {
+    let editorComponents = this.getEditorComponents();
+
+    // Try to find the editor component with the given filename or id.
+    const editorComponent = editorComponents.find(
+      (editorComponent) => id === null
+        ? editorComponent.getFilename() === filename
+        : editorComponent.getState().fileId === id
+    );
+
+    if (editorComponent) {
+      // Switch to the active tab that is already open.
+      editorComponent.setActive();
+    } else {
+      let removeFirstTab = false;
+
+      // Check if first tab is an Untitled tab with no content. If so, then remove
+      // it after we've inserted the new tab.
+      if (editorComponents.length === 1 && editorComponents[0].getFilename() === 'Untitled') {
+        if (editorComponents[0].getContent() === '') {
+          removeFirstTab = true;
+        } else {
+          editorComponents[0].clearContent();
+          return;
+        }
+      }
+
+      const activeEditorComponent = this.getActiveEditor();
+      if (activeEditorComponent) {
+        // Add a new tab next to the current active tab.
+        activeEditorComponent.addSiblingTab({
+          title: filename,
+          componentState: {
+            fileId: id,
+          },
+        });
+
+        editorComponents = this.getEditorComponents();
+
+        if (removeFirstTab) {
+          editorComponents[0].fakeOnContainerOpenEvent = true;
+          editorComponents[0].fakeOnEditorFocusEvent = true;
+          editorComponents[1].fakeOnContainerOpenEvent = true;
+          editorComponents[1].fakeOnEditorFocusEvent = true;
+
+          // Close Untitled tab.
+          editorComponents[0].close();
+        }
+      }
+    }
+  }
+
 }
