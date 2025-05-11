@@ -373,12 +373,13 @@ export default class App {
    */
   async getFileInfo(fileId) {
     const { name, content } = this.vfs.findFileById(fileId);
+    const filepath = this.vfs.getAbsoluteFilePath(fileId);
 
     if (this.hasLFSProjectLoaded && !content) {
       content = await this.lfs.getFileContent(fileId);
     }
 
-    return { name, content };
+    return { name, filepath, content };
   }
 
   /**
@@ -389,7 +390,7 @@ export default class App {
    */
   getAllEditorFiles() {
     return Promise.all(
-      this.layout.getAllOpenTabFileIds().map(this.getFileInfo)
+      Object.keys(this.vfs.files).map(this.getFileInfo)
     );
   }
 }
