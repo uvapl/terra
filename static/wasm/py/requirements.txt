@@ -3,3 +3,4 @@ mypy
 checkpy
 pytest
 pandas
+pycodestyle
