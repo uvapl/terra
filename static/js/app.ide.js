@@ -97,10 +97,11 @@ export default class IDEApp extends App {
     const repoLink = localStorageManager.getLocalStorageItem('git-repo');
     if (repoLink) {
       this.createGitFSWorker();
-    } else {
+    } else if (this.hasLFSProjectLoaded) {
       this.lfs.init();
-      fileTreeManager.createFileTree();
     }
+
+    fileTreeManager.createFileTree();
 
     if (!this.browserHasLFSApi()) {
       // Disable open-folder if the FileSystemAPI is not supported.
