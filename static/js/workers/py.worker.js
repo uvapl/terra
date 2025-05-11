@@ -1,5 +1,4 @@
 self.importScripts('../vendor/pyodide-0.25.0.min.js');
-// self.importScripts('../helpers.js')
 self.importScripts('base-api.js')
 
 class API extends BaseAPI {
@@ -9,6 +8,7 @@ class API extends BaseAPI {
     super(options);
     this.hostRead = options.hostRead;
     this.sharedMem = options.sharedMem;
+    this.newFilesCallback = options.newFilesCallback;
     this.runButtonCommandCallback = options.runButtonCommandCallback;
 
     this.initPyodide();
@@ -84,9 +84,6 @@ class API extends BaseAPI {
    * @param {array} files - The files to write to the filesystem.
    */
   writeFilesToVirtualFS(files) {
-    // Ensure that we always operate from the home directory.
-    this.pyodide.FS.chdir("/home/pyodide");
-
     for (const file of files) {
       if (file.filepath.includes('/')) {
         // Create the parent folders.
@@ -117,30 +114,10 @@ class API extends BaseAPI {
     // Ensure that we always operate from the home directory.
     this.pyodide.FS.chdir("/home/pyodide");
 
-    const parentFolderPaths = [];
-
     // Since new files can be created when a python file is executed, we just
     // gather all parent directories and then delete their files, followed by
     // deleting the folder itself, going bottom-up direction.
-
-    // Gather all parent folder paths.
-    for (const file of files) {
-      if (file.filepath.includes('/')) {
-        const parentFolderPath = file.filepath.split('/').slice(0, -1).join('/');
-        if (!parentFolderPaths.includes(parentFolderPath)) {
-          parentFolderPaths.push(parentFolderPath);
-        }
-      }
-    }
-
-    // Sort the parent folders based on how many subfolders they have.
-    parentFolderPaths.sort((a, b) => {
-      const aCount = a.split('/').length;
-      const bCount = b.split('/').length;
-      if (aCount < bCount) return 1;
-      if (aCount > bCount) return -1;
-      return 0;
-    });
+    const parentFolderPaths = this.getParentFolderPaths(files);
 
     // Delete the parent folders if they are empty and exist, bottom-up.
     for (const folderpath of parentFolderPaths) {
@@ -166,6 +143,38 @@ class API extends BaseAPI {
         this.pyodide.FS.unlink(filepath);
       }
     }
+  }
+
+  /**
+   * Get all the parent folder paths of the given list of files, sorted by how
+   *  many subfolders they have.
+   *
+   * @param {array} files - List of files to get the parent folder paths from.
+   * @returns {array} List of strings containing the parent folder paths.
+   */
+  getParentFolderPaths(files) {
+    const parentFolderPaths = [];
+
+    // Gather all parent folder paths.
+    for (const file of files) {
+      if (file.filepath.includes('/')) {
+        const parentFolderPath = file.filepath.split('/').slice(0, -1).join('/');
+        if (!parentFolderPaths.includes(parentFolderPath)) {
+          parentFolderPaths.push(parentFolderPath);
+        }
+      }
+    }
+
+    // Sort the parent folders based on how many subfolders they have.
+    parentFolderPaths.sort((a, b) => {
+      const aCount = a.split('/').length;
+      const bCount = b.split('/').length;
+      if (aCount < bCount) return 1;
+      if (aCount > bCount) return -1;
+      return 0;
+    });
+
+    return parentFolderPaths;
   }
 
   /**
@@ -199,6 +208,35 @@ class API extends BaseAPI {
   }
 
   /**
+   * Check if new files have been created in the virtual filesystem, based on
+   * the files that were passed to the runUserCode function.
+   */
+  checkForNewFiles(files) {
+    const parentFolderPaths = this.getParentFolderPaths(files);
+    const newFiles = [];
+
+    // Iterate bottoms-up over the parent folders and read all filenames inside
+    // the coresponding folder. Then, check if any of those files exist inside
+    // the `files` parameter. If not, it's a new file.
+    for (const folderpath of parentFolderPaths) {
+      const subFolderFilePaths = this.pyodide.FS.readdir(folderpath);
+      for (const filename of subFolderFilePaths) {
+        const filepath = `${folderpath}/${filename}`;
+        if (this.fileExists(filepath)) {
+          // Check if the file already exists in the files parameter.
+          const isNewFile = !files.some((f) => f.filepath === filepath);
+          if (isNewFile) {
+            const content = this.pyodide.FS.readFile(filepath, { encoding: 'utf8' });
+            newFiles.push({ name: filename, filepath, content });
+          }
+        }
+      }
+    }
+
+    return newFiles;
+  }
+
+  /**
    * Run the user's code and print the output to the terminal.
    *
    * @param {object} data - The data object coming from the worker.
@@ -208,6 +246,9 @@ class API extends BaseAPI {
    */
   runUserCode({ activeTabName, files }) {
     try {
+      // Ensure that we always operate from the home directory as a fresh start.
+      this.pyodide.FS.chdir("/home/pyodide");
+
       this.writeFilesToVirtualFS(files);
 
       const activeTab = files.find(file => file.name === activeTabName);
@@ -223,11 +264,19 @@ class API extends BaseAPI {
         this.hostWrite(error);
       }
     } finally {
+      // Ensure that we always operate from the home directory, because the cwd
+      // might have changed during execution.
+      this.pyodide.FS.chdir("/home/pyodide");
+
+      const newFiles = this.checkForNewFiles(files);
+
       this.deleteFilesFromVirtualFS(files);
 
-      if (typeof this.runUserCodeCallback === 'function') {
-        this.runUserCodeCallback();
+      if (newFiles.length > 0) {
+        this.newFilesCallback(newFiles);
       }
+
+      this.runUserCodeCallback(newFiles);
     }
   }
 
@@ -405,8 +454,12 @@ const onAnyMessage = async event => {
           port.postMessage({ id: 'ready' });
         },
 
-        runUserCodeCallback() {
-          port.postMessage({ id: 'runUserCodeCallback' });
+        newFilesCallback(newFiles) {
+          port.postMessage({ id: 'newFilesCallback', newFiles });
+        },
+
+        runUserCodeCallback(newFiles) {
+          port.postMessage({ id: 'runUserCodeCallback', newFiles });
         },
 
         runButtonCommandCallback(selector) {

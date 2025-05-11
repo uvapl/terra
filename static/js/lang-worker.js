@@ -1,5 +1,7 @@
 import { getFileExtension } from './helpers/shared.js';
 import Terra from './terra.js';
+import fileTreeManager from './file-tree-manager.js';
+
 
 /**
  * List of supported programming languages that have a corresponding worker.
@@ -251,6 +253,33 @@ export default class LangWorker {
   }
 
   /**
+   * Called from within the worker when new files have been added to the
+   * worker's internal filesystem during execution of the program.
+   *
+   * @param {array} newFiles - List of file objects.
+   */
+  newFilesCallback(newFiles) {
+    if (!Array.isArray(newFiles)) {
+      return;
+    }
+
+    for (const file of newFiles) {
+      const parentFolderPath = file.filepath.split('/').slice(0, -1).join('/');
+      const parentFolder = Terra.app.vfs.findFolderByPath(parentFolderPath);
+      if (parentFolder) {
+        Terra.app.vfs.createFile({
+          name: file.name,
+          content: file.content,
+          parentId: parentFolder.id,
+        });
+      }
+    }
+
+    // Recreate the file tree.
+    fileTreeManager.createFileTree();
+  }
+
+  /**
    * Message event handler for the worker.
    *
    * @param {object} event - Event object coming from the UI.
@@ -311,6 +340,10 @@ export default class LangWorker {
       // triggered after excecuting the user's code.
       case 'runUserCodeCallback':
         this.runUserCodeCallback();
+        break;
+
+      case 'newFilesCallback':
+        this.newFilesCallback(event.data.newFiles);
         break;
     }
   }
