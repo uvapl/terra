@@ -83,7 +83,9 @@ class FileTreeManager {
     const tree = this.getInstance();
     if (parentId) {
       const parentNode = tree.getNodeByKey(parentId);
-      parentNode.setExpanded();
+      if (!parentNode.expanded) {
+        parentNode.setExpanded();
+      }
 
       parentNode.addChildren(newChildProps);
     } else {
@@ -98,14 +100,10 @@ class FileTreeManager {
 
     const newNode = tree.getNodeByKey(id);
 
-    // Check again if the parent node is expanded, because the node might have
-    // been added to a closed folder. Only then we can trigger editStart().
-    if (parentId) {
-      tree.getNodeByKey(parentId).setExpanded();
-    }
-
     // Trigger edit mode for the new node.
-    newNode.editStart();
+    setTimeout(() => {
+      newNode.editStart();
+    }, 0);
   }
 
   /**

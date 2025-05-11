@@ -93,22 +93,24 @@ export default class IDEApp extends App {
   }
 
   postSetupLayout() {
-    // Fetch the repo files or the local storage files (vfs) otherwise.
+    // Check what to start after the page loads (GitFS, LFS or local storage).
     const repoLink = localStorageManager.getLocalStorageItem('git-repo');
+    const useLFS = localStorageManager.getLocalStorageItem('use-lfs', false);
     if (repoLink) {
       this.createGitFSWorker();
-    } else if (this.hasLFSProjectLoaded) {
+    } else if (useLFS) {
       this.lfs.init();
+    } else {
+      // local storage
+      fileTreeManager.createFileTree();
     }
-
-    fileTreeManager.createFileTree();
 
     if (!this.browserHasLFSApi()) {
       // Disable open-folder if the FileSystemAPI is not supported.
       $('#menu-item--open-folder').remove();
     }
 
-    if (!repoLink && !this.browserHasLFSApi()) {
+    if (!repoLink && !useLFS) {
       fileTreeManager.showLocalStorageWarning();
     }
 
