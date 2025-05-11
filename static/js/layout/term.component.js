@@ -131,7 +131,7 @@ export default class TerminalComponent {
 
   globalKeyEventHandler = (event) => {
     if (event.key === 'c' && event.ctrlKey) {
-      Terra.app.handleControlC;
+      Terra.app.handleControlC(event);
     } else if (event.key === 'k' && (isMac() ? event.metaKey : event.ctrlKey)) {
       this.clear();
     }
