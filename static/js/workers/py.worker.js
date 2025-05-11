@@ -84,6 +84,9 @@ class API extends BaseAPI {
    * @param {array} files - The files to write to the filesystem.
    */
   writeFilesToVirtualFS(files) {
+    // Ensure that we always operate from the home directory.
+    this.pyodide.FS.chdir("/home/pyodide");
+
     for (const file of files) {
       if (file.filepath.includes('/')) {
         // Create the parent folders.
@@ -106,6 +109,66 @@ class API extends BaseAPI {
   }
 
   /**
+   * Delete a list of files from pyodide's virtual filesystem.
+   *
+   * @param {array} files - The files to delete from the filesystem.
+   */
+  deleteFilesFromVirtualFS(files) {
+    // Ensure that we always operate from the home directory.
+    this.pyodide.FS.chdir("/home/pyodide");
+
+    const parentFolderPaths = [];
+
+    // Since new files can be created when a python file is executed, we just
+    // gather all parent directories and then delete their files, followed by
+    // deleting the folder itself, going bottom-up direction.
+
+    // Gather all parent folder paths.
+    for (const file of files) {
+      if (file.filepath.includes('/')) {
+        const parentFolderPath = file.filepath.split('/').slice(0, -1).join('/');
+        if (!parentFolderPaths.includes(parentFolderPath)) {
+          parentFolderPaths.push(parentFolderPath);
+        }
+      }
+    }
+
+    // Sort the parent folders based on how many subfolders they have.
+    parentFolderPaths.sort((a, b) => {
+      const aCount = a.split('/').length;
+      const bCount = b.split('/').length;
+      if (aCount < bCount) return 1;
+      if (aCount > bCount) return -1;
+      return 0;
+    });
+
+    // Delete the parent folders if they are empty and exist, bottom-up.
+    for (const folderpath of parentFolderPaths) {
+      if (this.directoryExists(folderpath)) {
+        // Delete all files in the folder.
+        const subFolderFilePaths = this.pyodide.FS.readdir(folderpath);
+        for (const file of subFolderFilePaths) {
+          const filepath = `${folderpath}/${file}`;
+          if (this.fileExists(filepath)) {
+            this.pyodide.FS.unlink(filepath);
+          }
+        }
+
+        // Delete the folder itself.
+        this.pyodide.FS.rmdir(folderpath);
+      }
+    }
+
+    // Finally, delete all the files inside the home directory.
+    const rootFilePaths = this.pyodide.FS.readdir('/home/pyodide');
+    for (const filepath of rootFilePaths) {
+      if (this.fileExists(filepath)) {
+        this.pyodide.FS.unlink(filepath);
+      }
+    }
+  }
+
+  /**
    * Check if a given folderpath exists in the pyodide filesystem.
    *
    * @param {string} folderpath - The folderpath to check.
@@ -121,6 +184,21 @@ class API extends BaseAPI {
   }
 
   /**
+   * Check if a given filepath exists in the pyodide filesystem.
+   *
+   * @param {string} filepath - The filepath to check.
+   * @returns {boolean} True if the path exists, false otherwise.
+   */
+  fileExists(filepath) {
+    try {
+      const stat = this.pyodide.FS.stat(filepath);
+      return this.pyodide.FS.isFile(stat.mode);
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /**
    * Run the user's code and print the output to the terminal.
    *
    * @param {object} data - The data object coming from the worker.
@@ -130,10 +208,6 @@ class API extends BaseAPI {
    */
   runUserCode({ activeTabName, files }) {
     try {
-      // Ensure that we always operate from the home directory before doing
-      // anyhting else, because the cwd might change below.
-      this.pyodide.FS.chdir("/home/pyodide");
-
       this.writeFilesToVirtualFS(files);
 
       const activeTab = files.find(file => file.name === activeTabName);
@@ -149,6 +223,8 @@ class API extends BaseAPI {
         this.hostWrite(error);
       }
     } finally {
+      this.deleteFilesFromVirtualFS(files);
+
       if (typeof this.runUserCodeCallback === 'function') {
         this.runUserCodeCallback();
       }
