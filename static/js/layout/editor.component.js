@@ -188,11 +188,9 @@ export default class EditorComponent extends EventTarget {
       return;
     }
 
-    setTimeout(() => {
-      if (this.editor) {
-        this.editor.focus();
-      }
-    }, 0);
+    if (this.editor) {
+      this.editor.focus();
+    }
 
     // Add custom class for styling purposes.
     this.getParentComponentElement().classList.add('component-container', 'editor-component-container');
