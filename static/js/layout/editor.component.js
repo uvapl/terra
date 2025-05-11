@@ -142,6 +142,15 @@ export default class EditorComponent extends EventTarget {
   }
 
   /**
+   * Focus the editor instance.
+   */
+  focus = () => {
+    if (this.editor) {
+      this.editor.focus();
+    }
+  }
+
+  /**
    * Callback when the editor content changes, triggered each keystroke.
    */
   onEditorChange = () => {
