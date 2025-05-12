@@ -142,6 +142,15 @@ export default class EditorComponent extends EventTarget {
   }
 
   /**
+   * Focus the editor instance.
+   */
+  focus = () => {
+    if (this.editor) {
+      this.editor.focus();
+    }
+  }
+
+  /**
    * Callback when the editor content changes, triggered each keystroke.
    */
   onEditorChange = () => {
@@ -185,14 +194,22 @@ export default class EditorComponent extends EventTarget {
 
     if (this.fakeOnContainerOpenEvent) {
       this.fakeOnContainerOpenEvent = false;
+
+      // This focus is needed when there's solely an Untitled tab and the user
+      // is opening another tab from the file-tree in the IDE. This ensures the
+      // `this.fakeOnEditorFocusEvent` is willl be set to false in the
+      // `onEditorFocus` method.
+      this.editor.focus();
       return;
     }
 
+    // This focus is needed when switching between tabs where we use a
+    // set-timeout to make sure the editor is fully rendered.
     setTimeout(() => {
       if (this.editor) {
         this.editor.focus();
       }
-    }, 0);
+    }, 100);
 
     // Add custom class for styling purposes.
     this.getParentComponentElement().classList.add('component-container', 'editor-component-container');

@@ -27,8 +27,14 @@ export default class ExamApp extends App {
    */
   config = null;
 
+  /**
+   * Whether the user has made any changes in any editor.
+   * @type {boolean}
+   */
+  editorContentChanged = false;
+
   onEditorStartEditing(editorComponent) {
-    Terra.v.editorIsDirty = true;
+    this.editorContentChanged = true;
   }
 
   setupLayout() {
@@ -99,7 +105,7 @@ export default class ExamApp extends App {
   }
 
   postSetupLayout() {
-    Terra.v.editorIsDirty = false;
+    this.editorContentChanged = false;
 
     if (this.config.course_name && this.config.exam_name) {
       $('.page-title').html(`
@@ -111,9 +117,10 @@ export default class ExamApp extends App {
     // Register the auto-save after a certain auto-save offset time to prevent
     // the server receives many requests at once. This helps to spread them out
     // over a minute of time.
+    const forceAutoSave = localStorageManager.getLocalStorageItem('editor-content-changed', false);
     const startTimeout = getRandNumBetween(0, AUTOSAVE_START_OFFSET);
     setTimeout(() => {
-      Terra.app.registerAutoSave(this.config.postback, this.config.code);
+      Terra.app.registerAutoSave(this.config.postback, this.config.code, forceAutoSave);
     }, startTimeout);
 
     // Make the right navbar visible and add the click event listener to the
@@ -128,8 +135,12 @@ export default class ExamApp extends App {
       Terra.app.lock();
     }
 
-    // Catch ctrl-w and cmd-w to prevent the user from closing the tab.
+    // Catch ctrl/cmd+w (aka page reloading) to prevent the user from closing the tab.
     $(window).on('beforeunload', (e) => {
+      if (this.editorContentChanged) {
+        localStorageManager.setLocalStorageItem('editor-content-changed', true);
+      }
+
       const message = 'Are you sure you want to leave this page?';
       e.preventDefault();
       e.returnValue = message;
@@ -265,8 +276,8 @@ export default class ExamApp extends App {
     $submitModal = $('#submit-exam-model');
     if ($submitModal.length > 0) {
       let lastSubmissionText = '';
-      if (Terra.v.prevAutoSaveTime instanceof Date) {
-        lastSubmissionText = `<br/><br/>✅ The last successful submit was at ${formatDate(Terra.v.prevAutoSaveTime)}.`;
+      if (this.prevAutoSaveTime instanceof Date) {
+        lastSubmissionText = `<br/><br/>✅ The last successful submit was at ${formatDate(this.prevAutoSaveTime)}.`;
       }
 
       $submitModal.find('.modal-body').html(`❌ The submission was locked since the last submit. ${lastSubmissionText}`);
@@ -355,14 +366,14 @@ export default class ExamApp extends App {
    * @param {function} [saveCallback] - Callback when the save has been done.
    */
   registerAutoSave(url, uuid, force, saveCallback) {
-    if (Terra.v.autoSaveIntervalId) {
-      clearInterval(Terra.v.autoSaveIntervalId);
+    if (this.autoSaveIntervalId) {
+      clearInterval(this.autoSaveIntervalId);
     }
 
     const run = async () => {
       // Explicitly use a try-catch to make sure this auto-save never stops.
       try {
-        if (Terra.v.editorIsDirty || force) {
+        if (this.editorContentChanged || force) {
           // Save the editor content.
           const res = await this.doAutoSave(url, uuid);
 
@@ -373,7 +384,7 @@ export default class ExamApp extends App {
           // Check if the response returns a "423 Locked" status, indicating
           // that the user the submission has been closed.
           if (res.status === 423) {
-            clearInterval(Terra.v.autoSaveIntervalId);
+            clearInterval(this.autoSaveIntervalId);
             Terra.app.lock();
             return;
           }
@@ -383,8 +394,9 @@ export default class ExamApp extends App {
             throw new Error(`[${res.status} ${res.statusText}] ${res.url}`);
           }
 
-          // Reset the dirty flag as the response is successful at this point.
-          Terra.v.editorIsDirty = false;
+          // The response is successful at this point, thus reset flag.
+          this.editorContentChanged = false;
+          localStorageManager.removeLocalStorageItem('editor-content-changed');
 
           // Update the last saved timestamp in the UI.
           this.updateLastSaved();
@@ -396,7 +408,7 @@ export default class ExamApp extends App {
       }
     };
 
-    Terra.v.autoSaveIntervalId = setInterval(run, AUTOSAVE_INTERVAL);
+    this.autoSaveIntervalId = setInterval(run, AUTOSAVE_INTERVAL);
 
     if (force) run();
   }
@@ -410,14 +422,14 @@ export default class ExamApp extends App {
 
     if (showPrevAutoSaveTime) {
       let msg = `Could not save at ${autoSaveTime}`;
-      if (Terra.v.prevAutoSaveTime instanceof Date) {
-        msg += ` (last save at ${formatDate(Terra.v.prevAutoSaveTime)})`
+      if (this.prevAutoSaveTime instanceof Date) {
+        msg += ` (last save at ${formatDate(this.prevAutoSaveTime)})`
       }
 
       this.notifyError(msg);
     } else {
       Terra.app.notify(`Last save at ${autoSaveTime}`);
-      Terra.v.prevAutoSaveTime = currDate;
+      this.prevAutoSaveTime = currDate;
 
       const $modal = $('#submit-exam-model');
       if ($modal.length > 0) {
@@ -481,8 +493,8 @@ export default class ExamApp extends App {
    */
   showSubmitExamModal() {
     let lastSaveText = '';
-    if (Terra.v.prevAutoSaveTime instanceof Date) {
-      lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${formatDate(Terra.v.prevAutoSaveTime)}</span>.<br/>`;
+    if (this.prevAutoSaveTime instanceof Date) {
+      lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${formatDate(this.prevAutoSaveTime)}</span>.<br/>`;
     }
 
     const modalHtml = `

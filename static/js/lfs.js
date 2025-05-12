@@ -110,11 +110,6 @@ export default class LocalFileSystem {
   }
 
   init = async () => {
-    const lastTimeUsedLFS = localStorageManager.getLocalStorageItem('use-lfs', false);
-    if (!lastTimeUsedLFS) {
-      fileTreeManager.showLocalStorageWarning();
-    };
-
     const rootFolderHandle = await this.getFolderHandle('root');
     if (!rootFolderHandle) return;
 

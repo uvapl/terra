@@ -73,8 +73,8 @@ export default class GitFS {
 
   vfsBeforeFileDeletedHandler = (event) => {
     const  { file } = event.detail;
-    const newPath = this.vfs.getAbsoluteFilePath(file.id);
-    this.rm(newPath, file.sha);
+    const path = this.vfs.getAbsoluteFilePath(file.id);
+    this.rm(path, file.sha);
   }
 
   vfsFolderMovedHandler = (event) => {

@@ -47,12 +47,12 @@ export function renderGitRepoBranches(branches) {
     localStorageManager.setLocalStorageItem('git-branch', newBranch);
     $element.addClass('active').siblings().removeClass('active');
 
-    Terra.app.vfs._git('setRepoBranch', newBranch);
+    Terra.app.gitfs.setRepoBranch(newBranch);
 
     fileTreeManager.destroyTree();
 
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
-    Terra.app.vfs._git('clone');
+    Terra.app.gitfs.clone();
     Terra.app.layout.closeAllFiles();
   });
 }
@@ -92,9 +92,7 @@ function closeActiveMenuBarMenu(event) {
   if (isInsideMenu && isNotNewFileOrFolderBtn && editorComponent && editorComponent.ready) {
     // Set Terra.v.blockLFSPolling to prevent file contents being reloaded
     Terra.v.blockLFSPolling = true;
-    if (editorComponent.editor) {
-      editorComponent.editor.focus();
-    }
+    editorComponent.focus();
     Terra.v.blockLFSPolling = false;
   }
 
@@ -200,7 +198,7 @@ Menubar.openNewFile = () => {
 };
 
 Menubar.openLFSFolder = () => {
-  Terra.app.vfs._lfs('openFolderPicker').then(() => {
+  Terra.app.lfs.openFolderPicker().then(() => {
     $('#file-tree .info-msg').remove();
     $('#menu-item--close-folder').removeClass('disabled');
   });
@@ -209,7 +207,7 @@ Menubar.openLFSFolder = () => {
 Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-folder').hasClass('disabled')) return;
 
-  Terra.app.vfs._lfs('closeFolder');
+  Terra.app.lfs.closeFolder();
   Terra.app.layout.closeAllFiles();
   closeActiveMenuBarMenu(event);
 };
