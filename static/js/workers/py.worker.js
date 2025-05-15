@@ -34,10 +34,15 @@ class API extends BaseAPI {
       // mode, which gets triggered on every character the stdout receives.
       this.pyodide.setStdout({
         raw: (charCode) => this.hostWrite(String.fromCharCode(charCode))
-      })
+      });
 
       // Import some basic modules.
       this.pyodide.runPython('import io, sys');
+
+      // Pyodide sets the sys path to /home/pyodide, but native python has this
+      // set to an empty string. This allows for relative imports.
+      // @see https://github.com/pyodide/pyodide/discussions/5629#discussioncomment-13107855
+      this.pyodide.runPython('sys.path[0] = ""');
 
       // Get pyodide's Python version.
       const pyVersion = this.pyodide.runPython("sys.version.split(' ')[0]");
@@ -259,6 +264,7 @@ class API extends BaseAPI {
       }
 
       this.hostWriteCmd(`python3 ${activeTab.name}`);
+
       const error = this.run(activeTab.content, activeTabName);
       if (error) {
         this.hostWrite(error);
