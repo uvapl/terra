@@ -349,11 +349,11 @@ export default class GitFS {
     // Preserve all currently open tabs after refreshing.
     // We first obtain the current filepaths before clearing the VFS.
     const tabs = {};
-    Terra.app.layout.getEditorComponents().forEach((editorComponent) => {
-      const { fileId } = editorComponent.getState();
+    Terra.app.layout.getTabComponents().forEach((tabComponent) => {
+      const { fileId } = tabComponent.getState();
       if (fileId) {
         const filepath = this.vfs.getAbsoluteFilePath(fileId);
-        tabs[filepath] = editorComponent;
+        tabs[filepath] = tabComponent;
       }
     });
 
@@ -395,10 +395,10 @@ export default class GitFS {
       });
 
     // Finally, we sync the current tabs with their new file IDs.
-    for (const [filepath, editorComponent] of Object.entries(tabs)) {
+    for (const [filepath, tabComponent] of Object.entries(tabs)) {
       const file = this.vfs.findFileByPath(filepath);
       if (file) {
-        editorComponent.extendState({ fileId: file.id });
+        tabComponent.extendState({ fileId: file.id });
         Terra.app.layout.emitToAllComponents('vfsChanged');
       }
     }

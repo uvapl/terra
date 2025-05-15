@@ -1,4 +1,5 @@
-import { Octokit } from "../vendor/octokit-core-6.1.3.min.js";
+import { isImageExtension } from '../helpers/image.js';
+import { Octokit } from '../vendor/octokit-core-6.1.3.min.js';
 
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/;
 
@@ -291,7 +292,10 @@ class API {
               });
 
               const content = atob(res.data.content);
-              if (content) {
+              if (isImageExtension(fileOrFolder.path)) {
+                // Use the base64 string to create a blob URL later.
+                fileOrFolder.content = res.data.content.replace(/\n/g, "");
+              } else if (content) {
                 fileOrFolder.content = content;
               }
             } catch {
@@ -321,7 +325,7 @@ class API {
       path: filepath,
       message: `Update ${filepath}`,
       committer: this.committer,
-      content: btoa(filecontents),
+      content: isImageExtension(filepath) ? filecontents : btoa(filecontents),
       branch: this.repoBranch,
       sha,
     });
@@ -365,7 +369,7 @@ class API {
       message: `Rename ${oldPath} to ${newPath}`,
       branch: this.repoBranch,
       committer: this.committer,
-      content: btoa(newContent),
+      content: isImageExtension(newPath) ? newContent : btoa(newContent),
     });
 
     // Delete the old file.

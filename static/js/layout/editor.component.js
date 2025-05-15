@@ -1,30 +1,19 @@
 import { BASE_FONT_SIZE } from '../constants.js';
-import { getFileExtension, seconds } from '../helpers/shared.js';
+import { eventTargetMixin, getFileExtension, seconds } from '../helpers/shared.js';
 import pluginManager from '../plugin-manager.js';
 import localStorageManager from '../local-storage-manager.js';
 import Terra from '../terra.js';
+import TabComponent from './tab.component.js';
 
 /**
  * Editor component for GoldenLayout.
  */
-export default class EditorComponent extends EventTarget {
+export default class EditorComponent extends TabComponent {
   /**
    * Whether the editor has been rendered.
    * @type {boolean}
    */
   ready = false;
-
-  /**
-   * Component container object.
-   * @type {GoldenLayout.ItemContainer}
-   */
-  container = null;
-
-  /**
-   * Initialization state.
-   * @type {object}
-   */
-  state = null;
 
   /**
    * Instance of the editor for the current tab.
@@ -33,33 +22,20 @@ export default class EditorComponent extends EventTarget {
   editor = null;
 
   /**
-   * Whether the onContainerOpen event has been triggered falsely.
-   * This happens when there is a single empty Untitled tab where the user
-   * clicks on the left-sidebar to open another file. At this moment, the
-   * Untitled tab will be closed, however, GoldenLayout switches to the Untitled
-   * tab, closes it and then switches back to the newly inserted tab, which
-   * triggers another 'show' event, which leads to code being run twice and thus
-   * leading in an unexpected onfilechange event triggered, while the only thing
-   * that the user did was open file.
-   */
-  fakeOnContainerOpenEvent = false;
-  fakeOnEditorFocusEvent = false;
-
-  /**
    * Indicates whether the user is currently typing in the editor.
    * @type {boolean}
    */
   userIsEditing = false;
 
   constructor(container, state) {
-    super();
-    this.container = container;
-    this.state = state;
+    super(container, state);
 
     this.init();
   }
 
   init = () => {
+    this.container.parent.isEditor = true;
+
     this.bindContainerEvents();
     this.initEditor();
     this.bindEditorEvents();
@@ -215,6 +191,11 @@ export default class EditorComponent extends EventTarget {
     this.getParentComponentElement().classList.add('component-container', 'editor-component-container');
   }
 
+  onHide = () => {
+    // Remove class that was added.
+    this.getParentComponentElement().classList.remove('component-container', 'editor-component-container');
+  }
+
   /**
    * Get the cursor position in the editor.
    *
@@ -235,42 +216,6 @@ export default class EditorComponent extends EventTarget {
     if (this.editor) {
       this.editor.moveCursorToPosition(point);
     }
-  }
-
-  /**
-   * Get the current state of the editor.
-   *
-   * @returns {object} The state of the editor.
-   */
-  getState = () => {
-    return this.container.getState();
-  }
-
-  /**
-   * Extend the curent state of the editor.
-   *
-   * @param {object} state - Additional values to overwrite or set.
-   */
-  extendState = (state) => {
-    this.container.extendState(state);
-  }
-
-  /**
-   * Get the filename of the corresponding tab.
-   *
-   * @returns {string} The name of the tab.
-   */
-  getFilename = () => {
-    return this.container.parent.config.title;
-  }
-
-  /**
-   * Set the filename of the corresponding tab.
-   *
-   * @param {string} filename - The new name of the tab.
-   */
-  setFilename = (filename) => {
-    this.container.parent.setTitle(filename);
   }
 
   /**
@@ -314,13 +259,6 @@ export default class EditorComponent extends EventTarget {
   }
 
   /**
-   * Close the current editor, which will completely destroy the editor.
-   */
-  close = () => {
-    this.container.close();
-  }
-
-  /**
    * Lock the current editor by disabling any user input and any selection.
    */
   lock = () => {
@@ -346,24 +284,6 @@ export default class EditorComponent extends EventTarget {
       highlightGutterLine: true,
       highlightSelectedWord: true,
       highlightIndentGuides: true,
-    });
-  }
-
-  /**
-   * Add a new Untitled sibling tab next to the current editor.
-   *
-   * @param {GoldenLayout.ContentItem} config - Content item config object.
-   */
-  addSiblingTab = (config = {}) => {
-    this.container.parent.parent.addChild({
-      type: 'component',
-      componentName: 'editor',
-      title: 'Untitled',
-      componentState: {
-        fontSize: BASE_FONT_SIZE,
-        ...config.componentState
-      },
-      ...config,
     });
   }
 
@@ -418,10 +338,6 @@ export default class EditorComponent extends EventTarget {
     this.editor.getSession().getUndoManager().reset();
   }
 
-  setActive = () => {
-    this.container.parent.parent.setActiveContentItem(this.container.parent);
-  }
-
   /**
    * Callback before the container is destroyed.
    */
@@ -431,13 +347,6 @@ export default class EditorComponent extends EventTarget {
 
     this.editor.destroy();
     this.editor = null;
-  }
-
-  /**
-   * Get the parent component element.
-   */
-  getParentComponentElement = () => {
-    return this.container.parent.parent.element[0];
   }
 
   /**
@@ -637,6 +546,11 @@ export default class EditorComponent extends EventTarget {
       this.onShow();
       this.dispatchEvent(new Event('show'));
       pluginManager.triggerEvent('onEditorShow', this);
+    });
+
+    this.container.on('hide', () => {
+      this.onHide();
+      pluginManager.triggerEvent('onEditorHide', this);
     });
 
     this.container.on('lock', () => {

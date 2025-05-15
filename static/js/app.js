@@ -99,14 +99,16 @@ export default class App {
       'onEditorStopEditing',
       'onEditorChange',
       'onEditorShow',
-      'onVFSChanged',
+      'onEditorVFSChanged',
+      'onImageShow',
+      'onImageVFSChanged',
     ];
 
     editorEvents.forEach((eventName) => {
       this.layout.addEventListener(eventName, (event) => {
-        const { editorComponent } = event.detail;
+        const { tabComponent } = event.detail;
         if (typeof this[eventName] === 'function') {
-          this[eventName](editorComponent);
+          this[eventName](tabComponent);
         }
       });
     });
@@ -178,11 +180,23 @@ export default class App {
    *
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  onVFSChanged(editorComponent) {
+  onEditorVFSChanged(editorComponent) {
     if (!Terra.v.blockLFSPolling) {
       this.setEditorFileContent(editorComponent, true);
     }
   }
+
+  onImageShow(imageComponent) {
+    this.terminateLangWorker();
+    this.setImageFileContent(imageComponent);
+  }
+
+  onImageVFSChanged(imageComponent) {
+    if (!Terra.v.blockLFSPolling) {
+      this.setImageFileContent(imageComponent);
+    }
+  }
+
 
   /**
    * Reload the file content either from VFS or LFS.
@@ -356,12 +370,21 @@ export default class App {
 
       // Situation 2: existing worker but new proglang is invalid.
       if (!LangWorker.hasWorker(proglang)) {
-        this.langWorker.terminate();
-        this.langWorker = null;
+        this.terminateLangWorker();
       } else {
         // Situation 3: existing worker and new proglang is valid.
         this.langWorker.restart();
       }
+    }
+  }
+
+  /**
+  * Terminate the current language worker if it exists.
+   */
+  terminateLangWorker() {
+    if (this.langWorker) {
+      this.langWorker.terminate();
+      this.langWorker = null;
     }
   }
 

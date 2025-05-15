@@ -1,4 +1,3 @@
-import { IS_IDE } from '../constants.js';
 import GitFS from '../gitfs.js';
 import Terra from '../terra.js';
 
@@ -251,7 +250,7 @@ export function seconds(secs) {
  * @returns {boolean} True if the worker has been initialised, false otherwise.
  */
 export function hasGitFSWorker() {
-  return IS_IDE && Terra.app.gitfs instanceof GitFS;
+  return Terra.app.gitfs instanceof GitFS;
 }
 
 /**

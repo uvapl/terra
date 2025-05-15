@@ -177,6 +177,7 @@ export class TerraPlugin {
   // onEditorChange = (editorComponent) => { }
   // onEditorFocus = (editorComponent) => { }
   // onEditorShow = (editorComponent) => { }
+  // onEditorHide = (editorComponent) => { }
   // onEditorLoad = (editorComponent) => { }
   // onEditorLock = (editorComponent) => { }
   // onEditorUnlock = (editorComponent) => { }
@@ -185,6 +186,10 @@ export class TerraPlugin {
   // onEditorContainerResize = (editorComponent) => { }
   // onEditorDestroy = (editorComponent) => { }
   // onEditorContentChanged (editorComponent) => { }
+  // onImageShow = (imageComponent) => { }
+  // onImageHide = (imageComponent) => { }
+  // onImageDestroy = (imageComponent) => { }
+  // onImageHide = (imageComponent) => { }
   // onStorageChange = (storageName, prevStorageName) => { }
   // onPluginRegistered = (plugin) => { }
 }

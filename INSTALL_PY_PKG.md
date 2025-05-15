@@ -12,9 +12,10 @@ The `./static/wasm/py/python_stdlib.zip` contains all the default python modules
 that pyodide ships. If you want to import other modules from pypi then it is
 recommended to modify the `./static/wasm/py/custom_stdlib.zip`.
 
-There's a [requirements.txt](./static/wasm/py/requirements.txt) that is not
-used, but just to keep track of the packages that have been added in the
-`custom_stdlib.zip`. Please update this when adding another package to the zip.
+> [!IMPORTANT]
+> There's a [requirements.txt](./static/wasm/py/requirements.txt) that is not
+> used, but just to keep track of the packages that have been added in the
+> custom_stdlib.zip`. Please update this when adding another package to the zip.
 
 There are two ways to import a module and both are quite tedious:
 1) Download `.whl` file through pyodide (recommended)

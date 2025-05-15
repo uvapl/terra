@@ -47,6 +47,11 @@ export default class Check50Plugin extends TerraPlugin {
     });
   }
 
+  onImageShow = (imageComponent) => {
+    if (!this.$button) return;
+    this.$button.prop('disabled', true);
+  }
+
   onEditorFocus = (editorComponent) => {
     if (!this.$button) return;
 

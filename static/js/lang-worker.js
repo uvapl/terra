@@ -138,7 +138,7 @@ export default class LangWorker {
 
     console.log(`Spawning new ${this.proglang} worker`);
 
-    this.worker = new Worker(this.getWorkerPath(this._proglang));
+    this.worker = new Worker(this.getWorkerPath(this._proglang), { type: 'module' });
     const channel = new MessageChannel();
     this.port = channel.port1;
     this.port.onmessage = this.onmessage.bind(this);
@@ -256,30 +256,49 @@ export default class LangWorker {
   }
 
   /**
-   * Called from within the worker when new files have been added to the
+   * Called from within the worker when files have been added or modified in the
    * worker's internal filesystem during execution of the program.
    *
-   * @param {array} newFiles - List of file objects.
+   * @param {array} newOrModifiedFiles - List of file objects.
    */
-  newFilesCallback(newFiles) {
-    if (!Array.isArray(newFiles)) {
+  newOrModifiedFilesCallback(newOrModifiedFiles) {
+    if (!Array.isArray(newOrModifiedFiles)) {
       return;
     }
 
-    for (const file of newFiles) {
-      const parentFolderPath = file.filepath.split('/').slice(0, -1).join('/');
-      const parentFolder = Terra.app.vfs.findFolderByPath(parentFolderPath);
-      if (parentFolder) {
+    for (const file of newOrModifiedFiles) {
+      // Check if the file already exists in the VFS.
+      const existingFile = Terra.app.vfs.findFileByPath(file.filepath);
+      if (existingFile) {
+        // If the file already exists, update its content.
+        Terra.app.vfs.updateFile(existingFile.id, {
+          content: file.content,
+        });
+
+        // Check if there's an open tab for this file.
+        const tabComponent = Terra.app.layout.getTabComponents().find((tabComponent) => {
+          const { fileId } = tabComponent.getState();
+          return fileId == existingFile.id;
+        });
+
+        // If so, update its content.
+        if (tabComponent) {
+          tabComponent.setContent(file.content);
+        }
+      } else {
+        const parentFolderPath = file.filepath.split('/').slice(0, -1).join('/');
+        const parentFolder = Terra.app.vfs.findFolderByPath(parentFolderPath);
+        const parentId = parentFolder ? parentFolder.id : null;
         Terra.app.vfs.createFile({
           name: file.name,
           content: file.content,
-          parentId: parentFolder.id,
+          parentId,
         });
       }
-    }
 
-    // Recreate the file tree.
-    fileTreeManager.createFileTree();
+      // Recreate the file tree.
+      fileTreeManager.createFileTree();
+    }
   }
 
   /**
@@ -345,11 +364,12 @@ export default class LangWorker {
         this.runUserCodeCallback();
         break;
 
-      case 'newFilesCallback':
-        // New files callback invoked from the worker instance. This event will
-        // be triggered just before the run-user-code callback and will only
-        // triggerer if there are new files created during execution time.
-        this.newFilesCallback(event.data.newFiles);
+      case 'newOrModifiedFilesCallback':
+        // New or modified files callback invoked from the worker instance. This
+        // event will be triggered just before the run-user-code callback and
+        // will only triggerer if there are new files created or existing files
+        // have been modified during execution time.
+        this.newOrModifiedFilesCallback(event.data.newOrModifiedFiles);
         break;
     }
   }
