@@ -295,10 +295,6 @@ export default class App {
   handleControlC(event) {
     if (event.key === 'c' && event.ctrlKey && this.langWorker && this.langWorker.isRunningCode) {
       this.langWorker.restart(true);
-
-      // Focus the active editor again.
-      const editorComponent = this.layout.getActiveEditor();
-      editorComponent.focus();
     }
   }
 

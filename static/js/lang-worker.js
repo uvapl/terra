@@ -238,6 +238,9 @@ export default class LangWorker {
       disableRunBtn = true;
     }
 
+    // Focus the active editor again.
+    editorComponent.focus();
+
     // Change the stop-code button back to a run-code button.
     const $button = $('#run-code');
     const newText = $button.text().replace('Stop', 'Run');
@@ -336,13 +339,16 @@ export default class LangWorker {
         $(event.data.selector).prop('disabled', false);
         break;
 
-      // Run user code callback from the worker instance. This event will be
-      // triggered after excecuting the user's code.
       case 'runUserCodeCallback':
+        // Run user code callback invoked from the worker instance. This event
+        // will be triggered after excecuting the user's code.
         this.runUserCodeCallback();
         break;
 
       case 'newFilesCallback':
+        // New files callback invoked from the worker instance. This event will
+        // be triggered just before the run-user-code callback and will only
+        // triggerer if there are new files created during execution time.
         this.newFilesCallback(event.data.newFiles);
         break;
     }
