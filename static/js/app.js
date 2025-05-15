@@ -266,14 +266,8 @@ export default class App {
       files = await this.getAllEditorFiles();
     }
 
-    const hiddenFileKeys = Object.keys(this.layout.hiddenFiles);
-    if (hiddenFileKeys.length > 0) {
-      const hiddenFiles = hiddenFileKeys.map((filename) => ({
-        name: filename,
-        content: this.layout.hiddenFiles[filename],
-      }));
-      files = files.concat(hiddenFiles);
-    }
+    // Append hidden files if present.
+    files = files.concat(this.getHiddenFiles());
 
     // Create a new worker instance if needed.
     const proglang = getFileExtension(filename);
@@ -321,6 +315,16 @@ export default class App {
   }
 
   /**
+   * Get the hidden files that should be passed to the worker, but are not
+   * displayed as visual tabs inside the UI for the user.
+   *
+   * @returns {array} List of (hidden) files.
+   */
+  getHiddenFiles() {
+    return [];
+  }
+
+  /**
    * Run the command of a custom config button.
    *
    * @param {string} selector - Unique selector for the button, used to disable
@@ -333,7 +337,8 @@ export default class App {
     $button.prop('disabled', true);
 
     const activeTabName = this.layout.getActiveEditor().getFilename();
-    const files = await this.getAllEditorFiles();
+    let files = await this.getAllEditorFiles();
+    files = files.concat(this.getHiddenFiles());
 
     if (this.langWorker && this.langWorker.isReady) {
       this.langWorker.runButtonCommand(selector, activeTabName, cmd, files);

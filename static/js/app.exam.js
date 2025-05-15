@@ -550,4 +550,22 @@ export default class ExamApp extends App {
 
     }, 300);
   }
+
+  /**
+   * Get the hidden files defined in the exam config's `hidden_tabs` property.
+   *
+   * @returns {array<object<string,string>>} List of (hidden) file objects.
+   */
+  getHiddenFiles() {
+    const hiddenFileKeys = Object.keys(this.layout.hiddenFiles);
+    if (hiddenFileKeys.length > 0) {
+      return hiddenFileKeys.map((filename) => ({
+        filepath: filename,
+        name: filename,
+        content: this.layout.hiddenFiles[filename],
+      }));
+    }
+
+    return [];
+  }
 }
