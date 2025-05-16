@@ -730,7 +730,7 @@ class FileTreeManager {
 
     tree.visit((node) => {
       if (node.data.isFolder && node.expanded) {
-        prevExpandedFolderPaths.push(Terra.app.vfs.getAbsoluteFolderPath(node.key));
+        prevExpandedFolderPaths.push(Terra.app.vfs.findFolderById(node.key).filepath);
       }
     });
 
@@ -738,7 +738,7 @@ class FileTreeManager {
 
     // Expand all folder nodes again that were open (if they still exist).
     this.getInstance().visit((node) => {
-      if (node.data.isFolder && prevExpandedFolderPaths.includes(Terra.app.vfs.getAbsoluteFolderPath(node.key))) {
+      if (node.data.isFolder && prevExpandedFolderPaths.includes(Terra.app.vfs.findFolderById(node.key).filepath)) {
         node.setExpanded(true, { noAnimation: true });
       }
     });
