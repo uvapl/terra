@@ -51,12 +51,12 @@ export default class GitFS {
 
   vfsFileCreatedHandler = (event) => {
     const { file } = event.detail;
-    this.commit(file.filepath, file.content, file.sha);
+    this.commit(file.path, file.content, file.sha);
   }
 
   vfsFileMovedHandler = (event) => {
     const { file, oldPath } = event.detail;
-    this.moveFile(oldPath, file.sha, file.filepath, file.content);
+    this.moveFile(oldPath, file.sha, file.path, file.content);
   }
 
   vfsFileContentChangedHandler = (event) => {
@@ -64,13 +64,13 @@ export default class GitFS {
 
     // Only commit changes after 2 seconds of inactivity.
     Terra.app.registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
-      this.commit(file.filepath, file.content, file.sha);
+      this.commit(file.path, file.content, file.sha);
     });
   }
 
   vfsBeforeFileDeletedHandler = (event) => {
     const  { file } = event.detail;
-    this.rm(file.filepath, file.sha);
+    this.rm(file.path, file.sha);
   }
 
   vfsFolderMovedHandler = (event) => {
@@ -91,7 +91,7 @@ export default class GitFS {
     const folders = this.vfs.findFoldersWhere({ parentId: folderId });
 
     let paths = files.map((file) => {
-      const filename = file.filepath.split('/').pop();
+      const filename = file.path.split('/').pop();
       return {
         oldPath: `${oldPath}/${filename}`,
         newPath,
@@ -347,8 +347,8 @@ export default class GitFS {
     Terra.app.layout.getTabComponents().forEach((tabComponent) => {
       const { fileId } = tabComponent.getState();
       if (fileId) {
-        const { filepath } = this.vfs.findFileById(fileId);
-        tabs[filepath] = tabComponent;
+        const { path } = this.vfs.findFileById(fileId);
+        tabs[path] = tabComponent;
       }
     });
 

@@ -87,7 +87,7 @@ export default class Check50Plugin extends TerraPlugin {
     if (!editorComponent || editorComponent.proglang !== 'c') return;
 
     const { fileId } = editorComponent.getState();
-    const { filepath } = Terra.app.vfs.findFileById(fileId);
+    const { path: filepath } = Terra.app.vfs.findFileById(fileId);
 
     // Check if the file has a slug and the check50 password is set.
     // Otherwise, if one of them is not set, prompt the user to fill in the
@@ -181,7 +181,7 @@ export default class Check50Plugin extends TerraPlugin {
           level: 9
       }
     }).then((content) => {
-      const { filepath } = Terra.app.vfs.findFileById(fileId);
+      const { path: filepath } = Terra.app.vfs.findFileById(fileId);
       const slug = this.getState('fileslugs')[filepath];
 
       this.disableCheck50Button();

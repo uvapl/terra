@@ -231,9 +231,9 @@ export default class IDEApp extends App {
    * @returns {array} The arguments for the current file.
    */
   getCurrentFileArgs(fileId) {
-    const { filepath } = this.vfs.findFileById(fileId);
+    const { path } = this.vfs.findFileById(fileId);
     const fileArgsPlugin = pluginManager.getPlugin('file-args').getState('fileargs');
-    const fileArgs = fileArgsPlugin[filepath];
+    const fileArgs = fileArgsPlugin[path];
 
     const parseArgsRegex = /("[^"]*"|'[^']*'|\S+)/g;
     return fileArgs !== undefined ? fileArgs.match(parseArgsRegex) : [];
