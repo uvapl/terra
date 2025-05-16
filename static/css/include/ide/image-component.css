@@ -1,0 +1,10 @@
+.image-component-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  visibility: hidden;
+}
+
+.image-component-container img[src] {
+  visibility: visible;
+}

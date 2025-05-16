@@ -1,5 +1,8 @@
-self.importScripts('../vendor/pyodide-0.25.0.min.js');
-self.importScripts('base-api.js')
+import { isImageExtension, uint8ToBase64 } from '../helpers/image.js';
+import BaseAPI from './base-api.js';
+import { loadPyodide } from '../vendor/pyodide-0.25.0.min.js';
+
+const HOME_DIR = '/home/pyodide';
 
 class API extends BaseAPI {
   pyodide = null;
@@ -8,7 +11,7 @@ class API extends BaseAPI {
     super(options);
     this.hostRead = options.hostRead;
     this.sharedMem = options.sharedMem;
-    this.newFilesCallback = options.newFilesCallback;
+    this.newOrModifiedFilesCallback = options.newOrModifiedFilesCallback;
     this.runButtonCommandCallback = options.runButtonCommandCallback;
 
     this.initPyodide();
@@ -35,10 +38,15 @@ class API extends BaseAPI {
       this.pyodide.setStdout({
         raw: (charCode) => this.hostWrite(String.fromCharCode(charCode)),
         isatty: true
-      })
+      });
 
       // Import some basic modules.
       this.pyodide.runPython('import io, sys');
+
+      // Pyodide sets the sys path to /home/pyodide, but native python has this
+      // set to an empty string. This allows for relative imports.
+      // @see https://github.com/pyodide/pyodide/discussions/5629#discussioncomment-13107855
+      this.pyodide.runPython('sys.path[0] = ""');
 
       // Get pyodide's Python version.
       const pyVersion = this.pyodide.runPython("sys.version.split(' ')[0]");
@@ -51,6 +59,9 @@ class API extends BaseAPI {
       this.pyodide.unpackArchive(zipBinary, 'zip', {
         extractDir: `/lib/python${pyMajorVersion}.${pyMinorVersion}/site-packages/`
       });
+
+      // Use matplotlib's Agg backend for static images.
+      this.pyodide.runPython("import matplotlib; matplotlib.use('Agg')");
 
       this.readyCallback();
     });
@@ -102,6 +113,10 @@ class API extends BaseAPI {
       // content is not empty, otherwise pyodide throws an error.
       if (file.content) {
         this.pyodide.FS.writeFile(file.filepath, file.content, { encoding: 'utf8' });
+
+        // Keep track of when the file was created.
+        const stat = this.pyodide.FS.stat(file.filepath);
+        file.ctime = stat.ctime;
       }
     }
   }
@@ -113,7 +128,7 @@ class API extends BaseAPI {
    */
   deleteFilesFromVirtualFS(files) {
     // Ensure that we always operate from the home directory.
-    this.pyodide.FS.chdir("/home/pyodide");
+    this.pyodide.FS.chdir(HOME_DIR);
 
     // Since new files can be created when a python file is executed, we just
     // gather all parent directories and then delete their files, followed by
@@ -138,7 +153,7 @@ class API extends BaseAPI {
     }
 
     // Finally, delete all the files inside the home directory.
-    const rootFilePaths = this.pyodide.FS.readdir('/home/pyodide');
+    const rootFilePaths = this.pyodide.FS.readdir(HOME_DIR);
     for (const filepath of rootFilePaths) {
       if (this.fileExists(filepath)) {
         this.pyodide.FS.unlink(filepath);
@@ -209,6 +224,24 @@ class API extends BaseAPI {
   }
 
   /**
+   * Get the content of a file in the pyodide filesystem.
+   *
+   * @param {string} filepath - The path of the file to read.
+   * @returns {string} The content of the file.
+   */
+  getFileContent(filepath) {
+    let content = null;
+
+    if (isImageExtension(filepath)) {
+      content = uint8ToBase64(this.pyodide.FS.readFile(filepath));
+    } else {
+      content = this.pyodide.FS.readFile(filepath, { encoding: 'utf8' });
+    }
+
+    return content;
+  }
+
+  /**
    * Check if new files have been created in the virtual filesystem, based on
    * the files that were passed to the runUserCode function.
    */
@@ -223,13 +256,35 @@ class API extends BaseAPI {
       const subFolderFilePaths = this.pyodide.FS.readdir(folderpath);
       for (const filename of subFolderFilePaths) {
         const filepath = `${folderpath}/${filename}`;
+
         if (this.fileExists(filepath)) {
           // Check if the file already exists in the files parameter.
-          const isNewFile = !files.some((f) => f.filepath === filepath);
-          if (isNewFile) {
-            const content = this.pyodide.FS.readFile(filepath, { encoding: 'utf8' });
+          const existingFile = files.find((f) => f.filepath === filepath);
+          const isNewFile = !existingFile;
+
+          const stat = this.pyodide.FS.stat(filepath);
+          const isModified = !isNewFile && existingFile.ctime.getTime() !== stat.mtime.getTime();
+          if (isNewFile || isModified) {
+            const content = this.getFileContent(filepath);
             newFiles.push({ name: filename, filepath, content });
           }
+        }
+      }
+    }
+
+    // Finally, check for new files in the home directory.
+    const subFolderFilePaths = this.pyodide.FS.readdir(HOME_DIR);
+    for (const filepath of subFolderFilePaths) {
+      if (this.fileExists(filepath)) {
+        // Check if the file already exists in the files parameter.
+        const existingFile = files.find((f) => f.filepath === filepath);
+        const isNewFile = !existingFile;
+
+        const stat = this.pyodide.FS.stat(filepath);
+        const isModified = !isNewFile && existingFile.ctime.getTime() !== stat.mtime.getTime();
+        if (isNewFile || isModified) {
+          const content = this.getFileContent(filepath);
+          newFiles.push({ name: filepath, filepath, content });
         }
       }
     }
@@ -248,7 +303,7 @@ class API extends BaseAPI {
   runUserCode({ activeTabName, files }) {
     try {
       // Ensure that we always operate from the home directory as a fresh start.
-      this.pyodide.FS.chdir("/home/pyodide");
+      this.pyodide.FS.chdir(HOME_DIR);
 
       this.writeFilesToVirtualFS(files);
 
@@ -260,6 +315,7 @@ class API extends BaseAPI {
       }
 
       this.hostWriteCmd(`python3 ${activeTab.name}`);
+
       const error = this.run(activeTab.content, activeTabName);
       if (error) {
         this.hostWrite(error);
@@ -267,14 +323,14 @@ class API extends BaseAPI {
     } finally {
       // Ensure that we always operate from the home directory, because the cwd
       // might have changed during execution.
-      this.pyodide.FS.chdir("/home/pyodide");
+      this.pyodide.FS.chdir(HOME_DIR);
 
       const newFiles = this.checkForNewFiles(files);
 
       this.deleteFilesFromVirtualFS(files);
 
       if (newFiles.length > 0) {
-        this.newFilesCallback(newFiles);
+        this.newOrModifiedFilesCallback(newFiles);
       }
 
       this.runUserCodeCallback(newFiles);
@@ -455,8 +511,11 @@ const onAnyMessage = async event => {
           port.postMessage({ id: 'ready' });
         },
 
-        newFilesCallback(newFiles) {
-          port.postMessage({ id: 'newFilesCallback', newFiles });
+        newOrModifiedFilesCallback(newOrModifiedFiles) {
+          port.postMessage({
+            id: 'newOrModifiedFilesCallback',
+            newOrModifiedFiles
+          });
         },
 
         runUserCodeCallback(newFiles) {

@@ -28,6 +28,10 @@ export default class FileArgsPlugin extends TerraPlugin {
     });
   }
 
+  onImageShow = (imageComponent) => {
+    this.disableButton();
+  }
+
   onEditorFocus = (editorComponent) => {
     if (!this.$button) return;
 
@@ -49,10 +53,12 @@ export default class FileArgsPlugin extends TerraPlugin {
   }
 
   enableButton = () => {
+    if (!this.$button) return;
     this.$button.prop('disabled', false);
   }
 
   disableButton = () => {
+    if (!this.$button) return;
     this.$button.prop('disabled', true)
   }
 

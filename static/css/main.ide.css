@@ -3,6 +3,7 @@
 @import 'include/button.css';
 @import 'include/ide/navbar.css';
 @import 'include/ide/file-tree.css';
+@import 'include/ide/image-component.css';
 @import 'include/settings-dropdown.css';
 @import 'include/goldenlayout.css';
 @import 'include/spinner.css';

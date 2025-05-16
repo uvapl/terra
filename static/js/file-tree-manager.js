@@ -3,6 +3,7 @@ import { getFileExtension, isObject, isValidFilename } from './helpers/shared.js
 import { createModal, hideModal, showModal } from './modal.js'
 import Terra from './terra.js'
 import LangWorker from './lang-worker.js';
+import EditorComponent from './layout/editor.component.js';
 
 class FileTreeManager {
   /**
@@ -515,13 +516,16 @@ class FileTreeManager {
 
     fn(data.node.key, { name });
 
-    const editorComponent = Terra.app.layout.getEditorComponents()
-      .find((editorComponent) => editorComponent.getState().fileId === data.node.key);
+    const tabComponent = Terra.app.layout.getTabComponents()
+      .find((tabComponent) => tabComponent.getState().fileId === data.node.key);
 
-    if (editorComponent) {
-      editorComponent.setFilename(name);
-      const proglang = name.includes('.') ? getFileExtension(name) : 'text';
-      editorComponent.setProgLang(proglang);
+    if (tabComponent) {
+      tabComponent.setFilename(name);
+
+      if (tabComponent instanceof EditorComponent) {
+        const proglang = name.includes('.') ? getFileExtension(name) : 'text';
+        tabComponent.setProgLang(proglang);
+      }
 
       // For some reason no update is triggered, so we trigger an update.
       Terra.app.layout.emit('stateChanged');

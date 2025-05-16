@@ -6,6 +6,7 @@ import {
   eventTargetMixin,
   seconds,
 } from '../helpers/shared.js';
+import ImageComponent from './image.component.js';
 import EditorComponent from './editor.component.js';
 import TerminalComponent from './term.component.js';
 import pluginManager from '../plugin-manager.js';
@@ -115,10 +116,10 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   hiddenFiles = {};
 
   /**
-   * Reference to the current active editor instance in the layout.
-   * @type {EditorComponent}
+   * Reference to the current active tab instance in the layout.
+   * @type {TabComponent}
    */
-  activeEditor = null;
+  activeTab = null;
 
   constructor(additionalLayoutConfig, options = {}) {
     let layoutConfig = localStorageManager.getLocalStorageItem('layout');
@@ -150,6 +151,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     this.on('stackCreated', (stack) => this.onStackCreated(stack, options));
     this.on('tabCreated', (tab) => this.onTabCreated(tab));
 
+    this.registerComponent('image', ImageComponent);
     this.registerComponent('editor', EditorComponent);
     this.registerComponent('terminal', TerminalComponent);
 
@@ -193,12 +195,21 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   /**
+   * Retrieve components from the layout.
+   *
+   * @returns {TabComponent[]} List containing all open tab components.
+   */
+  getTabComponents() {
+    return this.tabs.map((tab) => tab.contentItem.instance);
+  }
+
+  /**
    * Retrieve all editor components from the layout.
    *
-   * @returns {EditorComponent[]} All editor components in the layout.
+   * @returns {EditorComponent[]} List containing all open editor tabs' components.
    */
   getEditorComponents() {
-    return this.tabs.map((tab) => tab.contentItem.instance);
+    return this.getTabComponents().filter((component) => component instanceof EditorComponent);
   }
 
   /**
@@ -207,49 +218,56 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @returns {string[]} List of file IDs.
    */
   getAllOpenTabFileIds() {
-    return this.getEditorComponents().map(
+    return this.getTabComponents().map(
       (editorComponent) => editorComponent.getState().fileId
     );
   }
 
   /**
-   * Callback function when a new tab has been created in the layout.
+   * Invoked when the terminal tab is created for the first time.
    *
-   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
+   * @param {ContentItem} tab - The tab instance that has been created.
    */
-  onTabCreated(tab) {
-    if (tab.contentItem.isTerminal) {
-      this.term = tab.contentItem.instance;
-      tab.contentItem.container.on('destroy', () => {
-        this.term = null;
-      });
-      return;
-    }
-
-    // If the current active tab is not set, set it to the current tab.
-    // When the layout is loaded from local storage, the first tab that will be
-    // created by GoldenLayout is the one the user has opened. Additionally, the
-    // active tab will be overridden when another editor becomes active.
-    if (!this.activeEditor) {
-      this.activeEditor = tab.contentItem.instance;
-    }
-
-    // The onTabCreated is *also* triggered when a user is dragging tabs around,
-    // thus if the tab is already in the list, we return early.
-    const newTabFileId = tab.contentItem.instance.getState().fileId;
-    const tabExists = this.tabs.some((existingTab) => {
-      const { fileId } = existingTab.contentItem.instance.getState();
-      return fileId === newTabFileId;
-    });
-    if (tabExists) return;
-
-    // Add a regular editor component to the tabs list.
-    // Remove the tab from the list when it is destroyed.
-    this.tabs.push(tab);
+  onTermTabCreated(tab) {
+    this.term = tab.contentItem.instance;
     tab.contentItem.container.on('destroy', () => {
-      this.tabs.splice(this.tabs.indexOf(tab), 1);
+      this.term = null;
     });
+  }
 
+  /**
+   * Invoked when an image is opened.
+   *
+   * @param {ContentItem} tab - The tab instance that has been created.
+   */
+  onImageTabCreated(tab) {
+    const imageComponent = tab.contentItem.instance;
+
+    // Bind event listeners to custom image component events.
+    // key = local editor event name
+    // value = external event name that the app will listen to
+    const events = {
+      'show': 'onImageShow',
+      'vfsChanged': 'onImageVFSChanged',
+    }
+
+    for (const [internalEventName, externalEventName] of Object.entries(events)) {
+      imageComponent.addEventListener(internalEventName, () => {
+        this.dispatchEvent(new CustomEvent(externalEventName, {
+          detail: { tabComponent: imageComponent }
+        }));
+      });
+    }
+
+    imageComponent.addEventListener('destroy', () => this.onTabDestroy());
+  }
+
+  /**
+   * Invoked when a text file is opened.
+   *
+   * @param {ContentItem} tab - The tab instance that has been created.
+   */
+  onEditorTabCreated(tab) {
     const editorComponent = tab.contentItem.instance;
 
     this.registerEditorCommands(editorComponent);
@@ -262,19 +280,71 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       'stopEditing': 'onEditorStopEditing',
       'change': 'onEditorChange',
       'show': 'onEditorShow',
-      'vfsChanged': 'onVFSChanged',
+      'vfsChanged': 'onEditorVFSChanged',
     }
 
     for (const [internalEventName, externalEventName] of Object.entries(events)) {
       editorComponent.addEventListener(internalEventName, () => {
         this.dispatchEvent(new CustomEvent(externalEventName, {
-          detail: { editorComponent }
+          detail: { tabComponent: editorComponent }
         }));
       });
     }
 
     editorComponent.addEventListener('focus', () => this.onEditorFocus(editorComponent));
-    editorComponent.addEventListener('destroy', () => this.onEditorDestroy(editorComponent));
+    editorComponent.addEventListener('destroy', () => this.onTabDestroy());
+  }
+
+  /**
+   * Try to register a given tab instance to the internal tabs list of this
+   * class instance.
+   *
+   * @param {[TODO:type]} tab - [TODO:description]
+   * @returns {[TODO:type]} [TODO:description]
+   */
+  registerTab(tab) {
+    // If the current active tab is not set, set it to the current tab.
+    // When the layout is loaded from local storage, the first tab that will be
+    // created by GoldenLayout is the one the user has opened. Additionally, the
+    // active tab will be overridden when another editor becomes active.
+    if (!this.activeTab) {
+      this.activeTab = tab.contentItem.instance;
+    }
+
+    // The onTabCreated is *also* triggered when a user is dragging tabs around,
+    // thus if the tab is already in the list, we return early.
+    const newTabFileId = tab.contentItem.instance.getState().fileId;
+    const tabExists = this.tabs.some((existingTab) => {
+      const { fileId } = existingTab.contentItem.instance.getState();
+      return fileId === newTabFileId;
+    });
+    if (tabExists) return;
+
+    // Add a regular component to the tabs list.
+    // Remove the tab from the list when it is destroyed.
+    this.tabs.push(tab);
+    tab.contentItem.container.on('destroy', () => {
+      this.tabs.splice(this.tabs.indexOf(tab), 1);
+    });
+  }
+
+  /**
+   * Callback function when a new tab has been created in the layout.
+   *
+   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
+   */
+  onTabCreated(tab) {
+    if (tab.contentItem.isTerminal) {
+      this.onTermTabCreated(tab);
+    } else if (tab.contentItem.isImage) {
+      this.registerTab(tab);
+      this.onImageTabCreated(tab);
+    } else if (tab.contentItem.isEditor) {
+      this.registerTab(tab);
+      this.onEditorTabCreated(tab);
+    } else {
+      console.warn('Unknown tab type:', tab.contentItem);
+    }
   }
 
   /**
@@ -287,19 +357,17 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   /**
-   * Callback when an editor is about to be destroyed.
-   *
-   * @param {EditorComponent} editorComponent
+   * Callback when a tab is about to be destroyed.
    */
-  onEditorDestroy(editorComponent) {
+  onTabDestroy() {
     // If it's the last tab being closed, then we insert another 'Untitled' tab,
     // because we always need at least one tab open.
-    const editorComponents = this.getEditorComponents();
+    const editorComponents = this.getTabComponents();
     const totalTabs = editorComponents.length;
 
     if (totalTabs === 1) {
-      const firstEditorComponent = editorComponents[0];
-      firstEditorComponent.addSiblingTab();
+      const firstTabComponent = editorComponents[0];
+      firstTabComponent.addSiblingTab();
     }
   }
 
@@ -323,7 +391,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       pluginManager.triggerEvent('onLayoutLoaded');
 
       if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
-        this.emitToEditorComponents('setCustomAutocompleter', options.autocomplete);
+        this.emitToTabComponents('setCustomAutocompleter', options.autocomplete);
       }
 
       if (this.vertical) {
@@ -387,7 +455,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @param {object} data - Data object to pass along with the event.
    */
   emitToAllComponents(event, data) {
-    this.emitToEditorComponents(event, data);
+    this.emitToTabComponents(event, data);
     this.term.emit(event, data);
   }
 
@@ -397,7 +465,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @param {string} event - The event name.
    * @param {object} data - Data object to pass along with the event.
    */
-  emitToEditorComponents(event, data) {
+  emitToTabComponents(event, data) {
     this.tabs.forEach((tab) => {
       tab.contentItem.container.emit(event, data);
     });
@@ -553,7 +621,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @param {EditorComponent} editorComponent - The editor component to set as active.
    */
   setActiveEditor(editorComponent) {
-    this.activeEditor = editorComponent;
+    this.activeTab = editorComponent;
   }
 
   /**
@@ -562,7 +630,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @returns {EditorComponent} - The active editor component.
    */
   getActiveEditor() {
-    return this.activeEditor;
+    return this.activeTab;
   }
 
   /**
@@ -588,7 +656,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    */
   closeFile(fileId) {
     const editorComponent = fileId
-      ? this.getEditorComponents().find((editorComponent) => editorComponent.getState().fileId === fileId)
+      ? this.getTabComponents().find((editorComponent) => editorComponent.getState().fileId === fileId)
       : this.getActiveEditor();
 
     if (editorComponent) {
@@ -600,7 +668,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * Close all tabs in the editor.
    */
   closeAllFiles() {
-    this.getEditorComponents().forEach((editorComponent) => {
+    this.getTabComponents().forEach((editorComponent) => {
       editorComponent.close();
     });
   }

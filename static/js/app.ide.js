@@ -121,11 +121,12 @@ export default class IDEApp extends App {
    * Reset the layout to its initial state.
    */
   resetLayout() {
-    const oldContentConfig = Terra.app.layout.getEditorComponents().map((editorComponent) => ({
-      title: editorComponent.getFilename(),
+    const oldContentConfig = Terra.app.layout.getTabComponents().map((tabComponent) => ({
+      title: tabComponent.getFilename(),
+      componentName: tabComponent.getComponentName(),
       componentState: {
-        fileId: editorComponent.getState().fileId,
-        value: editorComponent.getContent(),
+        fileId: tabComponent.getState().fileId,
+        value: tabComponent.getContent(),
       }
     }));
 
@@ -173,7 +174,7 @@ export default class IDEApp extends App {
 
     if (Terra.app.hasLFSProjectLoaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
       editorComponent.exceededFileSize();
-    } else if (Terra.app.hasLFSProjectLoaded && !hasGitFSWorker() && !file.content) {
+    } else if (Terra.app.hasLFSProjectLoaded && !file.content) {
       // Load the file content from LFS.
       const cursorPos = editorComponent.getCursorPosition();
       this.lfs.getFileContent(file.id).then((content) => {
@@ -186,6 +187,28 @@ export default class IDEApp extends App {
       });
     } else {
       editorComponent.setContent(file.content);
+    }
+  }
+
+  /**
+   * Reload the file content either from VFS or LFS.
+   *
+   * @param {ImageComponent} imageComponent - The image component instance.
+   */
+  setImageFileContent(imageComponent) {
+    const file = this.vfs.findFileById(imageComponent.getState().fileId);
+    if (!file) return;
+
+    if (Terra.app.hasLFSProjectLoaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
+      imageComponent.exceededFileSize();
+    } else if (Terra.app.hasLFSProjectLoaded && !file.content) {
+      // Load the file content from LFS.
+      this.lfs.getFile(file.id).then((file) => {
+        const url = URL.createObjectURL(file);
+        imageComponent.img.src = url;
+      });
+    } else {
+      imageComponent.setContent(file.content);
     }
   }
 

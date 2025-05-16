@@ -247,12 +247,12 @@ export default class LocalFileSystem {
    * @returns {Promise<void>}
    */
   _importFolderToVFS = async (rootFolderHandle) => {
-    const editorComponents = Terra.app.layout.getEditorComponents();
-    const prevOpenTabs = editorComponents.map((editorComponent) => {
-      const { fileId } = editorComponent.getState();
+    const tabComponents = Terra.app.layout.getTabComponents();
+    const prevOpenTabs = tabComponents.map((tabComponent) => {
+      const { fileId } = tabComponent.getState();
       return {
         path: this.vfs.getAbsoluteFilePath(fileId),
-        editorComponent,
+        editorComponent: tabComponent,
       };
     });
 
@@ -299,6 +299,24 @@ export default class LocalFileSystem {
       return content;
     } catch (err) {
       console.error('Failed to get file content:', err);
+    }
+  }
+
+  /**
+   * Retrieve the file by its ID.
+   *
+   * @async
+   * @param {string} id - The VFS file id.
+  * @returns {Promise<File>} The file object.
+   */
+  getFile = async (id) => {
+    try {
+      const path = this.vfs.getAbsoluteFilePath(id)
+      const fileHandle = await this.getFileHandle(path);
+      const file = await fileHandle.handle.getFile();
+      return file;
+    } catch (err) {
+      console.error('Failed to get file object:', err);
     }
   }
 

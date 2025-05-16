@@ -7,7 +7,7 @@ class NotImplemented extends Error {
 /**
  * Base class for API implementations for each programming language worker.
  */
-class BaseAPI {
+export default class BaseAPI {
   constructor(options) {
     for (const fn of ['hostWrite', 'runUserCodeCallback', 'readyCallback']) {
       if (!(options[fn] instanceof Function)) {

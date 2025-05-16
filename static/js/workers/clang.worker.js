@@ -1,4 +1,4 @@
-self.importScripts('base-api.js')
+import BaseAPI from './base-api.js';
 
 function readStr(u8, o, len = -1) {
   let str = '';
@@ -375,7 +375,7 @@ class App {
 
   clock_time_get(clock_id, precision, time_out) {
     this.mem.check();
-  
+
     let time;
     if (clock_id === 0) {
       // CLOCK_REALTIME: Get current timestamp in nanoseconds

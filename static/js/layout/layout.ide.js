@@ -2,6 +2,7 @@ import Layout from './layout.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
 import { isValidFilename, isObject, getFileExtension } from '../helpers/shared.js';
+import { isImageExtension } from '../helpers/image.js';
 import { BASE_FONT_SIZE, LFS_MAX_FILE_SIZE } from '../constants.js';
 import { createModal, hideModal, showModal } from '../modal.js';
 import Terra from '../terra.js';
@@ -313,7 +314,7 @@ export default class IDELayout extends Layout {
    * @param {string} filename - The name of the file to open.
    */
   addFileTab(id, filename) {
-    let editorComponents = this.getEditorComponents();
+    let editorComponents = this.getTabComponents();
 
     // Try to find the editor component with the given filename or id.
     const editorComponent = editorComponents.find(
@@ -347,9 +348,10 @@ export default class IDELayout extends Layout {
           componentState: {
             fileId: id,
           },
+          componentName: isImageExtension(filename) ? 'image' : 'editor',
         });
 
-        editorComponents = this.getEditorComponents();
+        editorComponents = this.getTabComponents();
 
         if (removeFirstTab) {
           editorComponents[0].fakeOnContainerOpenEvent = true;
