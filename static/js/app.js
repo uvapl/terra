@@ -396,8 +396,7 @@ export default class App {
    * @returns {Promise<object>} Object containing the filename and content.
    */
   async getFileInfo(fileId) {
-    const { name, content } = this.vfs.findFileById(fileId);
-    const filepath = this.vfs.getAbsoluteFilePath(fileId);
+    const { name, content, path: filepath } = this.vfs.findFileById(fileId);
 
     if (this.hasLFSProjectLoaded && !content) {
       content = await this.lfs.getFileContent(fileId);

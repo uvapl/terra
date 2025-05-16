@@ -248,10 +248,12 @@ export default class LocalFileSystem {
    */
   _importFolderToVFS = async (rootFolderHandle) => {
     const tabComponents = Terra.app.layout.getTabComponents();
-    const prevOpenTabs = tabComponents.map((tabComponent) => {
+    const prevOpenTabs = tabComponents
+    .filter((tabComponent) => tabComponent.getState().fileId)
+    .map((tabComponent) => {
       const { fileId } = tabComponent.getState();
       return {
-        path: this.vfs.getAbsoluteFilePath(fileId),
+        path: this.vfs.findFileById(fileId).path,
         editorComponent: tabComponent,
       };
     });
@@ -292,7 +294,7 @@ export default class LocalFileSystem {
    */
   getFileContent = async (id) => {
     try {
-      const path = this.vfs.getAbsoluteFilePath(id)
+      const { path } = this.vfs.findFileById(id);
       const fileHandle = await this.getFileHandle(path);
       const file = await fileHandle.handle.getFile();
       const content = await file.text();
@@ -311,7 +313,7 @@ export default class LocalFileSystem {
    */
   getFile = async (id) => {
     try {
-      const path = this.vfs.getAbsoluteFilePath(id)
+      const { path } = this.vfs.findFileById(id);
       const fileHandle = await this.getFileHandle(path);
       const file = await fileHandle.handle.getFile();
       return file;
@@ -349,10 +351,10 @@ export default class LocalFileSystem {
           parentId,
           size: file.size
         }, false);
-        await this.saveFileHandle(this.vfs.getAbsoluteFilePath(fileId), fileId, handle);
+        await this.saveFileHandle(this.vfs.findFileById(fileId).path, fileId, handle);
       } else if (handle.kind === 'directory' && !blacklistedPaths.includes(name)) {
         const folder = this.vfs.createFolder({ name, parentId }, false);
-        await this.saveFolderHandle(this.vfs.getAbsoluteFolderPath(folder.id), folder.id, handle);
+        await this.saveFolderHandle(this.vfs.findFolderById(folder.id).path, folder.id, handle);
         await this._readFolder(handle, folder.id);
       }
     }
@@ -621,9 +623,9 @@ export default class LocalFileSystem {
   writeFileToFolder = async (folderId, fileId, filename, content) => {
     try {
       this.busy = true;
-      const fileKey = this.vfs.getAbsoluteFilePath(fileId);
+      const fileKey = this.vfs.findFileById(fileId).path;
 
-      const folderHandle = await this.getFolderHandle(folderId ? this.vfs.getAbsoluteFolderPath(folderId) : 'root');
+      const folderHandle = await this.getFolderHandle(folderId ? this.vfs.findFolderById(folderId).path : 'root');
 
       let fileHandle = await this.getFileHandle(fileKey);
       if (!fileHandle) {
@@ -657,9 +659,9 @@ export default class LocalFileSystem {
     try {
       this.busy = true;
 
-      const parentFolder = await this.getFolderHandle(parentId ? this.vfs.getAbsoluteFolderPath(parentId) : 'root');
+      const parentFolder = await this.getFolderHandle(parentId ? this.vfs.findFolderById(parentId).path : 'root');
       const folderHandle = await parentFolder.handle.getDirectoryHandle(folderName, { create: true });
-      await this.saveFolderHandle(this.vfs.getAbsoluteFolderPath(folderId), folderId, folderHandle);
+      await this.saveFolderHandle(this.vfs.findFolderById(folderId).path, folderId, folderHandle);
     } finally {
       this.busy = false;
     }
@@ -676,7 +678,7 @@ export default class LocalFileSystem {
     try {
       this.busy = true;
 
-      const fileKey = this.vfs.getAbsoluteFilePath(id);
+      const fileKey = this.vfs.findFileById(id).path;
       const fileHandle = await this.getFileHandle(fileKey);
       if (fileHandle) {
         await fileHandle.handle.remove();
@@ -702,7 +704,7 @@ export default class LocalFileSystem {
   deleteFolder = async (id) => {
     try {
       this.busy = true;
-      const folderKey = this.vfs.getAbsoluteFolderPath(id);
+      const folderKey = this.vfs.findFolderById(id).path;
       const folderHandle = await this.getFolderHandle(folderKey);
       await this._recursivelyDeleteFolder(folderHandle.handle);
       await this.removeFolderHandle(folderKey);
@@ -750,14 +752,14 @@ export default class LocalFileSystem {
     try {
       this.busy = true;
 
-      const fileKey = this.vfs.getAbsoluteFilePath(id);
+      const fileKey = this.vfs.findFileById(id).path;
 
       // Remove current file.
       const currentFileHandle = await this.getFileHandle(fileKey);
       await currentFileHandle.handle.remove();
 
       // Make new file and store handle under the same id.
-      const folderHandle = await this.getFolderHandle(newParentId ? this.vfs.getAbsoluteFolderPath(newParentId) : 'root');
+      const folderHandle = await this.getFolderHandle(newParentId ? this.vfs.findFolderById(newParentId).path : 'root');
       const fileHandle = await folderHandle.handle.getFileHandle(newName, { create: true });
       await this.saveFileHandle(fileKey, id, fileHandle);
     } finally {
@@ -785,13 +787,15 @@ export default class LocalFileSystem {
       // After moving everything, delete the folder itself on the LFS.
       const parentFolderHandle = await this.getFolderHandle(
         folder.parentId
-          ? this.vfs.getAbsoluteFolderPath(folder.parentId)
+          ? this.vfs.findFolderById(folder.parentId).path
           : 'root'
       );
       await parentFolderHandle.handle.removeEntry(folder.name, { recursive: true });
 
       // Move the folder in VFS.
+      // Do not use `VFS.updateFolder()` to prevent recursion.
       folder.parentId = newParentId;
+      folder.path = this.vfs.getAbsoluteFolderPath(folder.id);
 
       await this.rebuildIndexedDB();
     } finally {
@@ -809,11 +813,11 @@ export default class LocalFileSystem {
    * @returns {Promise<void>}
    */
   _moveFolderRecursively = async (folderId, parentFolderId, newName) => {
-    const folderKey = this.vfs.getAbsoluteFolderPath(folderId);
+    const folderKey = this.vfs.findFolderById(folderId).path;
     const folderHandle = await this.getFolderHandle(folderKey);
     const parentFolderHandle = await this.getFolderHandle(
       parentFolderId
-        ? this.vfs.getAbsoluteFolderPath(parentFolderId)
+        ? this.vfs.findFolderById(parentFolderId).path
         : 'root'
     );
 
@@ -833,7 +837,7 @@ export default class LocalFileSystem {
 
     await Promise.all(
       this.vfs.findFilesWhere({ parentId: folderId }).map(async (subfile) => {
-        const subfileKey = this.vfs.getAbsoluteFilePath(subfile.id);
+        const subfileKey = this.vfs.findFileById(subfile.id).path;
         const currentFileHandle = await this.getFileHandle(subfileKey);
         await currentFileHandle.handle.remove();
 
