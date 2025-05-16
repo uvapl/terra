@@ -33,7 +33,8 @@ class API extends BaseAPI {
       // newline character is received. We override the options by using raw
       // mode, which gets triggered on every character the stdout receives.
       this.pyodide.setStdout({
-        raw: (charCode) => this.hostWrite(String.fromCharCode(charCode))
+        raw: (charCode) => this.hostWrite(String.fromCharCode(charCode)),
+        isatty: true
       })
 
       // Import some basic modules.
