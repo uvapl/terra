@@ -424,7 +424,7 @@ export default class VirtualFileSystem extends EventTarget {
     const folder = this.findFolderById(id);
     if (!folder) return;
 
-    const oldPath = folder.folderpath;
+    const oldPath = folder.path;
 
     // This extra check is needed because in the UI, the user can trigger a
     // rename but not actually change the name.
