@@ -94,7 +94,7 @@ export default class GitFS {
       const filename = file.path.split('/').pop();
       return {
         oldPath: `${oldPath}/${filename}`,
-        newPath,
+        newPath: file.path,
         content: file.content,
         sha: file.sha,
       }
@@ -347,7 +347,6 @@ export default class GitFS {
     Terra.app.layout.getTabComponents().forEach((tabComponent) => {
       const { fileId } = tabComponent.getState();
       if (fileId) {
-        console.log('fileId', fileId);
         const { path } = this.vfs.findFileById(fileId);
         tabs[path] = tabComponent;
       }
