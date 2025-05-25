@@ -347,6 +347,7 @@ export default class GitFS {
     Terra.app.layout.getTabComponents().forEach((tabComponent) => {
       const { fileId } = tabComponent.getState();
       if (fileId) {
+        console.log('fileId', fileId);
         const { path } = this.vfs.findFileById(fileId);
         tabs[path] = tabComponent;
       }
@@ -357,13 +358,13 @@ export default class GitFS {
 
     // First create all root files.
     repoContents
-      .filter((fileOrFolder) => fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/'))
-      .forEach(async (fileOrFolder) => {
+      .filter((file) => file.type === 'blob' && !file.path.includes('/'))
+      .forEach(async (file) => {
         this.vfs.createFile({
-          name: fileOrFolder.path.split('/').pop(),
-          sha: fileOrFolder.sha,
+          name: file.path.split('/').pop(),
+          sha: file.sha,
           isNew: false,
-          content: fileOrFolder.content,
+          content: file.content,
         }, false);
       });
 
@@ -372,7 +373,7 @@ export default class GitFS {
       .filter((fileOrFolder) => !(fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/')))
       .forEach((fileOrFolder) => {
         const { sha } = fileOrFolder;
-        const path = fileOrFolder.path.split('/')
+        const path = fileOrFolder.path.split('/');
         const name = path.pop();
 
         const parentId = path.length > 0 ? this.vfs.findFolderByPath(path.join('/')).id : null;

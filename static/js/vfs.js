@@ -348,7 +348,7 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     this.folders[newFolder.id] = newFolder;
-    newFolder.folderpath = this.getAbsoluteFolderPath(newFolder.id);
+    newFolder.path = this.getAbsoluteFolderPath(newFolder.id);
 
     if (isUserInvoked) {
       this.dispatchEvent(new CustomEvent('folderCreated', {
