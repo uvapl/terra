@@ -84,6 +84,8 @@ class API {
     this.onRequestSuccess = options.onRequestSuccess;
 
     this.queue = new TaskQueue('Git');
+    this.queue.addEventListener('busy', () => options.onQueueBusy())
+    this.queue.addEventListener('done', () => options.onQueueDone());
 
     this.setRepoLink(options.repoLink);
 
@@ -514,6 +516,15 @@ self.onmessage = (event) => {
             data: { repoContents }
           })
         },
+
+        onQueueBusy() {
+          postMessage({ id: 'queue-busy' });
+        },
+
+        onQueueDone() {
+          postMessage({ id: 'queue-done' });
+        },
+
       });
       break;
 
