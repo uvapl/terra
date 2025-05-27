@@ -347,7 +347,6 @@ export default class GitFS {
     Terra.app.layout.getTabComponents().forEach((tabComponent) => {
       const { fileId } = tabComponent.getState();
       if (fileId) {
-        console.log('fileId', fileId);
         const { path } = this.vfs.findFileById(fileId);
         tabs[path] = tabComponent;
       }
