@@ -1,8 +1,23 @@
 /**
  * Checks whether the current app is the IDE or the embed.
  */
-export const IS_IDE = $('body').hasClass('terra-ide');
-export const IS_IFRAME = $('body').hasClass('terra-embed');
+let IS_IDE = null;
+let IS_IFRAME = null;
+
+// Checks whether the current app is running in development mode.
+let IS_DEV = null;
+
+// The constants may be indirectly imports inside workers, in which there is no
+// `window` or `document` available.
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  const $body = $('body');
+  IS_IDE = $body.hasClass('terra-ide');
+  IS_IFRAME = $body.hasClass('terra-embed');
+
+  IS_DEV = window.location.hostname === 'localhost';
+}
+
+export { IS_DEV, IS_IFRAME, IS_IDE };
 
 /**
  * Sets the default font-size for the upper-right select element.
@@ -21,11 +36,6 @@ export const AUTOSAVE_INTERVAL = 60 * 1000;
  * The offset is defined in milliseconds.
  */
 export const AUTOSAVE_START_OFFSET = 60 * 1000;
-
-/**
- * Checks whether the current app is running in development mode.
- */
-export const IS_DEV = window.location.hostname === 'localhost';
 
 // The modal's animation duration in milliseconds.
 export const MODAL_ANIM_DURATION = 300;

@@ -22,6 +22,35 @@ class FileTreeManager {
   }
 
   /**
+   * Removes the bottom message from the DOM.
+   */
+  removeBottomMsg = () => {
+    $('.file-tree-container').removeClass('has-bottom-msg')
+    $('#file-tree-bottom-msg').remove();
+  }
+
+  /**
+   * Show a message at the bottom of the file-tree.
+   */
+  showBottomMsg = (msg) => {
+    if (this.hasBottomMsg()) {
+      $('#file-tree-bottom-msg').html(msg);
+      return;
+    };
+
+    const html = `<div id="file-tree-bottom-msg" class="file-tree-bottom-msg"><p>${msg}</p></div>`;
+
+    $('.file-tree-container').addClass('has-bottom-msg').append(html);
+  }
+
+  /**
+   * Checks if the file tree has a bottom message.
+   */
+  hasBottomMsg = () => {
+    return $('#file-tree-bottom-msg').length > 0;
+  }
+
+  /**
    * Removes the local storage warning from the DOM.
    */
   removeLocalStorageWarning = () => {
@@ -730,7 +759,7 @@ class FileTreeManager {
 
     tree.visit((node) => {
       if (node.data.isFolder && node.expanded) {
-        prevExpandedFolderPaths.push(Terra.app.vfs.getAbsoluteFolderPath(node.key));
+        prevExpandedFolderPaths.push(Terra.app.vfs.findFolderById(node.key).path);
       }
     });
 
@@ -738,7 +767,7 @@ class FileTreeManager {
 
     // Expand all folder nodes again that were open (if they still exist).
     this.getInstance().visit((node) => {
-      if (node.data.isFolder && prevExpandedFolderPaths.includes(Terra.app.vfs.getAbsoluteFolderPath(node.key))) {
+      if (node.data.isFolder && prevExpandedFolderPaths.includes(Terra.app.vfs.findFolderById(node.key).path)) {
         node.setExpanded(true, { noAnimation: true });
       }
     });

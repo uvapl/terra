@@ -38,6 +38,18 @@ export default class GitFS {
     this._repoLink = repoLink;
 
     this.bindVFSEvents();
+    this.bindPageReloadEvent();
+  }
+
+  bindPageReloadEvent = () => {
+    $(window).on('beforeunload', (e) => {
+      if (fileTreeManager.hasBottomMsg()) {
+        const message = 'The app is currently syncing changes to GitHub. Are you sure you want to reload the page?';
+        e.preventDefault();
+        e.returnValue = message;
+        return message;
+      }
+    });
   }
 
   bindVFSEvents = () => {
@@ -51,30 +63,26 @@ export default class GitFS {
 
   vfsFileCreatedHandler = (event) => {
     const { file } = event.detail;
-    const newPath = this.vfs.getAbsoluteFilePath(file.id)
-    this.commit(newPath, file.content, file.sha);
+    this.commit(file.path, file.content, file.sha);
   }
 
   vfsFileMovedHandler = (event) => {
     const { file, oldPath } = event.detail;
-    const newPath = this.vfs.getAbsoluteFilePath(file.id);
-    this.moveFile(oldPath, file.sha, newPath, file.content);
+    this.moveFile(oldPath, file.sha, file.path, file.content);
   }
 
   vfsFileContentChangedHandler = (event) => {
     const { file } = event.detail;
-    const newPath = this.vfs.getAbsoluteFilePath(file.id);
 
     // Only commit changes after 2 seconds of inactivity.
     Terra.app.registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
-      this.commit(newPath, file.content, file.sha);
+      this.commit(file.path, file.content, file.sha);
     });
   }
 
   vfsBeforeFileDeletedHandler = (event) => {
     const  { file } = event.detail;
-    const path = this.vfs.getAbsoluteFilePath(file.id);
-    this.rm(path, file.sha);
+    this.rm(file.path, file.sha);
   }
 
   vfsFolderMovedHandler = (event) => {
@@ -95,11 +103,10 @@ export default class GitFS {
     const folders = this.vfs.findFoldersWhere({ parentId: folderId });
 
     let paths = files.map((file) => {
-      const newPath = this.vfs.getAbsoluteFilePath(file.id);
-      const filename = newPath.split('/').pop();
+      const filename = file.path.split('/').pop();
       return {
         oldPath: `${oldPath}/${filename}`,
-        newPath,
+        newPath: file.path,
         content: file.content,
         sha: file.sha,
       }
@@ -255,7 +262,7 @@ export default class GitFS {
         break;
 
       // Triggered for primary and secondary rate limit.
-      case 'rate-limit':
+      case 'rate-limit': {
         const retryAfter = Math.ceil(payload.retryAfter / 60);
         $('#file-tree').html('<div class="info-msg error">Exceeded GitHub API limit.</div>');
 
@@ -281,6 +288,7 @@ export default class GitFS {
 
         $modal.find('.primary-btn').click(() => hideModal($modal));
         break;
+      }
 
       case 'fetch-branches-success':
         // Import the renderGitRepoBranches dynamically, because if we put this
@@ -333,6 +341,14 @@ export default class GitFS {
         const file = this.vfs.findFileByPath(payload.filepath);
         file.sha = payload.sha;
         break;
+
+      case 'queue-busy':
+        fileTreeManager.showBottomMsg('Syncing changes to GitHub...');
+        break;
+
+      case 'queue-done':
+        fileTreeManager.removeBottomMsg();
+        break;
     }
   }
 
@@ -352,47 +368,50 @@ export default class GitFS {
     Terra.app.layout.getTabComponents().forEach((tabComponent) => {
       const { fileId } = tabComponent.getState();
       if (fileId) {
-        const filepath = this.vfs.getAbsoluteFilePath(fileId);
-        tabs[filepath] = tabComponent;
+        const { path } = this.vfs.findFileById(fileId);
+        tabs[path] = tabComponent;
       }
     });
 
     // Remove all files from the virtual filesystem.
-    this.vfs.clear();
+    console.log('clearing VFS...')
+    await this.vfs.clear();
+    console.log('clearing VFS DONE')
 
     // First create all root files.
-    repoContents
-      .filter((fileOrFolder) => fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/'))
-      .forEach(async (fileOrFolder) => {
-        this.vfs.createFile({
-          name: fileOrFolder.path.split('/').pop(),
-          sha: fileOrFolder.sha,
-          isNew: false,
-          content: fileOrFolder.content,
-        }, false);
-      });
+    const rootFiles = repoContents.filter((file) => file.type === 'blob' && file.path.includes('/'));
+    for (const file of rootFiles) {
+      await this.vfs.createFile({
+        name: file.path.split('/').pop(),
+        sha: file.sha,
+        isNew: false,
+        content: file.content,
+      }, false);
+    }
 
     // Then create all root folders and their nested files.
-    repoContents
-      .filter((fileOrFolder) => !(fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/')))
-      .forEach((fileOrFolder) => {
-        const { sha } = fileOrFolder;
-        const path = fileOrFolder.path.split('/')
-        const name = path.pop();
+    const remainingFilesAndFolders = repoContents.filter(
+      (fileOrFolder) => !(fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/'))
+    );
 
-        const parentId = path.length > 0 ? this.vfs.findFolderByPath(path.join('/')).id : null;
+    for (const fileOrFolder of remainingFilesAndFolders) {
+      const { sha } = fileOrFolder;
+      const path = fileOrFolder.path.split('/');
+      const name = path.pop();
 
-        if (fileOrFolder.type === 'tree') {
-          this.vfs.createFolder({ name, parentId, sha });
-        } else if (fileOrFolder.type === 'blob') {
-          this.vfs.createFile({
-            name,
-            parentId,
-            sha,
-            content: fileOrFolder.content,
-          }, false);
-        }
-      });
+      const parentId = path.length > 0 ? this.vfs.findFolderByPath(path.join('/')).id : null;
+
+      if (fileOrFolder.type === 'tree') {
+        await this.vfs.createFolder({ name, parentId, sha });
+      } else if (fileOrFolder.type === 'blob') {
+        await this.vfs.createFile({
+          name,
+          parentId,
+          sha,
+          content: fileOrFolder.content,
+        }, false);
+      }
+    }
 
     // Finally, we sync the current tabs with their new file IDs.
     for (const [filepath, tabComponent] of Object.entries(tabs)) {
