@@ -256,24 +256,26 @@ export default class ExamApp extends App {
     this.notify('Your code is now locked and cannot be edited anymore.');
 
     // Lock all components, making them read-only.
-    Terra.layout.root.contentItems[0].contentItems.forEach((contentItem) => {
-      contentItem.contentItems.forEach((component) => {
-        component.container.emit('lock');
-      });
+    this.layout.emitToTabComponents('lock');
+
+    // Disable language worker.
+    Terra.app.langWorker.terminate();
+
+    // Use set-timeout to ensure these locks happen after the DOM has been
+    // rendered at least once.
+    setTimeout(() => {
+      // Disable the controls and remove their 'click' event listeners.
+      $('.terminal-component-container .button').prop('disabled', true).off('click');
+
+      // Lock the drag handler between the editor and terminal.
+      $('.lm_splitter').addClass('locked');
+
+      // Show lock screen for both containers.
+      $('.component-container').addClass('locked');
     });
 
-    // Disable the controls and remove the 'click' event listeners.
-    $('#run').prop('disabled', true).off('click');
-    $('#clear-term').prop('disabled', true).off('click');
-
-    // Lock the drag handler between the editor and terminal.
-    $('.lm_splitter').addClass('locked');
-
-    // Show lock screen for both containers.
-    $('.component-container').addClass('locked');
-
     // Check if the submit modal is open.
-    $submitModal = $('#submit-exam-model');
+    const $submitModal = $('#submit-exam-model');
     if ($submitModal.length > 0) {
       let lastSubmissionText = '';
       if (this.prevAutoSaveTime instanceof Date) {

@@ -80,9 +80,22 @@ body {
   color: #099509;
 }
 
+.text-small {
+  font-size: 11px;
+}
+
+.flex-end {
+  justify-content: flex-end;
+}
+
+/* locked state for the exam */
 .component-container.locked {
   position: relative;
   pointer-events: none;
+}
+
+.component-container .ace_text-input[readonly] ~ .ace_scroller:before {
+  content: none;
 }
 
 .component-container.locked:before {
@@ -100,12 +113,4 @@ body {
   background-size: 50px;
   -webkit-backdrop-filter: blur(1px) grayscale(40%);
   backdrop-filter: blur(1px) grayscale(40%);
-}
-
-.text-small {
-  font-size: 11px;
-}
-
-.flex-end {
-  justify-content: flex-end;
 }
