@@ -376,17 +376,22 @@ class FileTreeManager {
    * If an existing instance already exists, only the data is updated and redrawn.
    *
    * @param {boolean} [forceRecreate=false] Enforce recreation of the file tree.
+   * @param {boolean} [persistState=true] Whether to persist the state of the expanded folders.
    *
    * @see https://wwwendt.de/tech/fancytree/doc/jsdoc/global.html#FancytreeOptions
    */
-  createFileTree = (forceRecreate = false) => {
+  createFileTree = (forceRecreate = false, persistState = true) => {
     // Reload the tree if it already exists by re-importing from VFS.
     if (this.tree) {
       if (!forceRecreate) {
-        // Always persist the tree state to prevent folders from being closed.
-        this.runFuncWithPersistedState(async () => {
+        // Persist the tree state to prevent folders from being closed.
+        if (persistState) {
+          this.runFuncWithPersistedState(async () => {
+            this.getInstance().reload(this.createFromVFS());
+          })
+        } else {
           this.getInstance().reload(this.createFromVFS());
-        })
+        }
         return;
       } else {
         $('#file-tree .info-msg').remove();

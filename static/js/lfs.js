@@ -15,6 +15,23 @@ export default class LocalFileSystem {
   FOLDER_HANDLES_STORE_NAME = 'folder-handles';
 
   /**
+   * List of paths that the LFS is not allowed to import during import.
+   * @type {string[]}
+   */
+  blacklistedPaths = [
+    'site-packages',           // when user folder has python virtual env
+    '__pycache__',             // Python cache directory
+    '.mypy_cache',             // Mypy cache directory
+    '.venv', 'venv', 'env',    // virtual environment
+    '.DS_Store',               // Macos metadata file
+    'dist', 'build',           // compiled assets for various languages
+    'coverage', '.nyc_output', // code coverage reports
+    '.git',                    // Git directory
+    'node_modules',            // NodeJS projects
+  ];
+
+
+  /**
    * Local reference to the VFS instance.
    * @type {VirtualFileSystem}
    */
@@ -249,14 +266,14 @@ export default class LocalFileSystem {
   _importFolderToVFS = async (rootFolderHandle) => {
     const tabComponents = Terra.app.layout.getTabComponents();
     const prevOpenTabs = tabComponents
-    .filter((tabComponent) => tabComponent.getState().fileId)
-    .map((tabComponent) => {
-      const { fileId } = tabComponent.getState();
-      return {
-        path: this.vfs.findFileById(fileId).path,
-        editorComponent: tabComponent,
-      };
-    });
+      .filter((tabComponent) => tabComponent.getState().fileId)
+      .map((tabComponent) => {
+        const { fileId } = tabComponent.getState();
+        return {
+          path: this.vfs.findFileById(fileId).path,
+          editorComponent: tabComponent,
+        };
+      });
 
     this.vfs.clear();
     await this._clearStores();
@@ -270,7 +287,7 @@ export default class LocalFileSystem {
     await this._readFolder(rootFolderHandle, null);
 
     // Recreate the file tree.
-    fileTreeManager.createFileTree();
+    fileTreeManager.createFileTree(false, false);
 
     // Sync the new imported VFS IDs with the currently open tabs.
     prevOpenTabs.forEach(({ path, editorComponent }) => {
@@ -331,20 +348,10 @@ export default class LocalFileSystem {
    * @returns {Promise<void>}
    */
   _readFolder = async (dirHandle, parentId) => {
-    const blacklistedPaths = [
-      'site-packages',           // when user folder has python virtual env
-      '__pycache__',             // Python cache directory
-      '.mypy_cache',             // Mypy cache directory
-      '.venv', 'venv', 'env',    // virtual environment
-      '.DS_Store',               // Macos metadata file
-      'dist', 'build',           // compiled assets for various languages
-      'coverage', '.nyc_output', // code coverage reports
-      '.git',                    // Git directory
-      'node_modules',            // NodeJS projects
-    ];
-
     for await (const [name, handle] of dirHandle) {
-      if (handle.kind === 'file' && !blacklistedPaths.includes(name)) {
+      if (this.blacklistedPaths.includes(name)) continue;
+
+      if (handle.kind === 'file') {
         const file = await handle.getFile();
         const { id: fileId } = this.vfs.createFile({
           name: file.name,
@@ -352,7 +359,7 @@ export default class LocalFileSystem {
           size: file.size
         }, false);
         await this.saveFileHandle(this.vfs.findFileById(fileId).path, fileId, handle);
-      } else if (handle.kind === 'directory' && !blacklistedPaths.includes(name)) {
+      } else if (handle.kind === 'directory') {
         const folder = this.vfs.createFolder({ name, parentId }, false);
         await this.saveFolderHandle(this.vfs.findFolderById(folder.id).path, folder.id, handle);
         await this._readFolder(handle, folder.id);
