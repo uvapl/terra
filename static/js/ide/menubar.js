@@ -53,7 +53,7 @@ export function renderGitRepoBranches(branches) {
 
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
     Terra.app.gitfs.clone();
-    Terra.app.layout.closeAllFiles();
+    Terra.app.closeAllFiles();
   });
 }
 
@@ -88,7 +88,7 @@ function closeActiveMenuBarMenu(event) {
   // and menu-item--new-folder.
   const isInsideMenu = $('.menubar > li.open').find($(event.target)).length > 0;
   const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
-  const editorComponent = Terra.app.layout.getActiveEditor();
+  const editorComponent = Terra.app.getActiveEditor();
   if (isInsideMenu && isNotNewFileOrFolderBtn && editorComponent && editorComponent.ready) {
     // Set Terra.v.blockLFSPolling to prevent file contents being reloaded
     Terra.v.blockLFSPolling = true;
@@ -147,8 +147,8 @@ function registerMenubarEventListeners() {
   $('#menu-item--new-folder').click(() => fileTreeManager.createFolder());
   Mousetrap.bind(['ctrl+shift+t'], () => fileTreeManager.createFolder());
 
-  $('#menu-item--close-file').click(() => Terra.app.layout.closeFile());
-  Mousetrap.bind(['ctrl+w'], () => Terra.app.layout.closeFile());
+  $('#menu-item--close-file').click(() => Terra.app.closeFile());
+  Mousetrap.bind(['ctrl+w'], () => Terra.app.closeFile());
 
   $('#menu-item--comment').click(Menubar.toggleComment);
 
@@ -185,7 +185,7 @@ function registerMenubarEventListeners() {
   $('#menu-item--reset-layout').click(() => Terra.app.resetLayout());
 
   $('#menu-item--kill-process').click(Menubar.killTermProcess);
-  $('#menu-item--clear-term').click(() => Terra.app.layout.term.clear());
+  $('#menu-item--clear-term').click(() => Terra.app.termClear());
 
   // Prevent the default browser save dialog when pressing ctrl+s or cmd+s.
   Mousetrap.bind(['ctrl+s', 'meta+s'], (event) => event.preventDefault());
@@ -208,20 +208,20 @@ Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-folder').hasClass('disabled')) return;
 
   Terra.app.lfs.closeFolder();
-  Terra.app.layout.closeAllFiles();
+  Terra.app.closeAllFiles();
   closeActiveMenuBarMenu(event);
 };
 
 Menubar.undo = () => {
-  Terra.app.layout.getActiveEditor().editor.undo();
+  Terra.app.getActiveEditor().editor.undo();
 };
 
 Menubar.redo = () => {
-  Terra.app.layout.getActiveEditor().editor.redo();
+  Terra.app.getActiveEditor().editor.redo();
 };
 
 Menubar.copyToClipboard = () => {
-  const editor = Terra.app.layout.getActiveEditor().editor;
+  const editor = Terra.app.getActiveEditor().editor;
   if (!editor.selection.isEmpty()) {
     const text = editor.getSelectedText();
     navigator.clipboard.writeText(text);
@@ -232,53 +232,53 @@ Menubar.cut = () => {
   Menubar.copyToClipboard();
 
   // Cut the selected text.
-  Terra.app.layout.getActiveEditor().editor.insert('');
+  Terra.app.getActiveEditor().editor.insert('');
 };
 
 Menubar.toggleComment = () => {
-  Terra.app.layout.getActiveEditor().editor.toggleCommentLines();
+  Terra.app.getActiveEditor().editor.toggleCommentLines();
 }
 
 Menubar.moveLinesUp = () => {
-  Terra.app.layout.getActiveEditor().editor.moveLinesUp();
+  Terra.app.getActiveEditor().editor.moveLinesUp();
 }
 
 Menubar.moveLinesDown = () => {
-  Terra.app.layout.getActiveEditor().editor.moveLinesDown();
+  Terra.app.getActiveEditor().editor.moveLinesDown();
 }
 
 Menubar.pasteFromClipboard = () => {
   navigator.clipboard.readText().then((text) => {
-    Terra.app.layout.getActiveEditor().editor.insert(text);
+    Terra.app.getActiveEditor().editor.insert(text);
   });
 };
 
 Menubar.indent = () => {
-  Terra.app.layout.getActiveEditor().editor.blockIndent();
+  Terra.app.getActiveEditor().editor.blockIndent();
 };
 
 Menubar.outdent = () => {
-  Terra.app.layout.getActiveEditor().editor.blockOutdent();
+  Terra.app.getActiveEditor().editor.blockOutdent();
 };
 
 Menubar.findNext = () => {
-  Terra.app.layout.getActiveEditor().editor.findNext();
+  Terra.app.getActiveEditor().editor.findNext();
 }
 
 Menubar.findPrev = () => {
-  Terra.app.layout.getActiveEditor().editor.findPrevious();
+  Terra.app.getActiveEditor().editor.findPrevious();
 }
 
 Menubar.search = () => {
-  Terra.app.layout.getActiveEditor().editor.execCommand('find');
+  Terra.app.getActiveEditor().editor.execCommand('find');
 };
 
 Menubar.replace = () => {
-  Terra.app.layout.getActiveEditor().editor.execCommand('replace');
+  Terra.app.getActiveEditor().editor.execCommand('replace');
 };
 
 Menubar.runTab = () => {
-  Terra.app.layout.getActiveEditor().editor.execCommand('run');
+  Terra.app.getActiveEditor().editor.execCommand('run');
 };
 
 Menubar.addCredentials = () => {
@@ -458,7 +458,7 @@ Menubar.connectRepo = () => {
 
           // Close all tabs, because we know we will change from either local
           // storage to git, or from one git repo to another.
-          Terra.app.layout.closeAllFiles();
+          Terra.app.closeAllFiles();
         });
 
       }, MODAL_ANIM_DURATION);

@@ -68,8 +68,7 @@ export default class FileArgsPlugin extends TerraPlugin {
     const editorComponent = Terra.app.layout.getActiveEditor();
     if (!editorComponent || editorComponent.proglang !== 'c') return;
 
-    const fileId = editorComponent.container.getState().fileId;
-    const { path: filepath } = Terra.app.vfs.findFileById(fileId);
+    const { path: filepath } = Terra.app.getActiveEditorFileObject();
 
     const currentArgs = (this.getState('fileargs')[filepath] || '').replace(/"/g, '&quot;');
 

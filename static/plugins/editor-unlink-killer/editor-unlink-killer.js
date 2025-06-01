@@ -6,12 +6,13 @@
 import Terra from '../../js/terra.js';
 import { createModal, showModal } from '../../js/modal.js';
 import { TerraPlugin } from '../../js/plugin-manager.js';
+import { seconds } from '../../js/helpers/shared.js';
 
 export default class EditorUnlinkKiller extends TerraPlugin {
   constructor() {
     super();
     this.name = 'tab-watcher';
-    this.interval = 10000; // 10 seconds
+    this.interval = seconds(10);
     this.startWatching();
     console.log("Started unlink KILLER");
   }

@@ -295,14 +295,14 @@ export default class App {
       const runFileIntervalId = setInterval(() => {
         if (this.langWorker && this.langWorker.isReady) {
           this.langWorker.runUserCode(filename, files, args);
-          Terra.app.layout.checkForStopCodeButton();
+          this.layout.checkForStopCodeButton();
           clearInterval(runFileIntervalId);
         }
       }, 200);
     } else if (this.langWorker) {
       // If the worker is ready, run the code immediately.
       this.langWorker.runUserCode(filename, files, args);
-      Terra.app.layout.checkForStopCodeButton();
+      this.layout.checkForStopCodeButton();
     }
   }
 
@@ -396,8 +396,10 @@ export default class App {
    * @returns {Promise<object>} Object containing the filename and content.
    */
   async getFileInfo(fileId) {
-    const { name, content, path: filepath } = this.vfs.findFileById(fileId);
+    const file = this.vfs.findFileById(fileId);
+    const { name, path: filepath } = file;
 
+    let content = file.content;
     if (this.hasLFSProjectLoaded && !content) {
       content = await this.lfs.getFileContent(fileId);
     }
@@ -415,5 +417,80 @@ export default class App {
     return Promise.all(
       Object.keys(this.vfs.files).map(this.getFileInfo)
     );
+  }
+
+  /**
+   * Clear the terminal's write buffer.
+   */
+  termClearWriteBuffer() {
+    this.layout.term.clearTermWriteBuffer();
+  }
+
+  /**
+   * Write a message to the terminal without newline character.
+   *
+   * @param {string} msg - The message to write.
+   */
+  termWrite(msg) {
+    this.layout.term.write(msg);
+  }
+
+  /**
+   * Write a message to the terminal with newline character.
+   *
+   * @param {string} msg - The message to write.
+   */
+  termWriteln(msg) {
+    this.layout.term.writeln(msg);
+  }
+
+  /**
+   * Enable the terminal input for the user and wait until they press ENTER and
+   * process the typed input.
+   *
+   * @returns {Promise<string>} The user's input.
+   */
+  termWaitForInput() {
+    return this.layout.term.waitForInput()
+  }
+
+  /**
+   * Dispose the terminal user input, which means that the terminal will no
+   * longer wait for user input and will not process any further input.
+   */
+  termDisposeUserInput() {
+    this.layout.term.disposeUserInput();
+  }
+
+  /**
+   * Hide the cursor of the terminal.
+   */
+  termHideTermCursor() {
+    this.layout.term.hideTermCursor();
+  }
+
+  /**
+   * Clear the terminal's content.
+   */
+  termClear() {
+    this.layout.term.clear();
+  }
+
+  /**
+   * Get all tab components from the layout.
+   *
+   * @returns {TabComponent[]} List containing all open tab components.
+   */
+  getTabComponents() {
+    return this.layout.getTabComponents();
+  }
+
+  /**
+   * Get the active editor component from the layout.
+   *
+   * @returns {Editor} the active editor instance.
+   */
+  getActiveEditor() {
+    return this.layout.getActiveEditor();
   }
 }

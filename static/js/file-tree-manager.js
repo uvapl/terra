@@ -218,7 +218,7 @@ class FileTreeManager {
 
     $modal.find('.confirm-btn').click(() => {
       if (node.data.isFile) {
-        Terra.app.layout.closeFile(node.key);
+        Terra.app.closeFile(node.key);
         Terra.app.vfs.deleteFile(node.key);
       } else if (node.data.isFolder) {
         this.closeFilesInFolderRecursively(node.key);
@@ -250,7 +250,7 @@ class FileTreeManager {
   closeFilesInFolderRecursively = (folderId) => {
     const files = Terra.app.vfs.findFilesWhere({ parentId: folderId });
     for (const file of files) {
-      Terra.app.layout.closeFile(file.id);
+      Terra.app.closeFile(file.id);
     }
 
     const folders = Terra.app.vfs.findFoldersWhere({ parentId: folderId });
@@ -521,7 +521,7 @@ class FileTreeManager {
 
     fn(data.node.key, { name });
 
-    const tabComponent = Terra.app.layout.getTabComponents()
+    const tabComponent = Terra.app.getTabComponents()
       .find((tabComponent) => tabComponent.getState().fileId === data.node.key);
 
     if (tabComponent) {

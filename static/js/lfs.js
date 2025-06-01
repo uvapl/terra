@@ -249,7 +249,7 @@ export default class LocalFileSystem {
       // Remove local file storage warning if present.
       fileTreeManager.removeLocalStorageWarning();
 
-      Terra.app.layout.closeAllFiles();
+      Terra.app.closeAllFiles();
       await this._importFolderToVFS(rootFolderHandle);
       this._watchRootFolder();
       pluginManager.triggerEvent('onStorageChange', 'lfs');
