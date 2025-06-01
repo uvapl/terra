@@ -1,3 +1,6 @@
+// This file includes code adapted from wasm-clang (https://github.com/binji/wasm-clang)
+// Licensed under the Apache License 2.0. See LICENSE.wasm-clang for details.
+
 import BaseAPI from './base-api.js';
 
 function readStr(u8, o, len = -1) {
