@@ -60,9 +60,6 @@ class API extends BaseAPI {
         extractDir: `/lib/python${pyMajorVersion}.${pyMinorVersion}/site-packages/`
       });
 
-      // Use matplotlib's Agg backend for static images.
-      this.pyodide.runPython("import matplotlib; matplotlib.use('Agg')");
-
       this.readyCallback();
     });
   }
@@ -456,6 +453,9 @@ class API extends BaseAPI {
     const sysModulesBefore = this.getSysModules();
 
     try {
+      // Use matplotlib's Agg backend for static images.
+      this.pyodide.runPython("import matplotlib; matplotlib.use('Agg')");
+
       // Most of the output will end up in the raw stdout handler defined
       // earlier, but some output will still end up in the console, which
       // generally happens solely for config buttons.
@@ -473,9 +473,8 @@ class API extends BaseAPI {
       // Remove all modules that were imported when executing the code.
       const sysModulesAfter = this.getSysModules();
       const addedModules = sysModulesAfter.filter(module => !sysModulesBefore.includes(module));
-      for (const module of addedModules) {
-        this.pyodide.runPython(`sys.modules.pop('${module}', None)`);
-      }
+      const cmd = addedModules.map((module) => `sys.modules.pop('${module}', None)`).join(';');
+      this.pyodide.runPython(cmd);
 
       // Clear the globals after the code has run such that the next execution
       // will be called with a clean state.
