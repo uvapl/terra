@@ -237,8 +237,7 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {string} path - The absolute filepath.
    */
   findFileByPath = (path) =>
-    Object.values(this.files)
-    .find((f) => this.getAbsoluteFilePath(f.id) === path);
+    Object.values(this.files).find((f) => f.path === path);
 
   /**
    * Find a folder by its absolute path.
@@ -246,8 +245,7 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {string} path - The absolute folderpath.
    */
   findFolderByPath = (path) =>
-    Object.values(this.folders)
-    .find((f) => this.getAbsoluteFolderPath(f.id) === path);
+    Object.values(this.folders).find((f) => f.path === path);
 
   /**
    * Get the absolute file path of a file.
@@ -315,6 +313,7 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     this.files[newFile.id] = newFile;
+    newFile.path = this.getAbsoluteFilePath(newFile.id);
 
     if (isUserInvoked) {
       this.dispatchEvent(new CustomEvent('fileCreated', {
@@ -349,6 +348,7 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     this.folders[newFolder.id] = newFolder;
+    newFolder.path = this.getAbsoluteFolderPath(newFolder.id);
 
     if (isUserInvoked) {
       this.dispatchEvent(new CustomEvent('folderCreated', {
@@ -372,7 +372,7 @@ export default class VirtualFileSystem extends EventTarget {
     const file = this.findFileById(id);
     if (!file) return;
 
-    const oldPath = this.getAbsoluteFilePath(file.id);
+    const oldPath = file.path;
 
     // These extra checks is needed because in the UI, the user can trigger a
     // rename but not actually change the name.
@@ -392,6 +392,7 @@ export default class VirtualFileSystem extends EventTarget {
       }
     }
 
+    file.path = this.getAbsoluteFilePath(file.id);
     file.updatedAt = new Date().toISOString();
 
     if (isRenamed || isMoved) {
@@ -423,7 +424,7 @@ export default class VirtualFileSystem extends EventTarget {
     const folder = this.findFolderById(id);
     if (!folder) return;
 
-    const oldPath = this.getAbsoluteFolderPath(folder.id);
+    const oldPath = folder.path;
 
     // This extra check is needed because in the UI, the user can trigger a
     // rename but not actually change the name.
@@ -442,6 +443,7 @@ export default class VirtualFileSystem extends EventTarget {
       }
     }
 
+    folder.path = this.getAbsoluteFolderPath(folder.id);
     folder.updatedAt = new Date().toISOString();
 
     if (isRenamed || isMoved) {
