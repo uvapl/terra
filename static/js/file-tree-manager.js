@@ -218,7 +218,7 @@ class FileTreeManager {
 
     $modal.find('.confirm-btn').click(() => {
       if (node.data.isFile) {
-        Terra.app.layout.closeFile(node.key);
+        Terra.app.closeFile(node.key);
         Terra.app.vfs.deleteFile(node.key);
       } else if (node.data.isFolder) {
         this.closeFilesInFolderRecursively(node.key);
@@ -250,7 +250,7 @@ class FileTreeManager {
   closeFilesInFolderRecursively = (folderId) => {
     const files = Terra.app.vfs.findFilesWhere({ parentId: folderId });
     for (const file of files) {
-      Terra.app.layout.closeFile(file.id);
+      Terra.app.closeFile(file.id);
     }
 
     const folders = Terra.app.vfs.findFoldersWhere({ parentId: folderId });
@@ -376,17 +376,22 @@ class FileTreeManager {
    * If an existing instance already exists, only the data is updated and redrawn.
    *
    * @param {boolean} [forceRecreate=false] Enforce recreation of the file tree.
+   * @param {boolean} [persistState=true] Whether to persist the state of the expanded folders.
    *
    * @see https://wwwendt.de/tech/fancytree/doc/jsdoc/global.html#FancytreeOptions
    */
-  createFileTree = (forceRecreate = false) => {
+  createFileTree = (forceRecreate = false, persistState = true) => {
     // Reload the tree if it already exists by re-importing from VFS.
     if (this.tree) {
       if (!forceRecreate) {
-        // Always persist the tree state to prevent folders from being closed.
-        this.runFuncWithPersistedState(async () => {
+        // Persist the tree state to prevent folders from being closed.
+        if (persistState) {
+          this.runFuncWithPersistedState(async () => {
+            this.getInstance().reload(this.createFromVFS());
+          })
+        } else {
           this.getInstance().reload(this.createFromVFS());
-        })
+        }
         return;
       } else {
         $('#file-tree .info-msg').remove();
@@ -516,7 +521,7 @@ class FileTreeManager {
 
     fn(data.node.key, { name });
 
-    const tabComponent = Terra.app.layout.getTabComponents()
+    const tabComponent = Terra.app.getTabComponents()
       .find((tabComponent) => tabComponent.getState().fileId === data.node.key);
 
     if (tabComponent) {

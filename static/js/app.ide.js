@@ -260,7 +260,7 @@ export default class IDEApp extends App {
     if (hasGitFSWorker()) {
       this.gitfs.terminate();
       this.gitfs = null;
-      Terra.app.layout.closeAllFiles();
+      this.closeAllFiles();
     }
 
     if (accessToken && repoLink) {
@@ -315,5 +315,42 @@ export default class IDEApp extends App {
 
     const proglang = getFileExtension(filename);
     this.createLangWorker(proglang);
+  }
+
+
+  /**
+   * Close the active tab in the editor.
+   *
+   * @param {string} fileId - The file ID of the tab to close. If not provided,
+   * the active tab will be closed.
+   */
+  closeFile(fileId) {
+    const editorComponent = fileId
+      ? this.layout.getTabComponents().find((editorComponent) => editorComponent.getState().fileId === fileId)
+      : this.layout.getActiveEditor();
+
+    if (editorComponent) {
+      editorComponent.close();
+    }
+  }
+
+  /**
+   * Close all tabs in the editor.
+   */
+  closeAllFiles() {
+    this.layout.getTabComponents().forEach((editorComponent) => {
+      editorComponent.close();
+    });
+  }
+
+  /**
+   * Retrieve the file object of the active editor.
+   *
+   * @returns {object} The file object.
+   */
+  getActiveEditorFileObject() {
+    const editorComponent = this.layout.getActiveEditor();
+    const { fileId } = editorComponent.getState();
+    return Terra.app.vfs.findFileById(fileId);
   }
 }

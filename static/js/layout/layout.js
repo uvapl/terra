@@ -647,29 +647,4 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
         .addClass('danger-btn');
     }, seconds(1));
   }
-
-  /**
-   * Close the active tab in the editor.
-   *
-   * @param {string} fileId - The file ID of the tab to close. If not provided,
-   * the active tab will be closed.
-   */
-  closeFile(fileId) {
-    const editorComponent = fileId
-      ? this.getTabComponents().find((editorComponent) => editorComponent.getState().fileId === fileId)
-      : this.getActiveEditor();
-
-    if (editorComponent) {
-      editorComponent.close();
-    }
-  }
-
-  /**
-   * Close all tabs in the editor.
-   */
-  closeAllFiles() {
-    this.getTabComponents().forEach((editorComponent) => {
-      editorComponent.close();
-    });
-  }
 }

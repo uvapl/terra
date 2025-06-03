@@ -109,16 +109,16 @@ export default class LangWorker {
     // once it has been loaded.
     $('#run-code').prop('disabled', true);
 
-    Terra.app.layout.term.clearTermWriteBuffer();
+    Terra.app.termClearWriteBuffer();
 
     if (showTerminateMsg) {
-      Terra.app.layout.term.writeln('\x1b[1;31mProcess terminated\x1b[0m');
+      Terra.app.termWriteln('\x1b[1;31mProcess terminated\x1b[0m');
     }
 
     // Dispose any active user input.
-    Terra.app.layout.term.disposeUserInput();
+    Terra.app.termDisposeUserInput();
 
-    Terra.app.layout.term.hideTermCursor();
+    Terra.app.termHideTermCursor();
   }
 
   /**
@@ -232,7 +232,7 @@ export default class LangWorker {
     // Only disable the button again if the current tab has a worker,
     // because users can still run code through the contextmenu in the
     // file-tree in the IDE app.
-    const editorComponent = Terra.app.layout.getActiveEditor();
+    const editorComponent = Terra.app.getActiveEditor();
     let disableRunBtn = false;
     if (editorComponent && !this.constructor.hasWorker(getFileExtension(editorComponent.getFilename()))) {
       disableRunBtn = true;
@@ -276,7 +276,7 @@ export default class LangWorker {
         });
 
         // Check if there's an open tab for this file.
-        const tabComponent = Terra.app.layout.getTabComponents().find((tabComponent) => {
+        const tabComponent = Terra.app.getTabComponents().find((tabComponent) => {
           const { fileId } = tabComponent.getState();
           return fileId == existingFile.id;
         });
@@ -326,10 +326,10 @@ export default class LangWorker {
           // with print statements to continue printing after the worker has
           // terminated when the user has pressed the stop button.
           if (this.isReady) {
-            Terra.app.layout.term.write(event.data.data);
+            Terra.app.termWrite(event.data.data);
           }
         } catch (e) {
-          Terra.app.layout.term.clearTermWriteBuffer();
+          Terra.app.termClearWriteBuffer();
         }
         break;
 
@@ -337,7 +337,7 @@ export default class LangWorker {
       // input, this event will be triggered. The user input will be requested
       // and sent back to the worker through the usage of shared memory.
       case 'readStdin':
-        Terra.app.layout.term.waitForInput().then((value) => {
+        Terra.app.termWaitForInput().then((value) => {
           const view = new Uint8Array(this.sharedMem.buffer);
           for (let i = 0; i < value.length; i++) {
             // To the shared memory.

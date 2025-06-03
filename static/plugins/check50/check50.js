@@ -86,8 +86,7 @@ export default class Check50Plugin extends TerraPlugin {
     const editorComponent = Terra.app.layout.getActiveEditor();
     if (!editorComponent || editorComponent.proglang !== 'c') return;
 
-    const { fileId } = editorComponent.getState();
-    const { path: filepath } = Terra.app.vfs.findFileById(fileId);
+    const { path: filepath } = Terra.app.getActiveEditorFileObject();
 
     // Check if the file has a slug and the check50 password is set.
     // Otherwise, if one of them is not set, prompt the user to fill in the
@@ -166,11 +165,7 @@ export default class Check50Plugin extends TerraPlugin {
   }
 
   runCheck50 = () => {
-    const editorComponent = Terra.app.layout.getActiveEditor();
-    const filename = editorComponent.getFilename();
-    const { fileId } = editorComponent.getState();
-    const file = Terra.app.vfs.findFileById(fileId);
-    const code = file.content;
+    const { name: filename, content: code } = Terra.app.getActiveEditorFileObject();
 
     const zip = new JSZip();
     zip.file(filename, code);
