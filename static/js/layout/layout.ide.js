@@ -77,7 +77,7 @@ export default class IDELayout extends Layout {
       {
         name: 'closeFile',
         bindKey: 'Ctrl+W',
-        exec: () => this.closeFile(),
+        exec: () => Terra.app.closeFile(),
       },
       {
         name: 'createNewFileTreeFile',
