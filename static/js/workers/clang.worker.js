@@ -354,8 +354,6 @@ class App {
         ? this.argv[i].replace(/\.wasm/, '.c')
         : this.argv[i];
 
-      console.log('arg', arg);
-
       // Remove quotes around the argument just like in a real shell.
       // '"FOO BAR"' with 'FOO BAR' or "'FOO BAR'" with "FOO BAR"
       if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
