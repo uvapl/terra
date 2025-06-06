@@ -436,13 +436,13 @@ export default class ExamApp extends App {
       const $modal = $('#submit-exam-model');
       if ($modal.length > 0) {
         const evaluationFormLink = this.config.eval_link
-          ? `<br/><br/>🙏 <a href="${this.config.eval_link}" target="_blank">Fill in the evaluation form for the course.</a>`
+          ? `<br/><br/>🙏 <a href="${this.config.eval_link}" target="_blank">Fill in the evaluation form for the course</a>`
           : '';
 
         $modal.find('.modal-body').html(`
           <p>
-            ✅ Your files have been submitted successfully.<br/><br/>
-            🛂 Make sure that you sign off at the desk before leaving.
+            ✅ Your files have been submitted successfully<br/><br/>
+            🛂 Make sure that you sign off at the desk before leaving
             ${evaluationFormLink}
           </p>
           <p>You can still return to the exam if you would like to make more changes to your code.</p>
