@@ -110,7 +110,7 @@ export function objectHasKeys(obj, keys) {
  * @returns {boolean} True when the url is valid.
  */
 export function isValidUrl(url) {
-  return /^https:?\/\//g.test(url);
+  return /^https?:\/\//g.test(url);
 }
 
 /**
