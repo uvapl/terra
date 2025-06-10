@@ -92,7 +92,7 @@ class Memory {
       return buf.length;
     }
   }
-};
+}
 
 class MemFS {
   constructor(options) {
@@ -591,6 +591,10 @@ class API extends BaseAPI {
   }
 
   async runUserCode({ activeTabName, files, args }) {
+    files.filter(file => file.name !== activeTabName).map((file) => {
+      this.memfs.addFile(file.name, file.content);
+    });
+
     const { name: filename, content } = files.find(file => file.name === activeTabName);
     const basename = filename.replace(/\.c$/, '');
     const input = `${basename}.cc`;
