@@ -3,6 +3,7 @@ import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
 import { seconds } from './helpers/shared.js';
+import { GITHUB_URL_PATTERN } from './ide/constants.js';
 
 /**
  * GitFS worker class that handles all Git operations.
@@ -140,11 +141,17 @@ export default class GitFS {
 
   /**
    * Terminate the current worker instance.
+   *
+  * @param {boolean} clear - Whether to clear related local storage items.
    */
-  terminate = () => {
+  terminate = (clear = true) => {
     console.log('Terminating existing GitFS worker')
-    localStorageManager.setLocalStorageItem('git-repo', '');
-    localStorageManager.setLocalStorageItem('git-branch', '');
+
+    if (clear) {
+      localStorageManager.setLocalStorageItem('git-repo', '');
+      localStorageManager.setLocalStorageItem('git-branch', '');
+    }
+
     $('#menu-item--branch')
       .removeClass('has-dropdown').addClass('disabled')
       .find('ul').remove();
@@ -307,7 +314,21 @@ export default class GitFS {
         break;
 
       case 'request-error':
-        $('#file-tree').html(`<div class="info-msg error">Failed to clone repository<br/><br/>${payload.error}</div>`);
+        let errMsg = payload.error.message;
+
+        if (errMsg.toLowerCase().includes('bad credentials')) {
+          errMsg = 'Personal access token was not accepted. Could it be expired?';
+        } else if (errMsg.toLowerCase().includes('not found')) {
+          const gitRepo = localStorageManager.getLocalStorageItem('git-repo');
+          const match = GITHUB_URL_PATTERN.exec(gitRepo);
+          if (match && match.length === 3) {
+            errMsg = `Repository ${match[1]}/${match[2]} was not found on GitHub.`;
+          } else {
+            errMsg = 'Repository was not found on GitHub.';
+          }
+        }
+
+        $('#file-tree').html(`<div class="info-msg error">Failed to clone repository<br/><br/>${errMsg}</div>`);
         break;
 
       case 'clone-fail':
@@ -317,7 +338,7 @@ export default class GitFS {
       case 'move-folder-success':
         // Update all sha in the new files in the VFS.
         payload.updatedFiles.forEach((fileObj) => {
-          const file = this.vfs.findFileByPath(fileObj.filepath);
+          const file = this.vfs.findFileByPath(fileObj.path);
           file.sha = fileObj.sha;
         });
         break;

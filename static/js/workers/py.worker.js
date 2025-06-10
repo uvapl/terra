@@ -94,9 +94,9 @@ class API extends BaseAPI {
    */
   writeFilesToVirtualFS(files) {
     for (const file of files) {
-      if (file.filepath.includes('/')) {
+      if (file.path.includes('/')) {
         // Create the parent folders.
-        const parentFolders = file.filepath.split("/").slice(0, -1);
+        const parentFolders = file.path.split("/").slice(0, -1);
         for (let i = 0; i < parentFolders.length; i++) {
           const folderpath = parentFolders.slice(0, i + 1).join("/");
           // Check if the folder already exists.
@@ -109,10 +109,10 @@ class API extends BaseAPI {
       // Put each file in the virtual file system. Only do this when the file
       // content is not empty, otherwise pyodide throws an error.
       if (file.content) {
-        this.pyodide.FS.writeFile(file.filepath, file.content, { encoding: 'utf8' });
+        this.pyodide.FS.writeFile(file.path, file.content, { encoding: 'utf8' });
 
         // Keep track of when the file was created.
-        const stat = this.pyodide.FS.stat(file.filepath);
+        const stat = this.pyodide.FS.stat(file.path);
         file.ctime = stat.ctime;
       }
     }
@@ -170,8 +170,8 @@ class API extends BaseAPI {
 
     // Gather all parent folder paths.
     for (const file of files) {
-      if (file.filepath.includes('/')) {
-        const parentFolderPath = file.filepath.split('/').slice(0, -1).join('/');
+      if (file.path.includes('/')) {
+        const parentFolderPath = file.path.split('/').slice(0, -1).join('/');
         if (!parentFolderPaths.includes(parentFolderPath)) {
           parentFolderPaths.push(parentFolderPath);
         }
@@ -179,6 +179,7 @@ class API extends BaseAPI {
     }
 
     // Sort the parent folders based on how many subfolders they have.
+    // Example: '/dir1/dir2/dir3' -> ['dir1', 'dir2', 'dir3'] -> len = 3
     parentFolderPaths.sort((a, b) => {
       const aCount = a.split('/').length;
       const bCount = b.split('/').length;
@@ -256,14 +257,14 @@ class API extends BaseAPI {
 
         if (this.fileExists(filepath)) {
           // Check if the file already exists in the files parameter.
-          const existingFile = files.find((f) => f.filepath === filepath);
+          const existingFile = files.find((f) => f.path === filepath);
           const isNewFile = !existingFile;
 
           const stat = this.pyodide.FS.stat(filepath);
           const isModified = !isNewFile && existingFile.ctime.getTime() !== stat.mtime.getTime();
           if (isNewFile || isModified) {
             const content = this.getFileContent(filepath);
-            newFiles.push({ name: filename, filepath, content });
+            newFiles.push({ name: filename, path: filepath, content });
           }
         }
       }
@@ -274,14 +275,14 @@ class API extends BaseAPI {
     for (const filepath of subFolderFilePaths) {
       if (this.fileExists(filepath)) {
         // Check if the file already exists in the files parameter.
-        const existingFile = files.find((f) => f.filepath === filepath);
+        const existingFile = files.find((f) => f.path === filepath);
         const isNewFile = !existingFile;
 
         const stat = this.pyodide.FS.stat(filepath);
         const isModified = !isNewFile && existingFile.ctime.getTime() !== stat.mtime.getTime();
         if (isNewFile || isModified) {
           const content = this.getFileContent(filepath);
-          newFiles.push({ name: filepath, filepath, content });
+          newFiles.push({ name: filepath, path: filepath, content });
         }
       }
     }
@@ -305,9 +306,9 @@ class API extends BaseAPI {
       this.writeFilesToVirtualFS(files);
 
       const activeTab = files.find(file => file.name === activeTabName);
-      if (activeTab.filepath.includes('/')) {
+      if (activeTab.path.includes('/')) {
         // change directory to the folder of the active file
-        const folderpath = activeTab.filepath.split('/').slice(0, -1).join('/');
+        const folderpath = activeTab.path.split('/').slice(0, -1).join('/');
         this.pyodide.FS.chdir(folderpath);
       }
 
@@ -330,7 +331,7 @@ class API extends BaseAPI {
         this.newOrModifiedFilesCallback(newFiles);
       }
 
-      this.runUserCodeCallback(newFiles);
+      this.runUserCodeCallback();
     }
   }
 
@@ -517,8 +518,8 @@ const onAnyMessage = async event => {
           });
         },
 
-        runUserCodeCallback(newFiles) {
-          port.postMessage({ id: 'runUserCodeCallback', newFiles });
+        runUserCodeCallback() {
+          port.postMessage({ id: 'runUserCodeCallback' });
         },
 
         runButtonCommandCallback(selector) {

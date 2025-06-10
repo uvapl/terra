@@ -567,7 +567,7 @@ export default class ExamApp extends App {
     const hiddenFileKeys = Object.keys(this.layout.hiddenFiles);
     if (hiddenFileKeys.length > 0) {
       return hiddenFileKeys.map((filename) => ({
-        filepath: filename,
+        path: filename,
         name: filename,
         content: this.layout.hiddenFiles[filename],
       }));

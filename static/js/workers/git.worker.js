@@ -421,7 +421,7 @@ class API {
         });
 
         updatedFiles.push({
-          filepath: file.newPath,
+          path: file.newPath,
           sha: result.data.content.sha,
         });
 
