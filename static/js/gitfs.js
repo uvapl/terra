@@ -140,11 +140,17 @@ export default class GitFS {
 
   /**
    * Terminate the current worker instance.
+   *
+  * @param {boolean} clear - Whether to clear related local storage items.
    */
-  terminate = () => {
+  terminate = (clear = true) => {
     console.log('Terminating existing GitFS worker')
-    localStorageManager.setLocalStorageItem('git-repo', '');
-    localStorageManager.setLocalStorageItem('git-branch', '');
+
+    if (clear) {
+      localStorageManager.setLocalStorageItem('git-repo', '');
+      localStorageManager.setLocalStorageItem('git-branch', '');
+    }
+
     $('#menu-item--branch')
       .removeClass('has-dropdown').addClass('disabled')
       .find('ul').remove();

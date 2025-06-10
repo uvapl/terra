@@ -258,7 +258,14 @@ export default class IDEApp extends App {
     }
 
     if (hasGitFSWorker()) {
-      this.gitfs.terminate();
+      // Pass `false` to *NOT* clear the git-repo and git-branch local storage
+      // items, because this if-statement only runs when the user is already
+      // connected to a repo and changed the repo URL. Thus, we shouldn't clear
+      // them; however, the clearing should only happen when terminate() is
+      // called in other places to exclusively terminate the worker without
+      // respawning another one.
+      this.gitfs.terminate(false);
+
       this.gitfs = null;
       this.closeAllFiles();
     }
