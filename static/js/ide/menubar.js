@@ -8,6 +8,7 @@ import pluginManager from '../plugin-manager.js';
 import Terra from '../terra.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
+import { GITHUB_URL_PATTERN } from './constants.js';
 
 $(document).ready(() => {
   $('.menubar [data-keystroke]').each((_, element) => setMenubarKeystrokeIcons(element));
@@ -384,7 +385,7 @@ Menubar.connectRepo = () => {
     const repoLink = $connectModal.find('.repo-link').val().trim();
 
     // For now, we only allow GitHub-HTTPS repo links.
-    if (repoLink && !/^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/.test(repoLink)) {
+    if (repoLink && !GITHUB_URL_PATTERN.test(repoLink)) {
       alert('Invalid GitHub repository');
       return;
     }

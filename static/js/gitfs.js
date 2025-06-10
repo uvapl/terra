@@ -3,6 +3,7 @@ import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
 import { seconds } from './helpers/shared.js';
+import { GITHUB_URL_PATTERN } from './ide/constants.js';
 
 /**
  * GitFS worker class that handles all Git operations.
@@ -313,7 +314,21 @@ export default class GitFS {
         break;
 
       case 'request-error':
-        $('#file-tree').html(`<div class="info-msg error">Failed to clone repository<br/><br/>${payload.error}</div>`);
+        let errMsg = payload.error.message;
+
+        if (errMsg.toLowerCase().includes('bad credentials')) {
+          errMsg = 'Personal access token was not accepted. Could it be expired?';
+        } else if (errMsg.toLowerCase().includes('not found')) {
+          const gitRepo = localStorageManager.getLocalStorageItem('git-repo');
+          const match = GITHUB_URL_PATTERN.exec(gitRepo);
+          if (match && match.length === 3) {
+            errMsg = `Repository ${match[1]}/${match[2]} was not found on GitHub.`;
+          } else {
+            errMsg = 'Repository was not found on GitHub.';
+          }
+        }
+
+        $('#file-tree').html(`<div class="info-msg error">Failed to clone repository<br/><br/>${errMsg}</div>`);
         break;
 
       case 'clone-fail':
