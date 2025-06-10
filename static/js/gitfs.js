@@ -317,7 +317,7 @@ export default class GitFS {
       case 'move-folder-success':
         // Update all sha in the new files in the VFS.
         payload.updatedFiles.forEach((fileObj) => {
-          const file = this.vfs.findFileByPath(fileObj.filepath);
+          const file = this.vfs.findFileByPath(fileObj.path);
           file.sha = fileObj.sha;
         });
         break;

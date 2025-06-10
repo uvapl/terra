@@ -591,6 +591,10 @@ class API extends BaseAPI {
   }
 
   async runUserCode({ activeTabName, files, args }) {
+    // Apart from the current tab's file, write all files to memfs.
+    //
+    // TODO: Just write all files here and do not exclude the current active
+    // tab's file. This will be fixed when custom compile support is added.
     files.filter(file => file.name !== activeTabName).map((file) => {
       this.memfs.addFile(file.name, file.content);
     });
@@ -604,7 +608,6 @@ class API extends BaseAPI {
     if (!Array.isArray(args)) {
       args = [];
     }
-
 
     this.hostWriteCmd(`make ${basename}`);
 

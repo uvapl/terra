@@ -268,7 +268,7 @@ export default class LangWorker {
 
     for (const file of newOrModifiedFiles) {
       // Check if the file already exists in the VFS.
-      const existingFile = Terra.app.vfs.findFileByPath(file.filepath);
+      const existingFile = Terra.app.vfs.findFileByPath(file.path);
       if (existingFile) {
         // If the file already exists, update its content.
         Terra.app.vfs.updateFile(existingFile.id, {
@@ -286,7 +286,7 @@ export default class LangWorker {
           tabComponent.setContent(file.content);
         }
       } else {
-        const parentFolderPath = file.filepath.split('/').slice(0, -1).join('/');
+        const parentFolderPath = file.path.split('/').slice(0, -1).join('/');
         const parentFolder = Terra.app.vfs.findFolderByPath(parentFolderPath);
         const parentId = parentFolder ? parentFolder.id : null;
         Terra.app.vfs.createFile({

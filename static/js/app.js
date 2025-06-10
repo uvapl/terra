@@ -397,14 +397,14 @@ export default class App {
    */
   async getFileInfo(fileId) {
     const file = this.vfs.findFileById(fileId);
-    const { name, path: filepath } = file;
+    const { name, path } = file;
 
     let content = file.content;
     if (this.hasLFSProjectLoaded && !content) {
       content = await this.lfs.getFileContent(fileId);
     }
 
-    return { name, filepath, content };
+    return { name, path, content };
   }
 
   /**
