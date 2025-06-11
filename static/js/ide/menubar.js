@@ -8,7 +8,7 @@ import pluginManager from '../plugin-manager.js';
 import Terra from '../terra.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
-import { GITHUB_URL_PATTERN } from './ide/constants.js';
+import { GITHUB_URL_PATTERN } from './constants.js';
 
 $(document).ready(() => {
   $('.menubar [data-keystroke]').each((_, element) => setMenubarKeystrokeIcons(element));
