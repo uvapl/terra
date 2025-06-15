@@ -595,14 +595,20 @@ class API extends BaseAPI {
    * @param {array} data.runAsConfig - The configuration for run-code button.
    */
   async runUserCode({ activeTabName, vfsFiles, runAsConfig }) {
-    const srcFiles = vfsFiles.filter((file) => runAsConfig.compileSrcFilenames.includes(file.name));
+    const srcFilenames = runAsConfig
+      ? runAsConfig.compileSrcFilenames
+      : [activeTabName];
 
-    const target = runAsConfig.compileTarget || activeTabName.replace(/\.c$/, '');
+    const srcFiles = runAsConfig
+      ? vfsFiles.filter((file) => srcFilenames.includes(file.name))
+      : vfsFiles.filter((file) => file.name === activeTabName);
+
+    const target = runAsConfig ? runAsConfig.compileTarget : activeTabName.replace(/\.c$/, '');
     const wasm = `${target}.wasm`;
     const objectFiles = [];
 
     this.hostWriteCmd(`make ${target}`);
-    this.hostWrite(makeCmdPlaceholder(runAsConfig.compileSrcFilenames, target) + '\n');
+    this.hostWrite(makeCmdPlaceholder(srcFilenames, target) + '\n');
 
     for (const file of srcFiles) {
       if (!file.name.endsWith('.c')) {
@@ -621,10 +627,11 @@ class API extends BaseAPI {
 
     const buffer = this.memfs.getFileContents(wasm);
     const testMod = await WebAssembly.compile(buffer);
-    this.hostWriteCmd(`./${target} ${(runAsConfig.args).join(' ')}`);
+    const args = runAsConfig ? runAsConfig.args : [];
+    this.hostWriteCmd(`./${target} ${(args).join(' ')}`);
 
     try {
-      return await this.run([testMod, wasm, ...runAsConfig.args]);
+      return await this.run([testMod, wasm, ...args]);
     } finally {
       this.runUserCodeCallback();
     }
