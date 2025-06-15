@@ -224,19 +224,30 @@ export default class IDEApp extends App {
   }
 
   /**
-   * Get the arguments for the current file.
+   * Get the configuration for the 'Run as...' plugin.
    * This is executed just before the user runs the code from an editor.
    *
-   * @param {string} fileId - The ID of the file to get the arguments for.
-   * @returns {array} The arguments for the current file.
+   * @returns {object} The configuration object containing the compile source files,
+   * compile target, and file arguments.
    */
-  getCurrentFileArgs(fileId) {
-    const { path } = this.vfs.findFileById(fileId);
-    const fileArgsPlugin = pluginManager.getPlugin('file-args').getState('fileargs');
-    const fileArgs = fileArgsPlugin[path];
+  getRunAsConfig() {
+    const runAsPlugin = pluginManager.getPlugin('run-as');
+    const state = runAsPlugin.getState();
 
+    const editorComponent = this.layout.getActiveEditor();
+    const activeTabName = editorComponent.getFilename();
+    const defaultTarget = activeTabName.replace(/\.c$/, '');
+
+    // This regex matches quoted strings (single or double quotes) or unquoted
+    // words separated by whitespace and is used to split a string of arguments
+    // into a list of individual arguments.
     const parseArgsRegex = /("[^"]*"|'[^']*'|\S+)/g;
-    return fileArgs !== undefined ? fileArgs.match(parseArgsRegex) : [];
+
+    return {
+      compileSrcFilenames: (state.compileSrcFilenames || activeTabName).split(' '),
+      compileTarget: state.compileTarget || defaultTarget,
+      args: state.args ? state.args.match(parseArgsRegex) : [],
+    }
   }
 
   /**

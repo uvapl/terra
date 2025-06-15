@@ -2,6 +2,8 @@
 // Licensed under the Apache License 2.0. See LICENSE.wasm-clang for details.
 
 import BaseAPI from './base-api.js';
+import { CLANG_C_FLAGS, CLANG_LD_FLAGS } from '../ide/constants.js';
+import { makeCmdPlaceholder } from '../ide/helpers.js';
 
 function readStr(u8, o, len = -1) {
   let str = '';
@@ -487,13 +489,8 @@ class API extends BaseAPI {
     this.lldFilename = options.lld || 'lld';
     this.sysrootFilename = options.sysroot || 'sysroot.tar';
 
-    this.cflags = [
-      '-O0', '-std=c11', '-O0', '-Wall', '-Werror', '-Wextra',
-      '-Wno-unused-variable', '-Wno-sign-compare', '-Wno-unused-parameter',
-      '-Wshadow', '-D_XOPEN_SOURCE'
-    ];
-
-    this.ldflags = ['-lc', '-lcs50'];
+    this.cflags = CLANG_C_FLAGS;
+    this.ldflags = CLANG_LD_FLAGS;
 
     this.memfs = new MemFS({
       compileStreaming: this.compileStreaming,
@@ -588,46 +585,30 @@ class API extends BaseAPI {
     return stillRunning ? app : null;
   }
 
-  async runUserCode({ activeTabName, files, args }) {
-    // Hardcoded source files
-    files = [
-      {
-        name: "bar.c",
-        content: `#include <stdio.h>
+  /**
+   * Run the user's code and print the output to the terminal.
+   *
+   * @param {object} data - The data object coming from the worker.
+   * @param {string} data.activeTabName - The name of the active editor tab.
+   * @param {array} data.vfsFiles - List of all file objects from the VFS, each
+   * containing the filename and content of the corresponding editor tab.
+   * @param {array} data.runAsConfig - The configuration for run-code button.
+   */
+  async runUserCode({ activeTabName, vfsFiles, runAsConfig }) {
+    const srcFiles = vfsFiles.filter((file) => runAsConfig.compileSrcFilenames.includes(file.name));
 
-void hello_from_bar() {
-    printf("Hello from bar!\\n");
-}`,
-      },
-      {
-        name: "foo.c",
-        content: `void hello_from_bar();
-
-int main() {
-    hello_from_bar();
-    return 0;
-}`,
-      }
-    ];
-
-    if (!Array.isArray(args)) {
-      args = [];
-    }
-
-    const mainBasename = 'foo';
-    const wasm = `${mainBasename}.wasm`;
+    const target = runAsConfig.compileTarget || activeTabName.replace(/\.c$/, '');
+    const wasm = `${target}.wasm`;
     const objectFiles = [];
 
-    this.hostWriteCmd(`make ${mainBasename}`);
-    const cmdPlaceholder = [
-      'clang', ...this.cflags,
-      '-o', mainBasename,
-      ...files.map(f => f.name),
-      ...this.ldflags,
-    ];
-    this.hostWrite(cmdPlaceholder.join(' ') + '\n');
+    this.hostWriteCmd(`make ${target}`);
+    this.hostWrite(makeCmdPlaceholder(runAsConfig.compileSrcFilenames, target) + '\n');
 
-    for (const file of files) {
+    for (const file of srcFiles) {
+      if (!file.name.endsWith('.c')) {
+        continue;
+      }
+
       const basename = file.name.replace(/\.c$/, '');
       const input = `${basename}.cc`;
       const obj = `${basename}.o`;
@@ -640,10 +621,10 @@ int main() {
 
     const buffer = this.memfs.getFileContents(wasm);
     const testMod = await WebAssembly.compile(buffer);
-    this.hostWriteCmd(`./${mainBasename} ${(args).join(' ')}`);
+    this.hostWriteCmd(`./${target} ${(runAsConfig.args).join(' ')}`);
 
     try {
-      return await this.run([testMod, wasm, ...args]);
+      return await this.run([testMod, wasm, ...runAsConfig.args]);
     } finally {
       this.runUserCodeCallback();
     }

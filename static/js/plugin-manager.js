@@ -1,6 +1,7 @@
 import {
   makeHtmlAttrs,
   makeLocalStorageKey,
+  isObject,
 } from './helpers/shared.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
@@ -37,7 +38,30 @@ export class TerraPlugin {
    * Contains the loaded local storage state that is persisted after refresh.
    * @type {object}
    */
-  state = this.loadFromLocalStorage();
+  _state = null;
+
+  /**
+   * Lazy loading of the state to avoid unnecessary local storage reads and to
+   * make sure the "name" property is set before loading the state.
+   *
+   * @returns {object} The local storage state object.
+   */
+  get state() {
+    if (this._state === null) {
+      this._state = this.loadFromLocalStorage();
+    }
+
+    return this._state;
+  }
+
+  /**
+   * Get the name of the storage key that is used to store the plugin state
+   *
+   * @returns {string} The storage key.
+   */
+  get storageKey() {
+    return `plugin-${this.name}`;
+  }
 
   /**
    * Create a button that is placed on top of the terminal component on the
@@ -104,9 +128,9 @@ export class TerraPlugin {
    * @returns {object|null} The state object from local storage or the default state.
    */
   loadFromLocalStorage() {
-    const className = this.constructor.name;
-    const storageKey = makeLocalStorageKey(className);
-    const state = localStorageManager.getLocalStorageItem(storageKey, this.defaultState);
+    const storageKey = makeLocalStorageKey(this.storageKey);
+    const defaultValue = isObject(this.defaultState) ? JSON.stringify(this.defaultState) : null;
+    const state = localStorageManager.getLocalStorageItem(storageKey, defaultValue);
 
     if (state) {
       return JSON.parse(state);
@@ -118,10 +142,13 @@ export class TerraPlugin {
   /**
    * Get the state value by key.
    *
-   * @param {string} key - The key of the state value.
+   * @param {string} [key] - The key of the state value. If none is provided, the
+   * complete state will be returned.
    * @returns {*} The value of the state.
    */
   getState(key) {
+    if (!key) return this.state;
+
     if (this.state.hasOwnProperty(key)) {
       return this.state[key];
     }
@@ -166,8 +193,7 @@ export class TerraPlugin {
    * Save the current state in local storage.
    */
   saveState() {
-    const className = this.constructor.name;
-    const storageKey = makeLocalStorageKey(className);
+    const storageKey = makeLocalStorageKey(this.storageKey);
     localStorageManager.setLocalStorageItem(storageKey, JSON.stringify(this.state));
   }
 
