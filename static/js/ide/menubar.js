@@ -350,9 +350,10 @@ Menubar.connectRepo = () => {
     title: 'Connect repository',
     body: `
       <p>Only GitHub repostory links are supported. Leave empty to disconnect from the repository.</p>
-      <input class="text-input full-width-input repo-link" value="${currentRepoLink}" placeholder="https://github.com/{owner}/{repo}"></textarea>
-      ${localFilesNotice}
-
+      <div class="form-wrapper-full-width">
+        <input class="text-input full-width-input repo-link" value="${currentRepoLink}" placeholder="https://github.com/{owner}/{repo}"></textarea>
+        ${localFilesNotice}
+      </div>
     `,
     footer: `
       <button type="button" class="button cancel-btn">Cancel</button>
