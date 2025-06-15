@@ -29,6 +29,7 @@
   max-width: 100%;
   width: 750px;
   min-width: 400px;
+  max-height: calc(100vh - 40px);
   background-color: var(--color-white);
   border-radius: var(--border-radius);
   opacity: 0;
@@ -36,6 +37,8 @@
   transition-property: transform, opacity;
   transition-duration: 0.3s;
   transform: translateY(-20px);
+  display: flex;
+  flex-direction: column;
 }
 
 .modal.show .modal-content {
@@ -64,6 +67,8 @@
 }
 
 .modal-body {
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: var(--modal-padding);
 }
 
@@ -88,4 +93,8 @@
 
 .modal-width-small .modal-content {
   width: 400px;
+}
+
+.modal-width-medium .modal-content {
+  width: 550px;
 }

@@ -287,21 +287,26 @@ export default class App {
     const proglang = getFileExtension(filename);
     this.createLangWorker(proglang);
 
-    // Get file args, if any.
-    const args = this.getCurrentFileArgs(fileId);
+    // Build args send to the worker's runUserCode function.
+    const runUserCodeArgs = [filename, files];
+
+    const runAsConfig = this.getRunAsConfig();
+    if (runAsConfig) {
+      runUserCodeArgs.push(runAsConfig);
+    }
 
     // Wait for the worker to be ready before running the code.
     if (this.langWorker && !this.langWorker.isReady) {
       const runFileIntervalId = setInterval(() => {
         if (this.langWorker && this.langWorker.isReady) {
-          this.langWorker.runUserCode(filename, files, args);
+          this.langWorker.runUserCode(...runUserCodeArgs);
           this.layout.checkForStopCodeButton();
           clearInterval(runFileIntervalId);
         }
       }, 200);
     } else if (this.langWorker) {
       // If the worker is ready, run the code immediately.
-      this.langWorker.runUserCode(filename, files, args);
+      this.langWorker.runUserCode(...runUserCodeArgs);
       this.layout.checkForStopCodeButton();
     }
   }
@@ -313,15 +318,14 @@ export default class App {
   }
 
   /**
-   * Get the arguments for the current file.
+   * Get the config object for the run-as button.
    * This is executed just before the user runs the code from an editor.
-   * By default this returns an empty array if not implemented in child classes.
+   * By default this returns null if not implemented in child classes.
    *
-   * @param {string} fileId - The ID of the file to get the arguments for.
-   * @returns {array} The arguments for the current file.
+   * @returns {null|object} The config object if implemented.
    */
-  getCurrentFileArgs(fileId) {
-    return [];
+  getRunAsConfig() {
+    return null;
   }
 
   /**
