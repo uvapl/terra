@@ -63,7 +63,7 @@ export default class RunAsPlugin extends TerraPlugin {
     `);
   }
 
-  validateInputFields = () => {
+  validateInputFields = ($modal) => {
     const whitelistedKeys = [
       'Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
       'Delete', 'Home', 'End'
@@ -137,7 +137,7 @@ export default class RunAsPlugin extends TerraPlugin {
 
     showModal($modal);
 
-    this.validateInputs();
+    this.validateInputFields($modal);
 
     // Update the preview when the user types in any the input fields.
     this.updateCmdPreview($modal, activeTabName, defaultTarget);
