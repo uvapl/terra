@@ -354,6 +354,8 @@ class App {
         ? this.argv[i].replace(/\.wasm/, '.c')
         : this.argv[i];
 
+      console.log('arg', arg);
+
       // Remove quotes around the argument just like in a real shell.
       // '"FOO BAR"' with 'FOO BAR' or "'FOO BAR'" with "FOO BAR"
       if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
@@ -565,18 +567,18 @@ class API extends BaseAPI {
     ]);
   }
 
-  async link(obj, wasm) {
+  async link(objs, wasm) {
     const stackSize = 1024 * 1024;
-
     const libdir = 'lib/wasm32-wasi';
     const crt1 = `${libdir}/crt1.o`;
+
     await this.ready;
     const lld = await this.getModule(this.lldFilename);
     return await this.run([
       lld, 'wasm-ld', '--no-threads',
       '--export-dynamic',
       '-z', `stack-size=${stackSize}`,
-      `-L${libdir}`, crt1, obj, ...this.ldflags,
+      `-L${libdir}`, crt1, ...objs, ...this.ldflags,
       '-o', wasm,
     ]);
   }
@@ -584,48 +586,65 @@ class API extends BaseAPI {
   async run(cmd) {
     const [module, ...args] = cmd;
     const app = new App(module, this.memfs, ...args);
-    // app.argv = ["program_name", "test1", "test2"];
-    // app.argc = app.argv.length;
     const stillRunning = await app.run();
     return stillRunning ? app : null;
   }
 
   async runUserCode({ activeTabName, files, args }) {
-    // Apart from the current tab's file, write all files to memfs.
-    //
-    // TODO: Just write all files here and do not exclude the current active
-    // tab's file. This will be fixed when custom compile support is added.
-    files.filter(file => file.name !== activeTabName).map((file) => {
-      this.memfs.addFile(file.name, file.content);
-    });
+    // Hardcoded source files
+    files = [
+      {
+        name: "bar.c",
+        content: `#include <stdio.h>
 
-    const { name: filename, content } = files.find(file => file.name === activeTabName);
-    const basename = filename.replace(/\.c$/, '');
-    const input = `${basename}.cc`;
-    const obj = `${basename}.o`;
-    const wasm = `${basename}.wasm`;
+void hello_from_bar() {
+    printf("Hello from bar!\\n");
+}`,
+      },
+      {
+        name: "foo.c",
+        content: `void hello_from_bar();
+
+int main() {
+    hello_from_bar();
+    return 0;
+}`,
+      }
+    ];
 
     if (!Array.isArray(args)) {
       args = [];
     }
 
-    this.hostWriteCmd(`make ${basename}`);
+    const mainBasename = 'foo';
+    const wasm = `${mainBasename}.wasm`;
+    const objectFiles = [];
 
-    // Make a custom command placeholder without all the unnecessary
-    // additional flags needed for wasm.
+    this.hostWriteCmd(`make ${mainBasename}`);
     const cmdPlaceholder = [
       'clang', ...this.cflags,
-      '-o', basename, `${basename}.c`,
+      '-o', mainBasename,
+      ...files.map(f => f.name),
       ...this.ldflags,
     ];
     this.hostWrite(cmdPlaceholder.join(' ') + '\n');
 
+    for (const file of files) {
+      const basename = file.name.replace(/\.c$/, '');
+      const input = `${basename}.cc`;
+      const obj = `${basename}.o`;
+      this.memfs.addFile(input, file.content);
+      await this.compile({ input, content: file.content, obj });
+      objectFiles.push(obj);
+    }
+
+    await this.link(objectFiles, wasm);
+
+    const buffer = this.memfs.getFileContents(wasm);
+    const testMod = await WebAssembly.compile(buffer);
+    this.hostWriteCmd(`./${mainBasename} ${(args).join(' ')}`);
+
     try {
-      await this.compile({ input, content, obj });
-      await this.link(obj, wasm);
-      const buffer = this.memfs.getFileContents(wasm);
-      const testMod = await WebAssembly.compile(buffer)
-      this.hostWriteCmd(`./${basename} ${args.join(' ')}`)
       return await this.run([testMod, wasm, ...args]);
     } finally {
       this.runUserCodeCallback();
@@ -638,7 +657,6 @@ class API extends BaseAPI {
 // =============================================================================
 
 let api;
-let port;
 let currentApp = null;
 
 const onAnyMessage = async event => {
