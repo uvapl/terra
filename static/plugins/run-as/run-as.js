@@ -1,6 +1,7 @@
 import { TerraPlugin } from '../../js/plugin-manager.js';
 import { createModal, hideModal, showModal } from '../../js/modal.js';
 import Terra from '../../js/terra.js';
+import { isMac } from '../../js/helpers/shared.js';
 
 export default class RunAsPlugin extends TerraPlugin {
   name = 'run-as';
@@ -18,8 +19,10 @@ export default class RunAsPlugin extends TerraPlugin {
   }
 
   onLayoutLoaded = () => {
+    const shortcut = isMac() ? '\u2318+Shift+Enter' : 'Ctrl+Shift+Enter';
+
     this.$button = this.createTermButtonLeft({
-      text: 'Run as...',
+      text: `Run as... (${shortcut})`,
       id: 'run-as-btn',
       class: '',
       onClick: this.onButtonClick,
@@ -154,7 +157,7 @@ export default class RunAsPlugin extends TerraPlugin {
       this.setState('args', args);
 
       hideModal($modal);
-      Terra.app.runCode();
+      Terra.app.runCode({ runAs: true });
     });
   }
 }
