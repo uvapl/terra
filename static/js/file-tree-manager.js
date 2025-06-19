@@ -318,7 +318,7 @@ class FileTreeManager {
           name: 'Run',
           callback: () => {
             Terra.v.userClickedContextMenuItem = true;
-            Terra.app.runCode(node.key);
+            Terra.app.runCode({ fileId: node.key });
             Terra.v.blockLFSPolling = false;
           }
         };

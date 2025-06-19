@@ -6,7 +6,7 @@ import pluginManager from './plugin-manager.js';
 
 const plugins = [
   'check50',
-  'file-args',
+  'run-as',
   'right-sidebar',
   'editor-unlink-killer',
 ];

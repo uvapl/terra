@@ -67,3 +67,25 @@
 .lm_header .lm_controls > li + li {
   margin-left: 5px;
 }
+
+.code-block {
+  background-color: #f5f5f5;
+  border-radius: 3px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  font-family: monospace;
+}
+
+.code-block .cmd {
+  /* force breaks only at spaces */
+  white-space: normal;
+  word-break: keep-all;
+}
+
+.code-block .cmd:before {
+  content: '$ ';
+}
+
+.code-block .line + .line {
+  margin-top: 4px;
+}

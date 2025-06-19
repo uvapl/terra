@@ -121,7 +121,7 @@ export default class App {
    */
   onRunCode(event) {
     const { clearTerm } = event.detail;
-    this.runCode(null, clearTerm);
+    this.runCode({ clearTerm });
   }
 
   /**
@@ -237,12 +237,14 @@ export default class App {
    * the current active tab name. If the `fileId` is set, then solely that file
    * will be run.
    *
-   * @param {string} [id] - The ID of the file to run.
-   * @param {boolean} [clearTerm=false] Whether to clear the terminal before
+   * @param {object} options - Options for running the code.
+   * @param {string} options.fileId - Run a specific file.
+   * @param {boolean} options.clearTerm Whether to clear the terminal before
    * printing the output.
+   * @param {boolean} options.runAs - Whether the runAs config should be used.
    */
-  async runCode(fileId = null, clearTerm = false) {
-    if (clearTerm) this.layout.term.clear();
+  async runCode(options = {}) {
+    if (options.clearTerm) this.layout.term.clear();
 
     if (this.langWorker) {
       if (!this.langWorker.isReady) {
@@ -264,9 +266,9 @@ export default class App {
     let filename = null;
     let files = null;
 
-    if (fileId) {
+    if (options.fileId) {
       // Run given file id.
-      const file = this.vfs.findFileById(fileId);
+      const file = this.vfs.findFileById(options.fileId);
       filename = file.name;
       files = await this.getAllEditorFiles();
       if (!files.some((file) => file.name === filename)) {
@@ -275,7 +277,6 @@ export default class App {
       }
     } else {
       const editorComponent = this.layout.getActiveEditor();
-      fileId = editorComponent.getState().fileId;
       filename = editorComponent.getFilename();
       files = await this.getAllEditorFiles();
     }
@@ -287,21 +288,26 @@ export default class App {
     const proglang = getFileExtension(filename);
     this.createLangWorker(proglang);
 
-    // Get file args, if any.
-    const args = this.getCurrentFileArgs(fileId);
+    // Build args send to the worker's runUserCode function.
+    const runUserCodeArgs = [filename, files];
+
+    const runAsConfig = this.getRunAsConfig();
+    if (options.runAs && runAsConfig) {
+      runUserCodeArgs.push(runAsConfig);
+    }
 
     // Wait for the worker to be ready before running the code.
     if (this.langWorker && !this.langWorker.isReady) {
       const runFileIntervalId = setInterval(() => {
         if (this.langWorker && this.langWorker.isReady) {
-          this.langWorker.runUserCode(filename, files, args);
+          this.langWorker.runUserCode(...runUserCodeArgs);
           this.layout.checkForStopCodeButton();
           clearInterval(runFileIntervalId);
         }
       }, 200);
     } else if (this.langWorker) {
       // If the worker is ready, run the code immediately.
-      this.langWorker.runUserCode(filename, files, args);
+      this.langWorker.runUserCode(...runUserCodeArgs);
       this.layout.checkForStopCodeButton();
     }
   }
@@ -313,15 +319,14 @@ export default class App {
   }
 
   /**
-   * Get the arguments for the current file.
+   * Get the config object for the run-as button.
    * This is executed just before the user runs the code from an editor.
-   * By default this returns an empty array if not implemented in child classes.
+   * By default this returns null if not implemented in child classes.
    *
-   * @param {string} fileId - The ID of the file to get the arguments for.
-   * @returns {array} The arguments for the current file.
+   * @returns {null|object} The config object if implemented.
    */
-  getCurrentFileArgs(fileId) {
-    return [];
+  getRunAsConfig() {
+    return null;
   }
 
   /**
