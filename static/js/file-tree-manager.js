@@ -1,5 +1,5 @@
 import { DROP_AREA_INDICATOR_CLASS } from './ide/constants.js';
-import { getFileExtension, isObject, isValidFilename } from './helpers/shared.js'
+import { getFileExtension, isObject, isValidFilename, uuidv4 } from './helpers/shared.js'
 import { createModal, hideModal, showModal } from './modal.js'
 import Terra from './terra.js'
 import LangWorker from './lang-worker.js';
@@ -90,19 +90,21 @@ class FileTreeManager {
   /**
    * Create a new file element in the file tree and trigger edit mode.
    *
-   * @param {string|null} [parentId] - The parent folder id.
+   * @param {string|null} [path] - The parent path for the new file. Leave
+   * null to create a new file in the root folder.
    */
-  createFile = (parentId = null) => {
+  createFile = async (path = null) => {
     if (Terra.app.hasLFSProjectLoaded && Terra.app.lfs.busy) return;
 
     // Create the new file in the filesystem.
-    const { id, name } = Terra.app.vfs.createFile({ parentId });
+    const file = await Terra.app.vfs.createFile({ path });
+    const key = path ? `${path}/${file.name}` : file.name;
 
     // Create the new node in the file tree.
     const newChildProps = {
-      title: name,
+      key,
+      title: file.name,
       folder: false,
-      key: id,
       data: {
         type: 'file',
         isFile: true,
@@ -111,8 +113,8 @@ class FileTreeManager {
 
     // Append to the parent node if it exists, otherwise append to the root.
     const tree = this.getInstance();
-    if (parentId) {
-      const parentNode = tree.getNodeByKey(parentId);
+    if (path) {
+      const parentNode = tree.getNodeByKey(path);
       if (!parentNode.expanded) {
         parentNode.setExpanded();
       }
@@ -121,14 +123,15 @@ class FileTreeManager {
     } else {
       tree.rootNode.addChildren(newChildProps);
     }
+    tree.rootNode.addChildren(newChildProps);
 
     // Reload tree such that the 'No files or folders found' is removed in case
     // there were no files, but a new has been created.
-    this.createFileTree();
+    await this.createFileTree();
 
     this.sortFileTree();
 
-    const newNode = tree.getNodeByKey(id);
+    const newNode = tree.getNodeByKey(key);
 
     // Trigger edit mode for the new node.
     setTimeout(() => {
@@ -137,21 +140,36 @@ class FileTreeManager {
   }
 
   /**
+   * Get the absolute path of a node.
+   *
+   * @param {string} key - The key of the node.
+   * @returns {string} The absolute path.
+   */
+  getAbsoluteNodePath = (node) => {
+    if (!node.parent) return node.title;
+
+    let parentPath = this.getAbsoluteNodePath(node.parent);
+    return parentPath === 'root' ? node.title : `${parentPath}/${node.title}`;
+  }
+
+  /**
    * Create a new folder element in the file tree and trigger edit mode.
    *
-   * @param {string|null} [parentId] - The parent id of the new folder.
+   * @param {string|null} [path] - The parent path for the new folder. Leave
+   * null to create a new folder in the root folder.
    */
-  createFolder = (parentId = null) => {
+  createFolder = async (path = null) => {
     if (Terra.app.hasLFSProjectLoaded && Terra.app.lfs.busy) return;
 
     // Create the new folder in the filesystem.
-    const { id, name } = Terra.app.vfs.createFolder({ parentId });
+    const folder = await Terra.app.vfs.createFolder({ path });
+    const key = path ? `${path}/${folder.name}` : folder.name;
 
     // Create the new node in the file tree.
     const newChildProps = {
-      title: name,
+      key,
+      title: folder.name,
       folder: true,
-      key: id,
       data: {
         type: 'folder',
         isFolder: true,
@@ -160,10 +178,9 @@ class FileTreeManager {
 
     // Append to the parent node if it exists, otherwise append to the root.
     const tree = this.getInstance();
-    if (parentId) {
-      const parentNode = tree.getNodeByKey(parentId);
+    if (path) {
+      const parentNode = tree.getNodeByKey(path);
       parentNode.setExpanded();
-
       parentNode.addChildren(newChildProps);
     } else {
       tree.rootNode.addChildren(newChildProps);
@@ -171,17 +188,17 @@ class FileTreeManager {
 
     // Reload tree such that the 'No files or folders found' is removed in case
     // there were no files, but a new has been created.
-    this.createFileTree();
+    await this.createFileTree();
 
     this.sortFileTree();
 
     // Trigger edit mode for the new node.
-    const newNode = tree.getNodeByKey(id);
+    const newNode = tree.getNodeByKey(key);
 
     // Check again if the parent node is expanded, because the node might have
     // been added to a closed folder. Only then we can trigger editStart().
-    if (parentId) {
-      tree.getNodeByKey(parentId).setExpanded();
+    if (path) {
+      tree.getNodeByKey(path).setExpanded();
     }
 
     newNode.editStart();
@@ -193,20 +210,25 @@ class FileTreeManager {
    * @param {string} [parentId] - The parent folder id.
    * @returns {array} List with file tree objects.
    */
-  createFromVFS = (parentId = null) => {
-    const folders = Terra.app.vfs.findFoldersWhere({ parentId }).map((folder) => ({
-      key: folder.id,
-      title: folder.name,
-      folder: true,
-      data: {
-        type: 'folder',
-        isFolder: true,
-      },
-      children: this.createFromVFS(folder.id),
-    }));
+  createFromVFS = async (path = '') => {
+    const folders = await Promise.all(
+      (await Terra.app.vfs.findFoldersByPath(path)).map(async (folder) => {
+        const subpath = path ? `${path}/${folder.name}` : folder.name;
+        return {
+          key: subpath,
+          title: folder.name,
+          folder: true,
+          data: {
+            type: 'folder',
+            isFolder: true,
+          },
+          children: (await this.createFromVFS(subpath)),
+        };
+      })
+    )
 
-    const files = Terra.app.vfs.findFilesWhere({ parentId }).map((file) => ({
-      key: file.id,
+    const files = (await Terra.app.vfs.findFilesByPath(path)).map((file) => ({
+      key: path ? `${path}/${file.name}` : file.name,
       title: file.name,
       folder: false,
       data: {
@@ -410,86 +432,96 @@ class FileTreeManager {
    * @see https://wwwendt.de/tech/fancytree/doc/jsdoc/global.html#FancytreeOptions
    */
   createFileTree = (forceRecreate = false, persistState = true) => {
-    // Reload the tree if it already exists by re-importing from VFS.
-    if (this.tree) {
-      if (!forceRecreate) {
-        // Persist the tree state to prevent folders from being closed.
-        if (persistState) {
-          this.runFuncWithPersistedState(async () => {
-            this.getInstance().reload(this.createFromVFS());
-          })
+    return new Promise((resolve) => {
+      // Reload the tree if it already exists by re-importing from VFS.
+      if (this.tree) {
+        if (!forceRecreate) {
+          const reloadTree = () => {
+            this.createFromVFS().then((data) => {
+              this.getInstance().reload(data);
+              resolve();
+            });
+          }
+
+          // Persist the tree state to prevent folders from being closed.
+          if (persistState) {
+            this.runFuncWithPersistedState(reloadTree);
+          } else {
+            reloadTree();
+          }
+          return;
         } else {
-          this.getInstance().reload(this.createFromVFS());
+          $('#file-tree .info-msg').remove();
+          this.getInstance().destroy();
         }
-        return;
-      } else {
-        $('#file-tree .info-msg').remove();
-        this.getInstance().destroy();
       }
-    }
 
-    // Bind buttons for creating new folders/files.
-    $('#file-tree--add-folder-btn').off('click').on('click', () => this.createFolder());
-    $('#file-tree--add-file-btn').off('click').on('click', () => this.createFile());
+      // Bind buttons for creating new folders/files.
+      $('#file-tree--add-folder-btn').off('click').on('click', () => this.createFolder());
+      $('#file-tree--add-file-btn').off('click').on('click', () => this.createFile());
 
-    // Otherwise, instantiate a new tree.
-    this.tree = $("#file-tree").fancytree({
-      selectMode: 1,
-      debugLevel: 0,
-      strings: {
-        noData: 'Create a file to get started'
-      },
-      source: this.createFromVFS(),
-      click: this._onClickNodeCallback,
-      init: () => this.sortFileTree(),
-
-      // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtensionIndex
-      extensions: ['glyph', 'edit', 'dnd5'],
-
-      // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtGlyph
-      glyph: {
-        map: {
-          dropMarker: '',
-          doc: "file-tree-icon file-tree-file-icon",
-          docOpen: "file-tree-icon file-tree-file-icon open",
-          folder: "file-tree-icon file-tree-folder-icon",
-          folderOpen: "file-tree-icon file-tree-folder-icon open",
+      // Otherwise, instantiate a new tree.
+      this.tree = $("#file-tree").fancytree({
+        selectMode: 1,
+        debugLevel: 0,
+        strings: {
+          noData: 'Create a file to get started'
         },
-      },
-
-      // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtDnd
-      dnd5: {
-        autoExpandMS: 400,
-        dragStart: this._dragStartCallback,
-        dragEnter: this._dragEnterCallback,
-        dragDrop: this._dragStopCallback,
-        dragEnd: this._dragEndCallback,
-      },
-
-      // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtEdit
-      edit: {
-        triggerStart: ['dblclick'],
-        edit: this._onStartEditNodeCallback,
-        beforeClose: this._beforeCloseEditNodeCallback,
-        close: this._afterCloseEditNodeCallback,
-      },
-    });
-
-    // @see http://swisnl.github.io/jQuery-contextMenu/docs.html
-    $.contextMenu({
-      zIndex: 10,
-      selector: '#file-tree span.fancytree-title',
-      build: this._createContextMenuItems,
-      events: {
-        show: () => {
-          Terra.v.blockLFSPolling = true;
+        source: this.createFromVFS(),
+        click: this._onClickNodeCallback,
+        init: () => {
+          this.sortFileTree();
+          resolve();
         },
-        hide: () => {
-          if (!Terra.v.userClickedContextMenuItem) {
-            Terra.v.blockLFSPolling = false;
+
+        // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtensionIndex
+        extensions: ['glyph', 'edit', 'dnd5'],
+
+        // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtGlyph
+        glyph: {
+          map: {
+            dropMarker: '',
+            doc: "file-tree-icon file-tree-file-icon",
+            docOpen: "file-tree-icon file-tree-file-icon open",
+            folder: "file-tree-icon file-tree-folder-icon",
+            folderOpen: "file-tree-icon file-tree-folder-icon open",
+          },
+        },
+
+        // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtDnd
+        dnd5: {
+          autoExpandMS: 400,
+          dragStart: this._dragStartCallback,
+          dragEnter: this._dragEnterCallback,
+          dragDrop: this._dragStopCallback,
+          dragEnd: this._dragEndCallback,
+        },
+
+        // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtEdit
+        edit: {
+          triggerStart: ['dblclick'],
+          edit: this._onStartEditNodeCallback,
+          beforeClose: this._beforeCloseEditNodeCallback,
+          close: this._afterCloseEditNodeCallback,
+        },
+      });
+
+      // @see http://swisnl.github.io/jQuery-contextMenu/docs.html
+      $.contextMenu({
+        zIndex: 10,
+        selector: '#file-tree span.fancytree-title',
+        build: this._createContextMenuItems,
+        events: {
+          show: () => {
+            Terra.v.blockLFSPolling = true;
+          },
+          hide: () => {
+            if (!Terra.v.userClickedContextMenuItem) {
+              Terra.v.blockLFSPolling = false;
+            }
           }
         }
-      }
+      });
     });
   }
 
@@ -764,7 +796,7 @@ class FileTreeManager {
 
     tree.visit((node) => {
       if (node.data.isFolder && node.expanded) {
-        prevExpandedFolderPaths.push(Terra.app.vfs.findFolderById(node.key).path);
+        prevExpandedFolderPaths.push(node.key);
       }
     });
 
@@ -772,7 +804,7 @@ class FileTreeManager {
 
     // Expand all folder nodes again that were open (if they still exist).
     this.getInstance().visit((node) => {
-      if (node.data.isFolder && prevExpandedFolderPaths.includes(Terra.app.vfs.findFolderById(node.key).path)) {
+      if (node.data.isFolder && prevExpandedFolderPaths.includes(node.key)) {
         node.setExpanded(true, { noAnimation: true });
       }
     });

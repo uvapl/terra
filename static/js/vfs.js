@@ -5,7 +5,6 @@
 import {
   addNewLineCharacter,
   hasGitFSWorker,
-  uuidv4
 } from './helpers/shared.js';
 import { IS_IDE } from './constants.js';
 import Terra from './terra.js';
@@ -26,9 +25,69 @@ export default class VirtualFileSystem extends EventTarget {
    */
   folders = {};
 
+  /**
+   * The OPFS root handle that is saved in the IndexedDB.
+   * @type {FileSystemDirectoryHandle}
+   */
+  rootHandle;
+
   constructor() {
     super();
     this.loadFromLocalStorage();
+    this.loadRootHandle();
+  }
+
+  /**
+   * Wait for the `this.rootHandle` to be available.
+   *
+   * @returns {Promise<void>} Resolves when the root handle is available.
+   */
+  ready = () => {
+    return new Promise((resolve) => {
+      const check = () => {
+        if (this.rootHandle) {
+          resolve();
+        } else {
+          // Check every 300ms if the root handle is available.
+          setTimeout(check, 300);
+        }
+      };
+
+      check();
+    });
+  }
+
+  /**
+   * Retrieve the root handle from OPFS.
+   */
+  loadRootHandle = () => {
+    navigator.storage.getDirectory().then((rootHandle) => {
+      this.rootHandle = rootHandle;
+    });
+  }
+
+  /**
+   * Get the root handle of the virtual filesystem.
+   *
+   * @returns {Promise<FileSystemDirectoryHandle>} A directory handle to the
+   * root of the virtual filesystem, or undefined if the handle is not found.
+   */
+  getRootHandle = () => {
+    return this._getHandle(this.STORE_NAME, 'root');
+  }
+
+
+  /**
+   * Callback function when the IndexedDB version is upgraded.
+   *
+   * @param {IDBVersionChangeEvent} event
+   */
+  indexedDBOnUpgradeNeededCallback = (event) => {
+    const db = event.target.result;
+
+    if (!db.objectStoreNames.contains(this.STORE_NAME)) {
+      db.createObjectStore(this.STORE_NAME);
+    }
   }
 
   /**
@@ -85,7 +144,7 @@ export default class VirtualFileSystem extends EventTarget {
    * Save the virtual filesystem state to localstorage.
    */
   saveState = () => {
-    let files = {...this.files};
+    let files = { ...this.files };
 
     // Remove the content from all files when LFS or Git is used, because LFS uses
     // lazy loading and GitFS is being cloned when refreshed anyway.
@@ -248,6 +307,76 @@ export default class VirtualFileSystem extends EventTarget {
     Object.values(this.folders).find((f) => f.path === path);
 
   /**
+   * Get a folder handle by its absolute path.
+   *
+   * @async
+  * @param {string} folderpath - The absolute folder path.
+  * @returns {Promise<FileSystemDirectoryHandle>} The folder handle.
+   */
+  getFolderHandleByPath = async (folderpath) => {
+    await this.ready();
+
+    if (!folderpath) return this.rootHandle;
+
+    let handle = this.rootHandle;
+    const parts = folderpath.split('/');
+
+    while (handle && parts.length > 0) {
+      handle = await handle.getDirectoryHandle(parts.shift(), { create: false });
+    }
+
+    return handle;
+  }
+
+  /**
+   * Get all folder handles inside a given folder path.
+   *
+   * @async
+   * @param {string} folderpath - The absolute folder path to search in.
+   * @returns {Promise<FileSystemDirectoryHandle[]>} Array of folder handles.
+   */
+  findFoldersByPath = async (folderpath) => {
+    await this.ready();
+
+    // Obtain the folder handle recursively.
+    const folderHandle = await this.getFolderHandleByPath(folderpath);
+
+    // Gather all subfolder handles.
+    const subfolders = [];
+    for await (let handle of folderHandle.values()) {
+      if (handle.kind === 'directory') {
+        subfolders.push(handle);
+      }
+    }
+
+    return subfolders;
+  }
+
+  /**
+   * Get all file handles inside a given path.
+   *
+   * @async
+   * @param {string} folderpath - The absolute folder path to search in.
+   * @returns {Promise<FileSystemFileHandle[]>} Array of file handles.
+   */
+  findFilesByPath = async (folderpath) => {
+    await this.ready();
+
+    // Obtain the folder handle recursively.
+    const folderHandle = await this.getFolderHandleByPath(folderpath);
+
+    // Gather all subfile handles.
+    const subfiles = [];
+    for await (let handle of folderHandle.values()) {
+      if (handle.kind === 'file') {
+        subfiles.push(handle);
+      }
+    }
+
+    return subfiles;
+  }
+
+  /**
    * Get the absolute file path of a file.
    *
    * @param {string} fileId - The file id.
@@ -293,36 +422,78 @@ export default class VirtualFileSystem extends EventTarget {
    * Create a new file in the virtual filesystem.
    *
    * @param {object} fileObj - The file object to create.
+   * @param {string} [fileObj.name] - The name of the file.
+   * @param {string} [fileObj.content] - The content of the file.
+   * @param {string} [fileObj.path] - Absolute folderpath to create the file in.
    * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
-   * @returns {object} The new file object.
+   * @returns {FileSystemFileHandle} The new file handle.
    */
-  createFile = (fileObj, isUserInvoked = true) => {
+  createFile = async (fileObj, isUserInvoked = true) => {
+    await this.ready();
+
     const newFile = {
-      id: uuidv4(),
       name: 'Untitled',
-      parentId: null,
       content: '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
       ...fileObj,
     };
 
+    let parentFolderHandle = fileObj.path
+      ? await this.getFolderHandleByPath(fileObj.path)
+      : this.rootHandle;
+
     // Ensure a unique file name.
-    while (this.existsWhere({ parentId: newFile.parentId, name: newFile.name })) {
+    while ((await this.pathExists(newFile.name, parentFolderHandle))) {
       newFile.name = this._incrementString(newFile.name);
     }
 
-    this.files[newFile.id] = newFile;
-    newFile.path = this.getAbsoluteFilePath(newFile.id);
+    const newFileHandle = await parentFolderHandle.getFileHandle(newFile.name, { create: true });
+
+    if (newFile.content) {
+      const writable = newFileHandle.createWritable();
+      await writable.write(newFile.content);
+      await writable.close();
+    }
 
     if (isUserInvoked) {
       this.dispatchEvent(new CustomEvent('fileCreated', {
-        detail: { file: newFile },
+        detail: { file: newFileHandle },
       }));
     }
 
-    this.saveState();
-    return newFile;
+    return newFileHandle;
+  }
+
+  pathExists = async (path, parentFolderHandle) => {
+    if (!parentFolderHandle) {
+      parentFolderHandle = this.rootHandle;
+    }
+
+    const parts = path.split('/');
+    const last = parts.pop();
+
+    // Check if the parent folders exist.
+    let currentHandle = parentFolderHandle;
+    for (const part of parts) {
+      try {
+        currentHandle = await currentHandle.getDirectoryHandle(part, { create: false });
+      } catch {
+        // If the handle does not exist, return false.
+        return false;
+      }
+    }
+
+    // At this point, we know the parent folder exists.
+    // The last part of the path could be either file or folder, so we just
+    // iterate over each entry and check if it exists.
+    for await (let entry of currentHandle.values()) {
+      if (entry.name === last) {
+        // If the entry exists, return true.
+        return true;
+      }
+    }
+
+    // If we reach here, the entry does not exist.
+    return false;
   }
 
   /**
@@ -332,32 +503,26 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
    * @returns {object} The new folder object.
    */
-  createFolder = (folderObj, isUserInvoked = true) => {
-    const newFolder = {
-      id: uuidv4(),
-      name: 'Untitled',
-      parentId: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      ...folderObj,
-    };
+  createFolder = async (folderObj, isUserInvoked = true) => {
+    let parentFolderHandle = folderObj.path
+      ? await this.getFolderHandleByPath(folderObj.path)
+      : this.rootHandle;
 
-    // Ensure the folder name is unique.
-    while (this.existsWhere({ parentId: newFolder.parentId, name: newFolder.name })) {
-      newFolder.name = this._incrementString(newFolder.name);
+    // Ensure a unique folder name.
+    let name = folderObj.name || 'Untitled';
+    while ((await this.pathExists(name, parentFolderHandle))) {
+      name = this._incrementString(name);
     }
 
-    this.folders[newFolder.id] = newFolder;
-    newFolder.path = this.getAbsoluteFolderPath(newFolder.id);
+    const newFolderHandle = await parentFolderHandle.getDirectoryHandle(name, { create: true });
 
     if (isUserInvoked) {
       this.dispatchEvent(new CustomEvent('folderCreated', {
-        detail: { folder: newFolder },
+        detail: { folder: newFolderHandle },
       }));
     }
 
-    this.saveState();
-    return newFolder;
+    return newFolderHandle;
   }
 
   /**
@@ -420,7 +585,7 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {object} values - Key-value pairs to update in the folder object.
    * @returns {object} The updated folder object.
    */
-   updateFolder = async (id, values) => {
+  updateFolder = async (id, values) => {
     const folder = this.findFolderById(id);
     if (!folder) return;
 

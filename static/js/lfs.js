@@ -422,7 +422,7 @@ export default class LocalFileSystem {
     if (!db.objectStoreNames.contains(this.FOLDER_HANDLES_STORE_NAME)) {
       db.createObjectStore(this.FOLDER_HANDLES_STORE_NAME);
     }
-  };
+  }
 
   /**
    * Opens a request to the IndexedDB.
