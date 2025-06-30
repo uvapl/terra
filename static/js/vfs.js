@@ -76,20 +76,6 @@ export default class VirtualFileSystem extends EventTarget {
     return this._getHandle(this.STORE_NAME, 'root');
   }
 
-
-  /**
-   * Callback function when the IndexedDB version is upgraded.
-   *
-   * @param {IDBVersionChangeEvent} event
-   */
-  indexedDBOnUpgradeNeededCallback = (event) => {
-    const db = event.target.result;
-
-    if (!db.objectStoreNames.contains(this.STORE_NAME)) {
-      db.createObjectStore(this.STORE_NAME);
-    }
-  }
-
   /**
    * Increment the number in a string with the pattern `XXXXXX (N)`.
    *
