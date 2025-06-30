@@ -26,7 +26,7 @@ export default class VirtualFileSystem extends EventTarget {
   folders = {};
 
   /**
-   * The OPFS root handle that is saved in the IndexedDB.
+   * The OPFS root handle.
    * @type {FileSystemDirectoryHandle}
    */
   rootHandle;
@@ -38,7 +38,7 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Wait for the `this.rootHandle` to be available.
+   * Wait for the OPFS root folder handle to be available.
    *
    * @returns {Promise<void>} Resolves when the root handle is available.
    */
@@ -298,6 +298,10 @@ export default class VirtualFileSystem extends EventTarget {
    * The example below returns the handle for folder3.
    * @example getFolderHandleByPath('folder1/folder2/folder3')
    *
+   * The examples below return the root handle.
+   * @example getFolderHandleByPath('')
+   * @example getFolderHandleByPath()
+   *
    * @async
    * @param {string} folderpath - The absolute folder path.
    * @returns {Promise<FileSystemDirectoryHandle>} The folder handle.
@@ -408,7 +412,7 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Create a new file in the virtual filesystem.
+   * Create a new file.
    *
    * @param {object} fileObj - The file object to create.
    * @param {string} [fileObj.name] - The name of the file.
@@ -495,7 +499,7 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Create a new folder in the virtual filesystem.
+   * Create a new folder.
    *
    * @param {object} folderObj - The folder object to create.
    * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
@@ -624,22 +628,27 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Delete a file from the virtual filesystem.
+   * Delete a file.
    *
-   * @param {string} id - The file id.
+   * @param {string} id - The path of the file to delete.
    * @param {boolean} [isSingleFileDelete] - whether this function is called for
    * a single file or is called from the `deleteFolder` function.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFile = (id, isSingleFileDelete = true) => {
-    const file = this.findFileById(id);
-    if (file) {
-      this.dispatchEvent(new CustomEvent('beforeFileDeleted', {
-        detail: { file, isSingleFileDelete },
-      }));
+  deleteFile = async (path, isSingleFileDelete = true) => {
+    await this.ready();
 
-      delete this.files[id];
-      this.saveState();
+    if ((await this.pathExists(path))) {
+      // TODO: migrate this.
+      // this.dispatchEvent(new CustomEvent('beforeFileDeleted', {
+      //   detail: { file, isSingleFileDelete },
+      // }));
+
+      const parts = path.split('/');
+      const filename = parts.pop();
+      const parentPath = parts.join('/');
+      const parentHandle = await this.getFolderHandleByPath(parentPath);
+      await parentHandle.removeEntry(filename);
       return true;
     }
 

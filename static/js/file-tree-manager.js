@@ -270,7 +270,6 @@ class FileTreeManager {
     $modal.find('.confirm-btn').click(() => {
       if (node.data.isFile) {
         Terra.app.closeFile(node.key);
-        Terra.app.vfs.deleteFile(node.key);
       } else if (node.data.isFolder) {
         this.closeFilesInFolderRecursively(node.key);
       }
