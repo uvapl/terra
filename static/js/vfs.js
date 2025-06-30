@@ -295,9 +295,12 @@ export default class VirtualFileSystem extends EventTarget {
   /**
    * Get a folder handle by its absolute path.
    *
+   * The example below returns the handle for folder3.
+   * @example getFolderHandleByPath('folder1/folder2/folder3')
+   *
    * @async
-  * @param {string} folderpath - The absolute folder path.
-  * @returns {Promise<FileSystemDirectoryHandle>} The folder handle.
+   * @param {string} folderpath - The absolute folder path.
+   * @returns {Promise<FileSystemDirectoryHandle>} The folder handle.
    */
   getFolderHandleByPath = async (folderpath) => {
     await this.ready();
@@ -449,7 +452,16 @@ export default class VirtualFileSystem extends EventTarget {
     return newFileHandle;
   }
 
-  pathExists = async (path, parentFolderHandle) => {
+  /**
+   * Check if a given path exists, either as a file or a folder.
+   *
+   * @async
+   * @param {string} path - The path to check.
+   * @param {FileSystemDirectoryHandle} [parentFolderHandle] - Check whether the
+   * path exists in this folder handle. Defaults to the root folder handle.
+   * @returns {Promise<boolean>} True if the path exists, false otherwise.
+   */
+  pathExists = async (path, parentFolderHandle = null) => {
     if (!parentFolderHandle) {
       parentFolderHandle = this.rootHandle;
     }
