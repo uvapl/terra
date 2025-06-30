@@ -212,7 +212,7 @@ class FileTreeManager {
    */
   createFromVFS = async (path = '') => {
     const folders = await Promise.all(
-      (await Terra.app.vfs.findFoldersByPath(path)).map(async (folder) => {
+      (await Terra.app.vfs.findFoldersInPath(path)).map(async (folder) => {
         const subpath = path ? `${path}/${folder.name}` : folder.name;
         return {
           key: subpath,
@@ -227,7 +227,7 @@ class FileTreeManager {
       })
     )
 
-    const files = (await Terra.app.vfs.findFilesByPath(path)).map((file) => ({
+    const files = (await Terra.app.vfs.findFilesInPath(path)).map((file) => ({
       key: path ? `${path}/${file.name}` : file.name,
       title: file.name,
       folder: false,
@@ -267,7 +267,7 @@ class FileTreeManager {
       hideModal($modal);
     });
 
-    $modal.find('.confirm-btn').click(() => {
+    $modal.find('.confirm-btn').click(async () => {
       if (node.data.isFile) {
         Terra.app.closeFile(node.key);
       } else if (node.data.isFolder) {
@@ -278,7 +278,7 @@ class FileTreeManager {
       const fn = node.data.isFolder
         ? Terra.app.vfs.deleteFolder
         : Terra.app.vfs.deleteFile;
-      fn(node.key);
+      await fn(node.key);
 
       // Delete from the file tree.
       node.remove();
@@ -288,7 +288,7 @@ class FileTreeManager {
 
       // Reload tree such that the 'No files or folders found' becomes visible
       // when needed.
-      this.createFileTree();
+      await this.createFileTree();
     });
   }
 

@@ -328,7 +328,7 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {string} folderpath - The absolute folder path to search in.
    * @returns {Promise<FileSystemDirectoryHandle[]>} Array of folder handles.
    */
-  findFoldersByPath = async (folderpath) => {
+  findFoldersInPath = async (folderpath) => {
     await this.ready();
 
     // Obtain the folder handle recursively.
@@ -352,7 +352,7 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {string} folderpath - The absolute folder path to search in.
    * @returns {Promise<FileSystemFileHandle[]>} Array of file handles.
    */
-  findFilesByPath = async (folderpath) => {
+  findFilesInPath = async (folderpath) => {
     await this.ready();
 
     // Obtain the folder handle recursively.
@@ -448,9 +448,10 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     if (isUserInvoked) {
-      this.dispatchEvent(new CustomEvent('fileCreated', {
-        detail: { file: newFileHandle },
-      }));
+      // TODO: migrate this.
+      // this.dispatchEvent(new CustomEvent('fileCreated', {
+      //   detail: { file: newFileHandle },
+      // }));
     }
 
     return newFileHandle;
@@ -519,9 +520,10 @@ export default class VirtualFileSystem extends EventTarget {
     const newFolderHandle = await parentFolderHandle.getDirectoryHandle(name, { create: true });
 
     if (isUserInvoked) {
-      this.dispatchEvent(new CustomEvent('folderCreated', {
-        detail: { folder: newFolderHandle },
-      }));
+      // TODO: migrate this.
+      // this.dispatchEvent(new CustomEvent('folderCreated', {
+      //   detail: { folder: newFolderHandle },
+      // }));
     }
 
     return newFolderHandle;
@@ -638,21 +640,21 @@ export default class VirtualFileSystem extends EventTarget {
   deleteFile = async (path, isSingleFileDelete = true) => {
     await this.ready();
 
-    if ((await this.pathExists(path))) {
-      // TODO: migrate this.
-      // this.dispatchEvent(new CustomEvent('beforeFileDeleted', {
-      //   detail: { file, isSingleFileDelete },
-      // }));
-
-      const parts = path.split('/');
-      const filename = parts.pop();
-      const parentPath = parts.join('/');
-      const parentHandle = await this.getFolderHandleByPath(parentPath);
-      await parentHandle.removeEntry(filename);
-      return true;
+    if (!(await this.pathExists(path))) {
+      return false;
     }
 
-    return false;
+    // TODO: migrate this.
+    // this.dispatchEvent(new CustomEvent('beforeFileDeleted', {
+    //   detail: { file, isSingleFileDelete },
+    // }));
+
+    const parts = path.split('/');
+    const filename = parts.pop();
+    const parentPath = parts.join('/');
+    const parentHandle = await this.getFolderHandleByPath(parentPath);
+    await parentHandle.removeEntry(filename);
+    return true;
   }
 
   /**
@@ -663,34 +665,39 @@ export default class VirtualFileSystem extends EventTarget {
    * subsequent calls will have it set to false, because we don't want to remove
    * the those nested files by ourselves.
    *
-   * @param {string} id - The folder id.
+   * @param {string} path - The folder path to delete.
    * @param {boolean} [isRootFolder] - Whether it is the root folder.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFolder = (id, isRootFolder = true) => {
-    // Delete all the files inside the current folder.
-    const files = this.findFilesWhere({ parentId: id });
+  deleteFolder = async (path, isRootFolder = true) => {
+    if (!(await this.pathExists(path, this.rootHandle))) {
+      return false;
+    }
+
+    // TODO: migrate this.
+    // this.dispatchEvent(new CustomEvent('beforeFolderDeleted', {
+    //   detail: { folder: this.folders[id], isRootFolder },
+    // }));
+
+    // Gather all subfiles and trigger a deleteFile on them.
+    const files = await this.findFilesInPath(path);
     for (const file of files) {
-      this.deleteFile(file.id, false);
+      const filepath = `${path}/${file.name}`;
+      await this.deleteFile(filepath, false);
     }
 
     // Delete all the nested folders inside the current folder.
-    const folders = this.findFoldersWhere({ parentId: id });
+    const folders = await this.findFoldersInPath(path);
     for (const folder of folders) {
-      this.deleteFolder(folder.id, false);
+      const folderpath = `${path}/${folder.name}`;
+      await this.deleteFolder(folderpath, false);
     }
 
-    if (this.folders[id]) {
-      this.dispatchEvent(new CustomEvent('beforeFolderDeleted', {
-        detail: { folder: this.folders[id], isRootFolder },
-      }));
+    // Finally, delete the folder itself from OPFS recursively.
+    const folderHandle = await this.getFolderHandleByPath(path);
+    await folderHandle.remove({ recursive: true });
 
-      delete this.folders[id];
-      this.saveState();
-      return true;
-    }
-
-    return false;
+    return true;
   }
 
   /**
