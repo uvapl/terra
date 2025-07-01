@@ -12,7 +12,7 @@ import localStorageManager from './local-storage-manager.js';
 import EmbedLayout from './layout/layout.embed.js';
 
 export default class EmbedApp extends App {
-  setupLayout() {
+  async setupLayout() {
     const queryParams = parseQueryParams();
     if (typeof queryParams.filename !== 'string') {
       throw Error('No filename provided in query params');
@@ -26,7 +26,7 @@ export default class EmbedApp extends App {
     localStorageManager.updateLocalStoragePrefix(currentStorageKey);
 
     // Create the tab in the virtual filesystem.
-    this.vfs.createFile({ name: queryParams.filename });
+    await this.vfs.createFile({ name: queryParams.filename });
 
     // Create tabs with the filename as key and empty string as the content.
     const tabs = {}

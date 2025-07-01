@@ -10,7 +10,7 @@ import fileTreeManager from './file-tree-manager.js';
 
 export default class LocalFileSystem {
   IDB_VERSION = 1;
-  IDB_NAME = 'terra';
+  IDB_NAME = 'terra-lfs';
   FILE_HANDLES_STORE_NAME = 'file-handles';
   FOLDER_HANDLES_STORE_NAME = 'folder-handles';
 
@@ -133,7 +133,7 @@ export default class LocalFileSystem {
     const hasPermission = await this._verifyPermission(rootFolderHandle.handle);
     if (!hasPermission) {
       // If we have no permission, clear VFS and the indexedDB stores.
-      this.vfs.clear();
+      await this.vfs.clear();
       fileTreeManager.createFileTree(); // show empty file tree
       await this._clearStores();
       return;
@@ -161,9 +161,9 @@ export default class LocalFileSystem {
   /**
    * Close the current folder and clear the VFS.
    */
-  closeFolder = () => {
+  closeFolder = async () => {
     this.terminate();
-    this.vfs.clear();
+    await this.vfs.clear();
     fileTreeManager.createFileTree(); // show empty file tree
     fileTreeManager.showLocalStorageWarning();
     fileTreeManager.setTitle('local storage');
@@ -275,7 +275,7 @@ export default class LocalFileSystem {
         };
       });
 
-    this.vfs.clear();
+    await this.vfs.clear();
     await this._clearStores();
 
     // Save rootFolderHandle under the 'root' key for reference.
@@ -353,14 +353,14 @@ export default class LocalFileSystem {
 
       if (handle.kind === 'file') {
         const file = await handle.getFile();
-        const { id: fileId } = this.vfs.createFile({
+        const { id: fileId } = await this.vfs.createFile({
           name: file.name,
           parentId,
           size: file.size
         }, false);
         await this.saveFileHandle(this.vfs.findFileById(fileId).path, fileId, handle);
-      } else if (handle.kind === 'directory') {
-        const folder = this.vfs.createFolder({ name, parentId }, false);
+      } else if (handle.kind === 'directory' && !blacklistedPaths.includes(name)) {
+        const folder = await this.vfs.createFolder({ name, parentId }, false);
         await this.saveFolderHandle(this.vfs.findFolderById(folder.id).path, folder.id, handle);
         await this._readFolder(handle, folder.id);
       }

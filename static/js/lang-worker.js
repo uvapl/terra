@@ -259,9 +259,10 @@ export default class LangWorker {
    * Called from within the worker when files have been added or modified in the
    * worker's internal filesystem during execution of the program.
    *
+   * @async
    * @param {array} newOrModifiedFiles - List of file objects.
    */
-  newOrModifiedFilesCallback(newOrModifiedFiles) {
+  async newOrModifiedFilesCallback(newOrModifiedFiles) {
     if (!Array.isArray(newOrModifiedFiles)) {
       return;
     }
@@ -289,7 +290,7 @@ export default class LangWorker {
         const parentFolderPath = file.path.split('/').slice(0, -1).join('/');
         const parentFolder = Terra.app.vfs.findFolderByPath(parentFolderPath);
         const parentId = parentFolder ? parentFolder.id : null;
-        Terra.app.vfs.createFile({
+        await Terra.app.vfs.createFile({
           name: file.name,
           content: file.content,
           parentId,
