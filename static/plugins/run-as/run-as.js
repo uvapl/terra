@@ -19,10 +19,8 @@ export default class RunAsPlugin extends TerraPlugin {
   }
 
   onLayoutLoaded = () => {
-    const shortcut = isMac() ? '\u2318+Shift+Enter' : 'Ctrl+Shift+Enter';
-
     this.$button = this.createTermButtonLeft({
-      text: `Run as... (${shortcut})`,
+      text: `Run as...`,
       id: 'run-as-btn',
       class: '',
       onClick: this.onButtonClick,
