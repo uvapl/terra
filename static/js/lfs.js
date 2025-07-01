@@ -275,7 +275,7 @@ export default class LocalFileSystem {
         };
       });
 
-    await this.vfs.clear();
+    this.vfs.clear();
     await this._clearStores();
 
     // Save rootFolderHandle under the 'root' key for reference.
