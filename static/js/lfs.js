@@ -10,7 +10,7 @@ import fileTreeManager from './file-tree-manager.js';
 
 export default class LocalFileSystem {
   IDB_VERSION = 1;
-  IDB_NAME = 'terra-lfs';
+  IDB_NAME = 'terra';
   FILE_HANDLES_STORE_NAME = 'file-handles';
   FOLDER_HANDLES_STORE_NAME = 'folder-handles';
 
