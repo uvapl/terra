@@ -95,7 +95,7 @@ export default class GitFS {
       const filename = file.path.split('/').pop();
       return {
         oldPath: `${oldPath}/${filename}`,
-        newPath,
+        newPath: file.path,
         content: file.content,
         sha: file.sha,
       }

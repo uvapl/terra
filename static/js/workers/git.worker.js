@@ -1,5 +1,6 @@
 import { isImageExtension } from '../helpers/image.js';
 import { Octokit } from '../vendor/octokit-core-6.1.3.min.js';
+import TaskQueue from '../helpers/task-queue.js';
 
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/;
 
@@ -63,6 +64,12 @@ class API {
    */
   blacklistedFolders = ['.', '..', '.git'];
 
+  /**
+   * Queue for requests to process that are sent to the GitHub API.
+   * @type {Queue}
+   */
+  queue = null;
+
   constructor(options) {
     this.repoBranch = options.branch;
     this.accessToken = options.accessToken;
@@ -75,6 +82,8 @@ class API {
     this.onRateLimit = options.onRateLimit;
     this.onRequestError = options.onRequestError;
     this.onRequestSuccess = options.onRequestSuccess;
+
+    this.queue = new TaskQueue('Git');
 
     this.setRepoLink(options.repoLink);
 
@@ -400,34 +409,32 @@ class API {
     // Keep track of a list of all new files with their new sha.
     const updatedFiles = [];
 
-    await Promise.all(
-      files.map(async (file) => {
-        // Create the new file.
-        const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
-          path: file.newPath,
-          message: `Rename ${file.oldPath} to ${file.newPath}`,
-          branch: this.repoBranch,
-          committer: this.committer,
-          content: btoa(file.content),
-        });
+    for (const file of files) {
+      // Create the new file.
+      const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
+        path: file.newPath,
+        message: `Rename ${file.oldPath} to ${file.newPath}`,
+        branch: this.repoBranch,
+        committer: this.committer,
+        content: isImageExtension(file.newPath) ? file.content : btoa(file.content),
+      });
 
-        // Delete the old files.
-        await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
-          path: file.oldPath,
-          message: `Remove ${file.oldPath}`,
-          branch: this.repoBranch,
-          committer: this.committer,
-          sha: file.sha,
-        });
+      // Delete the old files.
+      await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
+        path: file.oldPath,
+        message: `Remove ${file.oldPath}`,
+        branch: this.repoBranch,
+        committer: this.committer,
+        sha: file.sha,
+      });
 
-        updatedFiles.push({
-          path: file.newPath,
-          sha: result.data.content.sha,
-        });
+      updatedFiles.push({
+        path: file.newPath,
+        sha: result.data.content.sha,
+      });
 
-        this._log(`Moved file from ${file.oldPath} to ${file.newPath}`);
-      })
-    );
+      this._log(`Moved file from ${file.oldPath} to ${file.newPath}`);
+    }
 
     this.moveFolderSuccessCallback(updatedFiles);
   }
@@ -523,23 +530,28 @@ self.onmessage = (event) => {
       break;
 
     case 'commit':
-      api.commit(payload.filepath, payload.filecontents, payload.sha);
-      break;
-
-    case 'newFolder':
-      api.newFolder(payload.folderPath);
+      api.queue.schedule(() => api.commit(
+        payload.filepath,
+        payload.filecontents,
+        payload.sha
+      ));
       break;
 
     case 'rm':
-      api.rm(payload.filepath, payload.sha);
+      api.queue.schedule(() => api.rm(payload.filepath, payload.sha));
       break;
 
     case 'moveFile':
-      api.moveFile(payload.oldPath, payload.oldSha, payload.newPath, payload.newContent);
+      api.queue.schedule(() => api.moveFile(
+        payload.oldPath,
+        payload.oldSha,
+        payload.newPath,
+        payload.newContent
+      ));
       break;
 
     case 'moveFolder':
-      api.moveFolder(payload.files);
+      api.queue.schedule(() => api.moveFolder(payload.files));
       break;
   }
 };
