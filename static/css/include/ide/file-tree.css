@@ -12,6 +12,10 @@
   flex-direction: column;
 }
 
+.file-tree {
+  overflow-y: auto;
+}
+
 .file-tree-container .info-msg {
   padding: var(--file-tree-padding);
 }
@@ -88,8 +92,6 @@
 
 .fancytree-container {
   outline: 0;
-  height: 100%;
-  overflow: auto;
   list-style: none;
   margin: 0;
   padding: 0 var(--file-tree-padding);
