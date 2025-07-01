@@ -133,7 +133,7 @@ export default class LocalFileSystem {
     const hasPermission = await this._verifyPermission(rootFolderHandle.handle);
     if (!hasPermission) {
       // If we have no permission, clear VFS and the indexedDB stores.
-      await this.vfs.clear();
+      this.vfs.clear();
       fileTreeManager.createFileTree(); // show empty file tree
       await this._clearStores();
       return;
@@ -161,9 +161,9 @@ export default class LocalFileSystem {
   /**
    * Close the current folder and clear the VFS.
    */
-  closeFolder = async () => {
+  closeFolder = () => {
     this.terminate();
-    await this.vfs.clear();
+    this.vfs.clear();
     fileTreeManager.createFileTree(); // show empty file tree
     fileTreeManager.showLocalStorageWarning();
     fileTreeManager.setTitle('local storage');
@@ -353,14 +353,14 @@ export default class LocalFileSystem {
 
       if (handle.kind === 'file') {
         const file = await handle.getFile();
-        const { id: fileId } = await this.vfs.createFile({
+        const { id: fileId } = this.vfs.createFile({
           name: file.name,
           parentId,
           size: file.size
         }, false);
         await this.saveFileHandle(this.vfs.findFileById(fileId).path, fileId, handle);
       } else if (handle.kind === 'directory' && !blacklistedPaths.includes(name)) {
-        const folder = await this.vfs.createFolder({ name, parentId }, false);
+        const folder = this.vfs.createFolder({ name, parentId }, false);
         await this.saveFolderHandle(this.vfs.findFolderById(folder.id).path, folder.id, handle);
         await this._readFolder(handle, folder.id);
       }
