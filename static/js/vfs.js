@@ -448,7 +448,6 @@ export default class VirtualFileSystem extends EventTarget {
 
     // Update all nested files and folders recursively with the new path.
     this._updateFolderSubPaths(id);
-    console.log('oldPath', oldPath, 'newPath', folder.path);
 
     if (isRenamed || isMoved) {
       this.dispatchEvent(new CustomEvent('folderMoved', {
