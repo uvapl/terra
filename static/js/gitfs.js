@@ -395,44 +395,41 @@ export default class GitFS {
     });
 
     // Remove all files from the virtual filesystem.
-    console.log('clearing VFS...')
-    await this.vfs.clear();
-    console.log('clearing VFS DONE')
+    this.vfs.clear();
 
     // First create all root files.
-    const rootFiles = repoContents.filter((file) => file.type === 'blob' && file.path.includes('/'));
-    for (const file of rootFiles) {
-      await this.vfs.createFile({
-        name: file.path.split('/').pop(),
-        sha: file.sha,
-        isNew: false,
-        content: file.content,
-      }, false);
-    }
+    repoContents
+      .filter((file) => file.type === 'blob' && !file.path.includes('/'))
+      .forEach(async (file) => {
+        this.vfs.createFile({
+          name: file.path.split('/').pop(),
+          sha: file.sha,
+          isNew: false,
+          content: file.content,
+        }, false);
+      });
 
     // Then create all root folders and their nested files.
-    const remainingFilesAndFolders = repoContents.filter(
-      (fileOrFolder) => !(fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/'))
-    );
+    repoContents
+      .filter((fileOrFolder) => !(fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/')))
+      .forEach((fileOrFolder) => {
+        const { sha } = fileOrFolder;
+        const path = fileOrFolder.path.split('/');
+        const name = path.pop();
 
-    for (const fileOrFolder of remainingFilesAndFolders) {
-      const { sha } = fileOrFolder;
-      const path = fileOrFolder.path.split('/');
-      const name = path.pop();
+        const parentId = path.length > 0 ? this.vfs.findFolderByPath(path.join('/')).id : null;
 
-      const parentId = path.length > 0 ? this.vfs.findFolderByPath(path.join('/')).id : null;
-
-      if (fileOrFolder.type === 'tree') {
-        await this.vfs.createFolder({ name, parentId, sha });
-      } else if (fileOrFolder.type === 'blob') {
-        await this.vfs.createFile({
-          name,
-          parentId,
-          sha,
-          content: fileOrFolder.content,
-        }, false);
-      }
-    }
+        if (fileOrFolder.type === 'tree') {
+          this.vfs.createFolder({ name, parentId, sha });
+        } else if (fileOrFolder.type === 'blob') {
+          this.vfs.createFile({
+            name,
+            parentId,
+            sha,
+            content: fileOrFolder.content,
+          }, false);
+        }
+      });
 
     // Finally, we sync the current tabs with their new file IDs.
     for (const [filepath, tabComponent] of Object.entries(tabs)) {

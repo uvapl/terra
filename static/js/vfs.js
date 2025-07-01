@@ -12,11 +12,6 @@ import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 
 export default class VirtualFileSystem extends EventTarget {
-  IDB_VERSION = 1;
-  IDB_NAME = 'terra-vfs';
-  FILES_STORE_NAME = 'files';
-  FOLDERS_STORE_NAME = 'folders';
-
   /**
    * Contains all the files in the virtual filesystem.
    * The key is the file id and the value is the file object.
@@ -33,89 +28,7 @@ export default class VirtualFileSystem extends EventTarget {
 
   constructor() {
     super();
-  }
-
-  /**
-   * Callback function when the IndexedDB version is upgraded.
-   *
-   * @param {IDBVersionChangeEvent} event
-   */
-  indexedDBOnUpgradeNeededCallback = (event) => {
-    const db = event.target.result;
-
-    // Create object stores for file and folder handles
-
-    if (!db.objectStoreNames.contains(this.FILES_STORE_NAME)) {
-      db.createObjectStore(this.FILES_STORE_NAME);
-    }
-
-    if (!db.objectStoreNames.contains(this.FOLDERS_STORE_NAME)) {
-      db.createObjectStore(this.FOLDERS_STORE_NAME);
-    }
-  };
-
-  /**
-   * Opens a request to the IndexedDB.
-   *
-   * @returns {Promise<IDBRequest>} The IDB request object.
-   */
-  _openDB = () => {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
-      request.onupgradeneeded = this.indexedDBOnUpgradeNeededCallback;
-
-      request.onblocked = (event) => {
-        console.error('IDB is blocked', event);
-        reject(event.target.error);
-      }
-
-      request.onsuccess = (event) => event.target.result ? resolve(event.target.result) : resolve();
-      request.onerror = (event) => reject(event.target.error);
-    });
-  }
-
-  /**
-   * Clear all stores inside the app's indexedDB.
-   *
-   * @returns {Promise<void>}
-   */
-  _clearStores = () => {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
-      request.onupgradeneeded = this.indexedDBOnUpgradeNeededCallback;
-
-      request.onsuccess = (event) => {
-        const db = event.target.result;
-
-        // Check if the database has any object stores
-        if (db.objectStoreNames.length > 0) {
-          const transaction = db.transaction(db.objectStoreNames, 'readwrite');
-
-          transaction.oncomplete = () => {
-            resolve();
-          };
-
-          transaction.onerror = () => {
-            console.error('Error clearing stores');
-            reject(transaction.error);
-          };
-
-          // Clear each object store.
-          for (const storeName of db.objectStoreNames) {
-            const store = transaction.objectStore(storeName);
-            store.clear();
-          }
-        } else {
-          // No object stores, resolve immediately.
-          resolve();
-        }
-      };
-
-      request.onerror = () => {
-        console.error('Error opening database');
-        reject(request.error);
-      };
-    });
+    this.loadFromLocalStorage();
   }
 
   /**
@@ -141,47 +54,68 @@ export default class VirtualFileSystem extends EventTarget {
   /**
    * Clear the virtual filesystem, removing all files and folders permantly.
    */
-  clear = async () => {
-    // this.files = {};
-    // this.folders = {};
-
-    await this._clearStores();
-  }
-
-  _dbHasFiles = async () => {
-    const db = await this._openDB();
-
-    return new Promise((resolve, reject) => {
-      const request = db.transaction(this.FILES_STORE_NAME, 'readonly')
-        .objectStore(this.FILES_STORE_NAME)
-        .count();
-
-      request.onsuccess = () => resolve(request.result > 0);
-      request.onerror = () => reject();
-    });
-  }
-
-  _dbHasFolders = async () => {
-    const db = await this._openDB();
-
-    return new Promise((resolve, reject) => {
-      const request = db.transaction(this.FOLDERS_STORE_NAME, 'readonly')
-        .objectStore(this.FOLDERS_STORE_NAME)
-        .count();
-
-      request.onsuccess = () => resolve(request.result > 0);
-      request.onerror = () => reject();
-    });
+  clear = () => {
+    this.files = {};
+    this.folders = {};
+    this.saveState();
   }
 
   /**
    * Check whether the virtual filesystem is empty.
    */
-  isEmpty = async () => {
-    const hasFiles = await this._dbHasFiles();
-    const hasFolders = await this._dbHasFolders();
-    return !hasFiles && !hasFolders;
+  isEmpty = () => Object.keys(this.files).length === 0 && Object.keys(this.folders).length === 0;
+
+  /**
+   * Load the saved virtual filesystem state from local storage.
+   */
+  loadFromLocalStorage = () => {
+    const savedState = localStorageManager.getLocalStorageItem('vfs');
+    if (typeof savedState === 'string') {
+      const json = JSON.parse(savedState);
+
+      for (const key of ['files', 'folders']) {
+        if (json.hasOwnProperty(key)) {
+          this[key] = json[key];
+        }
+      }
+    }
   }
+
+  /**
+   * Save the virtual filesystem state to localstorage.
+   */
+  saveState = () => {
+    let files = {...this.files};
+
+    // Remove the content from all files when LFS or Git is used, because LFS uses
+    // lazy loading and GitFS is being cloned when refreshed anyway.
+    if (IS_IDE && (Terra.app.hasLFSProjectLoaded || hasGitFSWorker())) {
+      const keys = ['sha', 'content'];
+      Object.keys(files).forEach((fileId) => {
+        files[fileId] = { ...files[fileId] };
+        keys.forEach((key) => {
+          if (files[fileId].hasOwnProperty(key)) {
+            delete files[fileId][key];
+          }
+        });
+      });
+    }
+
+    localStorageManager.setLocalStorageItem('vfs', JSON.stringify({
+      files,
+      folders: this.folders,
+    }));
+  }
+
+  /**
+   * Get the root-level folders in the virtual filesystem.
+   */
+  getRootFolders = () => Object.values(this.folders).filter((folder) => !folder.parentId);
+
+  /**
+   * Get the root-level files in the virtual filesystem.
+   */
+  getRootFiles = () => Object.values(this.files).filter((file) => !file.parentId)
 
   /**
    * Internal helper function to filter an object based on conditions, ignoring
@@ -204,24 +138,9 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {object} conditions - The conditions to filter on.
    * @returns {array} List of file objects matching the conditions.
    */
-  findFilesWhere = async (conditions) => {
-    const db = await this._openDB();
-
-    return new Promise((resolve, reject) => {
-      const request = db.transaction(this.FILES_STORE_NAME, 'readonly')
-        .objectStore(this.FILES_STORE_NAME)
-        .getAll();
-
-      request.onsuccess = (event) => {
-        const allFiles = event.target.result;
-        const matchingFiles = allFiles.filter(this._whereIgnoreCase(conditions));
-        resolve(matchingFiles);
-      };
-
-      request.onerror = (event) => reject(event.target.error);
-    });
+  findFilesWhere = (conditions) => {
+    return Object.values(this.files).filter(this._whereIgnoreCase(conditions))
   }
-
   /**
    * Find a single file that match the given conditions.
    *
@@ -325,9 +244,8 @@ export default class VirtualFileSystem extends EventTarget {
    *
    * @param {string} path - The absolute folderpath.
    */
-  findFolderByPath = (path) => {
-    return Object.values(this.folders).find((f) => f.path === path);
-  }
+  findFolderByPath = (path) =>
+    Object.values(this.folders).find((f) => f.path === path);
 
   /**
    * Get the absolute file path of a file.
@@ -378,7 +296,7 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
    * @returns {object} The new file object.
    */
-  createFile = async (fileObj, isUserInvoked = true) => {
+  createFile = (fileObj, isUserInvoked = true) => {
     const newFile = {
       id: uuidv4(),
       name: 'Untitled',
@@ -394,8 +312,6 @@ export default class VirtualFileSystem extends EventTarget {
       newFile.name = this._incrementString(newFile.name);
     }
 
-    await this._dbCreateFile(newFile);
-
     this.files[newFile.id] = newFile;
     newFile.path = this.getAbsoluteFilePath(newFile.id);
 
@@ -405,28 +321,8 @@ export default class VirtualFileSystem extends EventTarget {
       }));
     }
 
+    this.saveState();
     return newFile;
-  }
-
-  /**
-   * Create a new file in the IndexedDB.
-   *
-   * @async
-   * @param {object} file - The file object to create.
-   * @returns {Promise<void>} Resolves when the file is created.
-   */
-  _dbCreateFile = async (file) => {
-    const db = await this._openDB();
-
-    return new Promise((resolve, reject) => {
-      const request = db
-        .transaction(this.FILES_STORE_NAME, 'readwrite')
-        .objectStore(this.FILES_STORE_NAME)
-        .put(file, file.id);
-
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject();
-    });
   }
 
   /**
@@ -436,7 +332,7 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
    * @returns {object} The new folder object.
    */
-  createFolder = async (folderObj, isUserInvoked = true) => {
+  createFolder = (folderObj, isUserInvoked = true) => {
     const newFolder = {
       id: uuidv4(),
       name: 'Untitled',
@@ -451,8 +347,6 @@ export default class VirtualFileSystem extends EventTarget {
       newFolder.name = this._incrementString(newFolder.name);
     }
 
-    await this._dbCreateFolder(newFolder);
-
     this.folders[newFolder.id] = newFolder;
     newFolder.path = this.getAbsoluteFolderPath(newFolder.id);
 
@@ -462,28 +356,8 @@ export default class VirtualFileSystem extends EventTarget {
       }));
     }
 
+    this.saveState();
     return newFolder;
-  }
-
-  /**
-   * Create a new folder in the IndexedDB.
-   *
-   * @async
-   * @param {object} folder - The folder object to create.
-   * @returns {Promise<void>} Resolves when the folder is created.
-   */
-  _dbCreateFolder = async (folder) => {
-    const db = await this._openDB();
-
-    return new Promise((resolve, reject) => {
-      const request = db
-        .transaction(this.FOLDERS_STORE_NAME, 'readwrite')
-        .objectStore(this.FOLDERS_STORE_NAME)
-        .put(folder, folder.id);
-
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject();
-    });
   }
 
   /**
@@ -534,6 +408,7 @@ export default class VirtualFileSystem extends EventTarget {
       }));
     }
 
+    this.saveState();
 
     return file;
   }
@@ -581,6 +456,7 @@ export default class VirtualFileSystem extends EventTarget {
       }));
     }
 
+    this.saveState();
 
     return folder;
   }
@@ -601,6 +477,7 @@ export default class VirtualFileSystem extends EventTarget {
       }));
 
       delete this.files[id];
+      this.saveState();
       return true;
     }
 
@@ -638,6 +515,7 @@ export default class VirtualFileSystem extends EventTarget {
       }));
 
       delete this.folders[id];
+      this.saveState();
       return true;
     }
 

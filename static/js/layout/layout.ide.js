@@ -238,7 +238,7 @@ export default class IDELayout extends Layout {
       hideModal($modal);
     });
 
-    $modal.find('.primary-btn').click(async () => {
+    $modal.find('.primary-btn').click(() => {
       const filename = $modal.find('.text-input').val();
 
       let folderId = $modal.find('.select').val();
@@ -280,7 +280,7 @@ export default class IDELayout extends Layout {
       }
 
       // Create a new file in the VFS and then refresh the file tree.
-      const { id: nodeId } = await Terra.app.vfs.createFile({
+      const { id: nodeId } = Terra.app.vfs.createFile({
         parentId: folderId,
         name: filename,
         content: editorComponent.getContent(),

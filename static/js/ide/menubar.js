@@ -205,11 +205,11 @@ Menubar.openLFSFolder = () => {
   });
 };
 
-Menubar.closeLFSFolder = async (event) => {
+Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-folder').hasClass('disabled')) return;
 
-  await Terra.app.lfs.closeFolder();
-  Terra.app.layout.closeAllFiles();
+  Terra.app.lfs.closeFolder();
+  Terra.app.closeAllFiles();
   closeActiveMenuBarMenu(event);
 };
 
@@ -381,7 +381,7 @@ Menubar.connectRepo = () => {
   }
 
   $connectModal.find('.cancel-btn').click(() => hideModal($connectModal));
-  $connectModal.find('.confirm-btn').click(async () => {
+  $connectModal.find('.confirm-btn').click(() => {
     const repoLink = $connectModal.find('.repo-link').val().trim();
 
     // For now, we only allow GitHub-HTTPS repo links.
@@ -404,7 +404,7 @@ Menubar.connectRepo = () => {
       fileTreeManager.showLocalStorageWarning();
 
       // Clear all files after disconnecting.
-      await Terra.app.vfs.clear();
+      Terra.app.vfs.clear();
       fileTreeManager.createFileTree();
       fileTreeManager.setTitle('local storage');
       $('#file-tree .info-msg').remove();
@@ -420,7 +420,7 @@ Menubar.connectRepo = () => {
     // 1) The user is connected to a repo and wants to connect to another one,
     //    so we are certain that there are files in the VFS.
     // 2) The user is not connected to a repo, but there are files in the VFS.
-    if (!currentRepoLink && !(await Terra.app.vfs.isEmpty())) {
+    if (!currentRepoLink && !Terra.app.vfs.isEmpty()) {
       // Create a new modal after the previous one is hidden.
       setTimeout(() => {
         const $confirmModal = createModal({
