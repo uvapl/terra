@@ -359,7 +359,7 @@ export default class LocalFileSystem {
           size: file.size
         }, false);
         await this.saveFileHandle(this.vfs.findFileById(fileId).path, fileId, handle);
-      } else if (handle.kind === 'directory' && !blacklistedPaths.includes(name)) {
+      } else if (handle.kind === 'directory') {
         const folder = this.vfs.createFolder({ name, parentId }, false);
         await this.saveFolderHandle(this.vfs.findFolderById(folder.id).path, folder.id, handle);
         await this._readFolder(handle, folder.id);
