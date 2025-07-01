@@ -481,6 +481,7 @@ class API extends BaseAPI {
   constructor(options) {
     super(options);
     this.moduleCache = {};
+    this.hostWriteError = options.hostWriteError;
     this.readBuffer = options.readBuffer;
     this.sharedMem = options.sharedMem;
     this.hostRead = options.hostRead;
@@ -598,9 +599,10 @@ class API extends BaseAPI {
     const srcFilenames = runAsConfig
       ? runAsConfig.compileSrcFilenames
       : [activeTabName];
+    console.log('1')
 
     const srcFiles = runAsConfig
-      ? vfsFiles.filter((file) => srcFilenames.includes(file.name))
+      ? vfsFiles.filter((file) => srcFilenames.includes(file.path))
       : vfsFiles.filter((file) => file.name === activeTabName);
 
     const target = runAsConfig ? runAsConfig.compileTarget : activeTabName.replace(/\.c$/, '');
@@ -610,12 +612,30 @@ class API extends BaseAPI {
     this.hostWriteCmd(`make ${target}`);
     this.hostWrite(makeCmdPlaceholder(srcFilenames, target) + '\n');
 
+    // The user could misspell the srcFilenames, which results in srcFiles being
+    // an empty list.
+    if (runAsConfig && srcFiles.length === 0) {
+      const incorrectFiles = srcFilenames
+        .filter((file) => !vfsFiles.includes(file.name))
+        .join(', ');
+
+      this.hostWriteError(`Error: The following files do not exist: ${incorrectFiles}\n`);
+      this.runUserCodeCallback();
+      return;
+    }
+
     for (const file of srcFiles) {
       if (!file.name.endsWith('.c')) {
         continue;
       }
 
-      const basename = file.name.replace(/\.c$/, '');
+      // Make parent dirs before creating the final file inside it.
+      const parentFoldersPath = file.path.split('/').slice(0, -1).join('/');
+      if (parentFoldersPath) {
+        this.memfs.addDirectory(parentFoldersPath);
+      }
+
+      const basename = file.path.replace(/\.c$/, '');
       const input = `${basename}.cc`;
       const obj = `${basename}.o`;
       this.memfs.addFile(input, file.content);
@@ -665,6 +685,10 @@ const onAnyMessage = async event => {
 
         hostWrite(s) {
           port.postMessage({ id: 'write', data: s });
+        },
+
+        hostWriteError(s) {
+          port.postMessage({ id: 'write-error', data: s });
         },
 
         hostRead() {

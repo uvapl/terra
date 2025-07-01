@@ -333,6 +333,10 @@ export default class LangWorker {
         }
         break;
 
+      case 'write-error':
+        Terra.app.termWrite(`\x1b[1;31m${event.data.data}\x1b[0m`);
+        break;
+
       // Stdin callback from the worker instance. When the worker requests user
       // input, this event will be triggered. The user input will be requested
       // and sent back to the worker through the usage of shared memory.

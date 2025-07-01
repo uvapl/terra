@@ -59,7 +59,7 @@ export default class RunAsPlugin extends TerraPlugin {
 
     $modal.find('.code-block').html(`
       <div class="line cmd">make ${target}</div>
-      <div class="line cmd">clang -ggdb3 -O0 -std=c11 -Wall -Werror -o ${target} ${srcFiles} -lcs50 -lm</div>
+      <div class="line">clang -ggdb3 -O0 -std=c11 -Wall -Werror -o ${target} ${srcFiles} -lcs50 -lm</div>
       <div class="line cmd">./${target} ${args}</div>
     `);
   }
@@ -122,8 +122,7 @@ export default class RunAsPlugin extends TerraPlugin {
 
         <div class="form-wrapper-full-width">
           <label>Preview</label>
-          <div class="code-block">
-          </div>
+          <div class="code-block"></div>
         </div>
       `,
       footer: `
