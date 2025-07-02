@@ -422,15 +422,6 @@ class API extends BaseAPI {
   }
 
   /**
-   * Request the list of modules that are currently loaded in the pyodide.
-   *
-   * @returns {array} List of loaded modules.
-   */
-  getSysModules() {
-    return this.pyodide.runPython(`','.join(sys.modules.keys())`).split(',');
-  }
-
-  /**
    * Run a string or an array of python code.
    *
    * @example run("print('Hello World!')"
@@ -451,8 +442,6 @@ class API extends BaseAPI {
     // Allow the user to run code in the __main__ scope.
     globals.set('__name__', '__main__');
 
-    const sysModulesBefore = this.getSysModules();
-
     try {
       // Use matplotlib's Agg backend for static images.
       this.pyodide.runPython("import matplotlib; matplotlib.use('Agg')");
@@ -471,12 +460,6 @@ class API extends BaseAPI {
         return this.formatErrorMsg(err.message, activeTabName);
       }
     } finally {
-      // Remove all modules that were imported when executing the code.
-      const sysModulesAfter = this.getSysModules();
-      const addedModules = sysModulesAfter.filter(module => !sysModulesBefore.includes(module));
-      const cmd = addedModules.map((module) => `sys.modules.pop('${module}', None)`).join(';');
-      this.pyodide.runPython(cmd);
-
       // Clear the globals after the code has run such that the next execution
       // will be called with a clean state.
       globals.destroy();
