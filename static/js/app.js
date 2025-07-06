@@ -130,15 +130,12 @@ export default class App {
    * This is default functionality and super.onEditorChange() must be
    * called first in child classes before any additional functionality.
    *
+   * @async
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  onEditorChange(editorComponent) {
-    const { fileId } = editorComponent.getState();
-    if (fileId) {
-      this.vfs.updateFile(fileId, {
-        content: editorComponent.getContent(),
-      });
-    }
+  async onEditorChange(editorComponent) {
+    const path = editorComponent.getPath();
+    await this.vfs.updateFileContent(path, editorComponent.getContent());
   }
 
   /**
@@ -149,12 +146,12 @@ export default class App {
    *
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  onEditorShow(editorComponent) {
+  async onEditorShow(editorComponent) {
     if (editorComponent.ready) {
       this.createLangWorker(editorComponent.proglang);
     }
 
-    this.setEditorFileContent(editorComponent);
+    await this.setEditorFileContent(editorComponent);
   }
 
 

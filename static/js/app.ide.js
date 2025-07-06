@@ -170,7 +170,13 @@ export default class IDEApp extends App {
    * @param {boolean} clearUndoStack - Whether to clear the undo stack or not.
    */
   async setEditorFileContent(editorComponent, clearUndoStack = false) {
-    const content = await this.vfs.getFileContentByPath(editorComponent.getPath());
+    const filepath = editorComponent.getPath();
+
+    if (!(await this.vfs.pathExists(filepath))) {
+      return;
+    }
+
+    const content = await this.vfs.getFileContentByPath(filepath);
     editorComponent.setContent(content);
 
     const cursorPos = editorComponent.getCursorPosition();

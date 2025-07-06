@@ -4,6 +4,7 @@ import { createModal, hideModal, showModal } from './modal.js'
 import Terra from './terra.js'
 import LangWorker from './lang-worker.js';
 import EditorComponent from './layout/editor.component.js';
+import tooltipManager from './tooltip-manager.js';
 
 class FileTreeManager {
   /**
@@ -149,7 +150,7 @@ class FileTreeManager {
     if (!node.parent) return node.title;
 
     let parentPath = this.getAbsoluteNodePath(node.parent);
-    return parentPath === 'root' ? node.title : `${parentPath}/${node.title}`;
+    return parentPath.startsWith('root') ? node.title : `${parentPath}/${node.title}`;
   }
 
   /**
@@ -532,6 +533,22 @@ class FileTreeManager {
     Terra.v.blockLFSPolling = false;
   }
 
+  _nodePathExists = (name, parentPath) => {
+    const tree = this.getInstance();
+    const parentNode = tree.getNodeByKey(parentPath);
+    if (!parentNode) return false;
+
+    const childNodes = parentNode.children || [];
+    for (const node of childNodes) {
+      // Check if the name matches the child node's title.
+      if (node.title === name) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   /**
    * Callback before the user closes the edit mode of a node in the file tree.
    */
@@ -539,68 +556,71 @@ class FileTreeManager {
     // Check if user pressed cancel or text is unchanged.
     if (!data.save) return;
 
-    const name = data.input.val().trim();
-    if (!name) {
+    const newName = data.input.val().trim();
+    const oldName = data.node.title;
+
+    if (!newName) {
+      // If no name has been filled in, return false.
+      // In this case, the old file name will be kept.
+      tooltipManager.destroyTooltip('renameNode');
       return false;
     }
 
-    const parentId = data.node.parent.title === 'root' ? null : data.node.parent.key;
+    if (oldName === newName) {
+      // Nothing changes, return true to close the edit.
+      tooltipManager.destroyTooltip('renameNode');
+      return true;
+    }
 
     let errorMsg;
 
     // Check if the name already exists in the parent folder.
     // If so, trigger edit mode again and show error tooltip.
-    if (!isValidFilename(name)) {
+    const parentNodeKey = data.node.parent.key;
+    if (!isValidFilename(newName)) {
       errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
-    } else if (Terra.app.vfs.existsWhere({ parentId, name }, { ignoreIds: data.node.key })) {
-      errorMsg = `There already exists a "${name}" file or folder`;
+    } else if (this._nodePathExists(newName, parentNodeKey)) {
+      errorMsg = `There already exists a "${newName}" file or folder`;
     }
 
     if (errorMsg) {
-      // Delete previous tooltip.
-      if (isObject(Terra.v.renameNodeTippy)) {
-        Terra.v.renameNodeTippy.destroy();
-        Terra.v.renameNodeTippy = null;
-      }
-
-      // Create new tooltip.
-      Terra.v.renameNodeTippy = tippy(data.node.span, {
-        content: errorMsg,
-        animation: false,
-        showOnCreate: true,
+      tooltipManager.createTooltip('renameNode', data.node.span, errorMsg, {
         placement: 'right',
         theme: 'error',
       });
-
       return false;
     }
 
     const fn = data.node.data.isFolder
-      ? Terra.app.vfs.updateFolder
-      : Terra.app.vfs.updateFile;
+      ? Terra.app.vfs.moveFolder
+      : Terra.app.vfs.moveFile;
 
-    fn(data.node.key, { name });
+    const srcPath = data.node.key;
+    const parentPath = parentNodeKey.startsWith('root') ? null : parentNodeKey;
+    const destPath = parentPath ? `${parentPath}/${newName}` : newName;
 
-    const tabComponent = Terra.app.getTabComponents()
-      .find((tabComponent) => tabComponent.getState().fileId === data.node.key);
+    console.log('moving file from', srcPath, 'to', destPath);
+    fn(srcPath, destPath).then(() => {
+      console.log('File moved successfully');
+      const tabComponent = Terra.app.getTabComponents()
+        .find((tabComponent) => tabComponent.getPath() === srcPath);
 
-    if (tabComponent) {
-      tabComponent.setFilename(name);
+      if (tabComponent) {
+        tabComponent.setFilename(newName);
 
-      if (tabComponent instanceof EditorComponent) {
-        const proglang = name.includes('.') ? getFileExtension(name) : 'text';
-        tabComponent.setProgLang(proglang);
+        if (tabComponent instanceof EditorComponent) {
+          const proglang = newName.includes('.') ? getFileExtension(newName) : 'text';
+          tabComponent.setProgLang(proglang);
+        }
+
+        // For some reason no update is triggered, so we trigger it manually.
+        // This will reload the content if needed.
+        Terra.app.layout.emit('stateChanged');
       }
-
-      // For some reason no update is triggered, so we trigger an update.
-      Terra.app.layout.emit('stateChanged');
-    }
+    });
 
     // Destroy the leftover tooltip if it exists.
-    if (isObject(Terra.v.renameNodeTippy)) {
-      Terra.v.renameNodeTippy.destroy();
-      Terra.v.renameNodeTippy = null;
-    }
+    tooltipManager.destroyTooltip('renameNode');
 
     return true;
   }
@@ -658,7 +678,7 @@ class FileTreeManager {
     // Add a visual drag area indicator.
     $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
 
-    if ((targetNode.parent.title === 'root' && targetNode.data.isFile) || targetNode.title === 'root') {
+    if ((targetNode.parent.title.startsWith('root') && targetNode.data.isFile) || targetNode.title === 'root') {
       $('#file-tree').addClass(DROP_AREA_INDICATOR_CLASS);
     }
     else if (targetNode.data.isFile) {
@@ -675,7 +695,7 @@ class FileTreeManager {
       (
         targetNode.data.isFile &&
         Terra.app.vfs.existsWhere({
-          parentId: targetNode.parent.title === 'root' ? null : targetNode.parent.key,
+          parentId: targetNode.parent.title.startsWith('root') ? null : targetNode.parent.key,
           name: sourceNode.title
         }, { ignoreIds: sourceNode.key })
       )
@@ -696,7 +716,7 @@ class FileTreeManager {
 
     if (containsDuplicate) {
       // Create new tooltip.
-      const tooltipElement = targetNode.parent.title === 'root'
+      const tooltipElement = targetNode.parent.title.startsWith('root')
         ? $('.file-tree-container .title')[0]
         : (targetNode.data.isFile ? targetNode.parent.span : targetNode.span);
 
@@ -756,7 +776,7 @@ class FileTreeManager {
     // If the dropped node became a root node, unset parentId.
     let parentId = (targetNode.data.isFolder)
       ? targetNode.key
-      : (targetNode.parent.title === 'root' ? null : targetNode.parent.key);
+      : (targetNode.parent.title.startsWith('root') ? null : targetNode.parent.key);
 
     const id = sourceNode.key;
     const fn = sourceNode.data.isFolder

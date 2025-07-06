@@ -87,6 +87,19 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
+   * Get the filename and parent path from a given filepath.
+   *
+   * @param {string} filepath - The absolute file path.
+   * @returns {object} An object containing the filename and parent path.
+   */
+  _getPartsFromFilepath = (filepath) => {
+    const parts = filepath.split('/');
+    const filename = parts.pop();
+    const parentPath = parts.join('/');
+    return { filename, parentPath };
+  }
+
+  /**
    * Clear the virtual filesystem, removing all files and folders permanently.
    *
    * @returns {Promise<void>} Resolves when the root handle is cleared.
@@ -336,9 +349,7 @@ export default class VirtualFileSystem extends EventTarget {
   getFileHandleByPath = async (filepath) => {
     await this.ready();
 
-    const parts = filepath.split('/');
-    const filename = parts.pop();
-    const parentPath = parts.join('/');
+    const { filename, parentPath } = this._getPartsFromFilepath(filepath);
 
     // Get the parent folder's handle.
     let parentFolderHandle = await this.getFolderHandleByPath(parentPath);
@@ -504,11 +515,21 @@ export default class VirtualFileSystem extends EventTarget {
    *
    * @async
    * @param {string} path - The path to check.
-   * @param {FileSystemDirectoryHandle} [parentFolderHandle] - Check whether the
-   * path exists in this folder handle. Defaults to the root folder handle.
+   * @param {string|FileSystemDirectoryHandle} [parentFolder] - Check whether
+   * the path exists in this folder. Defaults to the root folder handle. Either
+   * the absolute folder path or a FileSystemDirectoryHandle can be provided.
    * @returns {Promise<boolean>} True if the path exists, false otherwise.
    */
-  pathExists = async (path, parentFolderHandle = null) => {
+  pathExists = async (path, parentFolder = null) => {
+    await this.ready();
+
+    let parentFolderHandle = this.rootHandle;
+    if (typeof parentFolder === 'string') {
+      parentFolderHandle = await this.getFolderHandleByPath(parentFolder);
+    } else if (parentFolder instanceof FileSystemDirectoryHandle) {
+      parentFolderHandle = parentFolder;
+    }
+
     if (!parentFolderHandle) {
       parentFolderHandle = this.rootHandle;
     }
@@ -530,8 +551,8 @@ export default class VirtualFileSystem extends EventTarget {
     // At this point, we know the parent folder exists.
     // The last part of the path could be either file or folder, so we just
     // iterate over each entry and check if it exists.
-    for await (let entry of currentHandle.values()) {
-      if (entry.name === last) {
+    for await (let name of currentHandle.keys()) {
+      if (name === last) {
         // If the entry exists, return true.
         return true;
       }
@@ -578,54 +599,55 @@ export default class VirtualFileSystem extends EventTarget {
   /**
    * Update a file in the virtual filesystem.
    *
-   * @param {string} id - The file id.
-   * @param {object} values - Key-value pairs to update in the file object.
+   * @param {string} path - The file path.
+   * @param {object} content - The new content of the file.
    * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
-   * @returns {object} The updated file object.
+   * @returns {FileSystemFileHandle} The updated file handle.
    */
-  updateFile = async (id, values, isUserInvoked = true) => {
-    const file = this.findFileById(id);
-    if (!file) return;
+  updateFileContent = async (path, content, isUserInvoked = true) => {
+    const fileHandle = await this.getFileHandleByPath(path);
 
-    const oldPath = file.path;
-
-    // These extra checks is needed because in the UI, the user can trigger a
-    // rename but not actually change the name.
-    const isRenamed = typeof values.name === 'string' && file.name !== values.name;
-    const isMoved = typeof values.parentId !== 'undefined' && file.parentId !== values.parentId;
-    const isContentChanged = typeof values.content === 'string' && file.content !== values.content;
-
-    if (isRenamed || isMoved) {
-      this.dispatchEvent(new CustomEvent('beforeFileMoved', {
-        detail: { file, values },
-      }));
+    if (content) {
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
     }
 
-    for (const [key, value] of Object.entries(values)) {
-      if (file.hasOwnProperty(key) && key !== 'id') {
-        file[key] = value;
-      }
-    }
+    return fileHandle;
 
-    file.path = this.getAbsoluteFilePath(file.id);
-    file.updatedAt = new Date().toISOString();
+    // TODO: migrate this.
+    // if (isUserInvoked) {
+    //   this.dispatchEvent(new CustomEvent('fileContentChanged', {
+    //     detail: { file: fileHandle },
+    //   }));
+    // }
+  }
 
-    if (isRenamed || isMoved) {
-      // Move the file to the new location.
-      this.dispatchEvent(new CustomEvent('fileMoved', {
-        detail: { file, oldPath },
-      }));
-    }
+  /**
+   * Move a file from a source path to a destination path.
+   *
+   * @example moveFile('folder1/myfile.txt', 'folder2/myfile.txt')
+   *
+   * @async
+   * @param {string} srcPath - The source path of the file to move.
+   * @param {string} destPath - The destination path where the file should be moved to.
+   * @returns {Promise<FileSystemFileHandle>} The new file handle at the destination path.
+   */
+  moveFile = async (srcPath, destPath) => {
+    await this.ready();
 
-    if (isContentChanged && isUserInvoked) {
-      this.dispatchEvent(new CustomEvent('fileContentChanged', {
-        detail: { file },
-      }));
-    }
+    const srcFileContent = await this.getFileContentByPath(srcPath);
 
-    this.saveState();
+    // Create the file in the new destination path.
+    const newFileHandle = await this.createFile({
+      path: destPath,
+      content: srcFileContent,
+    });
 
-    return file;
+    // Delete the old file.
+    await this.deleteFile(srcPath);
+
+    return newFileHandle;
   }
 
   /**
