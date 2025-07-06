@@ -91,15 +91,23 @@ class FileTreeManager {
   /**
    * Create a new file element in the file tree and trigger edit mode.
    *
-   * @param {string|null} [path] - The parent path for the new file. Leave
-   * null to create a new file in the root folder.
+   * @example createFile('path/to/file.txt')
+   * @example createFile('file.txt')
+   *
+   * Creates a new Untitled file in the root folder
+   * @example createFile()
+   *
+   * @param {string|null} [path] - The path for the new file. Leave null to
+   * create a new file in the root folder.
    */
   createFile = async (path = null) => {
     if (Terra.app.hasLFSProjectLoaded && Terra.app.lfs.busy) return;
 
     // Create the new file in the filesystem.
+    const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
+
     const file = await Terra.app.vfs.createFile({ path });
-    const key = path ? `${path}/${file.name}` : file.name;
+    const key = parentPath ? `${parentPath}/${file.name}` : file.name;
 
     // Create the new node in the file tree.
     const newChildProps = {
@@ -114,25 +122,24 @@ class FileTreeManager {
 
     // Append to the parent node if it exists, otherwise append to the root.
     const tree = this.getInstance();
-    if (path) {
-      const parentNode = tree.getNodeByKey(path);
+    if (parentPath) {
+      const parentNode = tree.getNodeByKey(parentPath);
+      parentNode.addChildren(newChildProps);
+
       if (!parentNode.expanded) {
         parentNode.setExpanded();
       }
-
-      parentNode.addChildren(newChildProps);
     } else {
       tree.rootNode.addChildren(newChildProps);
     }
-    tree.rootNode.addChildren(newChildProps);
 
     // Reload tree such that the 'No files or folders found' is removed in case
     // there were no files, but a new has been created.
     await this.createFileTree();
 
-    this.sortFileTree();
-
     const newNode = tree.getNodeByKey(key);
+
+    this.sortFileTree();
 
     // Trigger edit mode for the new node.
     setTimeout(() => {
@@ -155,16 +162,23 @@ class FileTreeManager {
 
   /**
    * Create a new folder element in the file tree and trigger edit mode.
+   * @example createFolder('path/to/newFolder')
+   * @example createFolder('newFolder')
    *
-   * @param {string|null} [path] - The parent path for the new folder. Leave
+   * Creates a new Untitled folder in the root folder
+   * @example createFolder()
+   *
+   * @param {string|null} [path] - The path for the new folder. Leave
    * null to create a new folder in the root folder.
    */
   createFolder = async (path = null) => {
     if (Terra.app.hasLFSProjectLoaded && Terra.app.lfs.busy) return;
 
+    const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
+
     // Create the new folder in the filesystem.
     const folder = await Terra.app.vfs.createFolder(path);
-    const key = path ? `${path}/${folder.name}` : folder.name;
+    const key = parentPath ? `${parentPath}/${folder.name}` : folder.name;
 
     // Create the new node in the file tree.
     const newChildProps = {
@@ -179,8 +193,8 @@ class FileTreeManager {
 
     // Append to the parent node if it exists, otherwise append to the root.
     const tree = this.getInstance();
-    if (path) {
-      const parentNode = tree.getNodeByKey(path);
+    if (parentPath) {
+      const parentNode = tree.getNodeByKey(parentPath);
       parentNode.setExpanded();
       parentNode.addChildren(newChildProps);
     } else {
@@ -198,8 +212,8 @@ class FileTreeManager {
 
     // Check again if the parent node is expanded, because the node might have
     // been added to a closed folder. Only then we can trigger editStart().
-    if (path) {
-      tree.getNodeByKey(path).setExpanded();
+    if (parentPath) {
+      tree.getNodeByKey(parentPath).setExpanded();
     }
 
     newNode.editStart();
@@ -328,7 +342,9 @@ class FileTreeManager {
         name: 'New File',
         callback: () => {
           Terra.v.userClickedContextMenuItem = true;
-          this.createFile(node.key);
+          const parentPath = node.key;
+          const newPath = parentPath.startsWith('root') ? 'Untitled' : `${parentPath}/Untitled`;
+          this.createFile(newPath);
         },
       };
 
@@ -336,7 +352,9 @@ class FileTreeManager {
         name: 'New Folder',
         callback: () => {
           Terra.v.userClickedContextMenuItem = true;
-          this.createFolder(node.key);
+          const parentPath = node.key;
+          const newPath = parentPath.startsWith('root') ? 'Untitled' : `${parentPath}/Untitled`;
+          this.createFolder(newPath);
         },
       };
 
@@ -436,18 +454,18 @@ class FileTreeManager {
       // Reload the tree if it already exists by re-importing from VFS.
       if (this.tree) {
         if (!forceRecreate) {
-          const reloadTree = () => {
-            this.createFromVFS().then((data) => {
-              this.getInstance().reload(data);
-              resolve();
-            });
-          }
+          const reloadTree = () => this.createFromVFS().then((data) => {
+            this.getInstance().reload(data);
+          });
 
           // Persist the tree state to prevent folders from being closed.
           if (persistState) {
-            this.runFuncWithPersistedState(reloadTree);
+            this.runFuncWithPersistedState(reloadTree).then(() => {
+              resolve();
+            });
           } else {
             reloadTree();
+            resolve();
           }
           return;
         } else {
@@ -533,6 +551,13 @@ class FileTreeManager {
     Terra.v.blockLFSPolling = false;
   }
 
+  /**
+   * Check whether a file exists in the file tree in a given folder path.
+   *
+   * @param {string} name - The file name.
+   * @param {string} parentPath - The folder path where to check for the file.
+   * @returns {boolean} True if the file exists, false otherwise.
+   */
   _nodePathExists = (name, parentPath) => {
     const tree = this.getInstance();
     const parentNode = tree.getNodeByKey(parentPath);
@@ -556,8 +581,9 @@ class FileTreeManager {
     // Check if user pressed cancel or text is unchanged.
     if (!data.save) return;
 
+    const sourceNode = data.node;
     const newName = data.input.val().trim();
-    const oldName = data.node.title;
+    const oldName = sourceNode.title;
 
     if (!newName) {
       // If no name has been filled in, return false.
@@ -576,7 +602,7 @@ class FileTreeManager {
 
     // Check if the name already exists in the parent folder.
     // If so, trigger edit mode again and show error tooltip.
-    const parentNodeKey = data.node.parent.key;
+    const parentNodeKey = sourceNode.parent.key;
     if (!isValidFilename(newName)) {
       errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
     } else if (this._nodePathExists(newName, parentNodeKey)) {
@@ -584,24 +610,28 @@ class FileTreeManager {
     }
 
     if (errorMsg) {
-      tooltipManager.createTooltip('renameNode', data.node.span, errorMsg, {
+      tooltipManager.createTooltip('renameNode', sourceNode.span, errorMsg, {
         placement: 'right',
         theme: 'error',
       });
       return false;
     }
 
-    const fn = data.node.data.isFolder
+    const fn = sourceNode.data.isFolder
       ? Terra.app.vfs.moveFolder
       : Terra.app.vfs.moveFile;
 
-    const srcPath = data.node.key;
+    const srcPath = sourceNode.key;
     const parentPath = parentNodeKey.startsWith('root') ? null : parentNodeKey;
     const destPath = parentPath ? `${parentPath}/${newName}` : newName;
 
-    console.log('moving file from', srcPath, 'to', destPath);
     fn(srcPath, destPath).then(() => {
-      console.log('File moved successfully');
+      if (sourceNode.data.isFile) {
+        sourceNode.key = destPath;
+      } else if (sourceNode.data.isFolder) {
+        this._updateFolderKeyRecursively(sourceNode);
+      }
+
       const tabComponent = Terra.app.getTabComponents()
         .find((tabComponent) => tabComponent.getPath() === srcPath);
 
@@ -781,17 +811,43 @@ class FileTreeManager {
       return true;
     }
 
+    // Move the node in the tree, but when files or files are dropped onto other
+    // files, prevent a new folder being created and just insert the source file
+    // as a sibling next to the target file.
+    if (data.hitMode === 'over' && targetNode.data.isFile) {
+      sourceNode.moveTo(targetNode, 'before');
+    } else {
+      sourceNode.moveTo(targetNode, data.hitMode);
+      targetNode.setExpanded();
+    }
+
+
     fn(srcPath, destPath).then(() => {
-      // Move the node in the tree, but when files or files are dropped onto other
-      // files, prevent a new folder being created and just insert the source file
-      // as a sibling next to the target file.
-      if (data.hitMode === 'over' && targetNode.data.isFile) {
-        sourceNode.moveTo(targetNode, 'before');
-      } else {
-        sourceNode.moveTo(targetNode, data.hitMode);
-        targetNode.setExpanded();
+      // Update the node keys.
+      if (sourceNode.data.isFile) {
+        sourceNode.key = destPath;
+      } else if (sourceNode.data.isFolder) {
+        this._updateFolderKeyRecursively(sourceNode);
       }
     });
+  }
+
+  /**
+   * Update the folder key recursively for all child nodes.
+   *
+   * @param {FancytreeNode} folderNode - The folder node to update recursively.
+   */
+  _updateFolderKeyRecursively = (folderNode) => {
+    folderNode.key = this.getAbsoluteNodePath(folderNode);
+
+    const childNodes = folderNode.children || [];
+    for (const childNode of childNodes) {
+      if (childNode.data.isFolder) {
+        this._updateFolderKeyRecursively(childNode);
+      } else {
+        childNode.key = this.getAbsoluteNodePath(childNode)
+      }
+    }
   }
 
   /**

@@ -635,10 +635,8 @@ export default class VirtualFileSystem extends EventTarget {
    */
   moveFile = async (srcPath, destPath) => {
     await this.ready();
-    console.log('movin file from', srcPath, 'to', destPath);
 
     const srcFileContent = await this.getFileContentByPath(srcPath);
-    console.log('srcFileContent', srcFileContent);
 
     // Create the file in the new destination path.
     const newFileHandle = await this.createFile({
@@ -655,48 +653,41 @@ export default class VirtualFileSystem extends EventTarget {
   /**
    * Update a folder in the virtual filesystem.
    *
-   * @param {string} id - The folder id.
-   * @param {object} values - Key-value pairs to update in the folder object.
-   * @returns {object} The updated folder object.
+   * Move folder2 from folder1 to folder3
+   * @example moveFolder('folder1/folder2', 'folder3/folder2')
+   *
+   * @param {string} srcPath - The absolute path of the source folder.
+   * @param {string} destPath - The absolute path where the source folder should be moved to.
+   * @returns {Promise<FileSystemDirectoryHandle>} The new folder handle at the destination path.
    */
-  updateFolder = async (id, values) => {
-    const folder = this.findFolderById(id);
-    if (!folder) return;
-
-    const oldPath = folder.path;
-
-    // This extra check is needed because in the UI, the user can trigger a
-    // rename but not actually change the name.
-    const isRenamed = typeof values.name === 'string' && folder.name !== values.name;
-    const isMoved = typeof values.parentId !== 'undefined' && folder.parentId !== values.parentId;
-
-    if (isRenamed || isMoved) {
-      this.dispatchEvent(new CustomEvent('beforeFolderMoved', {
-        detail: { folder, values },
-      }));
+  moveFolder = async (srcPath, destPath) => {
+    // Move all files inside the folder to the new destination path.
+    const files = await this.findFilesInFolder(srcPath);
+    for (const file of files) {
+      const filePath = `${srcPath}/${file.name}`;
+      const newFilePath = destPath ? `${destPath}/${file.name}` : file.name;
+      await this.moveFile(filePath, newFilePath);
     }
 
-    for (const [key, value] of Object.entries(values)) {
-      if (folder.hasOwnProperty(key) && key !== 'id') {
-        folder[key] = value;
-      }
+    const folders = await this.findFoldersInFolder(srcPath);
+    for (const folder of folders) {
+      const folderPath = `${srcPath}/${folder.name}`;
+      const newFolderPath = destPath ? `${destPath}/${folder.name}` : folder.name;
+      await this.moveFolder(folderPath, newFolderPath);
     }
 
-    folder.path = this.getAbsoluteFolderPath(folder.id);
-    folder.updatedAt = new Date().toISOString();
+    // Delete source folder recursively.
+    await this.deleteFolder(srcPath);
 
-    // Update all nested files and folders recursively with the new path.
-    this._updateFolderSubPaths(id);
+    // Get the new folder handle at the destination path.
+    const newFolderHandle = await this.getFolderHandleByPath(destPath);
 
-    if (isRenamed || isMoved) {
-      this.dispatchEvent(new CustomEvent('folderMoved', {
-        detail: { folder, oldPath },
-      }));
-    }
+    // TODO: migrate this.
+    // this.dispatchEvent(new CustomEvent('folderMoved', {
+    //   detail: { folder, oldPath },
+    // }));
 
-    this.saveState();
-
-    return folder;
+    return newFolderHandle;
   }
 
   /**
@@ -764,8 +755,11 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     // Finally, delete the folder itself from OPFS recursively.
-    const folderHandle = await this.getFolderHandleByPath(path);
-    await folderHandle.remove({ recursive: true });
+    const parts = path.split('/');
+    const foldername = parts.pop();
+    const parentPath = parts.join('/');
+    const parentFolderHandle = await this.getFolderHandleByPath(parentPath);
+    await parentFolderHandle.removeEntry(foldername, { recursive: true });
 
     return true;
   }

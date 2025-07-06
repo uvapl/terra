@@ -108,7 +108,7 @@ export default class App {
       this.layout.addEventListener(eventName, async (event) => {
         const { tabComponent } = event.detail;
         if (typeof this[eventName] === 'function') {
-          await this[eventName](tabComponent);
+          this[eventName](tabComponent);
         }
       });
     });
