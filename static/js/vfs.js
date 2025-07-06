@@ -67,16 +67,6 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Get the root handle of the virtual filesystem.
-   *
-   * @returns {Promise<FileSystemDirectoryHandle>} A directory handle to the
-   * root of the virtual filesystem, or undefined if the handle is not found.
-   */
-  getRootHandle = () => {
-    return this._getHandle(this.STORE_NAME, 'root');
-  }
-
-  /**
    * Increment the number in a string with the pattern `XXXXXX (N)`.
    *
    * @example this._incrementString('Untitled')     -> 'Untitled (1)'
@@ -97,12 +87,24 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Clear the virtual filesystem, removing all files and folders permantly.
+   * Clear the virtual filesystem, removing all files and folders permanently.
+   *
+   * @returns {Promise<void>} Resolves when the root handle is cleared.
    */
-  clear = () => {
-    this.files = {};
-    this.folders = {};
-    this.saveState();
+  clear = async () => {
+    await this.ready();
+
+    // To date, the 'remove' function is only available in Chromium-based
+    // browsers. For other browsers, we iteratore through the first level of
+    // files and folders and delete them one by one.
+    if ('remove' in FileSystemDirectoryHandle.prototype) {
+      await this.rootHandle.remove({ recursive: true });
+    } else {
+      // Fallback for non-Chromium browsers.
+      for await (const name of this.rootHandle.keys()) {
+        await this.rootHandle.removeEntry(name, { recursive: true });
+      }
+    }
   }
 
   /**
@@ -315,10 +317,50 @@ export default class VirtualFileSystem extends EventTarget {
     const parts = folderpath.split('/');
 
     while (handle && parts.length > 0) {
-      handle = await handle.getDirectoryHandle(parts.shift(), { create: false });
+      handle = await handle.getDirectoryHandle(parts.shift(), { create: true });
     }
 
     return handle;
+  }
+
+  /**
+   * Get a file handle by its absolute path.
+   *
+   * The example below returns the handle for `myfile.txt`.
+   * @example getFolderHandleByPath('folder1/folder2/myfile.txt')
+   *
+   * @async
+   * @param {string} filepath - The absolute file path.
+   * @returns {Promise<FileSystemFileHandle>} The file handle.
+   */
+  getFileHandleByPath = async (filepath) => {
+    await this.ready();
+
+    const parts = filepath.split('/');
+    const filename = parts.pop();
+    const parentPath = parts.join('/');
+
+    // Get the parent folder's handle.
+    let parentFolderHandle = await this.getFolderHandleByPath(parentPath);
+
+    // Get the file handle through its parent folder handle.
+    const fileHandle = await parentFolderHandle.getFileHandle(filename, { create: false });
+
+    return fileHandle;
+  }
+
+  /**
+   * Obtain the content of a file by its absolute path.
+   *
+   * @async
+   * @param {string} filepath - The absolute file path.
+   * @returns {Promise<string>} The file content.
+   */
+  getFileContentByPath = async (filepath) => {
+    const fileHandle = await this.getFileHandleByPath(filepath);
+    const file = await fileHandle.getFile();
+    const content = await file.text();
+    return content;
   }
 
   /**
@@ -328,7 +370,7 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {string} folderpath - The absolute folder path to search in.
    * @returns {Promise<FileSystemDirectoryHandle[]>} Array of folder handles.
    */
-  findFoldersInPath = async (folderpath) => {
+  findFoldersInFolder = async (folderpath) => {
     await this.ready();
 
     // Obtain the folder handle recursively.
@@ -352,7 +394,7 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {string} folderpath - The absolute folder path to search in.
    * @returns {Promise<FileSystemFileHandle[]>} Array of file handles.
    */
-  findFilesInPath = async (folderpath) => {
+  findFilesInFolder = async (folderpath) => {
     await this.ready();
 
     // Obtain the folder handle recursively.
@@ -415,35 +457,35 @@ export default class VirtualFileSystem extends EventTarget {
    * Create a new file.
    *
    * @param {object} fileObj - The file object to create.
-   * @param {string} [fileObj.name] - The name of the file.
+   * @param {string} [fileObj.path] - The name of the file. Leave empty to
+   * create a new Untitled file in the root directory.
    * @param {string} [fileObj.content] - The content of the file.
-   * @param {string} [fileObj.path] - Absolute folderpath to create the file in.
    * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
    * @returns {FileSystemFileHandle} The new file handle.
    */
   createFile = async (fileObj, isUserInvoked = true) => {
     await this.ready();
 
-    const newFile = {
-      name: 'Untitled',
-      content: '',
-      ...fileObj,
-    };
+    const { path, content } = fileObj;
 
-    let parentFolderHandle = fileObj.path
-      ? await this.getFolderHandleByPath(fileObj.path)
+    const parts = path ? path.split('/') : [];
+    let name = path ? parts.pop() : 'Untitled';
+    const parentPath = parts.join('/');
+
+    let parentFolderHandle = parentPath
+      ? await this.getFolderHandleByPath(parentPath)
       : this.rootHandle;
 
     // Ensure a unique file name.
-    while ((await this.pathExists(newFile.name, parentFolderHandle))) {
-      newFile.name = this._incrementString(newFile.name);
+    while ((await this.pathExists(name, parentFolderHandle))) {
+      name = this._incrementString(name);
     }
 
-    const newFileHandle = await parentFolderHandle.getFileHandle(newFile.name, { create: true });
+    const newFileHandle = await parentFolderHandle.getFileHandle(name, { create: true });
 
-    if (newFile.content) {
-      const writable = newFileHandle.createWritable();
-      await writable.write(newFile.content);
+    if (content) {
+      const writable = await newFileHandle.createWritable();
+      await writable.write(content);
       await writable.close();
     }
 
@@ -502,17 +544,21 @@ export default class VirtualFileSystem extends EventTarget {
   /**
    * Create a new folder.
    *
-   * @param {object} folderObj - The folder object to create.
+   * @param {object} folderpath - The path where the new folder will be created.
+   * Leave empty to create a new Untitled folder in the root directory.
    * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
-   * @returns {object} The new folder object.
+   * @returns {FileSystemDirectoryHandle} The new folder handle.
    */
-  createFolder = async (folderObj, isUserInvoked = true) => {
-    let parentFolderHandle = folderObj.path
-      ? await this.getFolderHandleByPath(folderObj.path)
+  createFolder = async (folderpath, isUserInvoked = true) => {
+    const parts = folderpath ? folderpath.split('/') : [];
+    let name = folderpath ? parts.pop() : 'Untitled';
+    const parentPath = parts.join('/');
+
+    let parentFolderHandle = parentPath
+      ? await this.getFolderHandleByPath(parentPath)
       : this.rootHandle;
 
     // Ensure a unique folder name.
-    let name = folderObj.name || 'Untitled';
     while ((await this.pathExists(name, parentFolderHandle))) {
       name = this._incrementString(name);
     }
@@ -680,14 +726,14 @@ export default class VirtualFileSystem extends EventTarget {
     // }));
 
     // Gather all subfiles and trigger a deleteFile on them.
-    const files = await this.findFilesInPath(path);
+    const files = await this.findFilesInFolder(path);
     for (const file of files) {
       const filepath = `${path}/${file.name}`;
       await this.deleteFile(filepath, false);
     }
 
     // Delete all the nested folders inside the current folder.
-    const folders = await this.findFoldersInPath(path);
+    const folders = await this.findFoldersInFolder(path);
     for (const folder of folders) {
       const folderpath = `${path}/${folder.name}`;
       await this.deleteFolder(folderpath, false);

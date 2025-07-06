@@ -162,7 +162,7 @@ class FileTreeManager {
     if (Terra.app.hasLFSProjectLoaded && Terra.app.lfs.busy) return;
 
     // Create the new folder in the filesystem.
-    const folder = await Terra.app.vfs.createFolder({ path });
+    const folder = await Terra.app.vfs.createFolder(path);
     const key = path ? `${path}/${folder.name}` : folder.name;
 
     // Create the new node in the file tree.
@@ -212,7 +212,7 @@ class FileTreeManager {
    */
   createFromVFS = async (path = '') => {
     const folders = await Promise.all(
-      (await Terra.app.vfs.findFoldersInPath(path)).map(async (folder) => {
+      (await Terra.app.vfs.findFoldersInFolder(path)).map(async (folder) => {
         const subpath = path ? `${path}/${folder.name}` : folder.name;
         return {
           key: subpath,
@@ -227,7 +227,7 @@ class FileTreeManager {
       })
     )
 
-    const files = (await Terra.app.vfs.findFilesInPath(path)).map((file) => ({
+    const files = (await Terra.app.vfs.findFilesInFolder(path)).map((file) => ({
       key: path ? `${path}/${file.name}` : file.name,
       title: file.name,
       folder: false,
@@ -626,7 +626,7 @@ class FileTreeManager {
   _onClickNodeCallback = (event, data) => {
     // Prevent default behavior for folders.
     if (data.node.data.isFile) {
-      Terra.app.openFile(data.node.key, data.node.title);
+      Terra.app.openFile(data.node.key);
     } else if (data.node.data.isFolder) {
       clearTimeout(Terra.v.fileTreeToggleTimeout);
 

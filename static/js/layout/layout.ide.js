@@ -21,6 +21,7 @@ export default class IDELayout extends Layout {
       reorderEnabled: true,
       componentState: {
         fontSize: BASE_FONT_SIZE,
+        path: 'Untitled',
         ...tab.componentState,
       },
       title: 'Untitled',
@@ -43,6 +44,7 @@ export default class IDELayout extends Layout {
                   componentName: 'editor',
                   componentState: {
                     fontSize: BASE_FONT_SIZE,
+                    path: 'Untitled',
                   },
                   title: 'Untitled',
                 },
@@ -308,59 +310,56 @@ export default class IDELayout extends Layout {
   }
 
   /**
-   * Open a file in the editor, otherwise switch to the tab of the filename.
+   * Open a file in the editor, or switch to the tab if it's already open.
    *
-   * @param {string} id - The file id. Leave empty to create new file.
-   * @param {string} filename - The name of the file to open.
+   * @param {string} filepath - The path of the file to open.
    */
-  addFileTab(id, filename) {
-    let editorComponents = this.getTabComponents();
+  addFileTab(filepath) {
+    let tabComponents = this.getTabComponents();
 
-    // Try to find the editor component with the given filename or id.
-    const editorComponent = editorComponents.find(
-      (editorComponent) => id === null
-        ? editorComponent.getFilename() === filename
-        : editorComponent.getState().fileId === id
+    // Try to find the tab component with the given filepath.
+    const tabComponent = tabComponents.find(
+      (component) => component.getPath() === filepath
     );
 
-    if (editorComponent) {
+    if (tabComponent) {
       // Switch to the active tab that is already open.
-      editorComponent.setActive();
+      tabComponent.setActive();
     } else {
       let removeFirstTab = false;
 
-      // Check if first tab is an Untitled tab with no content. If so, then remove
-      // it after we've inserted the new tab.
-      if (editorComponents.length === 1 && editorComponents[0].getFilename() === 'Untitled') {
-        if (editorComponents[0].getContent() === '') {
+      // Check if first tab is an Untitled tab with no content.
+      // If so, then remove it after we've inserted the new tab.
+      if (tabComponents.length === 1 && tabComponents[0].getFilename() === 'Untitled') {
+        if (tabComponents[0].getContent() === '') {
           removeFirstTab = true;
         } else {
-          editorComponents[0].clearContent();
+          tabComponents[0].clearContent();
           return;
         }
       }
 
       const activeEditorComponent = this.getActiveEditor();
       if (activeEditorComponent) {
+        const filename = filepath.split('/').pop();
+
         // Add a new tab next to the current active tab.
         activeEditorComponent.addSiblingTab({
           title: filename,
-          componentState: {
-            fileId: id,
-          },
+          componentState: { path: filepath },
           componentName: isImageExtension(filename) ? 'image' : 'editor',
         });
 
-        editorComponents = this.getTabComponents();
+        tabComponents = this.getTabComponents();
 
         if (removeFirstTab) {
-          editorComponents[0].fakeOnContainerOpenEvent = true;
-          editorComponents[0].fakeOnEditorFocusEvent = true;
-          editorComponents[1].fakeOnContainerOpenEvent = true;
-          editorComponents[1].fakeOnEditorFocusEvent = true;
+          tabComponents[0].fakeOnContainerOpenEvent = true;
+          tabComponents[0].fakeOnEditorFocusEvent = true;
+          tabComponents[1].fakeOnContainerOpenEvent = true;
+          tabComponents[1].fakeOnEditorFocusEvent = true;
 
           // Close Untitled tab.
-          editorComponents[0].close();
+          tabComponents[0].close();
         }
       }
     }

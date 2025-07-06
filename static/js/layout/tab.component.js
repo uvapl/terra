@@ -28,6 +28,7 @@ export default class TabComponent extends EventTarget {
 
   constructor(container, state) {
     super();
+    console.log('creating new tab:', container.parent.config.title)
     this.container = container;
     this.state = state;
   }
@@ -48,6 +49,15 @@ export default class TabComponent extends EventTarget {
    */
   getState = () => {
     return this.container.getState();
+  }
+
+  /**
+   * Get tab's corresponding filepath.
+   *
+   * @returns {string} The path of the tab.
+   */
+  getPath = () => {
+    return this.getState().path;
   }
 
   /**
@@ -96,6 +106,7 @@ export default class TabComponent extends EventTarget {
       title: 'Untitled',
       componentState: {
         fontSize: BASE_FONT_SIZE,
+        path: 'Untitled',
         ...config.componentState
       },
       ...config,

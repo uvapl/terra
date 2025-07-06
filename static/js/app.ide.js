@@ -165,12 +165,29 @@ export default class IDEApp extends App {
   /**
    * Reload the file content either from VFS or LFS.
    *
+   * @async
    * @param {EditorComponent} editorComponent - The editor component instance.
    * @param {boolean} clearUndoStack - Whether to clear the undo stack or not.
    */
-  setEditorFileContent(editorComponent, clearUndoStack = false) {
-    const file = this.vfs.findFileById(editorComponent.getState().fileId);
-    if (!file) return;
+  async setEditorFileContent(editorComponent, clearUndoStack = false) {
+    const content = await this.vfs.getFileContentByPath(editorComponent.getPath());
+    editorComponent.setContent(content);
+
+    const cursorPos = editorComponent.getCursorPosition();
+    editorComponent.setContent(content);
+    editorComponent.setCursorPosition(cursorPos);
+
+    if (clearUndoStack) {
+      editorComponent.clearUndoStack();
+    }
+
+    return;
+
+    // TODO: We do want to persist the max filesize check and still call the
+    // editorComponent.exceededFileSize() function.
+    //
+    // Maybe this function here can be removed since it will be identical to the
+    // same definition in app.js, but that's still indecisive.
 
     if (Terra.app.hasLFSProjectLoaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
       editorComponent.exceededFileSize();
@@ -325,13 +342,12 @@ export default class IDEApp extends App {
    * Open a file in the editor and if necessary, spawn a new worker based on the
    * file extension.
    *
-   * @param {string} id - The file id. Leave empty to create new file.
-   * @param {string} filename - The name of the file to open.
+   * @param {string} filepath - The path of the file to open.
    */
-  openFile(id, filename) {
-    this.layout.addFileTab(id, filename);
+  openFile(filepath) {
+    this.layout.addFileTab(filepath);
 
-    const proglang = getFileExtension(filename);
+    const proglang = getFileExtension(filepath);
     this.createLangWorker(proglang);
   }
 
