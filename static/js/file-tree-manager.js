@@ -709,21 +709,16 @@ class FileTreeManager {
       )
     );
 
-    if (isObject(Terra.v.dndDuplicateTippy)) {
-      Terra.v.dndDuplicateTippy.destroy();
-      Terra.v.dndDuplicateTippy = null;
-    }
+    tooltipManager.destroyTooltip('dndDuplicate');
 
     if (containsDuplicate) {
       // Create new tooltip.
-      const tooltipElement = targetNode.parent.title.startsWith('root')
+      const anchor = targetNode.parent.title.startsWith('root')
         ? $('.file-tree-container .title')[0]
         : (targetNode.data.isFile ? targetNode.parent.span : targetNode.span);
 
-      Terra.v.dndDuplicateTippy = tippy(tooltipElement, {
-        content: `There already exists a "${sourceNode.title}" file or folder`,
-        animation: false,
-        showOnCreate: true,
+      const msg = `There already exists a "${sourceNode.title}" file or folder`;
+      tooltipManager.createTooltip('dndDuplicate', anchor, msg, {
         placement: 'right',
         theme: 'error',
       });
@@ -755,11 +750,7 @@ class FileTreeManager {
     // Remove the visual drag area indicator.
     $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
 
-    if (isObject(Terra.v.dndDuplicateTippy)) {
-      Terra.v.dndDuplicateTippy.destroy();
-      Terra.v.dndDuplicateTippy = null;
-    }
-
+    tooltipManager.destroyTooltip('dndDuplicate');
     this.sortFileTree()
     Terra.v.blockLFSPolling = false;
   }

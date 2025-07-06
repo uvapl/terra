@@ -6,6 +6,7 @@ import { isImageExtension } from '../helpers/image.js';
 import { BASE_FONT_SIZE, LFS_MAX_FILE_SIZE } from '../constants.js';
 import { createModal, hideModal, showModal } from '../modal.js';
 import Terra from '../terra.js';
+import tooltipManager from '../tooltip-manager.js';
 
 export default class IDELayout extends Layout {
   /**
@@ -232,11 +233,7 @@ export default class IDELayout extends Layout {
     $modal.find('.text-input').focus().select();
 
     $modal.find('.cancel-btn').click(() => {
-      if (Terra.v.saveFileTippy) {
-        Terra.v.saveFileTippy.destroy();
-        Terra.v.saveFileTippy = null;
-      }
-
+      tooltipManager.destroyTooltip('saveFile');
       hideModal($modal);
     });
 
@@ -256,30 +253,17 @@ export default class IDELayout extends Layout {
       }
 
       if (errorMsg) {
-        if (isObject(Terra.v.saveFileTippy)) {
-          Terra.v.saveFileTippy.destroy();
-          Terra.v.saveFileTippy = null;
-        }
-
-        // Create new tooltip.
-        Terra.v.saveFileTippy = tippy($modal.find('input').parent()[0], {
-          content: errorMsg,
-          animation: false,
-          showOnCreate: true,
+        const anchor = $modal.find('input').parent()[0];
+        tooltipManager.createTooltip('saveFile', anchor, errorMsg, {
           placement: 'top',
           theme: 'error',
         });
-
         $modal.find('input').focus().select();
-
         return;
       }
 
       // Remove the tooltip if it exists.
-      if (isObject(Terra.v.saveFileTippy)) {
-        Terra.v.saveFileTippy.destroy();
-        Terra.v.saveFileTippy = null;
-      }
+      tooltipManager.destroyTooltip('saveFile');
 
       // Create a new file in the VFS and then refresh the file tree.
       const { id: nodeId } = Terra.app.vfs.createFile({
