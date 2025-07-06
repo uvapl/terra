@@ -765,26 +765,33 @@ class FileTreeManager {
     const sourceNode = data.otherNode;
 
     // If the dropped node became a root node, unset parentId.
-    let parentId = (targetNode.data.isFolder)
+    let parentPath = (targetNode.data.isFolder)
       ? targetNode.key
       : (targetNode.parent.title.startsWith('root') ? null : targetNode.parent.key);
 
-    const id = sourceNode.key;
+    const srcPath = sourceNode.key;
     const fn = sourceNode.data.isFolder
-      ? Terra.app.vfs.updateFolder
-      : Terra.app.vfs.updateFile;
+      ? Terra.app.vfs.moveFolder
+      : Terra.app.vfs.moveFile;
 
-    fn(id, { parentId });
+    const destPath = parentPath ? `${parentPath}/${sourceNode.title}` : sourceNode.title;
 
-    // Move the node in the tree, but when files or files are dropped onto other
-    // files, prevent a new folder being created and just insert the source file
-    // as a sibling next to the target file.
-    if (data.hitMode === 'over' && targetNode.data.isFile) {
-      sourceNode.moveTo(targetNode, 'before');
-    } else {
-      sourceNode.moveTo(targetNode, data.hitMode);
-      targetNode.setExpanded();
+    if (srcPath == destPath) {
+      // Nothing happened (rare case, but it might occur).
+      return true;
     }
+
+    fn(srcPath, destPath).then(() => {
+      // Move the node in the tree, but when files or files are dropped onto other
+      // files, prevent a new folder being created and just insert the source file
+      // as a sibling next to the target file.
+      if (data.hitMode === 'over' && targetNode.data.isFile) {
+        sourceNode.moveTo(targetNode, 'before');
+      } else {
+        sourceNode.moveTo(targetNode, data.hitMode);
+        targetNode.setExpanded();
+      }
+    });
   }
 
   /**

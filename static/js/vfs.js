@@ -635,8 +635,10 @@ export default class VirtualFileSystem extends EventTarget {
    */
   moveFile = async (srcPath, destPath) => {
     await this.ready();
+    console.log('movin file from', srcPath, 'to', destPath);
 
     const srcFileContent = await this.getFileContentByPath(srcPath);
+    console.log('srcFileContent', srcFileContent);
 
     // Create the file in the new destination path.
     const newFileHandle = await this.createFile({
