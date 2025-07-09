@@ -5,7 +5,6 @@
 import {
   addNewLineCharacter,
   hasGitFSWorker,
-  uuidv4
 } from './helpers/shared.js';
 import { IS_IDE } from './constants.js';
 import Terra from './terra.js';
@@ -26,9 +25,45 @@ export default class VirtualFileSystem extends EventTarget {
    */
   folders = {};
 
+  /**
+   * The OPFS root handle.
+   * @type {FileSystemDirectoryHandle}
+   */
+  rootHandle;
+
   constructor() {
     super();
     this.loadFromLocalStorage();
+    this.loadRootHandle();
+  }
+
+  /**
+   * Wait for the OPFS root folder handle to be available.
+   *
+   * @returns {Promise<void>} Resolves when the root handle is available.
+   */
+  ready = () => {
+    return new Promise((resolve) => {
+      const check = () => {
+        if (this.rootHandle) {
+          resolve();
+        } else {
+          // Check every 300ms if the root handle is available.
+          setTimeout(check, 300);
+        }
+      };
+
+      check();
+    });
+  }
+
+  /**
+   * Retrieve the root handle from OPFS.
+   */
+  loadRootHandle = () => {
+    navigator.storage.getDirectory().then((rootHandle) => {
+      this.rootHandle = rootHandle;
+    });
   }
 
   /**
@@ -52,12 +87,37 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Clear the virtual filesystem, removing all files and folders permantly.
+   * Get the filename and parent path from a given filepath.
+   *
+   * @param {string} filepath - The absolute file path.
+   * @returns {object} An object containing the filename and parent path.
    */
-  clear = () => {
-    this.files = {};
-    this.folders = {};
-    this.saveState();
+  _getPartsFromFilepath = (filepath) => {
+    const parts = filepath.split('/');
+    const filename = parts.pop();
+    const parentPath = parts.join('/');
+    return { filename, parentPath };
+  }
+
+  /**
+   * Clear the virtual filesystem, removing all files and folders permanently.
+   *
+   * @returns {Promise<void>} Resolves when the root handle is cleared.
+   */
+  clear = async () => {
+    await this.ready();
+
+    // To date, the 'remove' function is only available in Chromium-based
+    // browsers. For other browsers, we iteratore through the first level of
+    // files and folders and delete them one by one.
+    if ('remove' in FileSystemDirectoryHandle.prototype) {
+      await this.rootHandle.remove({ recursive: true });
+    } else {
+      // Fallback for non-Chromium browsers.
+      for await (const name of this.rootHandle.keys()) {
+        await this.rootHandle.removeEntry(name, { recursive: true });
+      }
+    }
   }
 
   /**
@@ -85,7 +145,7 @@ export default class VirtualFileSystem extends EventTarget {
    * Save the virtual filesystem state to localstorage.
    */
   saveState = () => {
-    let files = {...this.files};
+    let files = { ...this.files };
 
     // Remove the content from all files when LFS or Git is used, because LFS uses
     // lazy loading and GitFS is being cloned when refreshed anyway.
@@ -248,6 +308,121 @@ export default class VirtualFileSystem extends EventTarget {
     Object.values(this.folders).find((f) => f.path === path);
 
   /**
+   * Get a folder handle by its absolute path.
+   *
+   * The example below returns the handle for folder3.
+   * @example getFolderHandleByPath('folder1/folder2/folder3')
+   *
+   * The examples below return the root handle.
+   * @example getFolderHandleByPath('')
+   * @example getFolderHandleByPath()
+   *
+   * @async
+   * @param {string} folderpath - The absolute folder path.
+   * @returns {Promise<FileSystemDirectoryHandle>} The folder handle.
+   */
+  getFolderHandleByPath = async (folderpath) => {
+    await this.ready();
+
+    if (!folderpath) return this.rootHandle;
+
+    let handle = this.rootHandle;
+    const parts = folderpath.split('/');
+
+    while (handle && parts.length > 0) {
+      handle = await handle.getDirectoryHandle(parts.shift(), { create: true });
+    }
+
+    return handle;
+  }
+
+  /**
+   * Get a file handle by its absolute path.
+   *
+   * The example below returns the handle for `myfile.txt`.
+   * @example getFolderHandleByPath('folder1/folder2/myfile.txt')
+   *
+   * @async
+   * @param {string} filepath - The absolute file path.
+   * @returns {Promise<FileSystemFileHandle>} The file handle.
+   */
+  getFileHandleByPath = async (filepath) => {
+    await this.ready();
+
+    const { filename, parentPath } = this._getPartsFromFilepath(filepath);
+
+    // Get the parent folder's handle.
+    let parentFolderHandle = await this.getFolderHandleByPath(parentPath);
+
+    // Get the file handle through its parent folder handle.
+    const fileHandle = await parentFolderHandle.getFileHandle(filename, { create: false });
+
+    return fileHandle;
+  }
+
+  /**
+   * Obtain the content of a file by its absolute path.
+   *
+   * @async
+   * @param {string} filepath - The absolute file path.
+   * @returns {Promise<string>} The file content.
+   */
+  getFileContentByPath = async (filepath) => {
+    const fileHandle = await this.getFileHandleByPath(filepath);
+    const file = await fileHandle.getFile();
+    const content = await file.text();
+    return content;
+  }
+
+  /**
+   * Get all folder handles inside a given folder path.
+   *
+   * @async
+   * @param {string} folderpath - The absolute folder path to search in.
+   * @returns {Promise<FileSystemDirectoryHandle[]>} Array of folder handles.
+   */
+  findFoldersInFolder = async (folderpath) => {
+    await this.ready();
+
+    // Obtain the folder handle recursively.
+    const folderHandle = await this.getFolderHandleByPath(folderpath);
+
+    // Gather all subfolder handles.
+    const subfolders = [];
+    for await (let handle of folderHandle.values()) {
+      if (handle.kind === 'directory') {
+        subfolders.push(handle);
+      }
+    }
+
+    return subfolders;
+  }
+
+  /**
+   * Get all file handles inside a given path.
+   *
+   * @async
+   * @param {string} folderpath - The absolute folder path to search in.
+   * @returns {Promise<FileSystemFileHandle[]>} Array of file handles.
+   */
+  findFilesInFolder = async (folderpath) => {
+    await this.ready();
+
+    // Obtain the folder handle recursively.
+    const folderHandle = await this.getFolderHandleByPath(folderpath);
+
+    // Gather all subfile handles.
+    const subfiles = [];
+    for await (let handle of folderHandle.values()) {
+      if (handle.kind === 'file') {
+        subfiles.push(handle);
+      }
+    }
+
+    return subfiles;
+  }
+
+  /**
    * Get the absolute file path of a file.
    *
    * @param {string} fileId - The file id.
@@ -290,197 +465,257 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Create a new file in the virtual filesystem.
+   * Create a new file.
    *
    * @param {object} fileObj - The file object to create.
+   * @param {string} [fileObj.path] - The name of the file. Leave empty to
+   * create a new Untitled file in the root directory.
+   * @param {string} [fileObj.content] - The content of the file.
    * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
-   * @returns {object} The new file object.
+   * @returns {FileSystemFileHandle} The new file handle.
    */
-  createFile = (fileObj, isUserInvoked = true) => {
-    const newFile = {
-      id: uuidv4(),
-      name: 'Untitled',
-      parentId: null,
-      content: '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      ...fileObj,
-    };
+  createFile = async (fileObj, isUserInvoked = true) => {
+    await this.ready();
+
+    const { path, content } = fileObj;
+
+    const parts = path ? path.split('/') : [];
+    let name = path ? parts.pop() : 'Untitled';
+    const parentPath = parts.join('/');
+
+    let parentFolderHandle = parentPath
+      ? await this.getFolderHandleByPath(parentPath)
+      : this.rootHandle;
 
     // Ensure a unique file name.
-    while (this.existsWhere({ parentId: newFile.parentId, name: newFile.name })) {
-      newFile.name = this._incrementString(newFile.name);
+    while ((await this.pathExists(name, parentFolderHandle))) {
+      name = this._incrementString(name);
     }
 
-    this.files[newFile.id] = newFile;
-    newFile.path = this.getAbsoluteFilePath(newFile.id);
+    const newFileHandle = await parentFolderHandle.getFileHandle(name, { create: true });
+
+    if (content) {
+      const writable = await newFileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+    }
 
     if (isUserInvoked) {
-      this.dispatchEvent(new CustomEvent('fileCreated', {
-        detail: { file: newFile },
-      }));
+      // TODO: migrate this.
+      // this.dispatchEvent(new CustomEvent('fileCreated', {
+      //   detail: { file: newFileHandle },
+      // }));
     }
 
-    this.saveState();
-    return newFile;
+    return newFileHandle;
   }
 
   /**
-   * Create a new folder in the virtual filesystem.
+   * Check if a given path exists, either as a file or a folder.
    *
-   * @param {object} folderObj - The folder object to create.
-   * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
-   * @returns {object} The new folder object.
+   * @async
+   * @param {string} path - The path to check.
+   * @param {string|FileSystemDirectoryHandle} [parentFolder] - Check whether
+   * the path exists in this folder. Defaults to the root folder handle. Either
+   * the absolute folder path or a FileSystemDirectoryHandle can be provided.
+   * @returns {Promise<boolean>} True if the path exists, false otherwise.
    */
-  createFolder = (folderObj, isUserInvoked = true) => {
-    const newFolder = {
-      id: uuidv4(),
-      name: 'Untitled',
-      parentId: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      ...folderObj,
-    };
+  pathExists = async (path, parentFolder = null) => {
+    await this.ready();
 
-    // Ensure the folder name is unique.
-    while (this.existsWhere({ parentId: newFolder.parentId, name: newFolder.name })) {
-      newFolder.name = this._incrementString(newFolder.name);
+    let parentFolderHandle = this.rootHandle;
+    if (typeof parentFolder === 'string') {
+      parentFolderHandle = await this.getFolderHandleByPath(parentFolder);
+    } else if (parentFolder instanceof FileSystemDirectoryHandle) {
+      parentFolderHandle = parentFolder;
     }
 
-    this.folders[newFolder.id] = newFolder;
-    newFolder.path = this.getAbsoluteFolderPath(newFolder.id);
+    if (!parentFolderHandle) {
+      parentFolderHandle = this.rootHandle;
+    }
+
+    const parts = path.split('/');
+    const last = parts.pop();
+
+    // Check if the parent folders exist.
+    let currentHandle = parentFolderHandle;
+    for (const part of parts) {
+      try {
+        currentHandle = await currentHandle.getDirectoryHandle(part, { create: false });
+      } catch {
+        // If the handle does not exist, return false.
+        return false;
+      }
+    }
+
+    // At this point, we know the parent folder exists.
+    // The last part of the path could be either file or folder, so we just
+    // iterate over each entry and check if it exists.
+    for await (let name of currentHandle.keys()) {
+      if (name === last) {
+        // If the entry exists, return true.
+        return true;
+      }
+    }
+
+    // If we reach here, the entry does not exist.
+    return false;
+  }
+
+  /**
+   * Create a new folder.
+   *
+   * @param {object} folderpath - The path where the new folder will be created.
+   * Leave empty to create a new Untitled folder in the root directory.
+   * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
+   * @returns {FileSystemDirectoryHandle} The new folder handle.
+   */
+  createFolder = async (folderpath, isUserInvoked = true) => {
+    const parts = folderpath ? folderpath.split('/') : [];
+    let name = folderpath ? parts.pop() : 'Untitled';
+    const parentPath = parts.join('/');
+
+    let parentFolderHandle = parentPath
+      ? await this.getFolderHandleByPath(parentPath)
+      : this.rootHandle;
+
+    // Ensure a unique folder name.
+    while ((await this.pathExists(name, parentFolderHandle))) {
+      name = this._incrementString(name);
+    }
+
+    const newFolderHandle = await parentFolderHandle.getDirectoryHandle(name, { create: true });
 
     if (isUserInvoked) {
-      this.dispatchEvent(new CustomEvent('folderCreated', {
-        detail: { folder: newFolder },
-      }));
+      // TODO: migrate this.
+      // this.dispatchEvent(new CustomEvent('folderCreated', {
+      //   detail: { folder: newFolderHandle },
+      // }));
     }
 
-    this.saveState();
-    return newFolder;
+    return newFolderHandle;
   }
 
   /**
    * Update a file in the virtual filesystem.
    *
-   * @param {string} id - The file id.
-   * @param {object} values - Key-value pairs to update in the file object.
+   * @param {string} path - The file path.
+   * @param {object} content - The new content of the file.
    * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
-   * @returns {object} The updated file object.
+   * @returns {FileSystemFileHandle} The updated file handle.
    */
-  updateFile = async (id, values, isUserInvoked = true) => {
-    const file = this.findFileById(id);
-    if (!file) return;
+  updateFileContent = async (path, content, isUserInvoked = true) => {
+    const fileHandle = await this.getFileHandleByPath(path);
 
-    const oldPath = file.path;
-
-    // These extra checks is needed because in the UI, the user can trigger a
-    // rename but not actually change the name.
-    const isRenamed = typeof values.name === 'string' && file.name !== values.name;
-    const isMoved = typeof values.parentId !== 'undefined' && file.parentId !== values.parentId;
-    const isContentChanged = typeof values.content === 'string' && file.content !== values.content;
-
-    if (isRenamed || isMoved) {
-      this.dispatchEvent(new CustomEvent('beforeFileMoved', {
-        detail: { file, values },
-      }));
+    if (content) {
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
     }
 
-    for (const [key, value] of Object.entries(values)) {
-      if (file.hasOwnProperty(key) && key !== 'id') {
-        file[key] = value;
-      }
-    }
+    return fileHandle;
 
-    file.path = this.getAbsoluteFilePath(file.id);
-    file.updatedAt = new Date().toISOString();
+    // TODO: migrate this.
+    // if (isUserInvoked) {
+    //   this.dispatchEvent(new CustomEvent('fileContentChanged', {
+    //     detail: { file: fileHandle },
+    //   }));
+    // }
+  }
 
-    if (isRenamed || isMoved) {
-      // Move the file to the new location.
-      this.dispatchEvent(new CustomEvent('fileMoved', {
-        detail: { file, oldPath },
-      }));
-    }
+  /**
+   * Move a file from a source path to a destination path.
+   *
+   * @example moveFile('folder1/myfile.txt', 'folder2/myfile.txt')
+   *
+   * @async
+   * @param {string} srcPath - The source path of the file to move.
+   * @param {string} destPath - The destination path where the file should be moved to.
+   * @returns {Promise<FileSystemFileHandle>} The new file handle at the destination path.
+   */
+  moveFile = async (srcPath, destPath) => {
+    await this.ready();
 
-    if (isContentChanged && isUserInvoked) {
-      this.dispatchEvent(new CustomEvent('fileContentChanged', {
-        detail: { file },
-      }));
-    }
+    const srcFileContent = await this.getFileContentByPath(srcPath);
 
-    this.saveState();
+    // Create the file in the new destination path.
+    const newFileHandle = await this.createFile({
+      path: destPath,
+      content: srcFileContent,
+    });
 
-    return file;
+    // Delete the old file.
+    await this.deleteFile(srcPath);
+
+    return newFileHandle;
   }
 
   /**
    * Update a folder in the virtual filesystem.
    *
-   * @param {string} id - The folder id.
-   * @param {object} values - Key-value pairs to update in the folder object.
-   * @returns {object} The updated folder object.
+   * Move folder2 from folder1 to folder3
+   * @example moveFolder('folder1/folder2', 'folder3/folder2')
+   *
+   * @param {string} srcPath - The absolute path of the source folder.
+   * @param {string} destPath - The absolute path where the source folder should be moved to.
+   * @returns {Promise<FileSystemDirectoryHandle>} The new folder handle at the destination path.
    */
-   updateFolder = async (id, values) => {
-    const folder = this.findFolderById(id);
-    if (!folder) return;
-
-    const oldPath = folder.path;
-
-    // This extra check is needed because in the UI, the user can trigger a
-    // rename but not actually change the name.
-    const isRenamed = typeof values.name === 'string' && folder.name !== values.name;
-    const isMoved = typeof values.parentId !== 'undefined' && folder.parentId !== values.parentId;
-
-    if (isRenamed || isMoved) {
-      this.dispatchEvent(new CustomEvent('beforeFolderMoved', {
-        detail: { folder, values },
-      }));
+  moveFolder = async (srcPath, destPath) => {
+    // Move all files inside the folder to the new destination path.
+    const files = await this.findFilesInFolder(srcPath);
+    for (const file of files) {
+      const filePath = `${srcPath}/${file.name}`;
+      const newFilePath = destPath ? `${destPath}/${file.name}` : file.name;
+      await this.moveFile(filePath, newFilePath);
     }
 
-    for (const [key, value] of Object.entries(values)) {
-      if (folder.hasOwnProperty(key) && key !== 'id') {
-        folder[key] = value;
-      }
+    const folders = await this.findFoldersInFolder(srcPath);
+    for (const folder of folders) {
+      const folderPath = `${srcPath}/${folder.name}`;
+      const newFolderPath = destPath ? `${destPath}/${folder.name}` : folder.name;
+      await this.moveFolder(folderPath, newFolderPath);
     }
 
-    folder.path = this.getAbsoluteFolderPath(folder.id);
-    folder.updatedAt = new Date().toISOString();
+    // Delete source folder recursively.
+    await this.deleteFolder(srcPath);
 
-    // Update all nested files and folders recursively with the new path.
-    this._updateFolderSubPaths(id);
+    // Get the new folder handle at the destination path.
+    const newFolderHandle = await this.getFolderHandleByPath(destPath);
 
-    if (isRenamed || isMoved) {
-      this.dispatchEvent(new CustomEvent('folderMoved', {
-        detail: { folder, oldPath },
-      }));
-    }
+    // TODO: migrate this.
+    // this.dispatchEvent(new CustomEvent('folderMoved', {
+    //   detail: { folder, oldPath },
+    // }));
 
-    this.saveState();
-
-    return folder;
+    return newFolderHandle;
   }
 
   /**
-   * Delete a file from the virtual filesystem.
+   * Delete a file.
    *
-   * @param {string} id - The file id.
+   * @param {string} id - The path of the file to delete.
    * @param {boolean} [isSingleFileDelete] - whether this function is called for
    * a single file or is called from the `deleteFolder` function.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFile = (id, isSingleFileDelete = true) => {
-    const file = this.findFileById(id);
-    if (file) {
-      this.dispatchEvent(new CustomEvent('beforeFileDeleted', {
-        detail: { file, isSingleFileDelete },
-      }));
+  deleteFile = async (path, isSingleFileDelete = true) => {
+    await this.ready();
 
-      delete this.files[id];
-      this.saveState();
-      return true;
+    if (!(await this.pathExists(path))) {
+      return false;
     }
 
-    return false;
+    // TODO: migrate this.
+    // this.dispatchEvent(new CustomEvent('beforeFileDeleted', {
+    //   detail: { file, isSingleFileDelete },
+    // }));
+
+    const parts = path.split('/');
+    const filename = parts.pop();
+    const parentPath = parts.join('/');
+    const parentHandle = await this.getFolderHandleByPath(parentPath);
+    await parentHandle.removeEntry(filename);
+    return true;
   }
 
   /**
@@ -491,34 +726,42 @@ export default class VirtualFileSystem extends EventTarget {
    * subsequent calls will have it set to false, because we don't want to remove
    * the those nested files by ourselves.
    *
-   * @param {string} id - The folder id.
+   * @param {string} path - The folder path to delete.
    * @param {boolean} [isRootFolder] - Whether it is the root folder.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFolder = (id, isRootFolder = true) => {
-    // Delete all the files inside the current folder.
-    const files = this.findFilesWhere({ parentId: id });
+  deleteFolder = async (path, isRootFolder = true) => {
+    if (!(await this.pathExists(path, this.rootHandle))) {
+      return false;
+    }
+
+    // TODO: migrate this.
+    // this.dispatchEvent(new CustomEvent('beforeFolderDeleted', {
+    //   detail: { folder: this.folders[id], isRootFolder },
+    // }));
+
+    // Gather all subfiles and trigger a deleteFile on them.
+    const files = await this.findFilesInFolder(path);
     for (const file of files) {
-      this.deleteFile(file.id, false);
+      const filepath = `${path}/${file.name}`;
+      await this.deleteFile(filepath, false);
     }
 
     // Delete all the nested folders inside the current folder.
-    const folders = this.findFoldersWhere({ parentId: id });
+    const folders = await this.findFoldersInFolder(path);
     for (const folder of folders) {
-      this.deleteFolder(folder.id, false);
+      const folderpath = `${path}/${folder.name}`;
+      await this.deleteFolder(folderpath, false);
     }
 
-    if (this.folders[id]) {
-      this.dispatchEvent(new CustomEvent('beforeFolderDeleted', {
-        detail: { folder: this.folders[id], isRootFolder },
-      }));
+    // Finally, delete the folder itself from OPFS recursively.
+    const parts = path.split('/');
+    const foldername = parts.pop();
+    const parentPath = parts.join('/');
+    const parentFolderHandle = await this.getFolderHandleByPath(parentPath);
+    await parentFolderHandle.removeEntry(foldername, { recursive: true });
 
-      delete this.folders[id];
-      this.saveState();
-      return true;
-    }
-
-    return false;
+    return true;
   }
 
   /**

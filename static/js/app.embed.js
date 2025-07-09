@@ -60,12 +60,12 @@ export default class EmbedApp extends App {
 
   postSetupLayout() {
     // Listen for the content of the file to be received.
-    window.addEventListener('message', (event) => {
+    window.addEventListener('message', async (event) => {
       const editorComponent = this.layout.getActiveEditor();
-      const { fileId } = editorComponent.getState();
+      const path = editorComponent.getPath();
       const content = removeIndent(event.data);
       if (content) {
-        this.vfs.updateFile(fileId, { content });
+        await this.vfs.updateFileContent(path, content);
         editorComponent.setContent(content);
       }
     });

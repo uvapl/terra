@@ -105,7 +105,7 @@ export default class App {
     ];
 
     editorEvents.forEach((eventName) => {
-      this.layout.addEventListener(eventName, (event) => {
+      this.layout.addEventListener(eventName, async (event) => {
         const { tabComponent } = event.detail;
         if (typeof this[eventName] === 'function') {
           this[eventName](tabComponent);
@@ -130,15 +130,12 @@ export default class App {
    * This is default functionality and super.onEditorChange() must be
    * called first in child classes before any additional functionality.
    *
+   * @async
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  onEditorChange(editorComponent) {
-    const { fileId } = editorComponent.getState();
-    if (fileId) {
-      this.vfs.updateFile(fileId, {
-        content: editorComponent.getContent(),
-      });
-    }
+  async onEditorChange(editorComponent) {
+    const path = editorComponent.getPath();
+    await this.vfs.updateFileContent(path, editorComponent.getContent());
   }
 
   /**
@@ -149,27 +146,12 @@ export default class App {
    *
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  onEditorShow(editorComponent) {
-    // If we ran into a layout state from localStorage that doesn't have
-    // a file ID, or the file ID is not the same, then we should sync the
-    // filesystem ID with this tab state's file ID. We can only do this for
-    // non-IDE versions, because the ID always uses IDs properly and can have
-    // multiple filenames. It can be assumed that both the exam and iframe will
-    // not have duplicate filenames.
-    if (!IS_IDE) {
-      const filename = editorComponent.getFilename();
-      const file = this.vfs.findFileWhere({ name: filename });
-      const { fileId } = editorComponent.getState();
-      if (!fileId || (file && fileId !== file.id)) {
-        editorComponent.extendState({ fileId: file.id });
-      }
-    }
-
+  async onEditorShow(editorComponent) {
     if (editorComponent.ready) {
       this.createLangWorker(editorComponent.proglang);
     }
 
-    this.setEditorFileContent(editorComponent);
+    await this.setEditorFileContent(editorComponent);
   }
 
 
@@ -180,9 +162,9 @@ export default class App {
    *
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  onEditorVFSChanged(editorComponent) {
+  async onEditorVFSChanged(editorComponent) {
     if (!Terra.v.blockLFSPolling) {
-      this.setEditorFileContent(editorComponent, true);
+      await this.setEditorFileContent(editorComponent, true);
     }
   }
 
@@ -201,13 +183,12 @@ export default class App {
   /**
    * Reload the file content either from VFS or LFS.
    *
+   * @async
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  setEditorFileContent(editorComponent) {
-    const file = this.vfs.findFileById(editorComponent.getState().fileId);
-    if (!file) return;
-
-    editorComponent.setContent(file.content);
+  async setEditorFileContent(editorComponent) {
+    const content = await this.vfs.getFileContentByPath(editorComponent.getPath());
+    editorComponent.setContent(content);
   }
 
   /**

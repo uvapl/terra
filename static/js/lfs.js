@@ -422,7 +422,7 @@ export default class LocalFileSystem {
     if (!db.objectStoreNames.contains(this.FOLDER_HANDLES_STORE_NAME)) {
       db.createObjectStore(this.FOLDER_HANDLES_STORE_NAME);
     }
-  };
+  }
 
   /**
    * Opens a request to the IndexedDB.
@@ -800,7 +800,7 @@ export default class LocalFileSystem {
       await parentFolderHandle.handle.removeEntry(folder.name, { recursive: true });
 
       // Move the folder in VFS.
-      // Do not use `VFS.updateFolder()` to prevent recursion.
+      // Do not use `VFS.moveFolder()` to prevent recursion.
       folder.parentId = newParentId;
       folder.path = this.vfs.getAbsoluteFolderPath(folder.id);
 

@@ -226,7 +226,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   /**
    * Invoked when the terminal tab is created for the first time.
    *
-   * @param {ContentItem} tab - The tab instance that has been created.
+   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
    */
   onTermTabCreated(tab) {
     this.term = tab.contentItem.instance;
@@ -238,7 +238,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   /**
    * Invoked when an image is opened.
    *
-   * @param {ContentItem} tab - The tab instance that has been created.
+   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
    */
   onImageTabCreated(tab) {
     const imageComponent = tab.contentItem.instance;
@@ -265,7 +265,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   /**
    * Invoked when a text file is opened.
    *
-   * @param {ContentItem} tab - The tab instance that has been created.
+   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
    */
   onEditorTabCreated(tab) {
     const editorComponent = tab.contentItem.instance;
@@ -299,8 +299,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * Try to register a given tab instance to the internal tabs list of this
    * class instance.
    *
-   * @param {[TODO:type]} tab - [TODO:description]
-   * @returns {[TODO:type]} [TODO:description]
+   * @param {GoldenLayout.Tab} tab - The tab instance to register.
    */
   registerTab(tab) {
     // If the current active tab is not set, set it to the current tab.
@@ -313,10 +312,10 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
     // The onTabCreated is *also* triggered when a user is dragging tabs around,
     // thus if the tab is already in the list, we return early.
-    const newTabFileId = tab.contentItem.instance.getState().fileId;
+    const newTabFilepath = tab.contentItem.instance.getPath();
     const tabExists = this.tabs.some((existingTab) => {
-      const { fileId } = existingTab.contentItem.instance.getState();
-      return fileId === newTabFileId;
+      const path = existingTab.contentItem.instance.getPath();
+      return path === newTabFilepath;
     });
     if (tabExists) return;
 

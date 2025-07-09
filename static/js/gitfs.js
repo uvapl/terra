@@ -383,63 +383,21 @@ export default class GitFS {
    * @async
    */
   importToVFS = async (repoContents) => {
-    // Preserve all currently open tabs after refreshing.
-    // We first obtain the current filepaths before clearing the VFS.
-    const tabs = {};
-    Terra.app.layout.getTabComponents().forEach((tabComponent) => {
-      const { fileId } = tabComponent.getState();
-      if (fileId) {
-        const { path } = this.vfs.findFileById(fileId);
-        tabs[path] = tabComponent;
-      }
-    });
+    // Remove all files from the VFS.
+    await this.vfs.clear();
 
-    // Remove all files from the virtual filesystem.
-    this.vfs.clear();
-
-    // First create all root files.
-    repoContents
-      .filter((file) => file.type === 'blob' && !file.path.includes('/'))
-      .forEach(async (file) => {
-        this.vfs.createFile({
-          name: file.path.split('/').pop(),
-          sha: file.sha,
-          isNew: false,
+    // Create all files in the VFS.
+    await Promise.all(
+      repoContents
+        .filter((file) => file.type === 'blob')
+        .map((file) => this.vfs.createFile({
+          path: file.path,
+          // sha: file.sha,     --> TODO: save this sha in GitFS class.
           content: file.content,
-        }, false);
-      });
+        }, false))
+    );
 
-    // Then create all root folders and their nested files.
-    repoContents
-      .filter((fileOrFolder) => !(fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/')))
-      .forEach((fileOrFolder) => {
-        const { sha } = fileOrFolder;
-        const path = fileOrFolder.path.split('/');
-        const name = path.pop();
-
-        const parentId = path.length > 0 ? this.vfs.findFolderByPath(path.join('/')).id : null;
-
-        if (fileOrFolder.type === 'tree') {
-          this.vfs.createFolder({ name, parentId, sha });
-        } else if (fileOrFolder.type === 'blob') {
-          this.vfs.createFile({
-            name,
-            parentId,
-            sha,
-            content: fileOrFolder.content,
-          }, false);
-        }
-      });
-
-    // Finally, we sync the current tabs with their new file IDs.
-    for (const [filepath, tabComponent] of Object.entries(tabs)) {
-      const file = this.vfs.findFileByPath(filepath);
-      if (file) {
-        tabComponent.extendState({ fileId: file.id });
-        Terra.app.layout.emitToAllComponents('vfsChanged');
-      }
-    }
-
-    this.vfs.saveState();
+    // Trigger a vfsChanged event, such that all editors reload their content.
+    Terra.app.layout.emitToAllComponents('vfsChanged');
   }
 }
