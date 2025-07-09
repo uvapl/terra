@@ -2,6 +2,8 @@
 // Licensed under the Apache License 2.0. See LICENSE.wasm-clang for details.
 
 import BaseAPI from './base-api.js';
+import { CLANG_C_FLAGS, CLANG_LD_FLAGS } from '../ide/constants.js';
+import { makeCmdPlaceholder } from '../ide/helpers.js';
 
 function readStr(u8, o, len = -1) {
   let str = '';
@@ -479,6 +481,7 @@ class API extends BaseAPI {
   constructor(options) {
     super(options);
     this.moduleCache = {};
+    this.hostWriteError = options.hostWriteError;
     this.readBuffer = options.readBuffer;
     this.sharedMem = options.sharedMem;
     this.hostRead = options.hostRead;
@@ -487,13 +490,8 @@ class API extends BaseAPI {
     this.lldFilename = options.lld || 'lld';
     this.sysrootFilename = options.sysroot || 'sysroot.tar';
 
-    this.cflags = [
-      '-O0', '-std=c11', '-O0', '-Wall', '-Werror', '-Wextra',
-      '-Wno-unused-variable', '-Wno-sign-compare', '-Wno-unused-parameter',
-      '-Wshadow', '-D_XOPEN_SOURCE'
-    ];
-
-    this.ldflags = ['-lc', '-lcs50'];
+    this.cflags = CLANG_C_FLAGS;
+    this.ldflags = CLANG_LD_FLAGS;
 
     this.memfs = new MemFS({
       compileStreaming: this.compileStreaming,
@@ -565,18 +563,18 @@ class API extends BaseAPI {
     ]);
   }
 
-  async link(obj, wasm) {
+  async link(objs, wasm) {
     const stackSize = 1024 * 1024;
-
     const libdir = 'lib/wasm32-wasi';
     const crt1 = `${libdir}/crt1.o`;
+
     await this.ready;
     const lld = await this.getModule(this.lldFilename);
     return await this.run([
       lld, 'wasm-ld', '--no-threads',
       '--export-dynamic',
       '-z', `stack-size=${stackSize}`,
-      `-L${libdir}`, crt1, obj, ...this.ldflags,
+      `-L${libdir}`, crt1, ...objs, ...this.ldflags,
       '-o', wasm,
     ]);
   }
@@ -584,48 +582,75 @@ class API extends BaseAPI {
   async run(cmd) {
     const [module, ...args] = cmd;
     const app = new App(module, this.memfs, ...args);
-    // app.argv = ["program_name", "test1", "test2"];
-    // app.argc = app.argv.length;
     const stillRunning = await app.run();
     return stillRunning ? app : null;
   }
 
-  async runUserCode({ activeTabName, files, args }) {
-    // Apart from the current tab's file, write all files to memfs.
-    //
-    // TODO: Just write all files here and do not exclude the current active
-    // tab's file. This will be fixed when custom compile support is added.
-    files.filter(file => file.name !== activeTabName).map((file) => {
-      this.memfs.addFile(file.name, file.content);
-    });
+  /**
+   * Run the user's code and print the output to the terminal.
+   *
+   * @param {object} data - The data object coming from the worker.
+   * @param {string} data.activeTabName - The name of the active editor tab.
+   * @param {array} data.vfsFiles - List of all file objects from the VFS, each
+   * containing the filename and content of the corresponding editor tab.
+   * @param {array} data.runAsConfig - The configuration for run-code button.
+   */
+  async runUserCode({ activeTabName, vfsFiles, runAsConfig }) {
+    const srcFilenames = runAsConfig
+      ? runAsConfig.compileSrcFilenames
+      : [activeTabName];
+    console.log('1')
 
-    const { name: filename, content } = files.find(file => file.name === activeTabName);
-    const basename = filename.replace(/\.c$/, '');
-    const input = `${basename}.cc`;
-    const obj = `${basename}.o`;
-    const wasm = `${basename}.wasm`;
+    const srcFiles = runAsConfig
+      ? vfsFiles.filter((file) => srcFilenames.includes(file.path))
+      : vfsFiles.filter((file) => file.name === activeTabName);
 
-    if (!Array.isArray(args)) {
-      args = [];
+    const target = runAsConfig ? runAsConfig.compileTarget : activeTabName.replace(/\.c$/, '');
+    const wasm = `${target}.wasm`;
+    const objectFiles = [];
+
+    this.hostWriteCmd(`make ${target}`);
+    this.hostWrite(makeCmdPlaceholder(srcFilenames, target) + '\n');
+
+    // The user could misspell the srcFilenames, which results in srcFiles being
+    // an empty list.
+    if (runAsConfig && srcFiles.length === 0) {
+      const incorrectFiles = srcFilenames
+        .filter((file) => !vfsFiles.includes(file.name))
+        .join(', ');
+
+      this.hostWriteError(`Error: The following files do not exist: ${incorrectFiles}\n`);
+      this.runUserCodeCallback();
+      return;
     }
 
-    this.hostWriteCmd(`make ${basename}`);
+    for (const file of srcFiles) {
+      if (!file.name.endsWith('.c')) {
+        continue;
+      }
 
-    // Make a custom command placeholder without all the unnecessary
-    // additional flags needed for wasm.
-    const cmdPlaceholder = [
-      'clang', ...this.cflags,
-      '-o', basename, `${basename}.c`,
-      ...this.ldflags,
-    ];
-    this.hostWrite(cmdPlaceholder.join(' ') + '\n');
+      // Make parent dirs before creating the final file inside it.
+      const parentFoldersPath = file.path.split('/').slice(0, -1).join('/');
+      if (parentFoldersPath) {
+        this.memfs.addDirectory(parentFoldersPath);
+      }
+
+      const basename = file.path.replace(/\.c$/, '');
+      const input = `${basename}.cc`;
+      const obj = `${basename}.o`;
+      this.memfs.addFile(input, file.content);
+      await this.compile({ input, content: file.content, obj });
+      objectFiles.push(obj);
+    }
+
+    await this.link(objectFiles, wasm);
+
+    const buffer = this.memfs.getFileContents(wasm);
+    const testMod = await WebAssembly.compile(buffer);
+    const args = runAsConfig ? runAsConfig.args : [];
+    this.hostWriteCmd(`./${target} ${(args).join(' ')}`);
 
     try {
-      await this.compile({ input, content, obj });
-      await this.link(obj, wasm);
-      const buffer = this.memfs.getFileContents(wasm);
-      const testMod = await WebAssembly.compile(buffer)
-      this.hostWriteCmd(`./${basename} ${args.join(' ')}`)
       return await this.run([testMod, wasm, ...args]);
     } finally {
       this.runUserCodeCallback();
@@ -638,7 +663,6 @@ class API extends BaseAPI {
 // =============================================================================
 
 let api;
-let port;
 let currentApp = null;
 
 const onAnyMessage = async event => {
@@ -661,6 +685,10 @@ const onAnyMessage = async event => {
 
         hostWrite(s) {
           port.postMessage({ id: 'write', data: s });
+        },
+
+        hostWriteError(s) {
+          port.postMessage({ id: 'write-error', data: s });
         },
 
         hostRead() {

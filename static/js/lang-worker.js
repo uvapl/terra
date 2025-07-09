@@ -164,16 +164,16 @@ export default class LangWorker {
    * Triggers the `runUserCode` event in the currently active worker.
    *
    * @param {string} activeTabName - The name of the currently active tab.
-   * @param {array} files - List of objects, each containing the filename
+   * @param {array} vfsFiles - List of objects, each containing the filename
    * and content of the corresponding editor tab.
-   * @param {array} args - List of arguments to pass to the file.
+   * @param {array} runAsConfig - Configuration object for the run-as command.
    */
-  runUserCode(activeTabName, files, args) {
+  runUserCode(activeTabName, vfsFiles, runAsConfig) {
     this.isRunningCode = true;
 
     this.port.postMessage({
       id: 'runUserCode',
-      data: { activeTabName, files, args },
+      data: { activeTabName, vfsFiles, runAsConfig },
     });
   }
 
@@ -331,6 +331,10 @@ export default class LangWorker {
         } catch (e) {
           Terra.app.termClearWriteBuffer();
         }
+        break;
+
+      case 'write-error':
+        Terra.app.termWrite(`\x1b[1;31m${event.data.data}\x1b[0m`);
         break;
 
       // Stdin callback from the worker instance. When the worker requests user

@@ -295,17 +295,17 @@ class API extends BaseAPI {
    *
    * @param {object} data - The data object coming from the worker.
    * @param {string} data.activeTabName - The name of the active editor tab.
-   * @param {array} data.files - List of objects, each containing the filename
-   * and content of the corresponding editor tab.
+   * @param {array} data.vfsFiles - List of all file objects from the VFS, each
+   * containing the filename and content of the corresponding editor tab.
    */
-  runUserCode({ activeTabName, files }) {
+  runUserCode({ activeTabName, vfsFiles }) {
     try {
       // Ensure that we always operate from the home directory as a fresh start.
       this.pyodide.FS.chdir(HOME_DIR);
 
-      this.writeFilesToVirtualFS(files);
+      this.writeFilesToVirtualFS(vfsFiles);
 
-      const activeTab = files.find(file => file.name === activeTabName);
+      const activeTab = vfsFiles.find((file) => file.name === activeTabName);
       if (activeTab.path.includes('/')) {
         // change directory to the folder of the active file
         const folderpath = activeTab.path.split('/').slice(0, -1).join('/');
@@ -323,9 +323,9 @@ class API extends BaseAPI {
       // might have changed during execution.
       this.pyodide.FS.chdir(HOME_DIR);
 
-      const newFiles = this.checkForNewFiles(files);
+      const newFiles = this.checkForNewFiles(vfsFiles);
 
-      this.deleteFilesFromVirtualFS(files);
+      this.deleteFilesFromVirtualFS(vfsFiles);
 
       if (newFiles.length > 0) {
         this.newOrModifiedFilesCallback(newFiles);
