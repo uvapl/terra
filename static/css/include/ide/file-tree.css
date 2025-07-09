@@ -12,6 +12,10 @@
   flex-direction: column;
 }
 
+.file-tree {
+  overflow-y: auto;
+}
+
 .file-tree-container .info-msg {
   padding: var(--file-tree-padding);
 }
@@ -88,8 +92,6 @@
 
 .fancytree-container {
   outline: 0;
-  height: 100%;
-  overflow: auto;
   list-style: none;
   margin: 0;
   padding: 0 var(--file-tree-padding);
@@ -237,10 +239,10 @@
  *  Local storage warning
  * ========================================================================== */
 .local-storage-warning {
-  position: absolute;
+  position: fixed;
   bottom: 0;
   left: 0;
-  right: 0;
+  width: var(--file-tree-width);
   padding: var(--file-tree-padding);
   border-top: 1px solid var(--border-color);
   background-color: #ffffeb;
@@ -263,4 +265,30 @@
 
 .localstorage-mode {
   padding-bottom: 130px;
+}
+
+/* ==========================================================================
+ *  Bottom messages at the file tree.
+ * ========================================================================== */
+.file-tree-container.has-bottom-msg  {
+  padding-bottom: 40px;
+}
+
+.file-tree-bottom-msg {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: var(--file-tree-width);
+  padding: var(--file-tree-padding);
+  border-top: 1px solid var(--border-color);
+  background-color: var(--color-white);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-tree-bottom-msg p {
+  margin: 0;
+  font-size: 12px;
 }

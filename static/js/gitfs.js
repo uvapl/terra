@@ -39,6 +39,18 @@ export default class GitFS {
     this._repoLink = repoLink;
 
     this.bindVFSEvents();
+    this.bindPageReloadEvent();
+  }
+
+  bindPageReloadEvent = () => {
+    $(window).on('beforeunload', (e) => {
+      if (fileTreeManager.hasBottomMsg()) {
+        const message = 'The app is currently syncing changes to GitHub. Are you sure you want to reload the page?';
+        e.preventDefault();
+        e.returnValue = message;
+        return message;
+      }
+    });
   }
 
   bindVFSEvents = () => {
@@ -95,7 +107,7 @@ export default class GitFS {
       const filename = file.path.split('/').pop();
       return {
         oldPath: `${oldPath}/${filename}`,
-        newPath,
+        newPath: file.path,
         content: file.content,
         sha: file.sha,
       }
@@ -257,7 +269,7 @@ export default class GitFS {
         break;
 
       // Triggered for primary and secondary rate limit.
-      case 'rate-limit':
+      case 'rate-limit': {
         const retryAfter = Math.ceil(payload.retryAfter / 60);
         $('#file-tree').html('<div class="info-msg error">Exceeded GitHub API limit.</div>');
 
@@ -283,6 +295,7 @@ export default class GitFS {
 
         $modal.find('.primary-btn').click(() => hideModal($modal));
         break;
+      }
 
       case 'fetch-branches-success':
         // Import the renderGitRepoBranches dynamically, because if we put this
@@ -348,6 +361,14 @@ export default class GitFS {
         // Update the file's sha in the VFS.
         const file = this.vfs.findFileByPath(payload.filepath);
         file.sha = payload.sha;
+        break;
+
+      case 'queue-busy':
+        fileTreeManager.showBottomMsg('Syncing changes to GitHub...');
+        break;
+
+      case 'queue-done':
+        fileTreeManager.removeBottomMsg();
         break;
     }
   }

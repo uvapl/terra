@@ -30,6 +30,7 @@ export function createModal(modalOptions = {}) {
   }
 
   const footerClasses = ['modal-footer'].concat(modalOptions.footerClass || []).join(' ');
+  const footer = modalOptions.footer ? `<div class="${footerClasses}">${modalOptions.footer}</div>` : '';
 
   const html = `
     <div ${attrsString} tabindex="-1">
@@ -38,7 +39,7 @@ export function createModal(modalOptions = {}) {
           <p class="modal-title">${modalOptions.title}</p>
         </div>
         <div class="modal-body">${modalOptions.body}</div>
-        <div class="${footerClasses}">${modalOptions.footer}</div>
+        ${footer}
       </div>
     </div>
   `;

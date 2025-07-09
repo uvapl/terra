@@ -446,6 +446,9 @@ export default class VirtualFileSystem extends EventTarget {
     folder.path = this.getAbsoluteFolderPath(folder.id);
     folder.updatedAt = new Date().toISOString();
 
+    // Update all nested files and folders recursively with the new path.
+    this._updateFolderSubPaths(id);
+
     if (isRenamed || isMoved) {
       this.dispatchEvent(new CustomEvent('folderMoved', {
         detail: { folder, oldPath },
@@ -574,5 +577,25 @@ export default class VirtualFileSystem extends EventTarget {
     zip.generateAsync({ type: 'blob' }).then((content) => {
       saveAs(content, `${folder.name}.zip`);
     });
+  }
+
+  /**
+   * Update the nested paths of all files and folders inside a folder.
+   *
+   * @param {string} folderId - The folder id to update.
+   */
+  _updateFolderSubPaths = (folderId) => {
+    // Update all files in the folder.
+    const files = this.findFilesWhere({ parentId: folderId });
+    for (const file of files) {
+      file.path = this.getAbsoluteFilePath(file.id);
+    }
+
+    // Update all nested folders recursively.
+    const folders = this.findFoldersWhere({ parentId: folderId });
+    for (const folder of folders) {
+      folder.path = this.getAbsoluteFolderPath(folder.id);
+      this._updateNestedPaths(folder.id);
+    }
   }
 }
