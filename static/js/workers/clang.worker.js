@@ -4,6 +4,7 @@
 import BaseAPI from './base-api.js';
 import { CLANG_C_FLAGS, CLANG_LD_FLAGS } from '../ide/constants.js';
 import { makeCmdPlaceholder } from '../ide/helpers.js';
+import { getPartsFromPath } from '../helpers/shared.js';
 
 function readStr(u8, o, len = -1) {
   let str = '';
@@ -595,16 +596,16 @@ class API extends BaseAPI {
    * containing the filename and content of the corresponding editor tab.
    * @param {array} data.runAsConfig - The configuration for run-code button.
    */
-  async runUserCode({ activeTabName, vfsFiles, runAsConfig }) {
+  async runUserCode({ activeTabPath, vfsFiles, runAsConfig }) {
     const srcFilenames = runAsConfig
       ? runAsConfig.compileSrcFilenames
-      : [activeTabName];
-    console.log('1')
+      : [activeTabPath];
 
     const srcFiles = runAsConfig
       ? vfsFiles.filter((file) => srcFilenames.includes(file.path))
-      : vfsFiles.filter((file) => file.name === activeTabName);
+      : vfsFiles.filter((file) => file.path === activeTabPath);
 
+    const activeTabName = getPartsFromPath(activeTabPath).name;
     const target = runAsConfig ? runAsConfig.compileTarget : activeTabName.replace(/\.c$/, '');
     const wasm = `${target}.wasm`;
     const objectFiles = [];
@@ -612,27 +613,29 @@ class API extends BaseAPI {
     this.hostWriteCmd(`make ${target}`);
     this.hostWrite(makeCmdPlaceholder(srcFilenames, target) + '\n');
 
-    // The user could misspell the srcFilenames, which results in srcFiles being
-    // an empty list.
-    if (runAsConfig && srcFiles.length === 0) {
+    // Check if the user misspelled some paths in srcFilenames.
+    if (runAsConfig) {
+      const vfsFilePaths = vfsFiles.map((file) => file.path);
       const incorrectFiles = srcFilenames
-        .filter((file) => !vfsFiles.includes(file.name))
+        .filter((filepath) => !vfsFilePaths.includes(filepath))
         .join(', ');
 
-      this.hostWriteError(`Error: The following files do not exist: ${incorrectFiles}\n`);
-      this.runUserCodeCallback();
-      return;
+      if (incorrectFiles.length > 0) {
+        this.hostWriteError(`Error: The following files do not exist: ${incorrectFiles}\n`);
+        this.runUserCodeCallback();
+        return;
+      }
     }
 
     for (const file of srcFiles) {
-      if (!file.name.endsWith('.c')) {
+      if (!file.path.endsWith('.c')) {
         continue;
       }
 
       // Make parent dirs before creating the final file inside it.
-      const parentFoldersPath = file.path.split('/').slice(0, -1).join('/');
-      if (parentFoldersPath) {
-        this.memfs.addDirectory(parentFoldersPath);
+      const { parentPath } = getPartsFromPath(file.path);
+      if (parentPath) {
+        this.memfs.addDirectory(parentPath);
       }
 
       const basename = file.path.replace(/\.c$/, '');
