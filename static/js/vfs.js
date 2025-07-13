@@ -118,7 +118,7 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * TODO: DELETE THIS
+   * TODO: DELETE THIS w/ findFilesWhere+findFileWhere+findFoldersWhere
    * Internal helper function to filter an object based on conditions, ignoring
    * the case of the values.
    *
@@ -464,6 +464,8 @@ export default class VirtualFileSystem extends EventTarget {
    * @returns {FileSystemFileHandle} The updated file handle.
    */
   updateFileContent = async (path, content, isUserInvoked = true) => {
+    await this.ready();
+
     const fileHandle = await this.getFileHandleByPath(path);
     if (!fileHandle) return;
 

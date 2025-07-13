@@ -12,7 +12,15 @@ import localStorageManager from './local-storage-manager.js';
 import EmbedLayout from './layout/layout.embed.js';
 
 export default class EmbedApp extends App {
-  setupLayout() {
+  /**
+   * The content passed from the iframe.
+   * @type {string|null}
+   */
+  frameContent = null;
+
+  async setupLayout() {
+    this.registerFrameListener();
+
     const queryParams = parseQueryParams();
     if (typeof queryParams.filename !== 'string') {
       throw Error('No filename provided in query params');
@@ -26,7 +34,8 @@ export default class EmbedApp extends App {
     localStorageManager.updateLocalStoragePrefix(currentStorageKey);
 
     // Create the tab in the virtual filesystem.
-    this.vfs.createFile({ name: queryParams.filename });
+    console.log('Creating file in virtual filesystem:', queryParams.filename)
+    await this.vfs.createFile({ path: queryParams.filename });
 
     // Create tabs with the filename as key and empty string as the content.
     const tabs = {}
@@ -58,17 +67,20 @@ export default class EmbedApp extends App {
     return layout;
   }
 
-  postSetupLayout() {
+  registerFrameListener() {
     // Listen for the content of the file to be received.
     window.addEventListener('message', async (event) => {
+      this.frameContent = removeIndent(event.data);
+    });
+  }
+
+  async postSetupLayout() {
+    if (this.frameContent) {
       const editorComponent = this.layout.getActiveEditor();
       const path = editorComponent.getPath();
-      const content = removeIndent(event.data);
-      if (content) {
-        await this.vfs.updateFileContent(path, content);
-        editorComponent.setContent(content);
-      }
-    });
+      await this.vfs.updateFileContent(path, this.frameContent);
+      editorComponent.setContent(this.frameContent);
+    }
   }
 
   /**

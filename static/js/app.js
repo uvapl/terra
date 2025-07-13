@@ -189,7 +189,7 @@ export default class App {
   async setEditorFileContent(editorComponent) {
     const path = editorComponent.getPath();
     if (path) {
-      const content = await this.vfs.getFileContentByPath();
+      const content = await this.vfs.getFileContentByPath(path);
       editorComponent.setContent(content);
     }
   }

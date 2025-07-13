@@ -14,6 +14,7 @@ import {
   makeUrl,
   objectHasKeys,
   parseQueryParams,
+  seconds,
 } from './helpers/shared.js';
 import LangWorker from './lang-worker.js';
 import ExamLayout from './layout/layout.exam.js';
@@ -39,7 +40,7 @@ export default class ExamApp extends App {
 
   setupLayout() {
     return new Promise((resolve, reject) => {
-      this.loadConfig().then(() => {
+      this.loadConfig().then(async () => {
         if (!this.config.tabs) {
           this.config.tabs = {};
         }
@@ -55,17 +56,17 @@ export default class ExamApp extends App {
 
         // Create the content objects that represent each tab in the editor.
         const content = this.generateConfigContent(this.config.tabs, fontSize);
+        console.log('Exam content:', content);
 
-        const hasPersistedState = Object.keys(Terra.app.vfs.files).length > 0;
+        const hasPersistedState = !(await Terra.app.vfs.isEmpty());
         if (!hasPersistedState) {
-          // Create the files inside the virtual file system.
-          content.forEach((file) => {
-            Terra.app.vfs.createFile({
-              id: file.componentState.fileId,
-              name: file.title,
+          // Create the files inside the VFS.
+          await Promise.all(
+            content.map((file) => Terra.app.vfs.createFile({
+              path: file.title,
               content: file.componentState.value,
-            })
-          });
+            }))
+          )
         }
 
         // Create the layout object.
@@ -176,13 +177,14 @@ export default class ExamApp extends App {
           // Remove query params from the URL.
           history.replaceState({}, null, window.location.origin + window.location.pathname);
 
-          this.notify('Connected to server', { fadeOutAfterMs: 10 * 1000 });
+          this.notify('Connected to server', { fadeOutAfterMs: seconds(10) });
         } catch (err) {
           console.error('Failed to fetch config:', err);
           this.notifyError('Could not connect to server');
           return;
         }
       } else {
+        console.log('fallback local storage')
         // Fallback on local storage.
 
         // This should only update the local storage prefix if it's
@@ -209,7 +211,7 @@ export default class ExamApp extends App {
           localStorageManager.setLocalStorageItem('config', JSON.stringify(localConfig));
 
           config = localConfig;
-          this.notify('Connected to server', { fadeOutAfterMs: 10 * 1000 });
+          this.notify('Connected to server', { fadeOutAfterMs: seconds(10) });
         } catch (err) {
           console.error('Failed to connect to server:');
           console.error(err);
@@ -221,7 +223,6 @@ export default class ExamApp extends App {
         reject('Invalid config file');
       } else {
         this.config = config;
-        Terra.app.vfs.loadFromLocalStorage();
         resolve();
       }
     });
@@ -460,19 +461,21 @@ export default class ExamApp extends App {
    *                        verification purposes.
    * @returns {Promise<Response>} The response from the submission endpoint.
    */
-  doAutoSave(url, uuid) {
+  async doAutoSave(url, uuid) {
     const formData = new FormData();
     formData.append('code', uuid);
 
     // Go through each tab and create a Blob with the file contents of that tab
     // and append it to the form data.
-    this.layout.getEditorComponents().forEach((editorComponent) => {
-      const filename = editorComponent.getFilename();
-      const { fileId } = editorComponent.getState();
-      const file = Terra.app.vfs.findFileById(fileId);
-      const blob = new Blob([file.content], { type: 'text/plain' });
-      formData.append(`files[${filename}]`, blob, filename);
-    });
+    await Promise.all(
+      this.layout.getEditorComponents().map(async (editorComponent) => {
+        const filename = editorComponent.getFilename();
+        const filepath = editorComponent.getPath();
+        const content = await Terra.app.vfs.getFileContentByPath(filepath);
+        const blob = new Blob([content], { type: 'text/plain' });
+        formData.append(`files[${filename}]`, blob, filename);
+      })
+    )
 
     return fetch(url, { method: 'POST', body: formData, });
   }
