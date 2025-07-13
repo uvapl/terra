@@ -560,11 +560,15 @@ class FileTreeManager {
   /**
    * Check whether a file exists in the file tree in a given folder path.
    *
+   * NOTE: The logic is ultimately identical to the VFS.pathExists(), but since
+   * the dnd5 does not support async callbacks, this function is used instead.
+   *
    * @param {string} name - The file name.
    * @param {string} parentPath - The folder path where to check for the file.
+   * @param {string[]} [ignorePaths] - Paths to ignore in the parent path.
    * @returns {boolean} True if the file exists, false otherwise.
    */
-  _nodePathExists = (name, parentPath) => {
+  _nodePathExists = (name, parentPath, ignorePaths = []) => {
     const tree = this.getInstance();
     const parentNode = tree.getNodeByKey(parentPath);
     if (!parentNode) return false;
@@ -572,7 +576,7 @@ class FileTreeManager {
     const childNodes = parentNode.children || [];
     for (const node of childNodes) {
       // Check if the name matches the child node's title.
-      if (node.title === name) {
+      if (node.title === name && !ignorePaths.includes(node.key)) {
         return true;
       }
     }
@@ -727,24 +731,18 @@ class FileTreeManager {
       $(targetNode.li).addClass(DROP_AREA_INDICATOR_CLASS);
     }
 
-    // Check if there exists already a file with the same name on the
-    // target folder. If so, prevent dropping.
+    // Prevent dropping if there exists already a file with the same name on the
+    // target folder.
     const sourceNode = data.otherNode;
     const containsDuplicate = (
       (
         targetNode.data.isFile &&
-        Terra.app.vfs.existsWhere({
-          parentId: targetNode.parent.title.startsWith('root') ? null : targetNode.parent.key,
-          name: sourceNode.title
-        }, { ignoreIds: sourceNode.key })
+        this._nodePathExists(sourceNode.title, targetNode.parent.key, [sourceNode.key])
       )
         ||
       (
         targetNode.data.isFolder &&
-        Terra.app.vfs.existsWhere({
-          parentId: targetNode.key,
-          name: sourceNode.title
-        }, { ignoreIds: sourceNode.key })
+        this._nodePathExists(sourceNode.title, targetNode.key, [sourceNode.key])
       )
     );
 
@@ -752,9 +750,9 @@ class FileTreeManager {
 
     if (containsDuplicate) {
       // Create new tooltip.
-      const anchor = targetNode.parent.title.startsWith('root')
-        ? $('.file-tree-container .title')[0]
-        : (targetNode.data.isFile ? targetNode.parent.span : targetNode.span);
+      const anchor = targetNode.data.isFile
+        ? (targetNode.parent.title.startsWith('root') ? $('.file-tree-container .title')[0] : targetNode.parent.span)
+        : targetNode.span;
 
       const msg = `There already exists a "${sourceNode.title}" file or folder`;
       tooltipManager.createTooltip('dndDuplicate', anchor, msg, {

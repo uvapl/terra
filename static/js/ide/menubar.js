@@ -382,7 +382,7 @@ Menubar.connectRepo = () => {
   }
 
   $connectModal.find('.cancel-btn').click(() => hideModal($connectModal));
-  $connectModal.find('.confirm-btn').click(() => {
+  $connectModal.find('.confirm-btn').click(async () => {
     const repoLink = $connectModal.find('.repo-link').val().trim();
 
     // For now, we only allow GitHub-HTTPS repo links.
@@ -421,7 +421,7 @@ Menubar.connectRepo = () => {
     // 1) The user is connected to a repo and wants to connect to another one,
     //    so we are certain that there are files in the VFS.
     // 2) The user is not connected to a repo, but there are files in the VFS.
-    if (!currentRepoLink && !Terra.app.vfs.isEmpty()) {
+    if (!currentRepoLink && !(await Terra.app.vfs.isEmpty())) {
       // Create a new modal after the previous one is hidden.
       setTimeout(() => {
         const $confirmModal = createModal({

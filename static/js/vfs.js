@@ -30,7 +30,6 @@ export default class VirtualFileSystem extends EventTarget {
 
   constructor() {
     super();
-    this.loadFromLocalStorage();
     this.loadRootHandle();
   }
 
@@ -106,60 +105,17 @@ export default class VirtualFileSystem extends EventTarget {
 
   /**
    * Check whether the virtual filesystem is empty.
+   *
+   * @async
+   * @returns {Promise<boolean>} True if VFS is empty, false otherwise.
    */
-  isEmpty = () => Object.keys(this.files).length === 0 && Object.keys(this.folders).length === 0;
+  isEmpty = async () => {
+    // Get the root folders and files.
+    const files = await this.findFilesInFolder();
+    const folders = await this.findFoldersInFolder();
 
-  /**
-   * Load the saved virtual filesystem state from local storage.
-   */
-  loadFromLocalStorage = () => {
-    const savedState = localStorageManager.getLocalStorageItem('vfs');
-    if (typeof savedState === 'string') {
-      const json = JSON.parse(savedState);
-
-      for (const key of ['files', 'folders']) {
-        if (json.hasOwnProperty(key)) {
-          this[key] = json[key];
-        }
-      }
-    }
+    return files.length === 0 && folders.length === 0;
   }
-
-  /**
-   * Save the virtual filesystem state to localstorage.
-   */
-  saveState = () => {
-    let files = { ...this.files };
-
-    // Remove the content from all files when LFS or Git is used, because LFS uses
-    // lazy loading and GitFS is being cloned when refreshed anyway.
-    if (IS_IDE && (Terra.app.hasLFSProjectLoaded || hasGitFSWorker())) {
-      const keys = ['sha', 'content'];
-      Object.keys(files).forEach((fileId) => {
-        files[fileId] = { ...files[fileId] };
-        keys.forEach((key) => {
-          if (files[fileId].hasOwnProperty(key)) {
-            delete files[fileId][key];
-          }
-        });
-      });
-    }
-
-    localStorageManager.setLocalStorageItem('vfs', JSON.stringify({
-      files,
-      folders: this.folders,
-    }));
-  }
-
-  /**
-   * Get the root-level folders in the virtual filesystem.
-   */
-  getRootFolders = () => Object.values(this.folders).filter((folder) => !folder.parentId);
-
-  /**
-   * Get the root-level files in the virtual filesystem.
-   */
-  getRootFiles = () => Object.values(this.files).filter((file) => !file.parentId)
 
   /**
    * Internal helper function to filter an object based on conditions, ignoring
