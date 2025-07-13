@@ -187,8 +187,11 @@ export default class App {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   async setEditorFileContent(editorComponent) {
-    const content = await this.vfs.getFileContentByPath(editorComponent.getPath());
-    editorComponent.setContent(content);
+    const path = editorComponent.getPath();
+    if (path) {
+      const content = await this.vfs.getFileContentByPath();
+      editorComponent.setContent(content);
+    }
   }
 
   /**

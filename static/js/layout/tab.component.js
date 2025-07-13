@@ -114,7 +114,6 @@ export default class TabComponent extends EventTarget {
       title: 'Untitled',
       componentState: {
         fontSize: BASE_FONT_SIZE,
-        path: 'Untitled',
         ...config.componentState
       },
       ...config,

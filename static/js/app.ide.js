@@ -172,7 +172,7 @@ export default class IDEApp extends App {
   async setEditorFileContent(editorComponent, clearUndoStack = false) {
     const filepath = editorComponent.getPath();
 
-    if (!(await this.vfs.pathExists(filepath))) {
+    if (!filepath || (filepath && !(await this.vfs.pathExists(filepath)))) {
       return;
     }
 

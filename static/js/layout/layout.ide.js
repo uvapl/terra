@@ -22,7 +22,6 @@ export default class IDELayout extends Layout {
       reorderEnabled: true,
       componentState: {
         fontSize: BASE_FONT_SIZE,
-        path: 'Untitled',
         ...tab.componentState,
       },
       title: 'Untitled',
@@ -45,7 +44,6 @@ export default class IDELayout extends Layout {
                   componentName: 'editor',
                   componentState: {
                     fontSize: BASE_FONT_SIZE,
-                    path: 'Untitled',
                   },
                   title: 'Untitled',
                 },
