@@ -1,3 +1,4 @@
+import { getPartsFromPath } from '../helpers/shared.js';
 import { isImageExtension, uint8ToBase64 } from '../helpers/image.js';
 import BaseAPI from './base-api.js';
 import { loadPyodide } from '../vendor/pyodide-0.25.0.min.js';
@@ -309,9 +310,9 @@ class API extends BaseAPI {
       let filename = activeTab.path;
       if (activeTab.path.includes('/')) {
         // Change directory to the folder of the active file.
-        const folderpath = activeTab.path.split('/').slice(0, -1).join('/');
-        filename = activeTab.path.split('/').pop();
-        this.pyodide.FS.chdir(folderpath);
+        const { name, parentPath } = getPartsFromPath(activeTab.path);
+        filename = name;
+        this.pyodide.FS.chdir(parentPath);
       }
 
       this.hostWriteCmd(`python3 ${filename}`);

@@ -301,3 +301,16 @@ export function eventTargetMixin(base) {
 
   return EventTargetMixin;
 }
+
+/**
+ * Get the name and parent path from a given filepath (either file or folder).
+ *
+ * @param {string} path - The absolute path.
+ * @returns {object} An object containing the name and parent path.
+ */
+export function getPartsFromPath(path) {
+  const parts = path.split('/');
+  const name = parts.pop();
+  const parentPath = parts.join('/');
+  return { name, parentPath };
+}

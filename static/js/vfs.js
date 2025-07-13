@@ -2,7 +2,7 @@
 // This file contains the virtual filesystem logic for the IDE app.
 ////////////////////////////////////////////////////////////////////////////////
 
-import { hasGitFSWorker } from './helpers/shared.js';
+import { hasGitFSWorker, getPartsFromPath } from './helpers/shared.js';
 import { IS_IDE } from './constants.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
@@ -81,19 +81,6 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     return `${string} (1)`;
-  }
-
-  /**
-   * Get the name and parent path from a given filepath.
-   *
-   * @param {string} path - The absolute path.
-   * @returns {object} An object containing the name and parent path.
-   */
-  _getPartsFromPath = (path) => {
-    const parts = path.split('/');
-    const name = parts.pop();
-    const parentPath = parts.join('/');
-    return { name, parentPath };
   }
 
   /**
@@ -350,7 +337,7 @@ export default class VirtualFileSystem extends EventTarget {
       return null;
     }
 
-    const { name, parentPath } = this._getPartsFromPath(filepath);
+    const { name, parentPath } = getPartsFromPath(filepath);
 
     // Get the parent folder's handle.
     let parentFolderHandle = await this.getFolderHandleByPath(parentPath);
@@ -774,7 +761,7 @@ export default class VirtualFileSystem extends EventTarget {
    */
   downloadFile = async (path) => {
     const content = await this.getFileContentByPath(path);
-    const { name } = this._getPartsFromPath(path);
+    const { name } = getPartsFromPath(path);
     const fileBlob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     saveAs(fileBlob, name);
   }
@@ -809,7 +796,7 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {string} path - The absolute folder path.
    */
   downloadFolder = async (path) => {
-    const { name } = this._getPartsFromPath(path);
+    const { name } = getPartsFromPath(path);
 
     const zip = new JSZip();
     const rootFolderZip = zip.folder(name);
