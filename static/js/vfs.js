@@ -118,6 +118,7 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
+   * TODO: DELETE THIS
    * Internal helper function to filter an object based on conditions, ignoring
    * the case of the values.
    *
@@ -131,6 +132,7 @@ export default class VirtualFileSystem extends EventTarget {
     )
 
   /**
+   * TODO: DELETE THIS
    * Find all files that match the given conditions.
    *
    * @example findFilesWhere({ name: 'foo' })
@@ -141,7 +143,9 @@ export default class VirtualFileSystem extends EventTarget {
   findFilesWhere = (conditions) => {
     return Object.values(this.files).filter(this._whereIgnoreCase(conditions))
   }
+
   /**
+   * TODO: DELETE THIS
    * Find a single file that match the given conditions.
    *
    * @example findFileWhere({ name: 'foo' })
@@ -156,27 +160,7 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Check whether either a folder or file exists with the given conditions.
-   *
-   * @example existsWhere({ name: 'foo' })
-   *
-   * @param {object} conditions - The conditions to filter on.
-   * @param {object} [options] - Additional options.
-   * @param {string|array} [options.ignoreIds] - List of ids to ignore.
-   * @returns {boolean} True if a folder or file exists with the given
-   * conditions, false otherwise.
-   */
-  existsWhere = (conditions, options = {}) => {
-    if (!Array.isArray(options.ignoreIds)) {
-      options.ignoreIds = [options.ignoreIds];
-    }
-
-    return this.findWhere(conditions)
-      .filter((f) => !options.ignoreIds.includes(f.id))
-      .length > 0;
-  }
-
-  /**
+   * TODO: DELETE THIS
    * Find all folders that match the given conditions.
    *
    * @example findFoldersWhere({ name: 'foo' })
@@ -189,35 +173,7 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Find a single folders that match the given conditions.
-   *
-   * @example findFolderWhere({ name: 'foo' })
-   *
-   * @param {object} conditions - The conditions to filter on.
-   * @returns {object|null} The folder object matching the conditions or null if
-   * the folder is not found.
-   */
-  findFolderWhere = (conditions) => {
-    const folders = this.findFoldersWhere(conditions);
-    return folders.length > 0 ? folders[0] : null;
-  }
-
-
-  /**
-   * Find a all files and folders that match the given conditions.
-   *
-   * @example findWhere({ name: 'foo' })
-   *
-   * @param {object} conditions - The conditions to filter on.
-   * @returns {array} List of objects matching the conditions.
-   */
-  findWhere = (conditions) => {
-    const files = this.findFilesWhere(conditions);
-    const folders = this.findFoldersWhere(conditions);
-    return [...files, ...folders];
-  }
-
-  /**
+   * TODO: DELETE THIS
    * Find a file by its id.
    *
    * @param {string} id - The id of the file to find.
@@ -225,6 +181,7 @@ export default class VirtualFileSystem extends EventTarget {
   findFileById = (id) => this.files[id];
 
   /**
+   * TODO: DELETE THIS
    * Find a folder by its id.
    *
    * @param {string} id - The id of the folder to find.
@@ -364,48 +321,6 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     return subfiles;
-  }
-
-  /**
-   * Get the absolute file path of a file.
-   *
-   * @param {string} fileId - The file id.
-   * @returns {string} The absolute file path of the file.
-   */
-  getAbsoluteFilePath = (fileId) => {
-    const file = this.findFileById(fileId);
-    if (!file) return '';
-    if (!file.parentId) return file.name;
-
-    let folder = this.findFolderById(file.parentId);
-    if (!folder) return file.name;
-    let folderPath = this.getAbsoluteFolderPath(folder.id);
-    let path = `${folderPath}/${file.name}`;
-
-    return path;
-  }
-
-  /**
-   * Get the absolute file path of a folder.
-   *
-   * @param {string} folderId - The folder id.
-   * @returns {string} The absolute file path of the folder.
-   */
-  getAbsoluteFolderPath = (folderId) => {
-    const folder = this.findFolderById(folderId);
-
-    if (!folder) return '';
-    if (!folder.parentId) return folder.name;
-
-    let parentFolder = this.findFolderById(folder.parentId);
-    let path = folder.name;
-
-    while (parentFolder) {
-      path = `${parentFolder.name}/${path}`;
-      parentFolder = this.findFolderById(parentFolder.parentId);
-    }
-
-    return path;
   }
 
   /**

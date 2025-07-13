@@ -799,11 +799,6 @@ export default class LocalFileSystem {
       );
       await parentFolderHandle.handle.removeEntry(folder.name, { recursive: true });
 
-      // Move the folder in VFS.
-      // Do not use `VFS.moveFolder()` to prevent recursion.
-      folder.parentId = newParentId;
-      folder.path = this.vfs.getAbsoluteFolderPath(folder.id);
-
       await this.rebuildIndexedDB();
     } finally {
       this.busy = false;
