@@ -820,24 +820,4 @@ export default class VirtualFileSystem extends EventTarget {
       saveAs(content, `${name}.zip`);
     });
   }
-
-  /**
-   * Update the nested paths of all files and folders inside a folder.
-   *
-   * @param {string} folderId - The folder id to update.
-   */
-  _updateFolderSubPaths = (folderId) => {
-    // Update all files in the folder.
-    const files = this.findFilesWhere({ parentId: folderId });
-    for (const file of files) {
-      file.path = this.getAbsoluteFilePath(file.id);
-    }
-
-    // Update all nested folders recursively.
-    const folders = this.findFoldersWhere({ parentId: folderId });
-    for (const folder of folders) {
-      folder.path = this.getAbsoluteFolderPath(folder.id);
-      this._updateNestedPaths(folder.id);
-    }
-  }
 }

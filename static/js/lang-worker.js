@@ -163,17 +163,17 @@ export default class LangWorker {
   /**
    * Triggers the `runUserCode` event in the currently active worker.
    *
-   * @param {string} activeTabName - The name of the currently active tab.
+   * @param {string} activeTabPath - The active tab's absolute file path.
    * @param {array} vfsFiles - List of objects, each containing the filename
    * and content of the corresponding editor tab.
    * @param {array} runAsConfig - Configuration object for the run-as command.
    */
-  runUserCode(activeTabName, vfsFiles, runAsConfig) {
+  runUserCode(activeTabPath, vfsFiles, runAsConfig) {
     this.isRunningCode = true;
 
     this.port.postMessage({
       id: 'runUserCode',
-      data: { activeTabName, vfsFiles, runAsConfig },
+      data: { activeTabPath, vfsFiles, runAsConfig },
     });
   }
 

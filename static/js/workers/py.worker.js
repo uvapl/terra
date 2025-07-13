@@ -294,27 +294,29 @@ class API extends BaseAPI {
    * Run the user's code and print the output to the terminal.
    *
    * @param {object} data - The data object coming from the worker.
-   * @param {string} data.activeTabName - The name of the active editor tab.
+   * @param {string} data.activeTabPath - The active tab's absolute file path.
    * @param {array} data.vfsFiles - List of all file objects from the VFS, each
    * containing the filename and content of the corresponding editor tab.
    */
-  runUserCode({ activeTabName, vfsFiles }) {
+  runUserCode({ activeTabPath, vfsFiles }) {
     try {
       // Ensure that we always operate from the home directory as a fresh start.
       this.pyodide.FS.chdir(HOME_DIR);
 
       this.writeFilesToVirtualFS(vfsFiles);
 
-      const activeTab = vfsFiles.find((file) => file.name === activeTabName);
+      const activeTab = vfsFiles.find((file) => file.path === activeTabPath);
+      let filename = activeTab.path;
       if (activeTab.path.includes('/')) {
-        // change directory to the folder of the active file
+        // Change directory to the folder of the active file.
         const folderpath = activeTab.path.split('/').slice(0, -1).join('/');
+        filename = activeTab.path.split('/').pop();
         this.pyodide.FS.chdir(folderpath);
       }
 
-      this.hostWriteCmd(`python3 ${activeTab.name}`);
+      this.hostWriteCmd(`python3 ${filename}`);
 
-      const error = this.run(activeTab.content, activeTabName);
+      const error = this.run(activeTab.content, activeTabPath);
       if (error) {
         this.hostWrite(error);
       }
