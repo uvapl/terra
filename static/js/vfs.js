@@ -2,10 +2,7 @@
 // This file contains the virtual filesystem logic for the IDE app.
 ////////////////////////////////////////////////////////////////////////////////
 
-import {
-  addNewLineCharacter,
-  hasGitFSWorker,
-} from './helpers/shared.js';
+import { hasGitFSWorker } from './helpers/shared.js';
 import { IS_IDE } from './constants.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
@@ -87,16 +84,16 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Get the filename and parent path from a given filepath.
+   * Get the name and parent path from a given filepath.
    *
-   * @param {string} filepath - The absolute file path.
-   * @returns {object} An object containing the filename and parent path.
+   * @param {string} path - The absolute path.
+   * @returns {object} An object containing the name and parent path.
    */
-  _getPartsFromFilepath = (filepath) => {
-    const parts = filepath.split('/');
-    const filename = parts.pop();
+  _getPartsFromPath = (path) => {
+    const parts = path.split('/');
+    const name = parts.pop();
     const parentPath = parts.join('/');
-    return { filename, parentPath };
+    return { name, parentPath };
   }
 
   /**
@@ -349,13 +346,13 @@ export default class VirtualFileSystem extends EventTarget {
   getFileHandleByPath = async (filepath) => {
     await this.ready();
 
-    const { filename, parentPath } = this._getPartsFromFilepath(filepath);
+    const { name, parentPath } = this._getPartsFromPath(filepath);
 
     // Get the parent folder's handle.
     let parentFolderHandle = await this.getFolderHandleByPath(parentPath);
 
     // Get the file handle through its parent folder handle.
-    const fileHandle = await parentFolderHandle.getFileHandle(filename, { create: false });
+    const fileHandle = await parentFolderHandle.getFileHandle(name, { create: false });
 
     return fileHandle;
   }
@@ -765,40 +762,38 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Download a file through the browser by creating a new blob and trigger a
-   * download by creating a new temporary anchor element.
+   * Download a file through the browser by creating a new blob and using
+   * FileSaver.js to save it.
    *
-   * @param {string} id - The file id.
+   * @param {string} path - The absolute file path.
    */
-  downloadFile = (id) => {
-    const file = this.findFileById(id);
-    if (!file) return;
-
-    const fileBlob = new Blob(
-      [addNewLineCharacter(file.content)],
-      { type: 'text/plain;charset=utf-8' }
-    );
-    saveAs(fileBlob, file.name);
+  downloadFile = async (path) => {
+    const content = await this.getFileContentByPath(path);
+    const { name } = this._getPartsFromPath(path);
+    const fileBlob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    saveAs(fileBlob, name);
   }
 
   /**
    * Internal helper function to recursively add files to a zip object.
    *
    * @param {JSZip} zip - The JSZip object to add files to.
-   * @param {string} folderId - The folder id to add files from.
+   * @param {string} folderpath - The absolute folder path to add files from.
    */
-  _addFilesToZipRecursively = (zip, folderId) => {
-    // Put all direct files into the zip file.
-    const files = this.findFilesWhere({ parentId: folderId });
-    for (const file of files) {
-      zip.file(file.name, addNewLineCharacter(file.content));
+  _addFilesToZipRecursively = async (zip, folderpath) => {
+    // Put all subfiles from this folder into the zip file.
+    const subfiles = await this.findFilesInFolder(folderpath);
+    for (const file of subfiles) {
+      const content = await this.getFileContentByPath(`${folderpath}/${file.name}`);
+      zip.file(file.name, content);
     }
 
     // Get all the nested folders and files.
-    const nestedFolders = this.findFoldersWhere({ parentId: folderId });
-    for (const nestedFolder of nestedFolders) {
-      const folderZip = zip.folder(nestedFolder.name);
-      this._addFilesToZipRecursively(folderZip, nestedFolder.id);
+    // const nestedFolders = this.findFoldersWhere({ parentId: folderpath });
+    const subfolders = await this.findFoldersInFolder(folderpath);
+    for (const folder of subfolders) {
+      const folderZip = zip.folder(folder.name);
+      await this._addFilesToZipRecursively(folderZip, `${folderpath}/${folder.name}`)
     }
   }
 
@@ -806,19 +801,18 @@ export default class VirtualFileSystem extends EventTarget {
    * Download a folder as a zip file. This includes all files in the folder as
    * well as all the nested folders.
    *
-   * @param {string} id - The folder id.
+   * @param {string} path - The absolute folder path.
    */
-  downloadFolder = (id) => {
-    const folder = this.findFolderById(id);
-    if (!folder) return;
+  downloadFolder = async (path) => {
+    const { name } = this._getPartsFromPath(path);
 
     const zip = new JSZip();
-    const rootFolderZip = zip.folder(folder.name);
+    const rootFolderZip = zip.folder(name);
 
-    this._addFilesToZipRecursively(rootFolderZip, folder.id);
+    await this._addFilesToZipRecursively(rootFolderZip, path);
 
     zip.generateAsync({ type: 'blob' }).then((content) => {
-      saveAs(content, `${folder.name}.zip`);
+      saveAs(content, `${name}.zip`);
     });
   }
 
