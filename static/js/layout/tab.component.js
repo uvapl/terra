@@ -60,6 +60,15 @@ export default class TabComponent extends EventTarget {
   }
 
   /**
+   * Set the path of the tab.
+   *
+   * @param {string} path - The absolute file path of the tab.
+   */
+  setPath = (path) => {
+    this.extendState({ path });
+  }
+
+  /**
    * Extend the curent state of the editor.
    *
    * @param {object} state - Additional values to overwrite or set.

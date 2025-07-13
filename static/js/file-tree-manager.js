@@ -626,17 +626,20 @@ class FileTreeManager {
     const destPath = parentPath ? `${parentPath}/${newName}` : newName;
 
     fn(srcPath, destPath).then(() => {
+      // Update the node's path (recurively).
       if (sourceNode.data.isFile) {
         sourceNode.key = destPath;
       } else if (sourceNode.data.isFolder) {
         this._updateFolderKeyRecursively(sourceNode);
       }
 
+      // Update the active tab's title and path.
       const tabComponent = Terra.app.getTabComponents()
         .find((tabComponent) => tabComponent.getPath() === srcPath);
 
       if (tabComponent) {
         tabComponent.setFilename(newName);
+        tabComponent.setPath(destPath);
 
         if (tabComponent instanceof EditorComponent) {
           const proglang = newName.includes('.') ? getFileExtension(newName) : 'text';

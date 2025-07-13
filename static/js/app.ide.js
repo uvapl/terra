@@ -392,11 +392,17 @@ export default class IDEApp extends App {
   /**
    * Retrieve the file object of the active editor.
    *
+   * @async
    * @returns {Promise<object>} The file object.
    */
-  getActiveEditorFileObject() {
+  async getActiveEditorFileObject() {
     const editorComponent = this.layout.getActiveEditor();
     const filepath = editorComponent.getPath();
-    return Terra.app.vfs.getFileHandleByPath(filepath);
+    const content = await this.vfs.getFileContentByPath(filepath);
+    return {
+      path: filepath,
+      content,
+      handle: this.vfs.getFileHandleByPath(filepath),
+    }
   }
 }
