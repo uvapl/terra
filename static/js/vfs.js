@@ -341,10 +341,14 @@ export default class VirtualFileSystem extends EventTarget {
    *
    * @async
    * @param {string} filepath - The absolute file path.
-   * @returns {Promise<FileSystemFileHandle>} The file handle.
+   * @returns {Promise<FileSystemFileHandle|null>} The file handle if it exists.
    */
   getFileHandleByPath = async (filepath) => {
     await this.ready();
+
+    if (!(await this.pathExists(filepath))) {
+      return null;
+    }
 
     const { name, parentPath } = this._getPartsFromPath(filepath);
 
@@ -603,6 +607,7 @@ export default class VirtualFileSystem extends EventTarget {
    */
   updateFileContent = async (path, content, isUserInvoked = true) => {
     const fileHandle = await this.getFileHandleByPath(path);
+    if (!fileHandle) return;
 
     if (content) {
       const writable = await fileHandle.createWritable();

@@ -121,12 +121,12 @@ export default class IDEApp extends App {
    * Reset the layout to its initial state.
    */
   resetLayout() {
-    const oldContentConfig = Terra.app.layout.getTabComponents().map((tabComponent) => ({
-      title: tabComponent.getFilename(),
-      componentName: tabComponent.getComponentName(),
+    const oldContentConfig = Terra.app.layout.getTabComponents().map((component) => ({
+      title: component.getFilename(),
+      componentName: component.getComponentName(),
       componentState: {
-        fileId: tabComponent.getState().fileId,
-        value: tabComponent.getContent(),
+        path: component.getPath(),
+        value: component.getContent(),
       }
     }));
 
@@ -216,22 +216,28 @@ export default class IDEApp extends App {
   /**
    * Reload the file content either from VFS or LFS.
    *
+   * @async
    * @param {ImageComponent} imageComponent - The image component instance.
    */
-  setImageFileContent(imageComponent) {
-    const file = this.vfs.findFileById(imageComponent.getState().fileId);
-    if (!file) return;
+  async setImageFileContent(imageComponent) {
+    // TODO: migrate properly.
+    const filepath = imageComponent.getPath();
+    const fileHandle = await this.vfs.getFileHandleByPath(filepath);
+    if (!fileHandle) return;
+
+    const file = await fileHandle.getFile();
+    const content = await this.vfs.getFileContentByPath(filepath);
 
     if (Terra.app.hasLFSProjectLoaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
       imageComponent.exceededFileSize();
-    } else if (Terra.app.hasLFSProjectLoaded && !file.content) {
+    } else if (Terra.app.hasLFSProjectLoaded && !content) {
       // Load the file content from LFS.
-      this.lfs.getFile(file.id).then((file) => {
+      this.lfs.getFile(fileHandle.id).then((file) => {
         const url = URL.createObjectURL(file);
         imageComponent.img.src = url;
       });
     } else {
-      imageComponent.setContent(file.content);
+      imageComponent.setContent(content);
     }
   }
 
@@ -327,18 +333,20 @@ export default class IDEApp extends App {
    * created in the file-tree which automatically creates the file in the vfs.
    *
    * This function gets triggered on each 'save' keystroke, i.e. <cmd/ctrl + s>.
+   *
+   * @async
    */
-  saveFile() {
+  async saveFile() {
     const editorComponent = this.layout.getActiveEditor();
 
     if (!editorComponent) return;
 
     // If the file exists in the vfs, then return, because the contents will be
     // auto-saved already by the editor component.
-    const existingFileId = editorComponent.getState().fileId;
-    if (existingFileId) {
-      const file = this.vfs.findFileById(existingFileId);
-      if (file) return;
+    const existingFilepath = editorComponent.getPath();
+    if (existingFilepath) {
+      const fileHandle = await this.vfs.getFileHandleByPath(existingFilepath);
+      if (fileHandle) return;
     }
 
     this.layout.promptSaveFile(editorComponent);
@@ -361,12 +369,12 @@ export default class IDEApp extends App {
   /**
    * Close the active tab in the editor.
    *
-   * @param {string} fileId - The file ID of the tab to close. If not provided,
-   * the active tab will be closed.
+   * @param {string} filepath - The absolute file path of the tab to close. If
+   * not provided, the active tab will be closed.
    */
-  closeFile(fileId) {
-    const editorComponent = fileId
-      ? this.layout.getTabComponents().find((editorComponent) => editorComponent.getState().fileId === fileId)
+  closeFile(filepath) {
+    const editorComponent = filepath
+      ? this.layout.getTabComponents().find((component) => component.getPath() === filepath)
       : this.layout.getActiveEditor();
 
     if (editorComponent) {
@@ -378,19 +386,17 @@ export default class IDEApp extends App {
    * Close all tabs in the editor.
    */
   closeAllFiles() {
-    this.layout.getTabComponents().forEach((editorComponent) => {
-      editorComponent.close();
-    });
+    this.layout.getTabComponents().forEach((component) => component.close());
   }
 
   /**
    * Retrieve the file object of the active editor.
    *
-   * @returns {object} The file object.
+   * @returns {Promise<object>} The file object.
    */
   getActiveEditorFileObject() {
     const editorComponent = this.layout.getActiveEditor();
-    const { fileId } = editorComponent.getState();
-    return Terra.app.vfs.findFileById(fileId);
+    const filepath = editorComponent.getPath();
+    return Terra.app.vfs.getFileHandleByPath(filepath);
   }
 }

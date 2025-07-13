@@ -28,7 +28,6 @@ export default class TabComponent extends EventTarget {
 
   constructor(container, state) {
     super();
-    console.log('creating new tab:', container.parent.config.title)
     this.container = container;
     this.state = state;
   }

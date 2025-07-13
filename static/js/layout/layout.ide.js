@@ -175,16 +175,21 @@ export default class IDELayout extends Layout {
   /**
    * Creates the HTML recursively for the folder options in the save file modal.
    *
+   * @async
+   * @param {string} [parentPath] - The absolute parent folder path where
+   * subfolders will be fetched from.
    * @param {string} [html] - The HTML string to append to.
-   * @param {string} [parentId] - The parent folder ID where subfolders will be fetched from.
    * @param {string} [indent] - The visual indent indicator.
    * @returns {string} The HTML string with the folder options.
    */
-  createFolderOptionsHtml(html = '', parentId = null, indent = '--') {
-    Terra.app.vfs.findFoldersWhere({ parentId }).forEach((folder, index) => {
-      html += `<option value="${folder.id}">${indent} ${folder.name}</option>`;
-      html += this.createFolderOptionsHtml('', folder.id, indent + '--');
-    });
+  async createFolderOptionsHtml(parentPath = '', html = '', indent = '--') {
+    const subfolders = await Terra.app.vfs.findFoldersInFolder(parentPath);
+
+    for (const folder of subfolders) {
+      const subfolderpath = parentPath ? `${parentPath}/${folder.name}` : folder.name;
+      html += `<option value="${subfolderpath}">${indent} ${folder.name}</option>`;
+      html += await this.createFolderOptionsHtml(subfolderpath, '', indent + '--');
+    }
 
     return html;
   }
@@ -193,10 +198,11 @@ export default class IDELayout extends Layout {
    * Prompt the user with a modal for a filename and in which folder to save it.
    * This function gets triggered on each 'save' keystroke, i.e. <cmd/ctrl + s>.
    *
+   * @async
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  promptSaveFile(editorComponent) {
-    const folderOptions = this.createFolderOptionsHtml();
+  async promptSaveFile(editorComponent) {
+    const folderOptions = await this.createFolderOptionsHtml();
 
     const $modal = createModal({
       title: 'Save file',
@@ -237,18 +243,20 @@ export default class IDELayout extends Layout {
       hideModal($modal);
     });
 
-    $modal.find('.primary-btn').click(() => {
+    $modal.find('.primary-btn').click(async () => {
       const filename = $modal.find('.text-input').val();
 
-      let folderId = $modal.find('.select').val();
-      if (folderId === 'root') {
-        folderId = null;
+      let parentPath = $modal.find('.select').val();
+      if (parentPath === 'root') {
+        parentPath = '';
       }
+
+      const filepath = parentPath ? `${parentPath}/${filename}` : filename;
 
       let errorMsg;
       if (!isValidFilename(filename)) {
         errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
-      } else if (Terra.app.vfs.existsWhere({ parentId: folderId, name: filename })) {
+      } else if ((await Terra.app.vfs.pathExists(filepath))) {
         errorMsg = `There already exists a "${filename}" file or folder`;
       }
 
@@ -266,18 +274,17 @@ export default class IDELayout extends Layout {
       tooltipManager.destroyTooltip('saveFile');
 
       // Create a new file in the VFS and then refresh the file tree.
-      const { id: nodeId } = Terra.app.vfs.createFile({
-        parentId: folderId,
-        name: filename,
+      await Terra.app.vfs.createFile({
+        path: filepath,
         content: editorComponent.getContent(),
       });
-      fileTreeManager.createFileTree();
+      await fileTreeManager.createFileTree();
 
       // Change the Untitled tab to the new filename.
       editorComponent.setFilename(filename);
 
       // Update the container state.
-      editorComponent.extendState({ fileId: nodeId });
+      editorComponent.extendState({ path: filepath });
 
       // For some reason no layout update is triggered, so we trigger an update.
       this.emit('stateChanged');
