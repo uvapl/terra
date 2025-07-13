@@ -380,6 +380,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     if (this.initialised) return;
 
     this.initialised = true;
+
     // Do a set-timeout trick to make sure the components are registered
     // through the registerComponent() function, prior to calling this part.
     setTimeout(() => {

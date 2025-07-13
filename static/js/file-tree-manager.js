@@ -97,6 +97,7 @@ class FileTreeManager {
    * Creates a new Untitled file in the root folder
    * @example createFile()
    *
+   * @async
    * @param {string|null} [path] - The path for the new file. Leave null to
    * create a new file in the root folder.
    */
@@ -168,6 +169,7 @@ class FileTreeManager {
    * Creates a new Untitled folder in the root folder
    * @example createFolder()
    *
+   * @async
    * @param {string|null} [path] - The path for the new folder. Leave
    * null to create a new folder in the root folder.
    */
@@ -222,7 +224,8 @@ class FileTreeManager {
   /**
    * Create a file tree list from the VFS compatible with FancyTree.
    *
-   * @param {string} [parentId] - The parent folder id.
+   * @async
+   * @param {string} [path] - The parent folder absolute path.
    * @returns {array} List with file tree objects.
    */
   createFromVFS = async (path = '') => {
@@ -286,7 +289,7 @@ class FileTreeManager {
       if (node.data.isFile) {
         Terra.app.closeFile(node.key);
       } else if (node.data.isFolder) {
-        this.closeFilesInFolderRecursively(node.key);
+        await this.closeFilesInFolderRecursively(node.key);
       }
 
       // Delete from the VFS.
@@ -310,17 +313,20 @@ class FileTreeManager {
   /**
    * Close all files inside a folder, including nested files in subfolders.
    *
-   * @param {string} folderId - The folder ID to close all files from.
+   * @async
+   * @param {string} path - The absolute folderpath to close all files from.
    */
-  closeFilesInFolderRecursively = (folderId) => {
-    const files = Terra.app.vfs.findFilesWhere({ parentId: folderId });
-    for (const file of files) {
-      Terra.app.closeFile(file.id);
+  closeFilesInFolderRecursively = async (path) => {
+    const subfiles = await Terra.app.vfs.findFilesInFolder(path);
+    for (const file of subfiles) {
+      const subfilepath = path ? `${path}/${file.name}` : file.name;
+      Terra.app.closeFile(subfilepath);
     }
 
-    const folders = Terra.app.vfs.findFoldersWhere({ parentId: folderId });
-    for (const folder of folders) {
-      this.closeFilesInFolderRecursively(folder.id);
+    const subfolders = await Terra.app.vfs.findFoldersInFolder(path);
+    for (const folder of subfolders) {
+      const subfolderpath = path ? `${path}/${folder.name}` : folder.name;
+      this.closeFilesInFolderRecursively(subfolderpath);
     }
   }
 
