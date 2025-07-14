@@ -352,7 +352,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @param {EditorComponent} editorComponent
    */
   onEditorFocus(editorComponent) {
-    console.log('FOCUS', editorComponent.getPath());
     this.setActiveEditor(editorComponent);
   }
 
