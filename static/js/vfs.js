@@ -360,10 +360,12 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     if (isUserInvoked) {
-      // TODO: migrate this.
-      // this.dispatchEvent(new CustomEvent('fileCreated', {
-      //   detail: { file: newFileHandle },
-      // }));
+      const filepath = parentPath ? `${parentPath}/${name}` : name;
+      this.dispatchEvent(new CustomEvent('fileCreated', {
+        detail: {
+          file: { path: filepath, content }
+        },
+      }));
     }
 
     return newFileHandle;
@@ -475,14 +477,13 @@ export default class VirtualFileSystem extends EventTarget {
       await writable.close();
     }
 
-    return fileHandle;
+    if (isUserInvoked) {
+      this.dispatchEvent(new CustomEvent('fileContentChanged', {
+        detail: { file: { path, content } },
+      }));
+    }
 
-    // TODO: migrate this.
-    // if (isUserInvoked) {
-    //   this.dispatchEvent(new CustomEvent('fileContentChanged', {
-    //     detail: { file: fileHandle },
-    //   }));
-    // }
+    return fileHandle;
   }
 
   /**
@@ -504,10 +505,20 @@ export default class VirtualFileSystem extends EventTarget {
     const newFileHandle = await this.createFile({
       path: destPath,
       content: srcFileContent,
-    });
+    }, false);
 
     // Delete the old file.
-    await this.deleteFile(srcPath);
+    await this.deleteFile(srcPath, false);
+
+    this.dispatchEvent(new CustomEvent('fileMoved', {
+      detail: {
+        oldPath: srcPath,
+        file: {
+          path: destPath,
+          content: srcFileContent,
+        }
+      },
+    }));
 
     return newFileHandle;
   }
@@ -560,23 +571,28 @@ export default class VirtualFileSystem extends EventTarget {
    * a single file or is called from the `deleteFolder` function.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFile = async (path, isSingleFileDelete = true) => {
+  deleteFile = async (path, isUserInvoked = true, isSingleFileDelete = true) => {
     await this.ready();
 
     if (!(await this.pathExists(path))) {
       return false;
     }
 
-    // TODO: migrate this.
-    // this.dispatchEvent(new CustomEvent('beforeFileDeleted', {
-    //   detail: { file, isSingleFileDelete },
-    // }));
-
     const parts = path.split('/');
     const filename = parts.pop();
     const parentPath = parts.join('/');
     const parentHandle = await this.getFolderHandleByPath(parentPath);
     await parentHandle.removeEntry(filename);
+
+    if (isUserInvoked) {
+      this.dispatchEvent(new CustomEvent('fileDeleted', {
+        detail: {
+          file: { path },
+          // isSingleFileDelete
+        },
+      }));
+    }
+
     return true;
   }
 
@@ -606,7 +622,7 @@ export default class VirtualFileSystem extends EventTarget {
     const files = await this.findFilesInFolder(path);
     for (const file of files) {
       const filepath = `${path}/${file.name}`;
-      await this.deleteFile(filepath, false);
+      await this.deleteFile(filepath, true, false);
     }
 
     // Delete all the nested folders inside the current folder.

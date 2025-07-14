@@ -57,19 +57,20 @@ export default class GitFS {
     this.vfs.addEventListener('fileCreated', this.vfsFileCreatedHandler);
     this.vfs.addEventListener('fileMoved', this.vfsFileMovedHandler);
     this.vfs.addEventListener('fileContentChanged', this.vfsFileContentChangedHandler);
-    this.vfs.addEventListener('beforeFileDeleted', this.vfsBeforeFileDeletedHandler);
+    this.vfs.addEventListener('fileDeleted', this.vfsBeforeFileDeletedHandler);
 
     this.vfs.addEventListener('folderMoved', this.vfsFolderMovedHandler);
   }
 
   vfsFileCreatedHandler = (event) => {
     const { file } = event.detail;
-    this.commit(file.path, file.content, file.sha);
+    throw new Error('vfsFileCreatedHandler is not implemented');
+    this.commit(file.path, file.content);
   }
 
   vfsFileMovedHandler = (event) => {
     const { file, oldPath } = event.detail;
-    this.moveFile(oldPath, file.sha, file.path, file.content);
+    this.moveFile(oldPath, file.path, file.content);
   }
 
   vfsFileContentChangedHandler = (event) => {
@@ -77,13 +78,13 @@ export default class GitFS {
 
     // Only commit changes after 2 seconds of inactivity.
     Terra.app.registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
-      this.commit(file.path, file.content, file.sha);
+      this.commit(file.path, file.content);
     });
   }
 
   vfsBeforeFileDeletedHandler = (event) => {
     const  { file } = event.detail;
-    this.rm(file.path, file.sha);
+    this.rm(file.path);
   }
 
   vfsFolderMovedHandler = (event) => {
@@ -201,12 +202,11 @@ export default class GitFS {
    *
    * @param {string} filepath - The absolute filepath within the git repo.
    * @param {string} filecontents - The new contents to commit.
-   * @param {string} sha - The sha of the file to commit.
    */
-  commit = (filepath, filecontents, sha) => {
+  commit = (filepath, filecontents) => {
     this.worker.postMessage({
       id: 'commit',
-      data: { filepath, filecontents, sha },
+      data: { filepath, filecontents },
     });
   }
 
@@ -214,12 +214,11 @@ export default class GitFS {
    * Remove a filepath from the current repository.
    *
    * @param {string} filepath - The absolute filepath within the git repo.
-   * @param {string} sha - The sha of the file to delete.
    */
-  rm = (filepath, sha) => {
+  rm = (filepath) => {
     this.worker.postMessage({
       id: 'rm',
-      data: { filepath, sha },
+      data: { filepath },
     });
   }
 
@@ -231,10 +230,10 @@ export default class GitFS {
    * @param {string} newPath - The absolute filepath to the new file.
    * @param {string} newContent - The new content of the file.
    */
-  moveFile = (oldPath, oldSha, newPath, newContent) => {
+  moveFile = (oldPath, newPath, newContent) => {
     this.worker.postMessage({
       id: 'moveFile',
-      data: { oldPath, oldSha, newPath, newContent },
+      data: { oldPath, newPath, newContent },
     });
   }
 
@@ -259,7 +258,7 @@ export default class GitFS {
    *
    * @param {object} event - Event object coming from the UI.
    */
-  onmessage = (event) => {
+  onmessage = async (event) => {
     const payload = event.data.data;
 
     switch (event.data.id) {
@@ -311,6 +310,13 @@ export default class GitFS {
         $('#file-tree .info-msg').remove();
         fileTreeManager.removeLocalStorageWarning();
 
+        // Add all file sha's to the fileShaMap.
+        // payload.repoContents.forEach((fileOrFolder) => {
+        //   if (fileOrFolder.type === 'blob') {
+        //     this.fileShaMap[fileOrFolder.path] = fileOrFolder.sha;
+        //   }
+        // });
+
         this.importToVFS(payload.repoContents).then(() => {
           Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
           fileTreeManager.createFileTree();
@@ -348,20 +354,12 @@ export default class GitFS {
         $('#file-tree').html('<div class="info-msg error">Failed to clone repository</div>');
         break;
 
-      case 'move-folder-success':
-        // Update all sha in the new files in the VFS.
-        payload.updatedFiles.forEach((fileObj) => {
-          const file = this.vfs.findFileByPath(fileObj.path);
-          file.sha = fileObj.sha;
-        });
-        break;
-
-      case 'move-file-success':
-      case 'commit-success':
-        // Update the file's sha in the VFS.
-        const file = this.vfs.findFileByPath(payload.filepath);
-        file.sha = payload.sha;
-        break;
+      // case 'move-folder-success':
+      //   // Update all sha for the new files.
+      //   payload.updatedFiles.forEach((fileObj) => {
+      //     this.fileShaMap[fileObj.path] = fileObj.sha;
+      //   });
+      //   break;
 
       case 'queue-busy':
         fileTreeManager.showBottomMsg('Syncing changes to GitHub...');
@@ -392,7 +390,6 @@ export default class GitFS {
         .filter((file) => file.type === 'blob')
         .map((file) => this.vfs.createFile({
           path: file.path,
-          // sha: file.sha,     --> TODO: save this sha in GitFS class.
           content: file.content,
         }, false))
     );

@@ -70,12 +70,16 @@ class API {
    */
   queue = null;
 
+  /**
+   * Contains the mapping of filepaths to their SHA values.
+   * @type {object<string, string>}
+   */
+  fileShaMap = {};
+
   constructor(options) {
     this.repoBranch = options.branch;
     this.accessToken = options.accessToken;
     this.fetchBranchesSuccessCallback = options.fetchBranchesSuccessCallback;
-    this.commitSuccessCallback = options.commitSuccessCallback;
-    this.moveFileSuccessCallback = options.moveFileSuccessCallback;
     this.moveFolderSuccessCallback = options.moveFolderSuccessCallback;
     this.cloneFailCallback = options.cloneFailCallback;
     this.cloneSuccessCallback = options.cloneSuccessCallback;
@@ -302,6 +306,8 @@ class API {
                 path: fileOrFolder.path,
               });
 
+              this.fileShaMap[fileOrFolder.path] = fileOrFolder.sha;
+
               const content = atob(res.data.content);
               if (isImageExtension(fileOrFolder.path)) {
                 // Use the base64 string to create a blob URL later.
@@ -329,8 +335,9 @@ class API {
    * @param {string} sha - The sha of the file to commit.
    * @async
    */
-  async commit(filepath, filecontents, sha) {
+  async commit(filepath, filecontents) {
     this._log('Committing', filepath);
+    const sha = this.fileShaMap[filepath];
 
     const response = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
       path: filepath,
@@ -341,24 +348,24 @@ class API {
       sha,
     });
 
-    this.commitSuccessCallback(filepath, response.data.content.sha);
+    this.fileShaMap[filepath] = response.data.content.sha;
   }
 
   /**
    * Remove a filepath from the current repository.
    *
    * @param {string} filepath - The absolute filepath to remove.
-   * @param {string} sha - The sha of the file to delete.
    */
-  async rm(filepath, sha) {
+  async rm(filepath) {
     try {
       await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
         path: filepath,
-        sha,
+        sha: this.fileShaMap[filepath],
         message: `Remove ${filepath}`,
         branch: this.repoBranch,
         committer: this.committer,
       });
+      delete this.fileShaMap[filepath];
       this._log(`Removed ${filepath}`);
     } catch (err) {
       this._log('Failed to remove', filepath, err);
@@ -369,11 +376,10 @@ class API {
    * Move a file from one location to another.
    *
    * @param {string} oldPath - The absolute filepath of the file to move.
-   * @param {string} oldSha - The sha of the file to remove.
    * @param {string} newPath - The absolute filepath to the new file.
    * @param {string} newContent - The new content of the file.
    */
-  async moveFile(oldPath, oldSha, newPath, newContent) {
+  async moveFile(oldPath, newPath, newContent) {
     // Create the new file with the new content.
     const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
       path: newPath,
@@ -389,11 +395,10 @@ class API {
       message: `Remove ${oldPath}`,
       branch: this.repoBranch,
       committer: this.committer,
-      sha: oldSha,
+      sha: this.fileShaMap[oldPath],
     });
 
-    const newSha = result.data.content.sha;
-    this.moveFileSuccessCallback(newPath, newSha);
+    this.fileShaMap[newPath] = result.data.content.sha;
 
     this._log(`Moved file from ${oldPath} to ${newPath}`);
   }
@@ -485,20 +490,6 @@ self.onmessage = (event) => {
           });
         },
 
-        commitSuccessCallback(filepath, sha) {
-          postMessage({
-            id: 'commit-success',
-            data: { filepath, sha }
-          });
-        },
-
-        moveFileSuccessCallback(filepath, sha) {
-          postMessage({
-            id: 'move-file-success',
-            data: { filepath, sha },
-          });
-        },
-
         moveFolderSuccessCallback(updatedFiles) {
           postMessage({
             id: 'move-folder-success',
@@ -544,7 +535,6 @@ self.onmessage = (event) => {
       api.queue.schedule(() => api.commit(
         payload.filepath,
         payload.filecontents,
-        payload.sha
       ));
       break;
 
@@ -555,7 +545,6 @@ self.onmessage = (event) => {
     case 'moveFile':
       api.queue.schedule(() => api.moveFile(
         payload.oldPath,
-        payload.oldSha,
         payload.newPath,
         payload.newContent
       ));
