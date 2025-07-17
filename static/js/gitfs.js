@@ -64,7 +64,6 @@ export default class GitFS {
 
   vfsFileCreatedHandler = (event) => {
     const { file } = event.detail;
-    throw new Error('vfsFileCreatedHandler is not implemented');
     this.commit(file.path, file.content);
   }
 
