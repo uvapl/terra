@@ -1,5 +1,5 @@
 import { DROP_AREA_INDICATOR_CLASS } from './ide/constants.js';
-import { getFileExtension, isObject, isValidFilename, uuidv4 } from './helpers/shared.js'
+import { getFileExtension, getPartsFromPath, isValidFilename } from './helpers/shared.js'
 import { createModal, hideModal, showModal } from './modal.js'
 import Terra from './terra.js'
 import LangWorker from './lang-worker.js';
@@ -639,26 +639,12 @@ class FileTreeManager {
       // Update the node's path (recurively).
       if (sourceNode.data.isFile) {
         sourceNode.key = destPath;
+
+        // If the moved file is also the active editor tab, update the tab's
+        // filename and path in-place.
+        this._updateOpenTab(srcPath, destPath);
       } else if (sourceNode.data.isFolder) {
-        this._updateFolderKeyRecursively(sourceNode);
-      }
-
-      // Update the active tab's title and path.
-      const tabComponent = Terra.app.getTabComponents()
-        .find((tabComponent) => tabComponent.getPath() === srcPath);
-
-      if (tabComponent) {
-        tabComponent.setFilename(newName);
-        tabComponent.setPath(destPath);
-
-        if (tabComponent instanceof EditorComponent) {
-          const proglang = newName.includes('.') ? getFileExtension(newName) : 'text';
-          tabComponent.setProgLang(proglang);
-        }
-
-        // For some reason no update is triggered, so we trigger it manually.
-        // This will reload the content if needed.
-        Terra.app.layout.emit('stateChanged');
+        this._updateFolderKeysRecursively(sourceNode);
       }
     });
 
@@ -666,6 +652,38 @@ class FileTreeManager {
     tooltipManager.destroyTooltip('renameNode');
 
     return true;
+  }
+
+  /**
+   * Update the open tab's filename and path when a file is renamed.
+   *
+   * @param {string} srcPath - The source path of the file.
+   * @param {string} destPath - The destination path of the file.
+   */
+  _updateOpenTab = (srcPath, destPath) => {
+    console.log('_updateOpenTab', srcPath, destPath)
+    // Find the tab component that corresponds to the file.
+    const tabComponent = Terra.app.getTabComponents().find(
+      (tabComponent) => tabComponent.getPath() === srcPath
+    );
+
+    // Update it if it exists.
+    if (tabComponent) {
+      const newName = getPartsFromPath(destPath).name;
+      tabComponent.setFilename(newName);
+      console.log(`Updated tab component for file: ${srcPath} -> ${destPath}`);
+      tabComponent.setPath(destPath);
+
+      if (tabComponent instanceof EditorComponent) {
+        const proglang = newName.includes('.') ? getFileExtension(newName) : 'text';
+        tabComponent.setProgLang(proglang);
+        Terra.app.createLangWorker(proglang);
+      }
+
+      // For some reason no update is triggered, so we trigger it manually.
+      // This will reload the content if needed.
+      Terra.app.layout.emit('stateChanged');
+    }
   }
 
   /**
@@ -833,8 +851,12 @@ class FileTreeManager {
       // Update the node keys.
       if (sourceNode.data.isFile) {
         sourceNode.key = destPath;
+
+        // If the moved file is also the active editor tab, update the tab's
+        // filename and path in-place.
+        this._updateOpenTab(srcPath, destPath);
       } else if (sourceNode.data.isFolder) {
-        this._updateFolderKeyRecursively(sourceNode);
+        this._updateFolderKeysRecursively(sourceNode);
       }
     });
   }
@@ -844,15 +866,18 @@ class FileTreeManager {
    *
    * @param {FancytreeNode} folderNode - The folder node to update recursively.
    */
-  _updateFolderKeyRecursively = (folderNode) => {
+  _updateFolderKeysRecursively = (folderNode) => {
     folderNode.key = this.getAbsoluteNodePath(folderNode);
 
     const childNodes = folderNode.children || [];
     for (const childNode of childNodes) {
       if (childNode.data.isFolder) {
-        this._updateFolderKeyRecursively(childNode);
+        this._updateFolderKeysRecursively(childNode);
       } else {
-        childNode.key = this.getAbsoluteNodePath(childNode)
+        const srcPath = childNode.key;
+        const destPath = this.getAbsoluteNodePath(childNode);
+        childNode.key = destPath;
+        this._updateOpenTab(srcPath, destPath);
       }
     }
   }

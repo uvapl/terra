@@ -2,10 +2,7 @@
 // This file contains the virtual filesystem logic for the IDE app.
 ////////////////////////////////////////////////////////////////////////////////
 
-import { hasGitFSWorker, getPartsFromPath } from './helpers/shared.js';
-import { IS_IDE } from './constants.js';
-import Terra from './terra.js';
-import localStorageManager from './local-storage-manager.js';
+import { getPartsFromPath } from './helpers/shared.js';
 
 export default class VirtualFileSystem extends EventTarget {
   /**
@@ -22,45 +19,20 @@ export default class VirtualFileSystem extends EventTarget {
    */
   folders = {};
 
-  /**
-   * The OPFS root handle.
-   * @type {FileSystemDirectoryHandle}
-   */
-  rootHandle;
-
   constructor() {
     super();
-    this.loadRootHandle();
-  }
-
-  /**
-   * Wait for the OPFS root folder handle to be available.
-   *
-   * @returns {Promise<void>} Resolves when the root handle is available.
-   */
-  ready = () => {
-    return new Promise((resolve) => {
-      const check = () => {
-        if (this.rootHandle) {
-          resolve();
-        } else {
-          // Check every 300ms if the root handle is available.
-          setTimeout(check, 300);
-        }
-      };
-
-      check();
-    });
   }
 
   /**
    * Retrieve the root handle from OPFS.
+   *
+   * NOTE: Since caching the root handle becomes stale rather quickly in
+   * Chrome/Safari, the root handle is explicitly requested each time an
+   * operation is performed on the OPFS.
+   *
+   * @returns {Promise<FileSystemDirectoryHandle>} The root handle of the OPFS.
    */
-  loadRootHandle = () => {
-    navigator.storage.getDirectory().then((rootHandle) => {
-      this.rootHandle = rootHandle;
-    });
-  }
+  getRootHandle = () => navigator.storage.getDirectory();
 
   /**
    * Increment the number in a string with the pattern `XXXXXX (N)`.
@@ -76,7 +48,7 @@ export default class VirtualFileSystem extends EventTarget {
 
     if (match) {
       const num = parseInt(match[1]) + 1;
-      return string.replace(/\d+/, num);
+      return string.replace(/\((\d+)\)$/, `(${num})`);;
     }
 
     return `${string} (1)`;
@@ -88,17 +60,17 @@ export default class VirtualFileSystem extends EventTarget {
    * @returns {Promise<void>} Resolves when the root handle is cleared.
    */
   clear = async () => {
-    await this.ready();
+    const rootHandle = await this.getRootHandle();
 
     // To date, the 'remove' function is only available in Chromium-based
     // browsers. For other browsers, we iteratore through the first level of
     // files and folders and delete them one by one.
     if ('remove' in FileSystemDirectoryHandle.prototype) {
-      await this.rootHandle.remove({ recursive: true });
+      await rootHandle.remove({ recursive: true });
     } else {
       // Fallback for non-Chromium browsers.
-      for await (const name of this.rootHandle.keys()) {
-        await this.rootHandle.removeEntry(name, { recursive: true });
+      for await (const name of rootHandle.keys()) {
+        await rootHandle.removeEntry(name, { recursive: true });
       }
     }
   }
@@ -219,11 +191,11 @@ export default class VirtualFileSystem extends EventTarget {
    * @returns {Promise<FileSystemDirectoryHandle>} The folder handle.
    */
   getFolderHandleByPath = async (folderpath) => {
-    await this.ready();
+    const rootHandle = await this.getRootHandle();
 
-    if (!folderpath) return this.rootHandle;
+    if (!folderpath) return rootHandle;
 
-    let handle = this.rootHandle;
+    let handle = rootHandle;
     const parts = folderpath.split('/');
 
     while (handle && parts.length > 0) {
@@ -244,8 +216,6 @@ export default class VirtualFileSystem extends EventTarget {
    * @returns {Promise<FileSystemFileHandle|null>} The file handle if it exists.
    */
   getFileHandleByPath = async (filepath) => {
-    await this.ready();
-
     if (!(await this.pathExists(filepath))) {
       return null;
     }
@@ -276,15 +246,13 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Get all folder handles inside a given folder path.
+   * Get all folder handles inside a given folder path (NOT recursive).
    *
    * @async
    * @param {string} folderpath - The absolute folder path to search in.
    * @returns {Promise<FileSystemDirectoryHandle[]>} Array of folder handles.
    */
   findFoldersInFolder = async (folderpath) => {
-    await this.ready();
-
     // Obtain the folder handle recursively.
     const folderHandle = await this.getFolderHandleByPath(folderpath);
 
@@ -300,15 +268,13 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Get all file handles inside a given path.
+   * Get all file handles inside a given path (NOT recursive).
    *
    * @async
    * @param {string} folderpath - The absolute folder path to search in.
    * @returns {Promise<FileSystemFileHandle[]>} Array of file handles.
    */
   findFilesInFolder = async (folderpath) => {
-    await this.ready();
-
     // Obtain the folder handle recursively.
     const folderHandle = await this.getFolderHandleByPath(folderpath);
 
@@ -334,8 +300,6 @@ export default class VirtualFileSystem extends EventTarget {
    * @returns {FileSystemFileHandle} The new file handle.
    */
   createFile = async (fileObj, isUserInvoked = true) => {
-    await this.ready();
-
     const { path, content } = fileObj;
 
     const parts = path ? path.split('/') : [];
@@ -344,7 +308,7 @@ export default class VirtualFileSystem extends EventTarget {
 
     let parentFolderHandle = parentPath
       ? await this.getFolderHandleByPath(parentPath)
-      : this.rootHandle;
+      : await this.getRootHandle();
 
     // Ensure a unique file name.
     while ((await this.pathExists(name, parentFolderHandle))) {
@@ -382,9 +346,9 @@ export default class VirtualFileSystem extends EventTarget {
    * @returns {Promise<boolean>} True if the path exists, false otherwise.
    */
   pathExists = async (path, parentFolder = null) => {
-    await this.ready();
+    const rootHandle = await this.getRootHandle();
 
-    let parentFolderHandle = this.rootHandle;
+    let parentFolderHandle = rootHandle;
     if (typeof parentFolder === 'string') {
       parentFolderHandle = await this.getFolderHandleByPath(parentFolder);
     } else if (parentFolder instanceof FileSystemDirectoryHandle) {
@@ -392,7 +356,7 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     if (!parentFolderHandle) {
-      parentFolderHandle = this.rootHandle;
+      parentFolderHandle = rootHandle;
     }
 
     const parts = path.split('/');
@@ -419,7 +383,6 @@ export default class VirtualFileSystem extends EventTarget {
       }
     }
 
-    // If we reach here, the entry does not exist.
     return false;
   }
 
@@ -438,7 +401,7 @@ export default class VirtualFileSystem extends EventTarget {
 
     let parentFolderHandle = parentPath
       ? await this.getFolderHandleByPath(parentPath)
-      : this.rootHandle;
+      : await this.getRootHandle();
 
     // Ensure a unique folder name.
     while ((await this.pathExists(name, parentFolderHandle))) {
@@ -466,8 +429,6 @@ export default class VirtualFileSystem extends EventTarget {
    * @returns {FileSystemFileHandle} The updated file handle.
    */
   updateFileContent = async (path, content, isUserInvoked = true) => {
-    await this.ready();
-
     const fileHandle = await this.getFileHandleByPath(path);
     if (!fileHandle) return;
 
@@ -497,8 +458,6 @@ export default class VirtualFileSystem extends EventTarget {
    * @returns {Promise<FileSystemFileHandle>} The new file handle at the destination path.
    */
   moveFile = async (srcPath, destPath) => {
-    await this.ready();
-
     const srcFileContent = await this.getFileContentByPath(srcPath);
 
     // Create the file in the new destination path.
@@ -530,8 +489,8 @@ export default class VirtualFileSystem extends EventTarget {
    * @example moveFolder('folder1/folder2', 'folder3/folder2')
    *
    * @param {string} srcPath - The absolute path of the source folder.
-   * @param {string} destPath - The absolute path where the source folder should be moved to.
-   * @returns {Promise<FileSystemDirectoryHandle>} The new folder handle at the destination path.
+   * @param {string} destPath - The absolute path where the source folder should
+   * be moved to.
    */
   moveFolder = async (srcPath, destPath) => {
     // Move all files inside the folder to the new destination path.
@@ -551,16 +510,6 @@ export default class VirtualFileSystem extends EventTarget {
 
     // Delete source folder recursively.
     await this.deleteFolder(srcPath);
-
-    // Get the new folder handle at the destination path.
-    const newFolderHandle = await this.getFolderHandleByPath(destPath);
-
-    // TODO: migrate this.
-    // this.dispatchEvent(new CustomEvent('folderMoved', {
-    //   detail: { folder, oldPath },
-    // }));
-
-    return newFolderHandle;
   }
 
   /**
@@ -572,8 +521,6 @@ export default class VirtualFileSystem extends EventTarget {
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
   deleteFile = async (path, isUserInvoked = true, isSingleFileDelete = true) => {
-    await this.ready();
-
     if (!(await this.pathExists(path))) {
       return false;
     }
@@ -597,26 +544,17 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
-   * Delete a folder from the VFS, including nested files and folders.
-   *
-   * The isRootFolder parameter will only be true on the first call because the
-   * LFS will delete the folder with all of its children at once. Therefore, all
-   * subsequent calls will have it set to false, because we don't want to remove
-   * the those nested files by ourselves.
+   * Delete a folder recursively from the VFS.
    *
    * @param {string} path - The folder path to delete.
-   * @param {boolean} [isRootFolder] - Whether it is the root folder.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFolder = async (path, isRootFolder = true) => {
-    if (!(await this.pathExists(path, this.rootHandle))) {
+  deleteFolder = async (path) => {
+    const rootHandle = await this.getRootHandle();
+
+    if (!(await this.pathExists(path, rootHandle))) {
       return false;
     }
-
-    // TODO: migrate this.
-    // this.dispatchEvent(new CustomEvent('beforeFolderDeleted', {
-    //   detail: { folder: this.folders[id], isRootFolder },
-    // }));
 
     // Gather all subfiles and trigger a deleteFile on them.
     const files = await this.findFilesInFolder(path);

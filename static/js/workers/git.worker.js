@@ -407,40 +407,42 @@ class API {
    * Move a file from one location to another.
    *
    * @param {array} files - Array of file objects to move.
-   * @param {string} files[].oldPath - The filepath of the file to move.
-   * @param {string} files[].sha - The sha of the file to remove.
-   * @param {string} files[].newPath - The filepath to the new file.
-   * @param {string} files[].content - The new content of the file.
+   * @param {string} files[].srcPath - The filepath of the file to move.
+   * @param {string} files[].destPath - The filepath to the new file.
    */
   async moveFolder(files) {
-    // Keep track of a list of all new files with their new sha.
-    const updatedFiles = [];
-
     for (const file of files) {
+      // Get the source file content.
+      console.log('file', file);
+      const contentResponse = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
+        branch: this.repoBranch,
+        path: file.srcPath,
+      });
+
+      const content = atob(contentResponse.data.content);
+
       // Create the new file.
-      const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
-        path: file.newPath,
-        message: `Rename ${file.oldPath} to ${file.newPath}`,
+      const newFileResponse = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
+        path: file.destPath,
+        message: `Rename ${file.srcPath} to ${file.destPath}`,
         branch: this.repoBranch,
         committer: this.committer,
-        content: isImageExtension(file.newPath) ? file.content : btoa(file.content),
+        content,
       });
 
       // Delete the old files.
       await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
-        path: file.oldPath,
-        message: `Remove ${file.oldPath}`,
+        path: file.srcPath,
+        message: `Remove ${file.srcPath}`,
         branch: this.repoBranch,
         committer: this.committer,
-        sha: file.sha,
+        sha: this.fileShaMap[file.srcPath],
       });
 
-      updatedFiles.push({
-        path: file.newPath,
-        sha: result.data.content.sha,
-      });
+      // Update the file's sha.
+      this.fileShaMap[file.destPath] = newFileResponse.data.content.sha;
 
-      this._log(`Moved file from ${file.oldPath} to ${file.newPath}`);
+      this._log(`Moved file from ${file.srcPath} to ${file.destPath}`);
     }
 
     this.moveFolderSuccessCallback(updatedFiles);

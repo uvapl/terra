@@ -58,8 +58,6 @@ export default class GitFS {
     this.vfs.addEventListener('fileMoved', this.vfsFileMovedHandler);
     this.vfs.addEventListener('fileContentChanged', this.vfsFileContentChangedHandler);
     this.vfs.addEventListener('fileDeleted', this.vfsBeforeFileDeletedHandler);
-
-    this.vfs.addEventListener('folderMoved', this.vfsFolderMovedHandler);
   }
 
   vfsFileCreatedHandler = (event) => {
@@ -82,45 +80,13 @@ export default class GitFS {
   }
 
   vfsBeforeFileDeletedHandler = (event) => {
-    const  { file } = event.detail;
+    const { file } = event.detail;
     this.rm(file.path);
   }
 
   vfsFolderMovedHandler = (event) => {
-    const { folder, oldPath } = event.detail;
-    const filesToMove = this.getOldNewFilePathsRecursively(folder.id, oldPath);
-    this.moveFolder(filesToMove);
-  }
-
-  /**
-   * Get all file paths recursively from a folder. Invoked when a folder is
-   * being renamed or moved and updated in the UI when connected to Git.
-   *
-   * @param {string} folderId - The folder id to get the file paths from.
-   * @returns {array} List of objects with the old and new file paths.
-   */
-  getOldNewFilePathsRecursively = (folderId, oldPath) => {
-    const files = this.vfs.findFilesWhere({ parentId: folderId });
-    const folders = this.vfs.findFoldersWhere({ parentId: folderId });
-
-    let paths = files.map((file) => {
-      const filename = file.path.split('/').pop();
-      return {
-        oldPath: `${oldPath}/${filename}`,
-        newPath: file.path,
-        content: file.content,
-        sha: file.sha,
-      }
-    });
-
-    for (const folder of folders) {
-      paths = [
-        ...paths,
-        ...this.getOldNewFilePathsRecursively(folder.id, oldPath)
-      ];
-    }
-
-    return paths;
+    const { filesMoved } = event.detail;
+    this.moveFolder(filesMoved);
   }
 
   /**
@@ -383,15 +349,13 @@ export default class GitFS {
     // Remove all files from the VFS.
     await this.vfs.clear();
 
-    // Create all files in the VFS.
-    await Promise.all(
-      repoContents
-        .filter((file) => file.type === 'blob')
-        .map((file) => this.vfs.createFile({
-          path: file.path,
-          content: file.content,
-        }, false))
-    );
+    const files = repoContents.filter((file) => file.type === 'blob');
+    for (const file of files) {
+      await this.vfs.createFile({
+        path: file.path,
+        content: file.content,
+      }, false);
+    }
 
     // Trigger a vfsChanged event, such that all editors reload their content.
     Terra.app.layout.emitToAllComponents('vfsChanged');
