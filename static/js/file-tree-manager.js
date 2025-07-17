@@ -661,7 +661,6 @@ class FileTreeManager {
    * @param {string} destPath - The destination path of the file.
    */
   _updateOpenTab = (srcPath, destPath) => {
-    console.log('_updateOpenTab', srcPath, destPath)
     // Find the tab component that corresponds to the file.
     const tabComponent = Terra.app.getTabComponents().find(
       (tabComponent) => tabComponent.getPath() === srcPath
@@ -670,8 +669,6 @@ class FileTreeManager {
     // Update it if it exists.
     if (tabComponent) {
       const newName = getPartsFromPath(destPath).name;
-      tabComponent.setFilename(newName);
-      console.log(`Updated tab component for file: ${srcPath} -> ${destPath}`);
       tabComponent.setPath(destPath);
 
       if (tabComponent instanceof EditorComponent) {

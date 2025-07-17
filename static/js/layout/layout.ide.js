@@ -279,7 +279,7 @@ export default class IDELayout extends Layout {
       await fileTreeManager.createFileTree();
 
       // Change the Untitled tab to the new filename.
-      editorComponent.setFilename(filename);
+      editorComponent.setPath(filepath);
 
       // Update the container state.
       editorComponent.extendState({ path: filepath });

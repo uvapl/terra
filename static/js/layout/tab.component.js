@@ -1,4 +1,5 @@
 import { BASE_FONT_SIZE } from '../constants.js';
+import { getPartsFromPath } from '../helpers/shared.js';
 
 export default class TabComponent extends EventTarget {
   /**
@@ -60,11 +61,16 @@ export default class TabComponent extends EventTarget {
   }
 
   /**
-   * Set the path of the tab.
+   * Set the path of the tab. This also updates the tab's filename.
    *
    * @param {string} path - The absolute file path of the tab.
    */
   setPath = (path) => {
+    // Update the tab's filename.
+    const newFilename = getPartsFromPath(path).name;
+    this.setFilename(newFilename);
+
+    // Update the state with the new path.
     this.extendState({ path });
   }
 
