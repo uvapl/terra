@@ -27,6 +27,14 @@ export default class EditorComponent extends TabComponent {
    */
   userIsEditing = false;
 
+  /**
+   * Indicates whether it is the first time loading the content. This check is
+   * needed to prevent the 'change' event being triggered when the tab opens for
+   * the first time.
+   * @type {boolean}
+   */
+  firstTimeLoadingContent = true;
+
   constructor(container, state) {
     super(container, state);
 
@@ -236,6 +244,10 @@ export default class EditorComponent extends TabComponent {
     if (typeof content === 'string' && this.getContent() !== content) {
       this.editor.setValue(content);
       this.editor.clearSelection();
+    }
+
+    if (this.firstTimeLoadingContent) {
+      this.firstTimeLoadingContent = false;
     }
   }
 
@@ -521,8 +533,12 @@ export default class EditorComponent extends TabComponent {
    */
   bindEditorEvents = () => {
     this.editor.on('change', () => {
-      this.onEditorChange();
-      pluginManager.triggerEvent('onEditorChange', this);
+      // Only trigger a change event when the content actually changed.
+      // This excludes the first time the content is loaded when the tab opened.
+      if (!this.firstTimeLoadingContent) {
+        this.onEditorChange();
+        pluginManager.triggerEvent('onEditorChange', this);
+      }
     });
 
     this.editor.on('focus', () => {
