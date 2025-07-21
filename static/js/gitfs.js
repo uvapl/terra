@@ -236,7 +236,7 @@ export default class GitFS {
       // Triggered for primary and secondary rate limit.
       case 'rate-limit': {
         const retryAfter = Math.ceil(payload.retryAfter / 60);
-        $('#file-tree').html('<div class="info-msg error">Exceeded GitHub API limit.</div>');
+        fileTreeManager.setErrorMsg('Exceeded GitHub API limit.');
 
         const $modal = createModal({
           title: 'Exceeded GitHub API limit',
@@ -273,7 +273,7 @@ export default class GitFS {
         break;
 
       case 'clone-success':
-        $('#file-tree .info-msg').remove();
+        fileTreeManager.removeInfoMsg();
         fileTreeManager.removeLocalStorageWarning();
 
         this.importToVFS(payload.repoContents).then(() => {
@@ -285,8 +285,8 @@ export default class GitFS {
       case 'request-success':
         // If there was an error message, the file tree is gone, thus we have to
         // recreate the file tree.
-        if (this.isReady && $('#file-tree .info-msg').length > 0) {
-          $('#file-tree .info-msg').remove();
+        if (this.isReady && fileTreeManager.hasInfoMsg()) {
+          fileTreeManager.removeInfoMsg();
           fileTreeManager.createFileTree(true);
         }
         break;
@@ -307,11 +307,11 @@ export default class GitFS {
         }
 
 
-        $('#file-tree').html(`<div class="info-msg error">Failed to clone repository<br/><br/>${errMsg}</div>`);
+        fileTreeManager.setErrorMsg(`Failed to clone repository<br/><br/>${errMsg}`);
         break;
 
       case 'clone-fail':
-        $('#file-tree').html('<div class="info-msg error">Failed to clone repository</div>');
+        fileTreeManager.setErrorMsg('Failed to clone repository');
         break;
 
       case 'queue-busy':

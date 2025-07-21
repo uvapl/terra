@@ -295,7 +295,7 @@ export default class IDEApp extends App {
       fileTreeManager.destroyTree();
 
       console.log('Creating gitfs worker');
-      $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
+      fileTreeManager.setInfoMsg('Cloning repository...');
       pluginManager.triggerEvent('onStorageChange', 'git');
     }
   }

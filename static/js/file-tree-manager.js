@@ -23,6 +23,40 @@ class FileTreeManager {
   }
 
   /**
+   * Set an info message in the file tree.
+   *
+   * @param {string} msg - The message to display.
+   */
+  setInfoMsg = (msg) => {
+    this.getInstance().destroy();
+    $('#file-tree').html(`<div class="info-msg">${msg}</div>`);
+  }
+
+  /**
+   * Set an error message in the file tree.
+   *
+   * @param {string} msg - The message to display.
+   */
+  setErrorMsg = (err) => {
+    this.getInstance().destroy();
+    $('#file-tree').html(`<div class="info-msg error">${err}</div>`);
+  }
+
+  /**
+   * Remove the info message.
+   */
+  removeInfoMsg = () => {
+    $('#file-tree .info-msg').remove();
+  }
+
+  /**
+   * Indicates whether the file tree has an info message.
+   *
+   * @returns {boolean} True if the file tree has an info message, false otherwise.
+   */
+  hasInfoMsg = () => $('#file-tree .info-msg').length > 0;
+
+  /**
    * Removes the bottom message from the DOM.
    */
   removeBottomMsg = () => {
@@ -475,8 +509,7 @@ class FileTreeManager {
           }
           return;
         } else {
-          $('#file-tree .info-msg').remove();
-          this.getInstance().destroy();
+          this.removeInfoMsg();
         }
       }
 

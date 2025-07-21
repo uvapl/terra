@@ -50,9 +50,7 @@ export function renderGitRepoBranches(branches) {
 
     Terra.app.gitfs.setRepoBranch(newBranch);
 
-    fileTreeManager.destroyTree();
-
-    $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
+    fileTreeManager.setInfoMsg('Cloning repository...');
     Terra.app.gitfs.clone();
 
     Terra.app.closeAllFiles();
@@ -201,7 +199,7 @@ Menubar.openNewFile = () => {
 
 Menubar.openLFSFolder = () => {
   Terra.app.openLFSFolder().then(() => {
-    $('#file-tree .info-msg').remove();
+    filetreeManager.removeInfoMsg();
     $('#menu-item--close-folder').removeClass('disabled');
   });
 };
@@ -409,7 +407,7 @@ Menubar.connectRepo = () => {
       Terra.app.vfs.clear();
       fileTreeManager.createFileTree();
       fileTreeManager.setTitle('local storage');
-      $('#file-tree .info-msg').remove();
+      filetreeManager.removeInfoMsg();
 
       pluginManager.triggerEvent('onStorageChange', 'local');
     }
