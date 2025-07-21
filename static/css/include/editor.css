@@ -33,9 +33,9 @@
   border: 0;
 }
 
-/* Exceeded filesize popup */
+/* Exceeded filesize screen inside a tab */
 
-.editor.exceeded-filesize:after  {
+.exceeded-filesize:after  {
   padding-left: 50px;
   content: 'This file exceeds the maximum file size';
   display: flex;
@@ -52,6 +52,6 @@
 }
 
 
-.editor.exceeded-filesize .ace_cursor {
+.exceeded-filesize .ace_cursor {
   display: none !important;
 }

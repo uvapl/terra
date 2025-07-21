@@ -1,9 +1,9 @@
 import Layout from './layout.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
-import { isValidFilename, isObject, getFileExtension } from '../helpers/shared.js';
+import { isValidFilename, getFileExtension } from '../helpers/shared.js';
 import { isImageExtension } from '../helpers/image.js';
-import { BASE_FONT_SIZE, LFS_MAX_FILE_SIZE } from '../constants.js';
+import { BASE_FONT_SIZE, MAX_FILE_SIZE } from '../constants.js';
 import { createModal, hideModal, showModal } from '../modal.js';
 import Terra from '../terra.js';
 import tooltipManager from '../tooltip-manager.js';
@@ -96,8 +96,7 @@ export default class IDELayout extends Layout {
   }
 
   /**
-   * Validates whether the file size exceeds the maximum file size limit when
-   * the LFS is enabled.
+   * Validates whether the file size exceeds the maximum size per keystroke.
    *
    * @param {Event} event - The event object.
    * @param {EditorComponent} editorComponent - The editor component instance.
@@ -105,16 +104,16 @@ export default class IDELayout extends Layout {
   _validateFileSizeLimit(event, editorComponent) {
     // Verify whether the user exceeded the maximum file size when either
     // pasting from the clipboard or inserting text (i.e. on each keystroke).
-    if (Terra.app.hasLFSProjectLoaded && ['paste', 'insertstring'].includes(event.command.name)) {
+    if (['paste', 'insertstring'].includes(event.command.name)) {
       const inputText = event.args.text || '';
       const filesize = new Blob([editorComponent.getContent() + inputText]).size;
-      if (filesize >= LFS_MAX_FILE_SIZE) {
+      if (filesize >= MAX_FILE_SIZE) {
         // Prevent the event from happening.
         event.preventDefault();
 
         const $modal = createModal({
-          title: 'Exceeded maximum file size',
-          body: 'The file size exceeds the maximum file size. This limit is solely required when you are connected to your local filesystem. Please reduce the file size beforing adding more content.',
+          title: 'Maximum file size reached',
+          body: 'This file reached the maximum file size of 1MB.',
           footer: ' <button type="button" class="button primary-btn confirm-btn">Go back</button>',
           footerClass: 'flex-end',
           attrs: {

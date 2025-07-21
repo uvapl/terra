@@ -230,7 +230,7 @@ export default class EditorComponent extends TabComponent {
    * Disable the editor if the content is too large.
    */
   exceededFileSize = () => {
-    this.editor.container.classList.add('exceeded-filesize');
+    this.editor.container.parentNode.classList.add('exceeded-filesize');
     this.lock();
   }
 

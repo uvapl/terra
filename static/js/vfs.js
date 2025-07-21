@@ -272,6 +272,20 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
+   * Get the size of a file by its absolute path.
+   *
+   * @async
+   * @param {string} filepath - The absoluten file path.
+   * @returns {Promise<number>} The file size in bytes.
+   */
+  getFileSizeByPath = async (filepath) => {
+    const fileHandle = await this.getFileHandleByPath(filepath);
+    if (!fileHandle) return 0;
+    const file = await fileHandle.getFile();
+    return file.size;
+  }
+
+  /**
    * Get all folder handles inside a given folder path (NOT recursive).
    *
    * @async

@@ -1,6 +1,6 @@
 import App from './app.js';
 import IDELayout from './layout/layout.ide.js';
-import { LFS_MAX_FILE_SIZE } from './constants.js';
+import { MAX_FILE_SIZE } from './constants.js';
 import {
   getFileExtension,
   getRepoInfo,
@@ -170,6 +170,13 @@ export default class IDEApp extends App {
       return;
     }
 
+    // Check if the editor exceeded the maximum allowed file size.
+    const size = await this.vfs.getFileSizeByPath(filepath);
+    if (size > MAX_FILE_SIZE) {
+      editorComponent.exceededFileSize();
+      return;
+    }
+
     const content = await this.vfs.getFileContentByPath(filepath);
     editorComponent.setContent(content);
 
@@ -180,31 +187,6 @@ export default class IDEApp extends App {
     if (clearUndoStack) {
       editorComponent.clearUndoStack();
     }
-
-    return;
-
-    // TODO: We do want to persist the max filesize check and still call the
-    // editorComponent.exceededFileSize() function.
-    //
-    // Maybe this function here can be removed since it will be identical to the
-    // same definition in app.js, but that's still indecisive.
-
-    if (Terra.app.hasLFSProjectLoaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
-      editorComponent.exceededFileSize();
-    } else if (Terra.app.hasLFSProjectLoaded && !file.content) {
-      // Load the file content from LFS.
-      const cursorPos = editorComponent.getCursorPosition();
-      this.lfs.getFileContent(file.id).then((content) => {
-        editorComponent.setContent(content);
-        editorComponent.setCursorPosition(cursorPos);
-
-        if (clearUndoStack) {
-          editorComponent.clearUndoStack();
-        }
-      });
-    } else {
-      editorComponent.setContent(file.content);
-    }
   }
 
   /**
@@ -214,24 +196,23 @@ export default class IDEApp extends App {
    * @param {ImageComponent} imageComponent - The image component instance.
    */
   async setImageFileContent(imageComponent) {
-    // TODO: migrate properly.
     const filepath = imageComponent.getPath();
     const fileHandle = await this.vfs.getFileHandleByPath(filepath);
     if (!fileHandle) return;
 
     const file = await fileHandle.getFile();
     const content = await this.vfs.getFileContentByPath(filepath);
+    const size = await this.vfs.getFileSizeByPath(filepath);
 
-    if (Terra.app.hasLFSProjectLoaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
+    if (size > MAX_FILE_SIZE) {
       imageComponent.exceededFileSize();
-    } else if (Terra.app.hasLFSProjectLoaded && !content) {
-      // Load the file content from LFS.
-      this.lfs.getFile(fileHandle.id).then((file) => {
-        const url = URL.createObjectURL(file);
-        imageComponent.img.src = url;
-      });
-    } else {
+    } else if (this.hasGitFSWorker()){
+      // GitHub stores images as base64, so we directly set that content.
       imageComponent.setContent(content);
+    } else {
+      // For local storage or LFS, we create a blob URL.
+      const url = URL.createObjectURL(file);
+      imageComponent.setSrc(url);
     }
   }
 

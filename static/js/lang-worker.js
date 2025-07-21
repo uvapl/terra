@@ -107,7 +107,7 @@ export default class LangWorker {
 
     // Disable the button and wait for the worker to remove the disabled prop
     // once it has been loaded.
-    $('#run-code').prop('disabled', true);
+    $('#run-code').removeClass('loading').prop('disabled', true);
 
     Terra.app.termClearWriteBuffer();
 
