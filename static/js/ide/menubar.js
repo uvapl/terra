@@ -199,7 +199,7 @@ Menubar.openNewFile = () => {
 
 Menubar.openLFSFolder = () => {
   Terra.app.openLFSFolder().then(() => {
-    filetreeManager.removeInfoMsg();
+    fileTreeManager.removeInfoMsg();
     $('#menu-item--close-folder').removeClass('disabled');
   });
 };
