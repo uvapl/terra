@@ -41,9 +41,7 @@ export default class VirtualFileSystem extends EventTarget {
   constructor() {
     super();
 
-    // TODO: Enable this later and fix the flickering in the UI file tree upon
-    // refreshing the folder contents.
-    // this._watchRootFolder();
+    this._watchRootFolder();
   }
 
   /**
@@ -166,7 +164,10 @@ export default class VirtualFileSystem extends EventTarget {
    * LocalFilesystemAPI does not have event listeners built-in, we have no other
    * choice to poll the root folder for changes manually.
    *
-   * Note that this does clear rebuild the VFS, indexedDB and visual tree every
+   * Polling only applies to local storage and LFS mode, but not when connected
+   * to a GitHub repository.
+   *
+   * Note that this does clear rebuild the VFS and visual file tree every
    * few seconds, which---besides not being efficient---also creates new
    * file/folder IDs every time. It's not a problem, but just something to be
    * aware of.
@@ -177,12 +178,12 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     this._watchRootFolderInterval = setInterval(async () => {
-      if (Terra.v.blockFSPolling) return;
+      if (Terra.v.blockFSPolling || Terra.app.hasGitFSWorker()) return;
 
-      await fileTreeManager.runFuncWithPersistedState(async () => {
-        // Import again from the VFS.
-        await fileTreeManager.createFileTree(true);
-      });
+      // Import again from the VFS.
+      await fileTreeManager.runFuncWithPersistedState(
+        () => fileTreeManager.createFileTree()
+      );
 
     }, seconds(5));
   }

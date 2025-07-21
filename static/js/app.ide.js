@@ -462,7 +462,6 @@ export default class IDEApp extends App {
       localStorageManager.setLocalStorageItem('use-lfs', true);
       this.closeAllFiles();
       await idbManager.saveHandle('lfs', 'root', rootFolderHandle);
-      // this._watchRootFolder();
       fileTreeManager.setTitle(rootFolderHandle.name);
       pluginManager.triggerEvent('onStorageChange', 'lfs');
 
