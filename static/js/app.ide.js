@@ -3,7 +3,6 @@ import IDELayout from './layout/layout.ide.js';
 import { LFS_MAX_FILE_SIZE } from './constants.js';
 import {
   getFileExtension,
-  hasGitFSWorker,
   getRepoInfo,
   isObject,
 } from './helpers/shared.js';
@@ -11,8 +10,8 @@ import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
-import LocalFileSystem from './lfs.js';
 import pluginManager from './plugin-manager.js';
+import idbManager from './idb.js';
 import GitFS from './gitfs.js';
 
 export default class IDEApp extends App {
@@ -21,12 +20,6 @@ export default class IDEApp extends App {
    * @type {GitFS}
    */
   gitfs = null;
-
-  /**
-   * Reference to the Local File System (LFS) instance.
-   * @type {LocalFileSystem}
-   */
-  lfs = null;
 
   /**
    * This is mainly used for files/folders where a user could potentially
@@ -40,10 +33,6 @@ export default class IDEApp extends App {
 
   constructor() {
     super();
-
-    if (this.browserHasLFSApi()) {
-      this.lfs = new LocalFileSystem(this.vfs);
-    }
   }
 
   /**
@@ -70,13 +59,12 @@ export default class IDEApp extends App {
   }
 
   /**
-   * Whether the LFS has been initialized (which only happens in the IDE) and
-   * the user subsequently loaded a project. This instance variable remains
+   * Whether the user loaded an LFS folder.
    *
    * @returns {boolean} True if an LFS project is loaded.
    */
   get hasLFSProjectLoaded() {
-    return this.lfs && this.lfs.loaded;
+    return localStorageManager.getLocalStorageItem('use-lfs', false);
   }
 
   /**
@@ -92,25 +80,31 @@ export default class IDEApp extends App {
     this.layout = this.createLayout();
   }
 
-  postSetupLayout() {
+  async postSetupLayout() {
     // Check what to start after the page loads (GitFS, LFS or local storage).
     const repoLink = localStorageManager.getLocalStorageItem('git-repo');
-    const useLFS = localStorageManager.getLocalStorageItem('use-lfs', false);
     if (repoLink) {
       this.createGitFSWorker();
-    } else if (useLFS) {
-      this.lfs.init();
     } else {
       // local storage
-      fileTreeManager.createFileTree();
+      await fileTreeManager.createFileTree();
     }
 
     if (!this.browserHasLFSApi()) {
       // Disable open-folder if the FileSystemAPI is not supported.
       $('#menu-item--open-folder').remove();
+    } else if (this.hasLFSProjectLoaded) {
+      // If the browser supports LFS and a project is loaded...
+
+      // Set file-tree title to the root folder name.
+      const rootFolderHandle = await this.vfs.getRootHandle();
+      fileTreeManager.setTitle(rootFolderHandle.name);
+
+      // Enable close-folder menu item.
+      $('#menu-item--close-folder').removeClass('disabled');
     }
 
-    if (!repoLink && !useLFS) {
+    if (!repoLink && !this.hasLFSProjectLoaded) {
       fileTreeManager.showLocalStorageWarning();
     }
 
@@ -285,9 +279,9 @@ export default class IDEApp extends App {
    * storage. Otherwise, a worker will be created automatically when the user
    * adds a new repository.
    */
-  createGitFSWorker() {
-    if (this.haLFSProjectLoaded) {
-      this.lfs.terminate();
+  async createGitFSWorker() {
+    if (this.hasLFSProjectLoaded) {
+      await this.terminateLFS();
     }
 
     const accessToken = localStorageManager.getLocalStorageItem('git-access-token');
@@ -297,7 +291,7 @@ export default class IDEApp extends App {
       fileTreeManager.setTitle(`${repoInfo.user}/${repoInfo.repo}`)
     }
 
-    if (hasGitFSWorker()) {
+    if (this.hasGitFSWorker()) {
       // Pass `false` to *NOT* clear the git-repo and git-branch local storage
       // items, because this if-statement only runs when the user is already
       // connected to a repo and changed the repo URL. Thus, we shouldn't clear
@@ -403,6 +397,77 @@ export default class IDEApp extends App {
       path: filepath,
       content,
       handle: this.vfs.getFileHandleByPath(filepath),
+    }
+  }
+
+  /**
+   * Check whether the GitFS worker has been initialised.
+   *
+   * @returns {boolean} True if the worker has been initialised, false otherwise.
+   */
+  hasGitFSWorker() {
+    return this.gitfs instanceof GitFS;
+  }
+
+  /**
+   * Disconnect the LFS from the current folder.
+   *
+   * @async
+   */
+  async terminateLFS() {
+    localStorageManager.setLocalStorageItem('use-lfs', false);
+    clearTimeout(this._watchRootFolderInterval);
+    await this.vfs.clear();
+    await idbManager.clearStores();
+    $('#menu-item--close-folder').addClass('disabled');
+  }
+
+  /**
+   * Close the current LFS folder and use the VFS again.
+   *
+   * @async
+   */
+  async closeLFSFolder() {
+    await this.terminateLFS();
+    await fileTreeManager.createFileTree(); // show empty file tree
+    fileTreeManager.showLocalStorageWarning();
+    fileTreeManager.setTitle('local storage');
+    pluginManager.triggerEvent('onStorageChange', 'local');
+  }
+
+  /**
+   * Open a directory picker dialog and returns the selected directory.
+   *
+   * @async
+   * @returns {Promise<void>}
+   */
+  async openLFSFolder() {
+    let rootFolderHandle;
+    try {
+      rootFolderHandle = await window.showDirectoryPicker();
+    } catch (err) {
+      // User most likely aborted.
+      return;
+    }
+
+    const hasPermission = await this.vfs._verifyLFSHandlePermission(rootFolderHandle);
+    if (hasPermission) {
+      // Make sure GitFS is stopped.
+      if (this.hasGitFSWorker()) {
+        this.gitfs.terminate();
+        this.gitfs = null;
+      }
+
+      fileTreeManager.removeLocalStorageWarning();
+      localStorageManager.setLocalStorageItem('use-lfs', true);
+      this.closeAllFiles();
+      await idbManager.saveHandle('lfs', 'root', rootFolderHandle);
+      // this._watchRootFolder();
+      fileTreeManager.setTitle(rootFolderHandle.name);
+      pluginManager.triggerEvent('onStorageChange', 'lfs');
+
+      // Render the LFS contents.
+      await fileTreeManager.createFileTree();
     }
   }
 }

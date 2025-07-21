@@ -235,15 +235,6 @@ export function seconds(secs) {
 }
 
 /**
- * Check whether the GitFS worker has been initialised.
- *
- * @returns {boolean} True if the worker has been initialised, false otherwise.
- */
-export function hasGitFSWorker() {
-  return Terra.app.gitfs instanceof GitFS;
-}
-
-/**
  * Get the repo name and username of a given repo link.
  *
  * @example getRepoName('https://github.com/<user>/<repo>')

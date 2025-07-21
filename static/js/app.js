@@ -1,5 +1,4 @@
-import { IS_IDE } from './constants.js';
-import { getFileExtension, uuidv4 } from './helpers/shared.js'
+import { getFileExtension } from './helpers/shared.js'
 import LangWorker from './lang-worker.js';
 import Terra from './terra.js';
 import VirtualFileSystem from './vfs.js';

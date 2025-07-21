@@ -2,7 +2,10 @@
 // This file contains the virtual filesystem logic for the IDE app.
 ////////////////////////////////////////////////////////////////////////////////
 
-import { getPartsFromPath } from './helpers/shared.js';
+import { getPartsFromPath, seconds } from './helpers/shared.js';
+import Terra from './terra.js';
+import fileTreeManager from './file-tree-manager.js';
+import idbManager from './idb.js';
 
 export default class VirtualFileSystem extends EventTarget {
   /**
@@ -19,20 +22,103 @@ export default class VirtualFileSystem extends EventTarget {
    */
   folders = {};
 
+  /**
+   * List of paths that should be ignored when traversing the filesystem.
+   * @type {string[]}
+   */
+  blacklistedPaths = [
+    'site-packages',           // when user folder has python virtual env
+    '__pycache__',             // Python cache directory
+    '.mypy_cache',             // Mypy cache directory
+    '.venv', 'venv', 'env',    // virtual environment
+    '.DS_Store',               // Macos metadata file
+    'dist', 'build',           // compiled assets for various languages
+    'coverage', '.nyc_output', // code coverage reports
+    '.git',                    // Git directory
+    'node_modules',            // NodeJS projects
+  ];
+
   constructor() {
     super();
+
+    // TODO: Enable this later and fix the flickering in the UI file tree upon
+    // refreshing the folder contents.
+    // this._watchRootFolder();
   }
 
   /**
-   * Retrieve the root handle from OPFS.
+   * Retrieve the root handle from OPFS/LFS, depending on which one is active.
    *
-   * NOTE: Since caching the root handle becomes stale rather quickly in
+   * NOTE: Since caching the OPFS root handle becomes stale rather quickly in
    * Chrome/Safari, the root handle is explicitly requested each time an
-   * operation is performed on the OPFS.
+   * operation is performed on the VFS in general.
    *
-   * @returns {Promise<FileSystemDirectoryHandle>} The root handle of the OPFS.
+   * @returns {Promise<FileSystemDirectoryHandle>} The root handle.
    */
-  getRootHandle = () => navigator.storage.getDirectory();
+  getRootHandle = () => {
+    if (Terra.app.hasLFSProjectLoaded) {
+      return this._getRootHandleFromLFS();
+    }
+
+    return this._getRootHandleFromOPFS();
+  }
+
+  /**
+   * Retrieve the root handle from the OPFS.
+   *
+   * @returns {Promise<FileSystemDirectoryHandle>} The OPFS root handle.
+   */
+  _getRootHandleFromOPFS = () => navigator.storage.getDirectory();
+
+  /**
+   * Retrieves the LFS root directory handle from the IndexedDB store.
+   *
+   * @async
+   * @returns {Promise<FileSystemDirectoryHandle>} The LFS root folder handle.
+   */
+  _getRootHandleFromLFS = async () => {
+    const rootFolderHandle = await idbManager.getHandle('lfs', 'root');
+    if (!rootFolderHandle) {
+      throw new Error('LFS root folder handle not found');
+    }
+
+    const hasPermission = await this._verifyLFSHandlePermission(rootFolderHandle);
+    if (!hasPermission) {
+      // If we have no permission, clear VFS and the indexedDB stores.
+      await this.clear();
+      await idbManager.clearStores();
+      await fileTreeManager.createFileTree(); // show empty file tree
+      return;
+    }
+
+    return rootFolderHandle;
+  }
+
+  /**
+   * Request permission for a given LFS handle, either file or directory handle.
+   *
+   * @param {FileSystemDirectoryHandle|FileSystemFileHandle} handle
+   * @param {string} [mode] - The mode to request permission for.
+   * @returns {Promise<boolean>} True if permission is granted, false otherwise.
+   */
+  _verifyLFSHandlePermission = (handle, mode = 'readwrite') => {
+    const opts = { mode };
+
+    return new Promise(async (resolve) => {
+      // Check if we already have permission.
+      if ((await handle.queryPermission(opts)) === 'granted') {
+        return resolve(true);
+      }
+
+      // Otherwise, request permission to the handle.
+      if ((await handle.requestPermission(opts)) === 'granted') {
+        return resolve(true);
+      }
+
+      // The user did not grant permission.
+      return resolve(false);
+    });
+  }
 
   /**
    * Increment the number in a string with the pattern `XXXXXX (N)`.
@@ -76,6 +162,32 @@ export default class VirtualFileSystem extends EventTarget {
   }
 
   /**
+   * Polling function to watch the root folder for changes. As long as Chrome's
+   * LocalFilesystemAPI does not have event listeners built-in, we have no other
+   * choice to poll the root folder for changes manually.
+   *
+   * Note that this does clear rebuild the VFS, indexedDB and visual tree every
+   * few seconds, which---besides not being efficient---also creates new
+   * file/folder IDs every time. It's not a problem, but just something to be
+   * aware of.
+   */
+  _watchRootFolder = () => {
+    if (this._watchRootFolderInterval) {
+      clearInterval(this._watchRootFolderInterval);
+    }
+
+    this._watchRootFolderInterval = setInterval(async () => {
+      if (Terra.v.blockLFSPolling) return;
+
+      await fileTreeManager.runFuncWithPersistedState(async () => {
+        // Import again from the VFS.
+        await fileTreeManager.createFileTree(true);
+      });
+
+    }, seconds(5));
+  }
+
+  /**
    * Check whether the virtual filesystem is empty.
    *
    * @async
@@ -88,93 +200,6 @@ export default class VirtualFileSystem extends EventTarget {
 
     return files.length === 0 && folders.length === 0;
   }
-
-  /**
-   * TODO: DELETE THIS w/ findFilesWhere+findFileWhere+findFoldersWhere
-   * Internal helper function to filter an object based on conditions, ignoring
-   * the case of the values.
-   *
-   * @param {object} conditions - The conditions to filter on.
-   */
-  _whereIgnoreCase = (conditions) => (f) =>
-    Object.entries(conditions).every(([k, v]) =>
-      typeof f[k] === 'string' && typeof v === 'string'
-        ? f[k].toLowerCase() === v.toLowerCase()
-        : f[k] === v
-    )
-
-  /**
-   * TODO: DELETE THIS
-   * Find all files that match the given conditions.
-   *
-   * @example findFilesWhere({ name: 'foo' })
-   *
-   * @param {object} conditions - The conditions to filter on.
-   * @returns {array} List of file objects matching the conditions.
-   */
-  findFilesWhere = (conditions) => {
-    return Object.values(this.files).filter(this._whereIgnoreCase(conditions))
-  }
-
-  /**
-   * TODO: DELETE THIS
-   * Find a single file that match the given conditions.
-   *
-   * @example findFileWhere({ name: 'foo' })
-   *
-   * @param {object} conditions - The conditions to filter on.
-   * @returns {object|null} The file object matching the conditions or null if
-   * the file is not found.
-   */
-  findFileWhere = (conditions) => {
-    const files = this.findFilesWhere(conditions);
-    return files.length > 0 ? files[0] : null;
-  }
-
-  /**
-   * TODO: DELETE THIS
-   * Find all folders that match the given conditions.
-   *
-   * @example findFoldersWhere({ name: 'foo' })
-   *
-   * @param {object} conditions - The conditions to filter on.
-   * @returns {array} List of folder objects matching the conditions.
-   */
-  findFoldersWhere = (conditions) => {
-    return Object.values(this.folders).filter(this._whereIgnoreCase(conditions))
-  }
-
-  /**
-   * TODO: DELETE THIS
-   * Find a file by its id.
-   *
-   * @param {string} id - The id of the file to find.
-   */
-  findFileById = (id) => this.files[id];
-
-  /**
-   * TODO: DELETE THIS
-   * Find a folder by its id.
-   *
-   * @param {string} id - The id of the folder to find.
-   */
-  findFolderById = (id) => this.folders[id];
-
-  /**
-   * Find a file by its absolute path.
-   *
-   * @param {string} path - The absolute filepath.
-   */
-  findFileByPath = (path) =>
-    Object.values(this.files).find((f) => f.path === path);
-
-  /**
-   * Find a folder by its absolute path.
-   *
-   * @param {string} path - The absolute folderpath.
-   */
-  findFolderByPath = (path) =>
-    Object.values(this.folders).find((f) => f.path === path);
 
   /**
    * Get a folder handle by its absolute path.
@@ -259,7 +284,7 @@ export default class VirtualFileSystem extends EventTarget {
     // Gather all subfolder handles.
     const subfolders = [];
     for await (let handle of folderHandle.values()) {
-      if (handle.kind === 'directory') {
+      if (handle.kind === 'directory' && !this.blacklistedPaths.includes(handle.name)) {
         subfolders.push(handle);
       }
     }
@@ -281,7 +306,7 @@ export default class VirtualFileSystem extends EventTarget {
     // Gather all subfile handles.
     const subfiles = [];
     for await (let handle of folderHandle.values()) {
-      if (handle.kind === 'file') {
+      if (handle.kind === 'file' && !this.blacklistedPaths.includes(handle.name)) {
         subfiles.push(handle);
       }
     }
@@ -410,13 +435,6 @@ export default class VirtualFileSystem extends EventTarget {
 
     const newFolderHandle = await parentFolderHandle.getDirectoryHandle(name, { create: true });
 
-    if (isUserInvoked) {
-      // TODO: migrate this.
-      // this.dispatchEvent(new CustomEvent('folderCreated', {
-      //   detail: { folder: newFolderHandle },
-      // }));
-    }
-
     return newFolderHandle;
   }
 
@@ -440,7 +458,9 @@ export default class VirtualFileSystem extends EventTarget {
 
     if (isUserInvoked) {
       this.dispatchEvent(new CustomEvent('fileContentChanged', {
-        detail: { file: { path, content } },
+        detail: {
+          file: { path, content }
+        },
       }));
     }
 
@@ -520,7 +540,7 @@ export default class VirtualFileSystem extends EventTarget {
    * a single file or is called from the `deleteFolder` function.
    * @returns {boolean} True if deleted successfully, false otherwise.
    */
-  deleteFile = async (path, isUserInvoked = true, isSingleFileDelete = true) => {
+  deleteFile = async (path, isUserInvoked = true) => {
     if (!(await this.pathExists(path))) {
       return false;
     }
@@ -535,7 +555,6 @@ export default class VirtualFileSystem extends EventTarget {
       this.dispatchEvent(new CustomEvent('fileDeleted', {
         detail: {
           file: { path },
-          // isSingleFileDelete
         },
       }));
     }
@@ -560,7 +579,7 @@ export default class VirtualFileSystem extends EventTarget {
     const files = await this.findFilesInFolder(path);
     for (const file of files) {
       const filepath = `${path}/${file.name}`;
-      await this.deleteFile(filepath, true, false);
+      await this.deleteFile(filepath, true);
     }
 
     // Delete all the nested folders inside the current folder.
@@ -608,7 +627,6 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     // Get all the nested folders and files.
-    // const nestedFolders = this.findFoldersWhere({ parentId: folderpath });
     const subfolders = await this.findFoldersInFolder(folderpath);
     for (const folder of subfolders) {
       const folderZip = zip.folder(folder.name);
