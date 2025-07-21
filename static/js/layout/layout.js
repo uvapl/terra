@@ -312,10 +312,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
     // The onTabCreated is *also* triggered when a user is dragging tabs around,
     // thus if the tab is already in the list, we return early.
-    const newTabFilepath = tab.contentItem.instance.getPath();
+    const newTabInstance = tab.contentItem.instance;
     const tabExists = this.tabs.some((existingTab) => {
-      const path = existingTab.contentItem.instance.getPath();
-      return path === newTabFilepath;
+      return existingTab.contentItem.instance === newTabInstance;
     });
     if (tabExists) return;
 
@@ -361,11 +360,10 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   onTabDestroy() {
     // If it's the last tab being closed, then we insert another 'Untitled' tab,
     // because we always need at least one tab open.
-    const editorComponents = this.getTabComponents();
-    const totalTabs = editorComponents.length;
+    const tabComponents = this.getTabComponents();
 
-    if (totalTabs === 1) {
-      const firstTabComponent = editorComponents[0];
+    if (tabComponents.length === 1) {
+      const firstTabComponent = tabComponents[0];
       firstTabComponent.addSiblingTab();
     }
   }

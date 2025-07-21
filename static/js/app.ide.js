@@ -367,12 +367,12 @@ export default class IDEApp extends App {
    * not provided, the active tab will be closed.
    */
   closeFile(filepath) {
-    const editorComponent = filepath
+    const component = filepath
       ? this.layout.getTabComponents().find((component) => component.getPath() === filepath)
       : this.layout.getActiveEditor();
 
-    if (editorComponent) {
-      editorComponent.close();
+    if (component) {
+      component.close();
     }
   }
 
