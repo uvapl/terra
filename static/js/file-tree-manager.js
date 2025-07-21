@@ -28,7 +28,10 @@ class FileTreeManager {
    * @param {string} msg - The message to display.
    */
   setInfoMsg = (msg) => {
-    this.getInstance().destroy();
+    const tree = this.getInstance();
+    if (tree) {
+      tree.destroy();
+    }
     $('#file-tree').html(`<div class="info-msg">${msg}</div>`);
   }
 
@@ -38,7 +41,10 @@ class FileTreeManager {
    * @param {string} msg - The message to display.
    */
   setErrorMsg = (err) => {
-    this.getInstance().destroy();
+    const tree = this.getInstance();
+    if (tree) {
+      tree.destroy();
+    }
     $('#file-tree').html(`<div class="info-msg error">${err}</div>`);
   }
 
