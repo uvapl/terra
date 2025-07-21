@@ -54,6 +54,7 @@ export function renderGitRepoBranches(branches) {
 
     $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
     Terra.app.gitfs.clone();
+
     Terra.app.closeAllFiles();
   });
 }

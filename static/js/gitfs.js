@@ -159,6 +159,7 @@ export default class GitFS {
    * Clone the current repository.
    */
   clone = () => {
+    this.isReady = false;
     this.worker.postMessage({ id: 'clone' });
   }
 
@@ -275,13 +276,6 @@ export default class GitFS {
         $('#file-tree .info-msg').remove();
         fileTreeManager.removeLocalStorageWarning();
 
-        // Add all file sha's to the fileShaMap.
-        // payload.repoContents.forEach((fileOrFolder) => {
-        //   if (fileOrFolder.type === 'blob') {
-        //     this.fileShaMap[fileOrFolder.path] = fileOrFolder.sha;
-        //   }
-        // });
-
         this.importToVFS(payload.repoContents).then(() => {
           Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
           fileTreeManager.createFileTree();
@@ -312,19 +306,13 @@ export default class GitFS {
           }
         }
 
+
         $('#file-tree').html(`<div class="info-msg error">Failed to clone repository<br/><br/>${errMsg}</div>`);
         break;
 
       case 'clone-fail':
         $('#file-tree').html('<div class="info-msg error">Failed to clone repository</div>');
         break;
-
-      // case 'move-folder-success':
-      //   // Update all sha for the new files.
-      //   payload.updatedFiles.forEach((fileObj) => {
-      //     this.fileShaMap[fileObj.path] = fileObj.sha;
-      //   });
-      //   break;
 
       case 'queue-busy':
         fileTreeManager.showBottomMsg('Syncing changes to GitHub...');
