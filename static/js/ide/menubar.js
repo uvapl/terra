@@ -91,10 +91,10 @@ function closeActiveMenuBarMenu(event) {
   const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
   const editorComponent = Terra.app.getActiveEditor();
   if (isInsideMenu && isNotNewFileOrFolderBtn && editorComponent && editorComponent.ready) {
-    // Set Terra.v.blockLFSPolling to prevent file contents being reloaded
-    Terra.v.blockLFSPolling = true;
+    // Set Terra.v.blockFSPolling to prevent file contents being reloaded
+    Terra.v.blockFSPolling = true;
     editorComponent.focus();
-    Terra.v.blockLFSPolling = false;
+    Terra.v.blockFSPolling = false;
   }
 
   // Close the active menu only when it is not a disabled menu item.

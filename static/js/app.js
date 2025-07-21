@@ -162,7 +162,7 @@ export default class App {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   async onEditorVFSChanged(editorComponent) {
-    if (!Terra.v.blockLFSPolling) {
+    if (!Terra.v.blockFSPolling) {
       await this.setEditorFileContent(editorComponent, true);
     }
   }
@@ -173,7 +173,7 @@ export default class App {
   }
 
   onImageVFSChanged(imageComponent) {
-    if (!Terra.v.blockLFSPolling) {
+    if (!Terra.v.blockFSPolling) {
       this.setImageFileContent(imageComponent);
     }
   }

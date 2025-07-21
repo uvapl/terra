@@ -281,7 +281,7 @@ class FileTreeManager {
     showModal($modal);
 
     $modal.find('.cancel-btn').click(() => {
-      Terra.v.blockLFSPolling = false;
+      Terra.v.blockFSPolling = false;
       hideModal($modal);
     });
 
@@ -302,7 +302,7 @@ class FileTreeManager {
       node.remove();
 
       hideModal($modal);
-      Terra.v.blockLFSPolling = false;
+      Terra.v.blockFSPolling = false;
 
       // Reload tree such that the 'No files or folders found' becomes visible
       // when needed.
@@ -370,7 +370,7 @@ class FileTreeManager {
           callback: () => {
             Terra.v.userClickedContextMenuItem = true;
             Terra.app.vfs.downloadFolder(node.key);
-            Terra.v.blockLFSPolling = false;
+            Terra.v.blockFSPolling = false;
           },
         };
       }
@@ -383,7 +383,7 @@ class FileTreeManager {
           callback: () => {
             Terra.v.userClickedContextMenuItem = true;
             Terra.app.vfs.downloadFile(node.key);
-            Terra.v.blockLFSPolling = false;
+            Terra.v.blockFSPolling = false;
           },
         };
       }
@@ -394,7 +394,7 @@ class FileTreeManager {
           callback: () => {
             Terra.v.userClickedContextMenuItem = true;
             Terra.app.runCode({ fileId: node.key });
-            Terra.v.blockLFSPolling = false;
+            Terra.v.blockFSPolling = false;
           }
         };
       }
@@ -537,11 +537,11 @@ class FileTreeManager {
         build: this._createContextMenuItems,
         events: {
           show: () => {
-            Terra.v.blockLFSPolling = true;
+            Terra.v.blockFSPolling = true;
           },
           hide: () => {
             if (!Terra.v.userClickedContextMenuItem) {
-              Terra.v.blockLFSPolling = false;
+              Terra.v.blockFSPolling = false;
             }
           }
         }
@@ -554,7 +554,7 @@ class FileTreeManager {
    */
   _afterCloseEditNodeCallback = () => {
     this.sortFileTree(),
-    Terra.v.blockLFSPolling = false;
+    Terra.v.blockFSPolling = false;
   }
 
   /**
@@ -687,7 +687,7 @@ class FileTreeManager {
    * Callback when the user starts editing a node in the file tree.
    */
   _onStartEditNodeCallback = (event, data) => {
-    Terra.v.blockLFSPolling = true;
+    Terra.v.blockFSPolling = true;
     clearTimeout(Terra.v.fileTreeToggleTimeout);
     data.input.select();
 
@@ -712,12 +712,12 @@ class FileTreeManager {
       // to prevent double-clicks.
       if (event.originalEvent.target.classList.contains('fancytree-title')) {
         Terra.v.fileTreeToggleTimeout = setTimeout(() => {
-          Terra.v.blockLFSPolling = true;
+          Terra.v.blockFSPolling = true;
           data.node.toggleExpanded();
 
           // Unblock LFS polling after the animation has completed.
           setTimeout(() => {
-            Terra.v.blockLFSPolling = false;
+            Terra.v.blockFSPolling = false;
           }, 400);
         }, 200);
       } else {
@@ -785,7 +785,7 @@ class FileTreeManager {
    * Callback when the user starts dragging a node in the file tree.
    */
   _dragStartCallback = (node, data) => {
-    Terra.v.blockLFSPolling = true;
+    Terra.v.blockFSPolling = true;
 
     // Set custom drag image.
     data.dataTransfer.setDragImage($(`<div class="custom-drag-helper">${node.title}</div>`).appendTo("body")[0], -10, -10);
@@ -804,7 +804,7 @@ class FileTreeManager {
 
     tooltipManager.destroyTooltip('dndDuplicate');
     this.sortFileTree()
-    Terra.v.blockLFSPolling = false;
+    Terra.v.blockFSPolling = false;
   }
 
   /**

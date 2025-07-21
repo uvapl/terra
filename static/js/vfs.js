@@ -177,7 +177,7 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     this._watchRootFolderInterval = setInterval(async () => {
-      if (Terra.v.blockLFSPolling) return;
+      if (Terra.v.blockFSPolling) return;
 
       await fileTreeManager.runFuncWithPersistedState(async () => {
         // Import again from the VFS.

@@ -144,7 +144,7 @@ export default class IDEApp extends App {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   onEditorStartEditing(editorComponent) {
-    Terra.v.blockLFSPolling = true;
+    Terra.v.blockFSPolling = true;
   }
 
   /**
@@ -153,7 +153,7 @@ export default class IDEApp extends App {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   onEditorStopEditing(editorComponent) {
-    Terra.v.blockLFSPolling = false;
+    Terra.v.blockFSPolling = false;
   }
 
   /**
