@@ -124,6 +124,7 @@ export default class IDEApp extends App {
       }
     }));
 
+    this.layout.resetLayout = true;
     this.layout.destroy();
     this.layout = this.createLayout(true, oldContentConfig);
     this.layout.on('initialised', () => {
@@ -136,6 +137,7 @@ export default class IDEApp extends App {
       }, 10);
     });
     this.layout.init();
+    this.layout.resetLayout = false;
   }
 
   /**

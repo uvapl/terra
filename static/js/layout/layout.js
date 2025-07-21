@@ -362,7 +362,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     // because we always need at least one tab open.
     const tabComponents = this.getTabComponents();
 
-    if (tabComponents.length === 1) {
+    if (tabComponents.length === 1 && !this.resetLayout) {
       const firstTabComponent = tabComponents[0];
       firstTabComponent.addSiblingTab();
     }
