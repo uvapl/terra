@@ -2,7 +2,7 @@
 // This file contains the virtual filesystem logic for the IDE app.
 ////////////////////////////////////////////////////////////////////////////////
 
-import { getPartsFromPath, seconds } from './helpers/shared.js';
+import { getPartsFromPath, seconds, slugify } from './helpers/shared.js';
 import Terra from './terra.js';
 import fileTreeManager from './file-tree-manager.js';
 import idbManager from './idb.js';
@@ -465,11 +465,14 @@ export default class VirtualFileSystem extends EventTarget {
     const fileHandle = await this.getFileHandleByPath(path);
     if (!fileHandle) return;
 
-    if (content) {
-      const writable = await fileHandle.createWritable();
-      await writable.write(content);
-      await writable.close();
-    }
+    // Update the file contents after a short delay to allow debouncing.
+    Terra.app.registerTimeoutHandler(`file-update-${slugify(path)}`, seconds(0.2), async () => {
+      if (content) {
+        const writable = await fileHandle.createWritable();
+        await writable.write(content);
+        await writable.close();
+      }
+    });
 
     if (isUserInvoked) {
       this.dispatchEvent(new CustomEvent('fileContentChanged', {
