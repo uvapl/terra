@@ -107,7 +107,7 @@ export default class LangWorker {
 
     // Disable the button and wait for the worker to remove the disabled prop
     // once it has been loaded.
-    $('#run-code').prop('disabled', true);
+    $('#run-code').removeClass('loading').prop('disabled', true);
 
     Terra.app.termClearWriteBuffer();
 
@@ -163,17 +163,17 @@ export default class LangWorker {
   /**
    * Triggers the `runUserCode` event in the currently active worker.
    *
-   * @param {string} activeTabName - The name of the currently active tab.
+   * @param {string} activeTabPath - The active tab's absolute file path.
    * @param {array} vfsFiles - List of objects, each containing the filename
    * and content of the corresponding editor tab.
    * @param {array} runAsConfig - Configuration object for the run-as command.
    */
-  runUserCode(activeTabName, vfsFiles, runAsConfig) {
+  runUserCode(activeTabPath, vfsFiles, runAsConfig) {
     this.isRunningCode = true;
 
     this.port.postMessage({
       id: 'runUserCode',
-      data: { activeTabName, vfsFiles, runAsConfig },
+      data: { activeTabPath, vfsFiles, runAsConfig },
     });
   }
 
@@ -259,26 +259,24 @@ export default class LangWorker {
    * Called from within the worker when files have been added or modified in the
    * worker's internal filesystem during execution of the program.
    *
+   * @async
    * @param {array} newOrModifiedFiles - List of file objects.
    */
-  newOrModifiedFilesCallback(newOrModifiedFiles) {
+  async newOrModifiedFilesCallback(newOrModifiedFiles) {
     if (!Array.isArray(newOrModifiedFiles)) {
       return;
     }
 
     for (const file of newOrModifiedFiles) {
       // Check if the file already exists in the VFS.
-      const existingFile = Terra.app.vfs.findFileByPath(file.path);
-      if (existingFile) {
+      if ((await Terra.app.vfs.pathExists(file.path))) {
         // If the file already exists, update its content.
-        Terra.app.vfs.updateFile(existingFile.id, {
-          content: file.content,
-        });
+        await Terra.app.vfs.updateFile(file.path, file.content);
 
         // Check if there's an open tab for this file.
-        const tabComponent = Terra.app.getTabComponents().find((tabComponent) => {
-          const { fileId } = tabComponent.getState();
-          return fileId == existingFile.id;
+        const tabComponent = Terra.app.getTabComponents().find((component) => {
+          const path = component.getPath();
+          return path == file.path;
         });
 
         // If so, update its content.
@@ -286,18 +284,15 @@ export default class LangWorker {
           tabComponent.setContent(file.content);
         }
       } else {
-        const parentFolderPath = file.path.split('/').slice(0, -1).join('/');
-        const parentFolder = Terra.app.vfs.findFolderByPath(parentFolderPath);
-        const parentId = parentFolder ? parentFolder.id : null;
-        Terra.app.vfs.createFile({
-          name: file.name,
+        // Otherwise, create a new file in the VFS.
+        await Terra.app.vfs.createFile({
+          path: file.path,
           content: file.content,
-          parentId,
         });
       }
 
       // Recreate the file tree.
-      fileTreeManager.createFileTree();
+      await fileTreeManager.createFileTree();
     }
   }
 

@@ -2,7 +2,7 @@ import { createModal, hideModal, showModal } from './modal.js';
 import Terra from './terra.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
-import { seconds } from './helpers/shared.js';
+import { seconds, slugify } from './helpers/shared.js';
 import { GITHUB_URL_PATTERN } from './ide/constants.js';
 
 /**
@@ -57,70 +57,36 @@ export default class GitFS {
     this.vfs.addEventListener('fileCreated', this.vfsFileCreatedHandler);
     this.vfs.addEventListener('fileMoved', this.vfsFileMovedHandler);
     this.vfs.addEventListener('fileContentChanged', this.vfsFileContentChangedHandler);
-    this.vfs.addEventListener('beforeFileDeleted', this.vfsBeforeFileDeletedHandler);
-
-    this.vfs.addEventListener('folderMoved', this.vfsFolderMovedHandler);
+    this.vfs.addEventListener('fileDeleted', this.vfsBeforeFileDeletedHandler);
   }
 
   vfsFileCreatedHandler = (event) => {
     const { file } = event.detail;
-    this.commit(file.path, file.content, file.sha);
+    this.commit(file.path, file.content);
   }
 
   vfsFileMovedHandler = (event) => {
     const { file, oldPath } = event.detail;
-    this.moveFile(oldPath, file.sha, file.path, file.content);
+    this.moveFile(oldPath, file.path, file.content);
   }
 
   vfsFileContentChangedHandler = (event) => {
     const { file } = event.detail;
 
     // Only commit changes after 2 seconds of inactivity.
-    Terra.app.registerTimeoutHandler(`git-commit-${file.id}`, seconds(2), () => {
-      this.commit(file.path, file.content, file.sha);
+    Terra.app.registerTimeoutHandler(`commit-${slugify(file.path)}`, seconds(2), () => {
+      this.commit(file.path, file.content);
     });
   }
 
   vfsBeforeFileDeletedHandler = (event) => {
-    const  { file } = event.detail;
-    this.rm(file.path, file.sha);
+    const { file } = event.detail;
+    this.rm(file.path);
   }
 
   vfsFolderMovedHandler = (event) => {
-    const { folder, oldPath } = event.detail;
-    const filesToMove = this.getOldNewFilePathsRecursively(folder.id, oldPath);
-    this.moveFolder(filesToMove);
-  }
-
-  /**
-   * Get all file paths recursively from a folder. Invoked when a folder is
-   * being renamed or moved and updated in the UI when connected to Git.
-   *
-   * @param {string} folderId - The folder id to get the file paths from.
-   * @returns {array} List of objects with the old and new file paths.
-   */
-  getOldNewFilePathsRecursively = (folderId, oldPath) => {
-    const files = this.vfs.findFilesWhere({ parentId: folderId });
-    const folders = this.vfs.findFoldersWhere({ parentId: folderId });
-
-    let paths = files.map((file) => {
-      const filename = file.path.split('/').pop();
-      return {
-        oldPath: `${oldPath}/${filename}`,
-        newPath: file.path,
-        content: file.content,
-        sha: file.sha,
-      }
-    });
-
-    for (const folder of folders) {
-      paths = [
-        ...paths,
-        ...this.getOldNewFilePathsRecursively(folder.id, oldPath)
-      ];
-    }
-
-    return paths;
+    const { filesMoved } = event.detail;
+    this.moveFolder(filesMoved);
   }
 
   /**
@@ -193,6 +159,7 @@ export default class GitFS {
    * Clone the current repository.
    */
   clone = () => {
+    this.isReady = false;
     this.worker.postMessage({ id: 'clone' });
   }
 
@@ -201,12 +168,11 @@ export default class GitFS {
    *
    * @param {string} filepath - The absolute filepath within the git repo.
    * @param {string} filecontents - The new contents to commit.
-   * @param {string} sha - The sha of the file to commit.
    */
-  commit = (filepath, filecontents, sha) => {
+  commit = (filepath, filecontents) => {
     this.worker.postMessage({
       id: 'commit',
-      data: { filepath, filecontents, sha },
+      data: { filepath, filecontents },
     });
   }
 
@@ -214,12 +180,11 @@ export default class GitFS {
    * Remove a filepath from the current repository.
    *
    * @param {string} filepath - The absolute filepath within the git repo.
-   * @param {string} sha - The sha of the file to delete.
    */
-  rm = (filepath, sha) => {
+  rm = (filepath) => {
     this.worker.postMessage({
       id: 'rm',
-      data: { filepath, sha },
+      data: { filepath },
     });
   }
 
@@ -231,10 +196,10 @@ export default class GitFS {
    * @param {string} newPath - The absolute filepath to the new file.
    * @param {string} newContent - The new content of the file.
    */
-  moveFile = (oldPath, oldSha, newPath, newContent) => {
+  moveFile = (oldPath, newPath, newContent) => {
     this.worker.postMessage({
       id: 'moveFile',
-      data: { oldPath, oldSha, newPath, newContent },
+      data: { oldPath, newPath, newContent },
     });
   }
 
@@ -259,7 +224,7 @@ export default class GitFS {
    *
    * @param {object} event - Event object coming from the UI.
    */
-  onmessage = (event) => {
+  onmessage = async (event) => {
     const payload = event.data.data;
 
     switch (event.data.id) {
@@ -271,7 +236,7 @@ export default class GitFS {
       // Triggered for primary and secondary rate limit.
       case 'rate-limit': {
         const retryAfter = Math.ceil(payload.retryAfter / 60);
-        $('#file-tree').html('<div class="info-msg error">Exceeded GitHub API limit.</div>');
+        fileTreeManager.setErrorMsg('Exceeded GitHub API limit.');
 
         const $modal = createModal({
           title: 'Exceeded GitHub API limit',
@@ -308,7 +273,7 @@ export default class GitFS {
         break;
 
       case 'clone-success':
-        $('#file-tree .info-msg').remove();
+        fileTreeManager.removeInfoMsg();
         fileTreeManager.removeLocalStorageWarning();
 
         this.importToVFS(payload.repoContents).then(() => {
@@ -320,8 +285,8 @@ export default class GitFS {
       case 'request-success':
         // If there was an error message, the file tree is gone, thus we have to
         // recreate the file tree.
-        if (this.isReady && $('#file-tree .info-msg').length > 0) {
-          $('#file-tree .info-msg').remove();
+        if (this.isReady && fileTreeManager.hasInfoMsg()) {
+          fileTreeManager.removeInfoMsg();
           fileTreeManager.createFileTree(true);
         }
         break;
@@ -341,26 +306,12 @@ export default class GitFS {
           }
         }
 
-        $('#file-tree').html(`<div class="info-msg error">Failed to clone repository<br/><br/>${errMsg}</div>`);
+
+        fileTreeManager.setErrorMsg(`Failed to clone repository<br/><br/>${errMsg}`);
         break;
 
       case 'clone-fail':
-        $('#file-tree').html('<div class="info-msg error">Failed to clone repository</div>');
-        break;
-
-      case 'move-folder-success':
-        // Update all sha in the new files in the VFS.
-        payload.updatedFiles.forEach((fileObj) => {
-          const file = this.vfs.findFileByPath(fileObj.path);
-          file.sha = fileObj.sha;
-        });
-        break;
-
-      case 'move-file-success':
-      case 'commit-success':
-        // Update the file's sha in the VFS.
-        const file = this.vfs.findFileByPath(payload.filepath);
-        file.sha = payload.sha;
+        fileTreeManager.setErrorMsg('Failed to clone repository');
         break;
 
       case 'queue-busy':
@@ -383,63 +334,18 @@ export default class GitFS {
    * @async
    */
   importToVFS = async (repoContents) => {
-    // Preserve all currently open tabs after refreshing.
-    // We first obtain the current filepaths before clearing the VFS.
-    const tabs = {};
-    Terra.app.layout.getTabComponents().forEach((tabComponent) => {
-      const { fileId } = tabComponent.getState();
-      if (fileId) {
-        const { path } = this.vfs.findFileById(fileId);
-        tabs[path] = tabComponent;
-      }
-    });
+    // Remove all files from the VFS.
+    await this.vfs.clear();
 
-    // Remove all files from the virtual filesystem.
-    this.vfs.clear();
-
-    // First create all root files.
-    repoContents
-      .filter((file) => file.type === 'blob' && !file.path.includes('/'))
-      .forEach(async (file) => {
-        this.vfs.createFile({
-          name: file.path.split('/').pop(),
-          sha: file.sha,
-          isNew: false,
-          content: file.content,
-        }, false);
-      });
-
-    // Then create all root folders and their nested files.
-    repoContents
-      .filter((fileOrFolder) => !(fileOrFolder.type === 'blob' && !fileOrFolder.path.includes('/')))
-      .forEach((fileOrFolder) => {
-        const { sha } = fileOrFolder;
-        const path = fileOrFolder.path.split('/');
-        const name = path.pop();
-
-        const parentId = path.length > 0 ? this.vfs.findFolderByPath(path.join('/')).id : null;
-
-        if (fileOrFolder.type === 'tree') {
-          this.vfs.createFolder({ name, parentId, sha });
-        } else if (fileOrFolder.type === 'blob') {
-          this.vfs.createFile({
-            name,
-            parentId,
-            sha,
-            content: fileOrFolder.content,
-          }, false);
-        }
-      });
-
-    // Finally, we sync the current tabs with their new file IDs.
-    for (const [filepath, tabComponent] of Object.entries(tabs)) {
-      const file = this.vfs.findFileByPath(filepath);
-      if (file) {
-        tabComponent.extendState({ fileId: file.id });
-        Terra.app.layout.emitToAllComponents('vfsChanged');
-      }
+    const files = repoContents.filter((file) => file.type === 'blob');
+    for (const file of files) {
+      await this.vfs.createFile({
+        path: file.path,
+        content: file.content,
+      }, false);
     }
 
-    this.vfs.saveState();
+    // Trigger a vfsChanged event, such that all editors reload their content.
+    Terra.app.layout.emitToAllComponents('vfsChanged');
   }
 }

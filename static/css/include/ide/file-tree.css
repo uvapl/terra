@@ -6,7 +6,6 @@
   position: relative;
   min-width: var(--file-tree-width);
   max-width: var(--file-tree-width);
-  overflow: auto;
   user-select: none;
   display: flex;
   flex-direction: column;

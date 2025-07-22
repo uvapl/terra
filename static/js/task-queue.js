@@ -1,4 +1,4 @@
-import { seconds } from './shared.js';
+import { seconds } from './helpers/shared.js';
 
 /**
  * Queue that allows scheduling tasks to be executed sequentially.

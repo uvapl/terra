@@ -1,4 +1,3 @@
-import Terra from '../terra.js';
 import Layout from './layout.js';
 
 export default class EmbedLayout extends Layout {

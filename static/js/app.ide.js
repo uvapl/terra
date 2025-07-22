@@ -1,9 +1,8 @@
 import App from './app.js';
 import IDELayout from './layout/layout.ide.js';
-import { LFS_MAX_FILE_SIZE } from './constants.js';
+import { MAX_FILE_SIZE } from './constants.js';
 import {
   getFileExtension,
-  hasGitFSWorker,
   getRepoInfo,
   isObject,
 } from './helpers/shared.js';
@@ -11,8 +10,8 @@ import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
-import LocalFileSystem from './lfs.js';
 import pluginManager from './plugin-manager.js';
+import idbManager from './idb.js';
 import GitFS from './gitfs.js';
 
 export default class IDEApp extends App {
@@ -21,12 +20,6 @@ export default class IDEApp extends App {
    * @type {GitFS}
    */
   gitfs = null;
-
-  /**
-   * Reference to the Local File System (LFS) instance.
-   * @type {LocalFileSystem}
-   */
-  lfs = null;
 
   /**
    * This is mainly used for files/folders where a user could potentially
@@ -40,10 +33,6 @@ export default class IDEApp extends App {
 
   constructor() {
     super();
-
-    if (this.browserHasLFSApi()) {
-      this.lfs = new LocalFileSystem(this.vfs);
-    }
   }
 
   /**
@@ -70,13 +59,12 @@ export default class IDEApp extends App {
   }
 
   /**
-   * Whether the LFS has been initialized (which only happens in the IDE) and
-   * the user subsequently loaded a project. This instance variable remains
+   * Whether the user loaded an LFS folder.
    *
    * @returns {boolean} True if an LFS project is loaded.
    */
   get hasLFSProjectLoaded() {
-    return this.lfs && this.lfs.loaded;
+    return localStorageManager.getLocalStorageItem('use-lfs', false);
   }
 
   /**
@@ -92,25 +80,31 @@ export default class IDEApp extends App {
     this.layout = this.createLayout();
   }
 
-  postSetupLayout() {
+  async postSetupLayout() {
     // Check what to start after the page loads (GitFS, LFS or local storage).
     const repoLink = localStorageManager.getLocalStorageItem('git-repo');
-    const useLFS = localStorageManager.getLocalStorageItem('use-lfs', false);
     if (repoLink) {
       this.createGitFSWorker();
-    } else if (useLFS) {
-      this.lfs.init();
     } else {
       // local storage
-      fileTreeManager.createFileTree();
+      await fileTreeManager.createFileTree();
     }
 
     if (!this.browserHasLFSApi()) {
       // Disable open-folder if the FileSystemAPI is not supported.
       $('#menu-item--open-folder').remove();
+    } else if (this.hasLFSProjectLoaded) {
+      // If the browser supports LFS and a project is loaded...
+
+      // Set file-tree title to the root folder name.
+      const rootFolderHandle = await this.vfs.getRootHandle();
+      fileTreeManager.setTitle(rootFolderHandle.name);
+
+      // Enable close-folder menu item.
+      $('#menu-item--close-folder').removeClass('disabled');
     }
 
-    if (!repoLink && !useLFS) {
+    if (!repoLink && !this.hasLFSProjectLoaded) {
       fileTreeManager.showLocalStorageWarning();
     }
 
@@ -121,15 +115,16 @@ export default class IDEApp extends App {
    * Reset the layout to its initial state.
    */
   resetLayout() {
-    const oldContentConfig = Terra.app.layout.getTabComponents().map((tabComponent) => ({
-      title: tabComponent.getFilename(),
-      componentName: tabComponent.getComponentName(),
+    const oldContentConfig = Terra.app.layout.getTabComponents().map((component) => ({
+      title: component.getFilename(),
+      componentName: component.getComponentName(),
       componentState: {
-        fileId: tabComponent.getState().fileId,
-        value: tabComponent.getContent(),
+        path: component.getPath(),
+        value: component.getContent(),
       }
     }));
 
+    this.layout.resetLayout = true;
     this.layout.destroy();
     this.layout = this.createLayout(true, oldContentConfig);
     this.layout.on('initialised', () => {
@@ -142,6 +137,7 @@ export default class IDEApp extends App {
       }, 10);
     });
     this.layout.init();
+    this.layout.resetLayout = false;
   }
 
   /**
@@ -150,7 +146,7 @@ export default class IDEApp extends App {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   onEditorStartEditing(editorComponent) {
-    Terra.v.blockLFSPolling = true;
+    Terra.v.blockFSPolling = true;
   }
 
   /**
@@ -159,56 +155,66 @@ export default class IDEApp extends App {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   onEditorStopEditing(editorComponent) {
-    Terra.v.blockLFSPolling = false;
+    Terra.v.blockFSPolling = false;
   }
 
   /**
    * Reload the file content either from VFS or LFS.
    *
+   * @async
    * @param {EditorComponent} editorComponent - The editor component instance.
    * @param {boolean} clearUndoStack - Whether to clear the undo stack or not.
    */
-  setEditorFileContent(editorComponent, clearUndoStack = false) {
-    const file = this.vfs.findFileById(editorComponent.getState().fileId);
-    if (!file) return;
+  async setEditorFileContent(editorComponent, clearUndoStack = false) {
+    const filepath = editorComponent.getPath();
 
-    if (Terra.app.hasLFSProjectLoaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
+    if (!filepath || (filepath && !(await this.vfs.pathExists(filepath)))) {
+      return;
+    }
+
+    // Check if the editor exceeded the maximum allowed file size.
+    const size = await this.vfs.getFileSizeByPath(filepath);
+    if (size > MAX_FILE_SIZE) {
       editorComponent.exceededFileSize();
-    } else if (Terra.app.hasLFSProjectLoaded && !file.content) {
-      // Load the file content from LFS.
-      const cursorPos = editorComponent.getCursorPosition();
-      this.lfs.getFileContent(file.id).then((content) => {
-        editorComponent.setContent(content);
-        editorComponent.setCursorPosition(cursorPos);
+      return;
+    }
 
-        if (clearUndoStack) {
-          editorComponent.clearUndoStack();
-        }
-      });
-    } else {
-      editorComponent.setContent(file.content);
+    const content = await this.vfs.getFileContentByPath(filepath);
+    editorComponent.setContent(content);
+
+    const cursorPos = editorComponent.getCursorPosition();
+    editorComponent.setContent(content);
+    editorComponent.setCursorPosition(cursorPos);
+
+    if (clearUndoStack) {
+      editorComponent.clearUndoStack();
     }
   }
 
   /**
    * Reload the file content either from VFS or LFS.
    *
+   * @async
    * @param {ImageComponent} imageComponent - The image component instance.
    */
-  setImageFileContent(imageComponent) {
-    const file = this.vfs.findFileById(imageComponent.getState().fileId);
-    if (!file) return;
+  async setImageFileContent(imageComponent) {
+    const filepath = imageComponent.getPath();
+    const fileHandle = await this.vfs.getFileHandleByPath(filepath);
+    if (!fileHandle) return;
 
-    if (Terra.app.hasLFSProjectLoaded && typeof file.size === 'number' && file.size > LFS_MAX_FILE_SIZE) {
+    const file = await fileHandle.getFile();
+    const content = await this.vfs.getFileContentByPath(filepath);
+    const size = await this.vfs.getFileSizeByPath(filepath);
+
+    if (size > MAX_FILE_SIZE) {
       imageComponent.exceededFileSize();
-    } else if (Terra.app.hasLFSProjectLoaded && !file.content) {
-      // Load the file content from LFS.
-      this.lfs.getFile(file.id).then((file) => {
-        const url = URL.createObjectURL(file);
-        imageComponent.img.src = url;
-      });
+    } else if (this.hasGitFSWorker()){
+      // GitHub stores images as base64, so we directly set that content.
+      imageComponent.setContent(content);
     } else {
-      imageComponent.setContent(file.content);
+      // For local storage or LFS, we create a blob URL.
+      const url = URL.createObjectURL(file);
+      imageComponent.setSrc(url);
     }
   }
 
@@ -256,9 +262,9 @@ export default class IDEApp extends App {
    * storage. Otherwise, a worker will be created automatically when the user
    * adds a new repository.
    */
-  createGitFSWorker() {
-    if (this.haLFSProjectLoaded) {
-      this.lfs.terminate();
+  async createGitFSWorker() {
+    if (this.hasLFSProjectLoaded) {
+      await this.terminateLFS();
     }
 
     const accessToken = localStorageManager.getLocalStorageItem('git-access-token');
@@ -268,7 +274,7 @@ export default class IDEApp extends App {
       fileTreeManager.setTitle(`${repoInfo.user}/${repoInfo.repo}`)
     }
 
-    if (hasGitFSWorker()) {
+    if (this.hasGitFSWorker()) {
       // Pass `false` to *NOT* clear the git-repo and git-branch local storage
       // items, because this if-statement only runs when the user is already
       // connected to a repo and changed the repo URL. Thus, we shouldn't clear
@@ -291,7 +297,7 @@ export default class IDEApp extends App {
       fileTreeManager.destroyTree();
 
       console.log('Creating gitfs worker');
-      $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
+      fileTreeManager.setInfoMsg('Cloning repository...');
       pluginManager.triggerEvent('onStorageChange', 'git');
     }
   }
@@ -304,18 +310,20 @@ export default class IDEApp extends App {
    * created in the file-tree which automatically creates the file in the vfs.
    *
    * This function gets triggered on each 'save' keystroke, i.e. <cmd/ctrl + s>.
+   *
+   * @async
    */
-  saveFile() {
+  async saveFile() {
     const editorComponent = this.layout.getActiveEditor();
 
     if (!editorComponent) return;
 
     // If the file exists in the vfs, then return, because the contents will be
     // auto-saved already by the editor component.
-    const existingFileId = editorComponent.getState().fileId;
-    if (existingFileId) {
-      const file = this.vfs.findFileById(existingFileId);
-      if (file) return;
+    const existingFilepath = editorComponent.getPath();
+    if (existingFilepath) {
+      const fileHandle = await this.vfs.getFileHandleByPath(existingFilepath);
+      if (fileHandle) return;
     }
 
     this.layout.promptSaveFile(editorComponent);
@@ -325,13 +333,12 @@ export default class IDEApp extends App {
    * Open a file in the editor and if necessary, spawn a new worker based on the
    * file extension.
    *
-   * @param {string} id - The file id. Leave empty to create new file.
-   * @param {string} filename - The name of the file to open.
+   * @param {string} filepath - The path of the file to open.
    */
-  openFile(id, filename) {
-    this.layout.addFileTab(id, filename);
+  openFile(filepath) {
+    this.layout.addFileTab(filepath);
 
-    const proglang = getFileExtension(filename);
+    const proglang = getFileExtension(filepath);
     this.createLangWorker(proglang);
   }
 
@@ -339,16 +346,16 @@ export default class IDEApp extends App {
   /**
    * Close the active tab in the editor.
    *
-   * @param {string} fileId - The file ID of the tab to close. If not provided,
-   * the active tab will be closed.
+   * @param {string} filepath - The absolute file path of the tab to close. If
+   * not provided, the active tab will be closed.
    */
-  closeFile(fileId) {
-    const editorComponent = fileId
-      ? this.layout.getTabComponents().find((editorComponent) => editorComponent.getState().fileId === fileId)
+  closeFile(filepath) {
+    const component = filepath
+      ? this.layout.getTabComponents().find((component) => component.getPath() === filepath)
       : this.layout.getActiveEditor();
 
-    if (editorComponent) {
-      editorComponent.close();
+    if (component) {
+      component.close();
     }
   }
 
@@ -356,19 +363,93 @@ export default class IDEApp extends App {
    * Close all tabs in the editor.
    */
   closeAllFiles() {
-    this.layout.getTabComponents().forEach((editorComponent) => {
-      editorComponent.close();
-    });
+    this.layout.getTabComponents().forEach((component) => component.close());
   }
 
   /**
    * Retrieve the file object of the active editor.
    *
-   * @returns {object} The file object.
+   * @async
+   * @returns {Promise<object>} The file object.
    */
-  getActiveEditorFileObject() {
+  async getActiveEditorFileObject() {
     const editorComponent = this.layout.getActiveEditor();
-    const { fileId } = editorComponent.getState();
-    return Terra.app.vfs.findFileById(fileId);
+    const filepath = editorComponent.getPath();
+    const content = await this.vfs.getFileContentByPath(filepath);
+    return {
+      path: filepath,
+      content,
+      handle: this.vfs.getFileHandleByPath(filepath),
+    }
+  }
+
+  /**
+   * Check whether the GitFS worker has been initialised.
+   *
+   * @returns {boolean} True if the worker has been initialised, false otherwise.
+   */
+  hasGitFSWorker() {
+    return this.gitfs instanceof GitFS;
+  }
+
+  /**
+   * Disconnect the LFS from the current folder.
+   *
+   * @async
+   */
+  async terminateLFS() {
+    localStorageManager.setLocalStorageItem('use-lfs', false);
+    clearTimeout(this._watchRootFolderInterval);
+    await this.vfs.clear();
+    await idbManager.clearStores();
+    $('#menu-item--close-folder').addClass('disabled');
+  }
+
+  /**
+   * Close the current LFS folder and use the VFS again.
+   *
+   * @async
+   */
+  async closeLFSFolder() {
+    await this.terminateLFS();
+    await fileTreeManager.createFileTree(); // show empty file tree
+    fileTreeManager.showLocalStorageWarning();
+    fileTreeManager.setTitle('local storage');
+    pluginManager.triggerEvent('onStorageChange', 'local');
+  }
+
+  /**
+   * Open a directory picker dialog and returns the selected directory.
+   *
+   * @async
+   * @returns {Promise<void>}
+   */
+  async openLFSFolder() {
+    let rootFolderHandle;
+    try {
+      rootFolderHandle = await window.showDirectoryPicker();
+    } catch (err) {
+      // User most likely aborted.
+      return;
+    }
+
+    const hasPermission = await this.vfs._verifyLFSHandlePermission(rootFolderHandle);
+    if (hasPermission) {
+      // Make sure GitFS is stopped.
+      if (this.hasGitFSWorker()) {
+        this.gitfs.terminate();
+        this.gitfs = null;
+      }
+
+      fileTreeManager.removeLocalStorageWarning();
+      localStorageManager.setLocalStorageItem('use-lfs', true);
+      this.closeAllFiles();
+      await idbManager.saveHandle('lfs', 'root', rootFolderHandle);
+      fileTreeManager.setTitle(rootFolderHandle.name);
+      pluginManager.triggerEvent('onStorageChange', 'lfs');
+
+      // Render the LFS contents.
+      await fileTreeManager.createFileTree();
+    }
   }
 }

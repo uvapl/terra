@@ -1,5 +1,4 @@
-import { IS_IDE } from './constants.js';
-import { getFileExtension, uuidv4 } from './helpers/shared.js'
+import { getFileExtension } from './helpers/shared.js'
 import LangWorker from './lang-worker.js';
 import Terra from './terra.js';
 import VirtualFileSystem from './vfs.js';
@@ -105,7 +104,7 @@ export default class App {
     ];
 
     editorEvents.forEach((eventName) => {
-      this.layout.addEventListener(eventName, (event) => {
+      this.layout.addEventListener(eventName, async (event) => {
         const { tabComponent } = event.detail;
         if (typeof this[eventName] === 'function') {
           this[eventName](tabComponent);
@@ -130,15 +129,12 @@ export default class App {
    * This is default functionality and super.onEditorChange() must be
    * called first in child classes before any additional functionality.
    *
+   * @async
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  onEditorChange(editorComponent) {
-    const { fileId } = editorComponent.getState();
-    if (fileId) {
-      this.vfs.updateFile(fileId, {
-        content: editorComponent.getContent(),
-      });
-    }
+  async onEditorChange(editorComponent) {
+    const path = editorComponent.getPath();
+    await this.vfs.updateFileContent(path, editorComponent.getContent());
   }
 
   /**
@@ -149,27 +145,12 @@ export default class App {
    *
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  onEditorShow(editorComponent) {
-    // If we ran into a layout state from localStorage that doesn't have
-    // a file ID, or the file ID is not the same, then we should sync the
-    // filesystem ID with this tab state's file ID. We can only do this for
-    // non-IDE versions, because the ID always uses IDs properly and can have
-    // multiple filenames. It can be assumed that both the exam and iframe will
-    // not have duplicate filenames.
-    if (!IS_IDE) {
-      const filename = editorComponent.getFilename();
-      const file = this.vfs.findFileWhere({ name: filename });
-      const { fileId } = editorComponent.getState();
-      if (!fileId || (file && fileId !== file.id)) {
-        editorComponent.extendState({ fileId: file.id });
-      }
-    }
-
+  async onEditorShow(editorComponent) {
     if (editorComponent.ready) {
       this.createLangWorker(editorComponent.proglang);
     }
 
-    this.setEditorFileContent(editorComponent);
+    await this.setEditorFileContent(editorComponent);
   }
 
 
@@ -180,9 +161,9 @@ export default class App {
    *
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  onEditorVFSChanged(editorComponent) {
-    if (!Terra.v.blockLFSPolling) {
-      this.setEditorFileContent(editorComponent, true);
+  async onEditorVFSChanged(editorComponent) {
+    if (!Terra.v.blockFSPolling) {
+      await this.setEditorFileContent(editorComponent, true);
     }
   }
 
@@ -192,7 +173,7 @@ export default class App {
   }
 
   onImageVFSChanged(imageComponent) {
-    if (!Terra.v.blockLFSPolling) {
+    if (!Terra.v.blockFSPolling) {
       this.setImageFileContent(imageComponent);
     }
   }
@@ -201,13 +182,15 @@ export default class App {
   /**
    * Reload the file content either from VFS or LFS.
    *
+   * @async
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  setEditorFileContent(editorComponent) {
-    const file = this.vfs.findFileById(editorComponent.getState().fileId);
-    if (!file) return;
-
-    editorComponent.setContent(file.content);
+  async setEditorFileContent(editorComponent) {
+    const path = editorComponent.getPath();
+    if (path) {
+      const content = await this.vfs.getFileContentByPath(path);
+      editorComponent.setContent(content);
+    }
   }
 
   /**
@@ -225,7 +208,7 @@ export default class App {
       componentState: {
         fontSize,
         value: tabs[filename],
-        fileId: uuidv4(),
+        path: filename,
       },
       title: filename,
       isClosable: false,
@@ -237,8 +220,9 @@ export default class App {
    * the current active tab name. If the `fileId` is set, then solely that file
    * will be run.
    *
+   * @async
    * @param {object} options - Options for running the code.
-   * @param {string} options.fileId - Run a specific file.
+   * @param {string} options.filepath - Run a specific file.
    * @param {boolean} options.clearTerm Whether to clear the terminal before
    * printing the output.
    * @param {boolean} options.runAs - Whether the runAs config should be used.
@@ -263,33 +247,19 @@ export default class App {
 
     $('#run-code').prop('disabled', true);
 
-    let filename = null;
-    let files = null;
-
-    if (options.fileId) {
-      // Run given file id.
-      const file = this.vfs.findFileById(options.fileId);
-      filename = file.name;
-      files = await this.getAllEditorFiles();
-      if (!files.some((file) => file.name === filename)) {
-        fileInfo = await this.getFileInfo(file.id);
-        files.append(fileInfo);
-      }
-    } else {
-      const editorComponent = this.layout.getActiveEditor();
-      filename = editorComponent.getFilename();
-      files = await this.getAllEditorFiles();
-    }
+    // Run a given file path, or otherwise the active file.
+    const filepath = options.filepath || this.layout.getActiveEditor().getPath();
+    let files = await this.getAllEditorFiles();
 
     // Append hidden files if present.
     files = files.concat(this.getHiddenFiles());
 
     // Create a new worker instance if needed.
-    const proglang = getFileExtension(filename);
+    const proglang = getFileExtension(filepath);
     this.createLangWorker(proglang);
 
     // Build args send to the worker's runUserCode function.
-    const runUserCodeArgs = [filename, files];
+    const runUserCodeArgs = [filepath, files];
 
     const runAsConfig = this.getRunAsConfig();
     if (options.runAs && runAsConfig) {
@@ -394,34 +364,34 @@ export default class App {
   }
 
   /**
-   * Gather the editor file content based on the fileId.
+   * Gathers all files from the VFS.
    *
    * @async
-   * @param {string} fileId - The ID of the file.
-   * @returns {Promise<object>} Object containing the filename and content.
+   * @param {string} [folderpath=''] - The folder path to start searching from.
+   * @returns {Promise<object[]>} List of objects, each containing the filepath
+   * and content of the corresponding file.
    */
-  async getFileInfo(fileId) {
-    const file = this.vfs.findFileById(fileId);
-    const { name, path } = file;
+  async getAllEditorFiles(folderpath = '') {
+    let files = [];
 
-    let content = file.content;
-    if (this.hasLFSProjectLoaded && !content) {
-      content = await this.lfs.getFileContent(fileId);
+    const subfiles = await this.vfs.findFilesInFolder(folderpath);
+    for (const file of subfiles) {
+      const subfilepath = folderpath ? `${folderpath}/${file.name}` : file.name;
+      const content = await this.vfs.getFileContentByPath(subfilepath);
+      files.push({
+        path: subfilepath,
+        content: content,
+      });
     }
 
-    return { name, path, content };
-  }
+    const subfolders = await this.vfs.findFoldersInFolder(folderpath);
+    for (const folder of subfolders) {
+      const subfolderpath = folderpath ? `${folderpath}/${folder.name}` : folder.name;
+      const subfiles = await this.getAllEditorFiles(subfolderpath);
+      files = files.concat(subfiles);
+    }
 
-  /**
-   * Gathers all files from the editor and returns them as an array of objects.
-   *
-   * @returns {Promise<array>} List of objects, each containing the filename and
-   * content of the corresponding editor tab.
-   */
-  getAllEditorFiles() {
-    return Promise.all(
-      Object.keys(this.vfs.files).map(this.getFileInfo)
-    );
+    return files;
   }
 
   /**

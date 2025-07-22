@@ -50,10 +50,9 @@ export function renderGitRepoBranches(branches) {
 
     Terra.app.gitfs.setRepoBranch(newBranch);
 
-    fileTreeManager.destroyTree();
-
-    $('#file-tree').html('<div class="info-msg">Cloning repository...</div>');
+    fileTreeManager.setInfoMsg('Cloning repository...');
     Terra.app.gitfs.clone();
+
     Terra.app.closeAllFiles();
   });
 }
@@ -91,10 +90,10 @@ function closeActiveMenuBarMenu(event) {
   const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
   const editorComponent = Terra.app.getActiveEditor();
   if (isInsideMenu && isNotNewFileOrFolderBtn && editorComponent && editorComponent.ready) {
-    // Set Terra.v.blockLFSPolling to prevent file contents being reloaded
-    Terra.v.blockLFSPolling = true;
+    // Set Terra.v.blockFSPolling to prevent file contents being reloaded
+    Terra.v.blockFSPolling = true;
     editorComponent.focus();
-    Terra.v.blockLFSPolling = false;
+    Terra.v.blockFSPolling = false;
   }
 
   // Close the active menu only when it is not a disabled menu item.
@@ -199,8 +198,8 @@ Menubar.openNewFile = () => {
 };
 
 Menubar.openLFSFolder = () => {
-  Terra.app.lfs.openFolderPicker().then(() => {
-    $('#file-tree .info-msg').remove();
+  Terra.app.openLFSFolder().then(() => {
+    fileTreeManager.removeInfoMsg();
     $('#menu-item--close-folder').removeClass('disabled');
   });
 };
@@ -208,7 +207,7 @@ Menubar.openLFSFolder = () => {
 Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-folder').hasClass('disabled')) return;
 
-  Terra.app.lfs.closeFolder();
+  Terra.app.closeLFSFolder();
   Terra.app.closeAllFiles();
   closeActiveMenuBarMenu(event);
 };
@@ -382,7 +381,7 @@ Menubar.connectRepo = () => {
   }
 
   $connectModal.find('.cancel-btn').click(() => hideModal($connectModal));
-  $connectModal.find('.confirm-btn').click(() => {
+  $connectModal.find('.confirm-btn').click(async () => {
     const repoLink = $connectModal.find('.repo-link').val().trim();
 
     // For now, we only allow GitHub-HTTPS repo links.
@@ -408,7 +407,7 @@ Menubar.connectRepo = () => {
       Terra.app.vfs.clear();
       fileTreeManager.createFileTree();
       fileTreeManager.setTitle('local storage');
-      $('#file-tree .info-msg').remove();
+      filetreeManager.removeInfoMsg();
 
       pluginManager.triggerEvent('onStorageChange', 'local');
     }
@@ -421,7 +420,7 @@ Menubar.connectRepo = () => {
     // 1) The user is connected to a repo and wants to connect to another one,
     //    so we are certain that there are files in the VFS.
     // 2) The user is not connected to a repo, but there are files in the VFS.
-    if (!currentRepoLink && !Terra.app.vfs.isEmpty()) {
+    if (!currentRepoLink && !(await Terra.app.vfs.isEmpty())) {
       // Create a new modal after the previous one is hidden.
       setTimeout(() => {
         const $confirmModal = createModal({

@@ -2,7 +2,7 @@ import App from './app.js';
 import { BASE_FONT_SIZE } from './constants.js';
 import {
   getFileExtension,
-  makeLocalStorageKey,
+  slugify,
   parseQueryParams,
   removeIndent,
 } from './helpers/shared.js';
@@ -12,7 +12,15 @@ import localStorageManager from './local-storage-manager.js';
 import EmbedLayout from './layout/layout.embed.js';
 
 export default class EmbedApp extends App {
-  setupLayout() {
+  /**
+   * The content passed from the iframe.
+   * @type {string|null}
+   */
+  frameContent = null;
+
+  async setupLayout() {
+    this.registerFrameListener();
+
     const queryParams = parseQueryParams();
     if (typeof queryParams.filename !== 'string') {
       throw Error('No filename provided in query params');
@@ -22,11 +30,11 @@ export default class EmbedApp extends App {
     const isVertical = !isHorizontal;
 
     // Update local storage key.
-    const currentStorageKey = makeLocalStorageKey(window.location.href);
+    const currentStorageKey = slugify(window.location.href);
     localStorageManager.updateLocalStoragePrefix(currentStorageKey);
 
     // Create the tab in the virtual filesystem.
-    this.vfs.createFile({ name: queryParams.filename });
+    await this.vfs.createFile({ path: queryParams.filename });
 
     // Create tabs with the filename as key and empty string as the content.
     const tabs = {}
@@ -58,17 +66,20 @@ export default class EmbedApp extends App {
     return layout;
   }
 
-  postSetupLayout() {
+  registerFrameListener() {
     // Listen for the content of the file to be received.
-    window.addEventListener('message', (event) => {
-      const editorComponent = this.layout.getActiveEditor();
-      const { fileId } = editorComponent.getState();
-      const content = removeIndent(event.data);
-      if (content) {
-        this.vfs.updateFile(fileId, { content });
-        editorComponent.setContent(content);
-      }
+    window.addEventListener('message', async (event) => {
+      this.frameContent = removeIndent(event.data);
     });
+  }
+
+  async postSetupLayout() {
+    if (this.frameContent) {
+      const editorComponent = this.layout.getActiveEditor();
+      const path = editorComponent.getPath();
+      await this.vfs.updateFileContent(path, this.frameContent);
+      editorComponent.setContent(this.frameContent);
+    }
   }
 
   /**

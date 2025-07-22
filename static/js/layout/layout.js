@@ -226,7 +226,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   /**
    * Invoked when the terminal tab is created for the first time.
    *
-   * @param {ContentItem} tab - The tab instance that has been created.
+   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
    */
   onTermTabCreated(tab) {
     this.term = tab.contentItem.instance;
@@ -238,7 +238,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   /**
    * Invoked when an image is opened.
    *
-   * @param {ContentItem} tab - The tab instance that has been created.
+   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
    */
   onImageTabCreated(tab) {
     const imageComponent = tab.contentItem.instance;
@@ -265,7 +265,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   /**
    * Invoked when a text file is opened.
    *
-   * @param {ContentItem} tab - The tab instance that has been created.
+   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
    */
   onEditorTabCreated(tab) {
     const editorComponent = tab.contentItem.instance;
@@ -299,8 +299,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * Try to register a given tab instance to the internal tabs list of this
    * class instance.
    *
-   * @param {[TODO:type]} tab - [TODO:description]
-   * @returns {[TODO:type]} [TODO:description]
+   * @param {GoldenLayout.Tab} tab - The tab instance to register.
    */
   registerTab(tab) {
     // If the current active tab is not set, set it to the current tab.
@@ -313,10 +312,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
     // The onTabCreated is *also* triggered when a user is dragging tabs around,
     // thus if the tab is already in the list, we return early.
-    const newTabFileId = tab.contentItem.instance.getState().fileId;
+    const newTabInstance = tab.contentItem.instance;
     const tabExists = this.tabs.some((existingTab) => {
-      const { fileId } = existingTab.contentItem.instance.getState();
-      return fileId === newTabFileId;
+      return existingTab.contentItem.instance === newTabInstance;
     });
     if (tabExists) return;
 
@@ -362,11 +360,10 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   onTabDestroy() {
     // If it's the last tab being closed, then we insert another 'Untitled' tab,
     // because we always need at least one tab open.
-    const editorComponents = this.getTabComponents();
-    const totalTabs = editorComponents.length;
+    const tabComponents = this.getTabComponents();
 
-    if (totalTabs === 1) {
-      const firstTabComponent = editorComponents[0];
+    if (tabComponents.length === 1 && !this.resetLayout) {
+      const firstTabComponent = tabComponents[0];
       firstTabComponent.addSiblingTab();
     }
   }
@@ -381,6 +378,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     if (this.initialised) return;
 
     this.initialised = true;
+
     // Do a set-timeout trick to make sure the components are registered
     // through the registerComponent() function, prior to calling this part.
     setTimeout(() => {

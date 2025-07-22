@@ -30,6 +30,9 @@ export default class ImageComponent extends TabComponent {
     contentContainer.appendChild(this.img);
   }
 
+  /**
+   * Disable the image component if the size if too large.
+   */
   exceededFileSize = () => {
     this.img.parentNode.classList.add('exceeded-filesize');
   }
@@ -59,8 +62,17 @@ export default class ImageComponent extends TabComponent {
    */
   setContent = (base64String) => {
     if (typeof base64String === 'string') {
-      this.img.src = `data:${this.getFileMimeType()};base64,` + base64String;
+      this.setSrc(`data:${this.getFileMimeType()};base64,` + base64String);
     }
+  }
+
+  /**
+   * Set the src attribute of the image component.
+   *
+   * @param {string} src - The source URL of the image.
+   */
+  setSrc = (src) => {
+    this.img.src = src;
   }
 
   /**

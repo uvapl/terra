@@ -1,4 +1,4 @@
-import { isObject } from './helpers/shared.js';
+import { isObject, uuidv4 } from './helpers/shared.js';
 import { MODAL_ANIM_DURATION } from './constants.js';
 
 /**
@@ -26,7 +26,7 @@ export function createModal(modalOptions = {}) {
     .join(' ');
 
   if (!modalOptions.attrs.id) {
-    modalOptions.attrs.id = uuiv4();
+    modalOptions.attrs.id = uuidv4();
   }
 
   const footerClasses = ['modal-footer'].concat(modalOptions.footerClass || []).join(' ');

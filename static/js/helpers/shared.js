@@ -1,6 +1,3 @@
-import GitFS from '../gitfs.js';
-import Terra from '../terra.js';
-
 /**
  * Check whether an object is a real object, because essentially, everything
  * is an object in JavaScript.
@@ -162,17 +159,16 @@ export function makeHtmlAttrs(attrs) {
 }
 
 /**
- * Converts a string to be a local storage suitable key by replacing
- * non-suitable characters with a hyphen.
+ * Converts a string to a slug.
  *
- * @example makeLocalStorageKey('https://example.com') -> 'https-example-com'
- * @example makeLocalStorageKey('FooBar') -> 'foo-bar'
+ * @example slugify('https://example.com') -> 'https-example-com'
+ * @example slugify('FooBar') -> 'foo-bar'
  *
- * @param {string} key - The key to convert.
- * @returns {string} A local storage suitable key.
+ * @param {string} str - The string to convert.
+ * @returns {string} The slugified string.
  */
-export function makeLocalStorageKey(key) {
-  return key.toLowerCase().replace(/[^a-z0-9]/g, '-');
+export function slugify(str) {
+  return str.toLowerCase().replace(/[^a-z0-9]/g, '-');
 }
 
 /**
@@ -225,16 +221,6 @@ export function getFileExtension(filename) {
 }
 
 /**
- * Adds a new line character at the end of a given text if it doesn't exist.
- *
- * @param {string} text - The text to add the new line character to.
- * @returns {string} Updated text with a new line character at the end.
- */
-export function addNewLineCharacter(text) {
-  return text.replace(/\n?$/g, '\n');
-}
-
-/**
  * Convert a given number of seconds to milliseconds.
  *
  * @param {number} secs - The amount of seconds to convert.
@@ -242,15 +228,6 @@ export function addNewLineCharacter(text) {
  */
 export function seconds(secs) {
   return 1000 * secs;
-}
-
-/**
- * Check whether the GitFS worker has been initialised.
- *
- * @returns {boolean} True if the worker has been initialised, false otherwise.
- */
-export function hasGitFSWorker() {
-  return Terra.app.gitfs instanceof GitFS;
 }
 
 /**
@@ -310,4 +287,17 @@ export function eventTargetMixin(base) {
   }
 
   return EventTargetMixin;
+}
+
+/**
+ * Get the name and parent path from a given filepath (either file or folder).
+ *
+ * @param {string} path - The absolute path.
+ * @returns {object} An object containing the name and parent path.
+ */
+export function getPartsFromPath(path) {
+  const parts = path.split('/');
+  const name = parts.pop();
+  const parentPath = parts.join('/');
+  return { name, parentPath };
 }

@@ -1,5 +1,5 @@
 import { TerraPlugin } from '../../js/plugin-manager.js';
-import { seconds } from '../../js/helpers/shared.js';
+import { seconds, getPartsFromPath } from '../../js/helpers/shared.js';
 import { createModal, hideModal, showModal } from '../../js/modal.js';
 import pluginManager from '../../js/plugin-manager.js';
 import Terra from '../../js/terra.js';
@@ -80,13 +80,13 @@ export default class Check50Plugin extends TerraPlugin {
     this.$button.prop('disabled', true).addClass('loading');
   }
 
-  onButtonClick = () => {
+  onButtonClick = async () => {
     if (this.$button.is(':disabled')) return;
 
     const editorComponent = Terra.app.layout.getActiveEditor();
     if (!editorComponent || editorComponent.proglang !== 'c') return;
 
-    const { path: filepath } = Terra.app.getActiveEditorFileObject();
+    const { path: filepath } = await Terra.app.getActiveEditorFileObject();
 
     // Check if the file has a slug and the check50 password is set.
     // Otherwise, if one of them is not set, prompt the user to fill in the
@@ -130,7 +130,7 @@ export default class Check50Plugin extends TerraPlugin {
       showModal($modal);
 
       $modal.find('.cancel-btn').click(() => hideModal($modal));
-      $modal.find('.primary-btn').click(() => {
+      $modal.find('.primary-btn').click(async () => {
         if ($modal.find('.password').length > 0) {
           const password = $modal.find('.password').val().trim();
           if (password) {
@@ -155,17 +155,19 @@ export default class Check50Plugin extends TerraPlugin {
         }
 
         if (hasPassword && hasSlug) {
-          this.runCheck50();
+          await this.runCheck50();
           hideModal($modal);
         }
       });
     } else {
-      this.runCheck50();
+      await this.runCheck50();
     }
   }
 
-  runCheck50 = () => {
-    const { name: filename, content: code } = Terra.app.getActiveEditorFileObject();
+  runCheck50 = async () => {
+    const { path: filepath, content: code } = await Terra.app.getActiveEditorFileObject();
+
+    const filename = getPartsFromPath(filepath).name;
 
     const zip = new JSZip();
     zip.file(filename, code);
@@ -175,8 +177,7 @@ export default class Check50Plugin extends TerraPlugin {
       compressionOptions: {
           level: 9
       }
-    }).then((content) => {
-      const { path: filepath } = Terra.app.vfs.findFileById(fileId);
+    }).then(async (content) => {
       const slug = this.getState('fileslugs')[filepath];
 
       this.disableCheck50Button();

@@ -1,6 +1,6 @@
 import { isImageExtension } from '../helpers/image.js';
 import { Octokit } from '../vendor/octokit-core-6.1.3.min.js';
-import TaskQueue from '../helpers/task-queue.js';
+import TaskQueue from '../task-queue.js';
 
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/;
 
@@ -70,12 +70,16 @@ class API {
    */
   queue = null;
 
+  /**
+   * Contains the mapping of filepaths to their SHA values.
+   * @type {object<string, string>}
+   */
+  fileShaMap = {};
+
   constructor(options) {
     this.repoBranch = options.branch;
     this.accessToken = options.accessToken;
     this.fetchBranchesSuccessCallback = options.fetchBranchesSuccessCallback;
-    this.commitSuccessCallback = options.commitSuccessCallback;
-    this.moveFileSuccessCallback = options.moveFileSuccessCallback;
     this.moveFolderSuccessCallback = options.moveFolderSuccessCallback;
     this.cloneFailCallback = options.cloneFailCallback;
     this.cloneSuccessCallback = options.cloneSuccessCallback;
@@ -302,6 +306,8 @@ class API {
                 path: fileOrFolder.path,
               });
 
+              this.fileShaMap[fileOrFolder.path] = fileOrFolder.sha;
+
               const content = atob(res.data.content);
               if (isImageExtension(fileOrFolder.path)) {
                 // Use the base64 string to create a blob URL later.
@@ -329,8 +335,9 @@ class API {
    * @param {string} sha - The sha of the file to commit.
    * @async
    */
-  async commit(filepath, filecontents, sha) {
+  async commit(filepath, filecontents) {
     this._log('Committing', filepath);
+    const sha = this.fileShaMap[filepath];
 
     const response = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
       path: filepath,
@@ -341,24 +348,24 @@ class API {
       sha,
     });
 
-    this.commitSuccessCallback(filepath, response.data.content.sha);
+    this.fileShaMap[filepath] = response.data.content.sha;
   }
 
   /**
    * Remove a filepath from the current repository.
    *
    * @param {string} filepath - The absolute filepath to remove.
-   * @param {string} sha - The sha of the file to delete.
    */
-  async rm(filepath, sha) {
+  async rm(filepath) {
     try {
       await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
         path: filepath,
-        sha,
+        sha: this.fileShaMap[filepath],
         message: `Remove ${filepath}`,
         branch: this.repoBranch,
         committer: this.committer,
       });
+      delete this.fileShaMap[filepath];
       this._log(`Removed ${filepath}`);
     } catch (err) {
       this._log('Failed to remove', filepath, err);
@@ -369,11 +376,10 @@ class API {
    * Move a file from one location to another.
    *
    * @param {string} oldPath - The absolute filepath of the file to move.
-   * @param {string} oldSha - The sha of the file to remove.
    * @param {string} newPath - The absolute filepath to the new file.
    * @param {string} newContent - The new content of the file.
    */
-  async moveFile(oldPath, oldSha, newPath, newContent) {
+  async moveFile(oldPath, newPath, newContent) {
     // Create the new file with the new content.
     const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
       path: newPath,
@@ -389,11 +395,10 @@ class API {
       message: `Remove ${oldPath}`,
       branch: this.repoBranch,
       committer: this.committer,
-      sha: oldSha,
+      sha: this.fileShaMap[oldPath],
     });
 
-    const newSha = result.data.content.sha;
-    this.moveFileSuccessCallback(newPath, newSha);
+    this.fileShaMap[newPath] = result.data.content.sha;
 
     this._log(`Moved file from ${oldPath} to ${newPath}`);
   }
@@ -402,40 +407,42 @@ class API {
    * Move a file from one location to another.
    *
    * @param {array} files - Array of file objects to move.
-   * @param {string} files[].oldPath - The filepath of the file to move.
-   * @param {string} files[].sha - The sha of the file to remove.
-   * @param {string} files[].newPath - The filepath to the new file.
-   * @param {string} files[].content - The new content of the file.
+   * @param {string} files[].srcPath - The filepath of the file to move.
+   * @param {string} files[].destPath - The filepath to the new file.
    */
   async moveFolder(files) {
-    // Keep track of a list of all new files with their new sha.
-    const updatedFiles = [];
-
     for (const file of files) {
+      // Get the source file content.
+      console.log('file', file);
+      const contentResponse = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
+        branch: this.repoBranch,
+        path: file.srcPath,
+      });
+
+      const content = atob(contentResponse.data.content);
+
       // Create the new file.
-      const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
-        path: file.newPath,
-        message: `Rename ${file.oldPath} to ${file.newPath}`,
+      const newFileResponse = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
+        path: file.destPath,
+        message: `Rename ${file.srcPath} to ${file.destPath}`,
         branch: this.repoBranch,
         committer: this.committer,
-        content: isImageExtension(file.newPath) ? file.content : btoa(file.content),
+        content,
       });
 
       // Delete the old files.
       await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
-        path: file.oldPath,
-        message: `Remove ${file.oldPath}`,
+        path: file.srcPath,
+        message: `Remove ${file.srcPath}`,
         branch: this.repoBranch,
         committer: this.committer,
-        sha: file.sha,
+        sha: this.fileShaMap[file.srcPath],
       });
 
-      updatedFiles.push({
-        path: file.newPath,
-        sha: result.data.content.sha,
-      });
+      // Update the file's sha.
+      this.fileShaMap[file.destPath] = newFileResponse.data.content.sha;
 
-      this._log(`Moved file from ${file.oldPath} to ${file.newPath}`);
+      this._log(`Moved file from ${file.srcPath} to ${file.destPath}`);
     }
 
     this.moveFolderSuccessCallback(updatedFiles);
@@ -485,20 +492,6 @@ self.onmessage = (event) => {
           });
         },
 
-        commitSuccessCallback(filepath, sha) {
-          postMessage({
-            id: 'commit-success',
-            data: { filepath, sha }
-          });
-        },
-
-        moveFileSuccessCallback(filepath, sha) {
-          postMessage({
-            id: 'move-file-success',
-            data: { filepath, sha },
-          });
-        },
-
         moveFolderSuccessCallback(updatedFiles) {
           postMessage({
             id: 'move-folder-success',
@@ -544,7 +537,6 @@ self.onmessage = (event) => {
       api.queue.schedule(() => api.commit(
         payload.filepath,
         payload.filecontents,
-        payload.sha
       ));
       break;
 
@@ -555,7 +547,6 @@ self.onmessage = (event) => {
     case 'moveFile':
       api.queue.schedule(() => api.moveFile(
         payload.oldPath,
-        payload.oldSha,
         payload.newPath,
         payload.newContent
       ));
