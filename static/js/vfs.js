@@ -178,7 +178,7 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     this._watchRootFolderInterval = setInterval(async () => {
-      if (Terra.v.blockFSPolling || Terra.app.hasGitFSWorker()) return;
+      if (Terra.v.blockFSPolling || !Terra.app.hasLFSProjectLoaded) return;
 
       // Import again from the VFS.
       await fileTreeManager.runFuncWithPersistedState(
