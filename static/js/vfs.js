@@ -178,7 +178,7 @@ export default class VirtualFileSystem extends EventTarget {
     }
 
     this._watchRootFolderInterval = setInterval(async () => {
-      if (Terra.v.blockFSPolling || Terra.app.hasGitFSWorker()) return;
+      if (Terra.v.blockFSPolling || !Terra.app.hasLFSProjectLoaded) return;
 
       // Import again from the VFS.
       await fileTreeManager.runFuncWithPersistedState(
@@ -467,11 +467,9 @@ export default class VirtualFileSystem extends EventTarget {
 
     // Update the file contents after a short delay to allow debouncing.
     Terra.app.registerTimeoutHandler(`file-update-${slugify(path)}`, seconds(0.2), async () => {
-      if (content) {
-        const writable = await fileHandle.createWritable();
-        await writable.write(content);
-        await writable.close();
-      }
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
     });
 
     if (isUserInvoked) {
