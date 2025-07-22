@@ -1,6 +1,3 @@
-import GitFS from '../gitfs.js';
-import Terra from '../terra.js';
-
 /**
  * Check whether an object is a real object, because essentially, everything
  * is an object in JavaScript.
@@ -162,17 +159,16 @@ export function makeHtmlAttrs(attrs) {
 }
 
 /**
- * Converts a string to be a local storage suitable key by replacing
- * non-suitable characters with a hyphen.
+ * Converts a string to a slug.
  *
- * @example makeLocalStorageKey('https://example.com') -> 'https-example-com'
- * @example makeLocalStorageKey('FooBar') -> 'foo-bar'
+ * @example slugify('https://example.com') -> 'https-example-com'
+ * @example slugify('FooBar') -> 'foo-bar'
  *
- * @param {string} key - The key to convert.
- * @returns {string} A local storage suitable key.
+ * @param {string} str - The string to convert.
+ * @returns {string} The slugified string.
  */
-export function makeLocalStorageKey(key) {
-  return key.toLowerCase().replace(/[^a-z0-9]/g, '-');
+export function slugify(str) {
+  return str.toLowerCase().replace(/[^a-z0-9]/g, '-');
 }
 
 /**

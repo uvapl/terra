@@ -10,7 +10,7 @@ import {
   getRandNumBetween,
   isObject,
   isValidUrl,
-  makeLocalStorageKey,
+  slugify,
   makeUrl,
   objectHasKeys,
   parseQueryParams,
@@ -169,7 +169,7 @@ export default class ExamApp extends App {
           config.code = queryParams.code;
           config.configUrl = queryParams.url;
 
-          const currentStorageKey = makeLocalStorageKey(config.configUrl);
+          const currentStorageKey = slugify(config.configUrl);
           localStorageManager.setLocalStorageItem('last-used', currentStorageKey);
           localStorageManager.updateLocalStoragePrefix(currentStorageKey);
           localStorageManager.setLocalStorageItem('config', JSON.stringify(config));

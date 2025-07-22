@@ -2,7 +2,7 @@ import App from './app.js';
 import { BASE_FONT_SIZE } from './constants.js';
 import {
   getFileExtension,
-  makeLocalStorageKey,
+  slugify,
   parseQueryParams,
   removeIndent,
 } from './helpers/shared.js';
@@ -30,11 +30,10 @@ export default class EmbedApp extends App {
     const isVertical = !isHorizontal;
 
     // Update local storage key.
-    const currentStorageKey = makeLocalStorageKey(window.location.href);
+    const currentStorageKey = slugify(window.location.href);
     localStorageManager.updateLocalStoragePrefix(currentStorageKey);
 
     // Create the tab in the virtual filesystem.
-    console.log('Creating file in virtual filesystem:', queryParams.filename)
     await this.vfs.createFile({ path: queryParams.filename });
 
     // Create tabs with the filename as key and empty string as the content.

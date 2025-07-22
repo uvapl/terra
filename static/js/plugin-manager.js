@@ -1,6 +1,6 @@
 import {
   makeHtmlAttrs,
-  makeLocalStorageKey,
+  slugify,
   isObject,
 } from './helpers/shared.js';
 import Terra from './terra.js';
@@ -128,7 +128,7 @@ export class TerraPlugin {
    * @returns {object|null} The state object from local storage or the default state.
    */
   loadFromLocalStorage() {
-    const storageKey = makeLocalStorageKey(this.storageKey);
+    const storageKey = slugify(this.storageKey);
     const defaultValue = isObject(this.defaultState) ? JSON.stringify(this.defaultState) : null;
     const state = localStorageManager.getLocalStorageItem(storageKey, defaultValue);
 
@@ -193,7 +193,7 @@ export class TerraPlugin {
    * Save the current state in local storage.
    */
   saveState() {
-    const storageKey = makeLocalStorageKey(this.storageKey);
+    const storageKey = slugify(this.storageKey);
     localStorageManager.setLocalStorageItem(storageKey, JSON.stringify(this.state));
   }
 
