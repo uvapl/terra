@@ -18,6 +18,11 @@ export default class EmbedApp extends App {
    */
   frameContent = null;
 
+  getOPFSRootFolderName() {
+    const slug = slugify(window.location.href);
+    return `embed-${slug}`;
+  }
+
   async setupLayout() {
     this.registerFrameListener();
 

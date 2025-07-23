@@ -30,6 +30,10 @@ export default class IDEApp extends App {
     return localStorageManager.getLocalStorageItem('use-lfs', false);
   }
 
+  getOPFSRootFolderName() {
+    return 'ide';
+  }
+
   /**
    * Check whether the browser has support for the Local Filesystem API.
    *

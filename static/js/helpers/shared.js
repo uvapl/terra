@@ -168,7 +168,7 @@ export function makeHtmlAttrs(attrs) {
  * @returns {string} The slugified string.
  */
 export function slugify(str) {
-  return str.toLowerCase().replace(/[^a-z0-9]/g, '-');
+  return str.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 }
 
 /**

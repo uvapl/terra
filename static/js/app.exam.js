@@ -34,6 +34,11 @@ export default class ExamApp extends App {
    */
   editorContentChanged = false;
 
+  getOPFSRootFolderName() {
+    const slug = slugify(this.config.configUrl);
+    return `exam-${slug}`;
+  }
+
   onEditorStartEditing(editorComponent) {
     this.editorContentChanged = true;
   }

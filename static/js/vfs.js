@@ -64,9 +64,17 @@ export default class VirtualFileSystem extends EventTarget {
   /**
    * Retrieve the root handle from the OPFS.
    *
+   * Since the app is always hosted at the same domain, each app has its own
+   * working directory within the OPFS root folder. All subsequent operations
+   * are performed on this subfolder.
+   *
    * @returns {Promise<FileSystemDirectoryHandle>} The OPFS root handle.
    */
-  _getRootHandleFromOPFS = () => navigator.storage.getDirectory();
+  _getRootHandleFromOPFS = async () => {
+    const rootHandle = await navigator.storage.getDirectory();
+    const folderName = Terra.app.getOPFSRootFolderName();
+    return rootHandle.getDirectoryHandle(folderName, { create: true });
+  }
 
   /**
    * Retrieves the LFS root directory handle from the IndexedDB store.
