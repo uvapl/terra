@@ -40,7 +40,7 @@ export default class ExamApp extends App {
 
   setupLayout() {
     return new Promise((resolve, reject) => {
-      this.loadConfig().then(async () => {
+      this.loadConfig().then(async (isNewExam) => {
         if (!this.config.tabs) {
           this.config.tabs = {};
         }
@@ -56,10 +56,10 @@ export default class ExamApp extends App {
 
         // Create the content objects that represent each tab in the editor.
         const content = this.generateConfigContent(this.config.tabs, fontSize);
-        console.log('Exam content:', content);
 
-        const hasPersistedState = !(await Terra.app.vfs.isEmpty());
-        if (!hasPersistedState) {
+        if (isNewExam) {
+          await Terra.app.vfs.clear();
+
           // Create the files inside the VFS.
           await Promise.all(
             content.map((file) => Terra.app.vfs.createFile({
@@ -75,7 +75,7 @@ export default class ExamApp extends App {
           hiddenFiles: this.config.hidden_tabs,
           buttonConfig: this.config.buttons,
           autocomplete: this.config.autocomplete,
-          forceDefaultLayout: !hasPersistedState,
+          forceDefaultLayout: isNewExam,
         });
 
         // Make layout instance available at all times.
@@ -157,6 +157,7 @@ export default class ExamApp extends App {
    */
   loadConfig() {
     return new Promise(async (resolve, reject) => {
+      let isNewExam = false;
       let config;
 
       // First, check if there are query params given. If so, validate them.
@@ -165,6 +166,8 @@ export default class ExamApp extends App {
       const queryParams = parseQueryParams();
       if (this.validateQueryParams(queryParams)) {
         try {
+          isNewExam = true;
+
           config = await this.getConfig(makeUrl(queryParams.url, { code: queryParams.code }));
           config.code = queryParams.code;
           config.configUrl = queryParams.url;
@@ -223,7 +226,7 @@ export default class ExamApp extends App {
         reject('Invalid config file');
       } else {
         this.config = config;
-        resolve();
+        resolve(isNewExam);
       }
     });
   }
