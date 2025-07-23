@@ -1,7 +1,7 @@
 import App from './app.js';
 import IDELayout from './layout/layout.ide.js';
 import { MAX_FILE_SIZE } from './constants.js';
-import { getFileExtension, getRepoInfo } from './helpers/shared.js';
+import { getFileExtension, getRepoInfo, isBase64 } from './helpers/shared.js';
 import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
 import localStorageManager from './local-storage-manager.js';
@@ -175,11 +175,11 @@ export default class IDEApp extends App {
 
     if (size > MAX_FILE_SIZE) {
       imageComponent.exceededFileSize();
-    } else if (this.hasGitFSWorker()){
-      // GitHub stores images as base64, so we directly set that content.
+    } else if (isBase64(content)){
+      // For base64 content we can directly set it.
       imageComponent.setContent(content);
     } else {
-      // For local storage or LFS, we create a blob URL.
+      // For binary content we create a blob URL.
       const url = URL.createObjectURL(file);
       imageComponent.setSrc(url);
     }

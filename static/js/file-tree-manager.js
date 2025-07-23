@@ -142,8 +142,6 @@ class FileTreeManager {
    * create a new file in the root folder.
    */
   createFile = async (path = null) => {
-    if (Terra.app.hasLFSProjectLoaded && Terra.app.lfs.busy) return;
-
     // Create the new file in the filesystem.
     const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
 
@@ -214,8 +212,6 @@ class FileTreeManager {
    * null to create a new folder in the root folder.
    */
   createFolder = async (path = null) => {
-    if (Terra.app.hasLFSProjectLoaded && Terra.app.lfs.busy) return;
-
     const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
 
     // Create the new folder in the filesystem.

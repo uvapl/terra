@@ -407,7 +407,7 @@ Menubar.connectRepo = () => {
       Terra.app.vfs.clear();
       fileTreeManager.createFileTree();
       fileTreeManager.setTitle('local storage');
-      filetreeManager.removeInfoMsg();
+      fileTreeManager.removeInfoMsg();
 
       pluginManager.triggerEvent('onStorageChange', 'local');
     }

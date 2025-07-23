@@ -38,8 +38,15 @@ export default class EmbedApp extends App {
     const currentStorageKey = slugify(window.location.href);
     localStorageManager.updateLocalStoragePrefix(currentStorageKey);
 
+    // Since embed's are temporary session, clear the VFS before making a new
+    // temporary file.
+    await this.vfs.clear();
+
     // Create the tab in the virtual filesystem.
-    await this.vfs.createFile({ path: queryParams.filename });
+    await this.vfs.createFile({
+      path: queryParams.filename,
+      content: this.frameContent,
+    });
 
     // Create tabs with the filename as key and empty string as the content.
     const tabs = {}
@@ -78,14 +85,7 @@ export default class EmbedApp extends App {
     });
   }
 
-  async postSetupLayout() {
-    if (this.frameContent) {
-      const editorComponent = this.layout.getActiveEditor();
-      const path = editorComponent.getPath();
-      await this.vfs.updateFileContent(path, this.frameContent);
-      editorComponent.setContent(this.frameContent);
-    }
-  }
+  postSetupLayout() { }
 
   /**
    * Create the layout object with the given content objects and font-size.
