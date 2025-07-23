@@ -301,3 +301,20 @@ export function getPartsFromPath(path) {
   const parentPath = parts.join('/');
   return { name, parentPath };
 }
+
+/**
+ * Check whether a given string is a valid base64 encoded string.
+ *
+ * @param {string} text - The string to check.
+ * @returns {boolean} True if the string is a valid base64 encoded string.
+ */
+export function isBase64(text) {
+  try {
+    // Attempt to decode the base64 string.
+    atob(text);
+    return true;
+  } catch {
+    // Otherwise it's something else.
+    return false;
+  }
+}
