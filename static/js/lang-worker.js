@@ -130,11 +130,11 @@ export default class LangWorker {
   _createWorker(showTerminateMsg) {
     this.isReady = false;
 
-    $('#run-code').addClass('loading');
-
     if (this.worker) {
       this.terminate(showTerminateMsg);
     }
+
+    $('#run-code').addClass('loading');
 
     console.log(`Spawning new ${this.proglang} worker`);
 
