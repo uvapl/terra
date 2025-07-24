@@ -409,7 +409,9 @@ export default class IDEApp extends App {
       return;
     }
 
-    const hasPermission = await this._verifyLFSHandlePermission(rootFolderHandle);
+    const hasPermission =
+      await this._verifyLFSHandlePermission(rootFolderHandle);
+
     if (hasPermission) {
       // Make sure GitFS is stopped.
       if (this.hasGitFSWorker()) {

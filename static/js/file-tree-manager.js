@@ -1,5 +1,5 @@
 import { DROP_AREA_INDICATOR_CLASS } from './ide/constants.js';
-import { getFileExtension, getPartsFromPath, isValidFilename } from './helpers/shared.js'
+import { getFileExtension, getPartsFromPath, isValidFilename, seconds } from './helpers/shared.js'
 import { createModal, hideModal, showModal } from './modal.js'
 import Terra from './terra.js'
 import LangWorker from './lang-worker.js';
@@ -12,6 +12,10 @@ class FileTreeManager {
    * @type {FancyTree}
    */
   tree = null;
+
+  constructor() {
+    this._watchRootFolder();
+  }
 
   /**
    * Set the file tree title.
@@ -886,6 +890,35 @@ class FileTreeManager {
         this._updateOpenTab(srcPath, destPath);
       }
     }
+  }
+
+  /**
+   * Polling function to watch the root folder for changes. As long as Chrome's
+   * LocalFilesystemAPI does not have event listeners built-in, we have no other
+   * choice to poll the root folder for changes manually.
+   *
+   * Polling only applies to local storage and LFS mode, but not when connected
+   * to a GitHub repository.
+   *
+   * Note that this does clear rebuild the VFS and visual file tree every
+   * few seconds, which---besides not being efficient---also creates new
+   * file/folder IDs every time. It's not a problem, but just something to be
+   * aware of.
+   */
+  _watchRootFolder = () => {
+    if (this._watchRootFolderInterval) {
+      clearInterval(this._watchRootFolderInterval);
+    }
+
+    this._watchRootFolderInterval = setInterval(async () => {
+      if (Terra.v.blockFSPolling || !Terra.app.hasLFSProjectLoaded) return;
+
+      // Import again from the VFS.
+      await this.runFuncWithPersistedState(
+        () => this.createFileTree()
+      );
+
+    }, seconds(5));
   }
 
   /**
