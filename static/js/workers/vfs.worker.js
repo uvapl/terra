@@ -339,16 +339,6 @@ const handlers = {
     return { ok: true };
   },
 
-  // async listDirectory({ path = "" }) {
-  //   const folder = await getFolderHandleByPath(path);
-  //   const entries = [];
-  //   for await (const [name, handle] of folder.entries()) {
-  //     if (blacklistedPaths.includes(name)) continue;
-  //     entries.push({ name, kind: handle.kind });
-  //   }
-  //   return { entries };
-  // },
-
   /**
    * Gathers all files from the VFS.
    * Formerly known as getAllEditorFiles.

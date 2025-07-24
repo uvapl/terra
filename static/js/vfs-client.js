@@ -54,8 +54,6 @@ export default class VirtualFileSystem {
 
   deleteFile = (path) => this._send("deleteFile", { path });
 
-  listDirectory = (path = "") => this._send("listDirectory", { path });
-
   findFoldersInFolder = (path = "") => this._send("findFoldersInFolder", path);
 
   findFilesInFolder = (path = "") => this._send("findFilesInFolder", path);
