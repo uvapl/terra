@@ -638,7 +638,7 @@ class FileTreeManager {
 
     const fn = sourceNode.data.isFolder
       ? Terra.app.vfs.moveFolder
-      : Terra.app.vfs.moveFile
+      : Terra.app.vfs.moveFile;
 
     const srcPath = sourceNode.key;
     const parentPath = parentNodeKey.startsWith('root') ? null : parentNodeKey;
@@ -833,7 +833,7 @@ class FileTreeManager {
     const srcPath = sourceNode.key;
     const fn = sourceNode.data.isFolder
       ? Terra.app.vfs.moveFolder
-      : Terra.app.vfs.moveFile
+      : Terra.app.vfs.moveFile;
 
     const destPath = parentPath ? `${parentPath}/${sourceNode.title}` : sourceNode.title;
 
