@@ -43,67 +43,38 @@ export default class VirtualFileSystem {
     });
   }
 
-  clear() {
-    return this._send("clear");
-  }
+  clear = () => this._send("clear");
 
-  // VFS methods:
+  readFile = (path) => this._send("readFile", { path });
 
-  readFile(path) {
-    return this._send("readFile", { path });
-  }
+  writeFile = (path, content) => this._send("writeFile", { path, content });
 
-  writeFile(path, content) {
-    return this._send("writeFile", { path, content });
-  }
+  createFile = (path, content = "") =>
+    this._send("createFile", { path, content });
 
-  createFile(path, content = "") {
-    return this._send("createFile", { path, content });
-  }
+  deleteFile = (path) => this._send("deleteFile", { path });
 
-  deleteFile(path) {
-    return this._send("deleteFile", { path });
-  }
+  listDirectory = (path = "") => this._send("listDirectory", { path });
 
-  listDirectory(path = "") {
-    return this._send("listDirectory", { path });
-  }
+  findFoldersInFolder = (path = "") => this._send("findFoldersInFolder", path);
 
-  findFoldersInFolder(path = "") {
-    return this._send("findFoldersInFolder", path);
-  }
+  findFilesInFolder = (path = "") => this._send("findFilesInFolder", path);
 
-  findFilesInFolder(path = "") {
-    return this._send("findFilesInFolder", path);
-  }
+  getAllFiles = () => this._send("getAllFiles");
 
-  getAllFiles() {
-    return this._send("getAllFiles");
-  }
+  createFolder = (path) => this._send("createFolder", { path });
 
-  createFolder(path) {
-    return this._send("createFolder", { path });
-  }
+  deleteFolder = (path) => this._send("deleteFolder", { path });
 
-  deleteFolder(path) {
-    return this._send("deleteFolder", { path });
-  }
+  moveFile = (src, dest) => this._send("moveFile", { src, dest });
 
-  moveFile(src, dest) {
-    return this._send("moveFile", { src, dest });
-  }
+  moveFolder = (src, dest) => this._send("moveFolder", { src, dest });
 
-  moveFolder(src, dest) {
-    return this._send("moveFolder", { src, dest });
-  }
+  getFileTree = (path = "") => this._send("getFileTree", { path });
 
-  getFileTree(path = "") {
-    return this._send("getFileTree", { path });
-  }
-
-  onEvent(eventName, handler) {
+  onEvent = (eventName, handler) => {
     this.eventListeners.set(eventName, handler);
-  }
+  };
 
   // // Optional: subscribe to fs events like `fs:changed`
   // onEvent(callback) {
@@ -121,12 +92,12 @@ export default class VirtualFileSystem {
    *
    * @param {string} path - The absolute file path.
    */
-  async downloadFile(path) {
+  downloadFile = async (path) => {
     const content = await this.readFile(path);
-    const { name } = getPartsFromPath(path);
+    const { name } = this.getPartsFromPath(path);
     const fileBlob = new Blob([content], { type: "text/plain;charset=utf-8" });
     saveAs(fileBlob, name);
-  }
+  };
 
   /**
    * Get the name and parent path from a given filepath (either file or folder).
@@ -134,12 +105,12 @@ export default class VirtualFileSystem {
    * @param {string} path - The absolute path.
    * @returns {object} An object containing the name and parent path.
    */
-  getPartsFromPath(path) {
+  getPartsFromPath = (path) => {
     const parts = path.split("/");
     const name = parts.pop();
     const parentPath = parts.join("/");
     return { name, parentPath };
-  }
+  };
 
   // TODO ZIP file generation and downloadFolder
 }

@@ -636,10 +636,9 @@ class FileTreeManager {
       return false;
     }
 
-    // note: re-binding because we assign to fn
     const fn = sourceNode.data.isFolder
-      ? Terra.app.vfs.moveFolder.bind(Terra.app.vfs)
-      : Terra.app.vfs.moveFile.bind(Terra.app.vfs);
+      ? Terra.app.vfs.moveFolder
+      : Terra.app.vfs.moveFile
 
     const srcPath = sourceNode.key;
     const parentPath = parentNodeKey.startsWith('root') ? null : parentNodeKey;
@@ -833,8 +832,8 @@ class FileTreeManager {
 
     const srcPath = sourceNode.key;
     const fn = sourceNode.data.isFolder
-      ? Terra.app.vfs.moveFolder.bind(Terra.app.vfs)
-      : Terra.app.vfs.moveFile.bind(Terra.app.vfs);
+      ? Terra.app.vfs.moveFolder
+      : Terra.app.vfs.moveFile
 
     const destPath = parentPath ? `${parentPath}/${sourceNode.title}` : sourceNode.title;
 
