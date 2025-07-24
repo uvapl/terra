@@ -54,10 +54,10 @@ export default class GitFS {
   }
 
   bindVFSEvents = () => {
-    this.vfs.addEventListener('fileCreated', this.vfsFileCreatedHandler);
-    this.vfs.addEventListener('fileMoved', this.vfsFileMovedHandler);
-    this.vfs.addEventListener('fileContentChanged', this.vfsFileContentChangedHandler);
-    this.vfs.addEventListener('fileDeleted', this.vfsBeforeFileDeletedHandler);
+    this.vfs.onEvent('fileCreated', this.vfsFileCreatedHandler);
+    this.vfs.onEvent('fileMoved', this.vfsFileMovedHandler);
+    this.vfs.onEvent('fileContentChanged', this.vfsFileContentChangedHandler);
+    this.vfs.onEvent('fileDeleted', this.vfsBeforeFileDeletedHandler);
   }
 
   vfsFileCreatedHandler = (event) => {

@@ -1,7 +1,7 @@
 import { getFileExtension, isObject } from './helpers/shared.js'
 import LangWorker from './lang-worker.js';
 import Terra from './terra.js';
-import VirtualFileSystem from './vfs.js';
+import VirtualFileSystem from './vfs-client.js';
 
 /**
  * Base class that is extended for each of the apps.
@@ -167,7 +167,7 @@ export default class App {
    */
   async onEditorChange(editorComponent) {
     const path = editorComponent.getPath();
-    await this.vfs.updateFileContent(path, editorComponent.getContent());
+    await this.vfs.writeFile(path, editorComponent.getContent())
   }
 
   /**
@@ -282,7 +282,7 @@ export default class App {
 
     // Run a given file path, or otherwise the active file.
     const filepath = options.filepath || this.layout.getActiveEditor().getPath();
-    let files = await this.getAllEditorFiles();
+    let files = await this.vfs.getAllFiles();
 
     // Append hidden files if present.
     files = files.concat(this.getHiddenFiles());
@@ -355,7 +355,7 @@ export default class App {
     $button.prop('disabled', true);
 
     const activeTabName = this.layout.getActiveEditor().getFilename();
-    let files = await this.getAllEditorFiles();
+    let files = await this.vfs.getAllFiles();
     files = files.concat(this.getHiddenFiles());
 
     if (this.langWorker && this.langWorker.isReady) {
@@ -394,37 +394,6 @@ export default class App {
       this.langWorker.terminate();
       this.langWorker = null;
     }
-  }
-
-  /**
-   * Gathers all files from the VFS.
-   *
-   * @async
-   * @param {string} [folderpath=''] - The folder path to start searching from.
-   * @returns {Promise<object[]>} List of objects, each containing the filepath
-   * and content of the corresponding file.
-   */
-  async getAllEditorFiles(folderpath = '') {
-    let files = [];
-
-    const subfiles = await this.vfs.findFilesInFolder(folderpath);
-    for (const file of subfiles) {
-      const subfilepath = folderpath ? `${folderpath}/${file.name}` : file.name;
-      const content = await this.vfs.getFileContentByPath(subfilepath);
-      files.push({
-        path: subfilepath,
-        content: content,
-      });
-    }
-
-    const subfolders = await this.vfs.findFoldersInFolder(folderpath);
-    for (const folder of subfolders) {
-      const subfolderpath = folderpath ? `${folderpath}/${folder.name}` : folder.name;
-      const subfiles = await this.getAllEditorFiles(subfolderpath);
-      files = files.concat(subfiles);
-    }
-
-    return files;
   }
 
   /**

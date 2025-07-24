@@ -9,6 +9,7 @@ import fileTreeManager from './file-tree-manager.js';
 import pluginManager from './plugin-manager.js';
 import idbManager from './idb.js';
 import GitFS from './gitfs.js';
+import { FileNotFoundError, FileTooLargeError } from './vfs-client.js';
 
 export default class IDEApp extends App {
   /**
@@ -64,7 +65,7 @@ export default class IDEApp extends App {
       // If the browser supports LFS and a project is loaded...
 
       // Set file-tree title to the root folder name.
-      const rootFolderHandle = await this.vfs.getRootHandle();
+      const rootFolderHandle = await idbManager.getHandle("lfs", "root");
       fileTreeManager.setTitle(rootFolderHandle.name);
 
       // Enable close-folder menu item.
@@ -134,27 +135,28 @@ export default class IDEApp extends App {
    */
   async setEditorFileContent(editorComponent, clearUndoStack = false) {
     const filepath = editorComponent.getPath();
+    if (!filepath) return;
 
-    if (!filepath || (filepath && !(await this.vfs.pathExists(filepath)))) {
-      return;
-    }
+    try {
+      const content = await this.vfs.readFile(filepath, { MAX_FILE_SIZE });
 
-    // Check if the editor exceeded the maximum allowed file size.
-    const size = await this.vfs.getFileSizeByPath(filepath);
-    if (size > MAX_FILE_SIZE) {
-      editorComponent.exceededFileSize();
-      return;
-    }
+      editorComponent.setContent(content);
 
-    const content = await this.vfs.getFileContentByPath(filepath);
-    editorComponent.setContent(content);
+      const cursorPos = editorComponent.getCursorPosition();
+      editorComponent.setContent(content);
+      editorComponent.setCursorPosition(cursorPos);
 
-    const cursorPos = editorComponent.getCursorPosition();
-    editorComponent.setContent(content);
-    editorComponent.setCursorPosition(cursorPos);
-
-    if (clearUndoStack) {
-      editorComponent.clearUndoStack();
+      if (clearUndoStack) {
+        editorComponent.clearUndoStack();
+      }
+    } catch (err) {
+      if (err instanceof FileTooLargeError) {
+        editor.exceededFileSize();
+      } else if (err instanceof FileNotFoundError) {
+        console.warn("Editor file disappeared:", err.path);
+      } else {
+        console.error("Unexpected error reading file:", err);
+      }
     }
   }
 
@@ -287,6 +289,8 @@ export default class IDEApp extends App {
 
     // If the file exists in the vfs, then return, because the contents will be
     // auto-saved already by the editor component.
+    //
+    // TODO this seems redundant if we KNOW saveFile is not triggered then
     const existingFilepath = editorComponent.getPath();
     if (existingFilepath) {
       const fileHandle = await this.vfs.getFileHandleByPath(existingFilepath);
@@ -367,7 +371,12 @@ export default class IDEApp extends App {
   async terminateLFS() {
     localStorageManager.setLocalStorageItem('use-lfs', false);
     clearTimeout(this._watchRootFolderInterval);
-    await this.vfs.clear();
+    this.vfs.setRootHandle(null);
+
+    // TODO this may still be necessary when unloading git
+    // however, currently it also fully deleted a local dir when closed
+    // await this.vfs.clear();
+
     await idbManager.clearStores();
     $('#menu-item--close-folder').addClass('disabled');
   }
@@ -415,8 +424,36 @@ export default class IDEApp extends App {
       fileTreeManager.setTitle(rootFolderHandle.name);
       pluginManager.triggerEvent('onStorageChange', 'lfs');
 
+      this.vfs.setRootHandle(rootFolderHandle);
+
       // Render the LFS contents.
       await fileTreeManager.createFileTree();
     }
+  }
+
+  /**
+   * Request permission for a given LFS handle, either file or directory handle.
+   *
+   * @param {FileSystemDirectoryHandle|FileSystemFileHandle} handle
+   * @param {string} [mode] - The mode to request permission for.
+   * @returns {Promise<boolean>} True if permission is granted, false otherwise.
+   */
+  _verifyLFSHandlePermission(handle, mode = "readwrite") {
+    const opts = { mode };
+
+    return new Promise(async (resolve) => {
+      // Check if we already have permission.
+      if ((await handle.queryPermission(opts)) === "granted") {
+        return resolve(true);
+      }
+
+      // Otherwise, request permission to the handle.
+      if ((await handle.requestPermission(opts)) === "granted") {
+        return resolve(true);
+      }
+
+      // The user did not grant permission.
+      return resolve(false);
+    });
   }
 }
