@@ -1,5 +1,4 @@
 import { getPartsFromPath, seconds, slugify } from "../helpers/shared.js";
-import idbManager from "../idb.js";
 
 const blacklistedPaths = [
   "site-packages",
