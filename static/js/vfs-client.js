@@ -1,3 +1,5 @@
+import { getPartsFromPath } from './helpers/shared.js';
+
 /**
  * VFS API for the main thread
  * delegates most of its work to a VFS worker module
@@ -15,19 +17,43 @@ export default class VirtualFileSystem {
     this.worker.addEventListener("message", (e) => this._handleMessage(e.data));
   }
 
+  /**
+   * Allows registering a VFS event handler
+   *
+   * @param {*} eventName
+   * @param {*} handler
+   */
+  onEvent = (eventName, handler) => {
+    this.eventListeners.set(eventName, handler);
+  };
+
+  /**
+   * Process a response or message from the vfs worker
+   *
+   * @param {*} param0
+   * @returns
+   */
   _handleMessage({ id, type, data, error }) {
     if (id) {
+      // this is a numbered response to an earlier request
       if (!this.pending.has(id)) return;
       const { resolve, reject } = this.pending.get(id);
       this.pending.delete(id);
       error ? reject(new Error(error)) : resolve(data);
     } else {
-      // Broadcast-style event from worker
+      // this is an event originating in the worker (e.g. FS changes)
       const handler = this.eventListeners.get(type);
       if (handler) handler(data);
     }
   }
 
+  /**
+   * Send a message to the vfs worker
+   * automatically numbered to match in _handleMessage
+   *
+   * @param {*} type
+   * @param {*} data
+   */
   _send(type, data) {
     const id = `vfs-${this._nextId++}`;
     return new Promise((resolve, reject) => {
@@ -36,12 +62,9 @@ export default class VirtualFileSystem {
     });
   }
 
-  setRootHandle(handle) {
-    this.worker.postMessage({
-      type: "setRootHandle",
-      data: { handle },
-    });
-  }
+  /* Pass-through to worker */
+
+  setRootHandle = (handle) => this._send("setRootHandle", { handle });
 
   clear = () => this._send("clear");
 
@@ -70,20 +93,6 @@ export default class VirtualFileSystem {
 
   getFileTree = (path = "") => this._send("getFileTree", { path });
 
-  onEvent = (eventName, handler) => {
-    this.eventListeners.set(eventName, handler);
-  };
-
-  // // Optional: subscribe to fs events like `fs:changed`
-  // onEvent(callback) {
-  //   this.worker.addEventListener("message", (e) => {
-  //     const { id, type, data } = e.data;
-  //     if (!id && type.startsWith("fs:")) {
-  //       callback(type, data);
-  //     }
-  //   });
-  // }
-
   /**
    * Download a file through the browser by creating a new blob and using
    * FileSaver.js to save it.
@@ -92,22 +101,9 @@ export default class VirtualFileSystem {
    */
   downloadFile = async (path) => {
     const content = await this.readFile(path);
-    const { name } = this.getPartsFromPath(path);
+    const { name } = getPartsFromPath(path);
     const fileBlob = new Blob([content], { type: "text/plain;charset=utf-8" });
     saveAs(fileBlob, name);
-  };
-
-  /**
-   * Get the name and parent path from a given filepath (either file or folder).
-   *
-   * @param {string} path - The absolute path.
-   * @returns {object} An object containing the name and parent path.
-   */
-  getPartsFromPath = (path) => {
-    const parts = path.split("/");
-    const name = parts.pop();
-    const parentPath = parts.join("/");
-    return { name, parentPath };
   };
 
   // TODO ZIP file generation and downloadFolder

@@ -371,7 +371,7 @@ export default class IDEApp extends App {
   async terminateLFS() {
     localStorageManager.setLocalStorageItem('use-lfs', false);
     clearTimeout(this._watchRootFolderInterval);
-    this.vfs.setRootHandle(null);
+    await this.vfs.setRootHandle(null);
 
     // TODO this may still be necessary when unloading git
     // however, currently it also fully deleted a local dir when closed
@@ -409,7 +409,7 @@ export default class IDEApp extends App {
       return;
     }
 
-    const hasPermission = await this.vfs._verifyLFSHandlePermission(rootFolderHandle);
+    const hasPermission = await this._verifyLFSHandlePermission(rootFolderHandle);
     if (hasPermission) {
       // Make sure GitFS is stopped.
       if (this.hasGitFSWorker()) {
@@ -424,7 +424,7 @@ export default class IDEApp extends App {
       fileTreeManager.setTitle(rootFolderHandle.name);
       pluginManager.triggerEvent('onStorageChange', 'lfs');
 
-      this.vfs.setRootHandle(rootFolderHandle);
+      await this.vfs.setRootHandle(rootFolderHandle);
 
       // Render the LFS contents.
       await fileTreeManager.createFileTree();
