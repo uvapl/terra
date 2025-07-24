@@ -176,9 +176,9 @@ const handlers = {
    * @returns {Promise<boolean>} True if VFS is empty, false otherwise.
    */
   async isEmpty() {
-    // Get the root folders and files.
-    const files = await this.findFilesInFolder();
-    const folders = await this.findFoldersInFolder();
+    // Count the root folders and files.
+    const files = await handlers.findFilesInFolder();
+    const folders = await handlers.findFoldersInFolder();
 
     return files.length === 0 && folders.length === 0;
   },
@@ -295,15 +295,15 @@ const handlers = {
       await writable.close();
     }
 
-    if (isUserInvoked) {
-      this.dispatchEvent(
-        new CustomEvent("fileContentChanged", {
-          detail: {
-            file: { path, content },
-          },
-        }),
-      );
-    }
+    // if (isUserInvoked) {
+    //   this.dispatchEvent(
+    //     new CustomEvent("fileContentChanged", {
+    //       detail: {
+    //         file: { path, content },
+    //       },
+    //     }),
+    //   );
+    // }
   },
 
   /**
@@ -325,15 +325,15 @@ const handlers = {
     const parent = await getFolderHandleByPath(parentPath);
     await parent.removeEntry(filename);
 
-    if (isUserInvoked) {
-      this.dispatchEvent(
-        new CustomEvent("fileDeleted", {
-          detail: {
-            file: { path },
-          },
-        }),
-      );
-    }
+    // if (isUserInvoked) {
+    //   this.dispatchEvent(
+    //     new CustomEvent("fileDeleted", {
+    //       detail: {
+    //         file: { path },
+    //       },
+    //     }),
+    //   );
+    // }
 
     // TODO
     return { ok: true };
@@ -418,17 +418,17 @@ const handlers = {
     }
 
     // Gather all subfiles and trigger a deleteFile on them.
-    const files = await this.findFilesInFolder(path);
+    const files = await handlers.findFilesInFolder(path);
     for (const file of files) {
       const filepath = `${path}/${file.name}`;
-      await this.deleteFile(filepath, true);
+      await handlers.deleteFile(filepath, true);
     }
 
     // Delete all the nested folders inside the current folder.
-    const folders = await this.findFoldersInFolder(path);
+    const folders = await handlers.findFoldersInFolder(path);
     for (const folder of folders) {
       const folderpath = `${path}/${folder.name}`;
-      await this.deleteFolder(folderpath, false);
+      await handlers.deleteFolder(folderpath, false);
     }
 
     // Finally, delete the folder itself from OPFS recursively.
@@ -465,7 +465,7 @@ const handlers = {
     );
 
     // Delete the old file.
-    await this.deleteFile({ path: src, isUserInvoked: false });
+    await handlers.deleteFile({ path: src, isUserInvoked: false });
 
     // TODO needed?
     // this.dispatchEvent(new CustomEvent('fileMoved', {
@@ -493,26 +493,26 @@ const handlers = {
     console.log(`moveFolder: ${src} -> ${dest}`);
 
     // Create the destination folder before moving contents.
-    await this.createFolder({ path: dest });
+    await handlers.createFolder({ path: dest });
 
     // Move all files inside the folder to the new destination path.
-    const files = await this.findFilesInFolder(src);
+    const files = await handlers.findFilesInFolder(src);
     for (const file of files) {
       const filePath = `${src}/${file.name}`;
       const newFilePath = dest ? `${dest}/${file.name}` : file.name;
-      await this.moveFile(filePath, newFilePath);
+      await handlers.moveFile(filePath, newFilePath);
     }
 
     // Recurse on folders inside the folder.
-    const folders = await this.findFoldersInFolder(src);
+    const folders = await handlers.findFoldersInFolder(src);
     for (const folder of folders) {
       const folderPath = `${src}/${folder.name}`;
       const newFolderPath = dest ? `${dest}/${folder.name}` : folder.name;
-      await this.moveFolder(folderPath, newFolderPath);
+      await handlers.moveFolder(folderPath, newFolderPath);
     }
 
     // Delete source folder recursively.
-    await this.deleteFolder({ path: src });
+    await handlers.deleteFolder({ path: src });
   },
 
   /**
@@ -529,7 +529,7 @@ const handlers = {
         const subpath = path ? `${path}/${folder.name}` : folder.name;
         console.log(`found ${subpath}`);
         const subtree = subpath
-          ? await this.getFileTree({ path: subpath })
+          ? await handlers.getFileTree({ path: subpath })
           : null;
         return {
           key: subpath,
