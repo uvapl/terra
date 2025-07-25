@@ -1,3 +1,22 @@
+/**
+ * This worker module managed the file system connection,
+ * either to a local file system (via a provided handle) or
+ * to the browser-managed origin private file system (OPFS).
+ *
+ * The module has no initialization procedure. Calling FS
+ * operations will *always* work, because by default, it is
+ * connected to the OPFS.
+ *
+ * The worker is managed by the VFS class in vfs-client.js.
+ * Information is exchanged via postMessage calls and
+ * translated into method or event handler calls on each side.
+ *
+ * Switching to another file system is done by calling
+ * handlers.setRootHandle(). This does nothing more than
+ * setting a variable, which is used from then on in FS
+ * operations.
+ */
+
 import { getPartsFromPath, seconds, slugify } from "../helpers/shared.js";
 
 const blacklistedPaths = [
@@ -33,6 +52,12 @@ function incrementString(str) {
  * "origin private file system" (OPFS), managed by the browser.
  */
 let vfsRoot = null;
+
+/**
+ * For polling or external changes in the FS.
+ */
+let watchRootFolderInterval;
+let previousTree = null;
 
 function isOPFS() {
   return vfsRoot == null;
@@ -131,13 +156,29 @@ async function pathExists(path) {
 // Operation handlers
 const handlers = {
   /**
-   * Link the file system to a handle provided by the UI.
+   * Link the file system to a local FS handle provided by the UI,
+   * or reset to null to use the origin private file system (OPFS).
    *
-   * @param {{ handle: FileSystemDirectoryHandle }} param0
+   * If set to a FS handle, this will automatically activate change
+   * polling. Any external change to the FS will trigger an event.
+   *
+   * Safari does not support local file systems other than the OPFS.
+   * However, it also does not support sending directory handles
+   * to a worker via postMessage, so this function will not be
+   * called on Safari anyway.
+   *
+   * @param {{ handle: FileSystemDirectoryHandle? }} param0
    */
-  setRootHandle({ handle }) {
+  async setRootHandle({ handle }) {
     vfsRoot = handle;
-    // return { ok: true };
+
+    // (de)activate external changes watcher
+    if (isOPFS()) {
+      clearTimeout(watchRootFolderInterval);
+    } else {
+      await resetTreeState();
+      watchRootFolder();
+    }
   },
 
   /**
@@ -431,9 +472,9 @@ const handlers = {
     }
 
     // Finally, delete the folder itself from OPFS recursively.
-    const parts = path.split('/');
+    const parts = path.split("/");
     const foldername = parts.pop();
-    const parentPath = parts.join('/');
+    const parentPath = parts.join("/");
     const parentFolderHandle = await getFolderHandleByPath(parentPath);
     await parentFolderHandle.removeEntry(foldername, { recursive: true });
 
@@ -519,14 +560,14 @@ const handlers = {
    *
    * @async
    * @param {string} [path] - The parent folder absolute path.
-   * @returns {array} List with file tree objects.
+   * @returns {Promise<array>} List with file tree objects.
    */
   async getFileTree({ path = "" }) {
-    console.log(`getFileTree: ${path}`);
+    // console.log(`getFileTree: ${path}`);
     const folders = await Promise.all(
       (await handlers.findFoldersInFolder(path)).map(async (folder) => {
         const subpath = path ? `${path}/${folder.name}` : folder.name;
-        console.log(`found ${subpath}`);
+        // console.log(`found ${subpath}`);
         const subtree = subpath
           ? await handlers.getFileTree({ path: subpath })
           : null;
@@ -552,6 +593,11 @@ const handlers = {
         isFile: true,
       },
     }));
+
+    // sort the tree so it can be compared in watchRootFolder
+    folders.sort((a, b) => a.key.localeCompare(b.key));
+    files.sort((a, b) => a.key.localeCompare(b.key));
+
     return folders.concat(files);
   },
 
@@ -563,7 +609,7 @@ const handlers = {
    * @returns {Promise<FileSystemDirectoryHandle[]>} Array of folder handles.
    */
   async findFoldersInFolder(folderpath) {
-    console.log(`findFoldersInFolder ${folderpath}`);
+    // console.log(`findFoldersInFolder ${folderpath}`);
     // Obtain the folder handle recursively.
     const folderHandle = await getFolderHandleByPath(folderpath);
 
@@ -604,6 +650,47 @@ const handlers = {
   },
 };
 
+/**
+ * Polling function to watch the root folder for changes. As long as Chrome's
+ * LocalFilesystemAPI does not have event listeners built-in, we have no other
+ * choice to poll the root folder for changes manually.
+ *
+ * Polling only applies to local storage and LFS mode, but not when connected
+ * to a GitHub repository.
+ *
+ * Note that this does clear rebuild the VFS and visual file tree every
+ * few seconds, which---besides not being efficient---also creates new
+ * file/folder IDs every time. It's not a problem, but just something to be
+ * aware of.
+ */
+function watchRootFolder() {
+  if (watchRootFolderInterval) {
+    clearInterval(watchRootFolderInterval);
+  }
+
+  watchRootFolderInterval = setInterval(async () => {
+    console.log("checking fs changes");
+    const newTree = await handlers.getFileTree({});
+    // BUG: files are randomly ordered in object so finds changes even when not changed!
+    if (JSON.stringify(newTree) !== JSON.stringify(previousTree)) {
+      console.log(
+        `event sent: fileSystemChanged ${JSON.stringify(newTree)} ${JSON.stringify(previousTree)}`,
+      );
+      previousTree = newTree;
+      self.postMessage({ type: "fileSystemChanged", data: newTree });
+    }
+  }, seconds(5));
+}
+
+/**
+ * Save the current file tree in the polling cache. To be
+ * used after switching file systems, so the new FS content is
+ * not reported as a change.
+ */
+async function resetTreeState() {
+  previousTree = await handlers.getFileTree({});
+}
+
 // Message dispatcher calls functions in the handler variable
 // this catches errors and translates to a postMessage to the main UI
 self.onmessage = async (event) => {
@@ -616,6 +703,7 @@ self.onmessage = async (event) => {
     });
     return;
   }
+  /* note: exception handling disabled to get good tracebacks on the worker */
   // try {
   const result = await handlers[type](data);
   self.postMessage({ id, type: `${type}:result`, data: result });

@@ -3,17 +3,24 @@ import { getPartsFromPath } from './helpers/shared.js';
 /**
  * VFS API for the main thread
  * delegates most of its work to a VFS worker module
+ *
+ * By default it will operate, through the worker, on the
+ * origin private file system provided by the browser.
  */
 export default class VirtualFileSystem {
-  constructor(worker) {
+  constructor() {
     this.worker = new Worker("static/js/workers/vfs.worker.js", {
       type: "module",
     });
 
+    // for tracking responses from the worker
     this.pending = new Map(); // id → { resolve, reject }
     this._nextId = 1;
+
+    // for handlers of general events like "fs changed"
     this.eventListeners = new Map();
 
+    // connect us to the worker
     this.worker.addEventListener("message", (e) => this._handleMessage(e.data));
   }
 

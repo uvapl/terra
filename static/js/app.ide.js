@@ -44,37 +44,53 @@ export default class IDEApp extends App {
     return 'showOpenFilePicker' in window;
   }
 
-  setupLayout() {
+  async setupLayout() {
+    // Check what to start after the page loads (GitFS, LFS or local storage).
+    if (localStorageManager.getLocalStorageItem('git-repo')) {
+      console.log("git project detected upon init")
+      this.createGitFSWorker();
+    }
+
+    if (this.browserHasLFSApi() && this.hasLFSProjectLoaded) {
+      console.log("LFS project detected upon init")
+      // Set file-tree title to the root folder name.
+      const rootFolderHandle = await idbManager.getHandle("lfs", "root");
+      // Set file system root before loading the UI (O(1))
+      await this.vfs.setRootHandle(rootFolderHandle);
+    }
+
     this.layout = this.createLayout();
   }
 
   async postSetupLayout() {
-    // Check what to start after the page loads (GitFS, LFS or local storage).
-    const repoLink = localStorageManager.getLocalStorageItem('git-repo');
-    if (repoLink) {
-      this.createGitFSWorker();
-    } else {
-      // local storage
-      await fileTreeManager.createFileTree();
-    }
-
     if (!this.browserHasLFSApi()) {
       // Disable open-folder if the FileSystemAPI is not supported.
       $('#menu-item--open-folder').remove();
     } else if (this.hasLFSProjectLoaded) {
-      // If the browser supports LFS and a project is loaded...
-
-      // Set file-tree title to the root folder name.
-      const rootFolderHandle = await idbManager.getHandle("lfs", "root");
-      fileTreeManager.setTitle(rootFolderHandle.name);
-
       // Enable close-folder menu item.
       $('#menu-item--close-folder').removeClass('disabled');
+      const rootFolderHandle = await idbManager.getHandle("lfs", "root"); // hmm
+      fileTreeManager.setTitle(rootFolderHandle.name);
     }
 
+    // Initialize file tree depending on FS state.
+    await fileTreeManager.createFileTree();
+    const repoLink = localStorageManager.getLocalStorageItem('git-repo'); // hmm
     if (!repoLink && !this.hasLFSProjectLoaded) {
       fileTreeManager.showLocalStorageWarning();
     }
+
+    // Start listening to file system changes.
+    // (events will only be sent on local file system)
+    this.vfs.onEvent("fileSystemChanged", async () => {
+      // We sometimes have a reason to not pick up changes,
+      // e.g. when the user is actively renaming an item.
+      if (Terra.v.blockFSPolling || !Terra.app.hasLFSProjectLoaded) return;
+      // Import again from the VFS.
+      await fileTreeManager.runFuncWithPersistedState(
+        () => fileTreeManager.createFileTree()
+      );
+    });
 
     $(window).resize();
   }
