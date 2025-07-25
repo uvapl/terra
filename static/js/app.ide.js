@@ -383,24 +383,20 @@ export default class IDEApp extends App {
 
   /**
    * Disconnect the LFS from the current folder.
+   * Gets called when LFS is closed, or when a Git repo is connected.
    *
    * @async
    */
   async terminateLFS() {
     localStorageManager.setLocalStorageItem('use-lfs', false);
-    clearTimeout(this._watchRootFolderInterval);
     await this.vfs.setRootHandle(null);
-
-    // TODO this may still be necessary when unloading git
-    // however, currently it also fully deleted a local dir when closed
-    // await this.vfs.clear();
-
     await idbManager.clearStores();
     $('#menu-item--close-folder').addClass('disabled');
   }
 
   /**
    * Close the current LFS folder and use the VFS again.
+   * Gets called by the "Close Folder" menu item.
    *
    * @async
    */

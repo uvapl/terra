@@ -148,6 +148,8 @@ export default class VirtualFileSystem extends EventTarget {
 
   /**
    * Clear the virtual filesystem, removing all files and folders permanently.
+   * Called when the app switches to a Git repo (VFS is needed as backed)
+   * or when the app disconnects from the Git repo.
    *
    * @returns {Promise<void>} Resolves when the root handle is cleared.
    */
