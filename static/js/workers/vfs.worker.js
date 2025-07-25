@@ -270,6 +270,7 @@ const handlers = {
    * @param {string} [fileObj.path] - The name of the file. Leave empty to
    * create a new Untitled file in the root directory.
    * @param {string} [fileObj.content] - The content of the file.
+   * // TODO had isUserInvoked but is this needed?
    * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
    * @returns {FileSystemFileHandle} The new file handle.
    */
@@ -311,8 +312,8 @@ const handlers = {
    * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
    * @returns {FileSystemFileHandle} The updated file handle.
    */
-  async writeFile({ path, content }) {
-    console.log(`writeFile: ${path}`);
+  async writeFile({ path, content, isUserInvoked }) {
+    console.log(`writeFile: ${path} ${isUserInvoked}`);
     const handle = await getFileHandleByPath(path);
     if (!handle) return;
 
@@ -327,7 +328,6 @@ const handlers = {
       accessHandle.write(data, { at: 0 });
       accessHandle.flush();
       accessHandle.close();
-      return { ok: true };
     } else {
       // use general FS API
       const writable = await handle.createWritable();
@@ -335,15 +335,13 @@ const handlers = {
       await writable.close();
     }
 
-    // if (isUserInvoked) {
-    //   this.dispatchEvent(
-    //     new CustomEvent("fileContentChanged", {
-    //       detail: {
-    //         file: { path, content },
-    //       },
-    //     }),
-    //   );
-    // }
+    if (isUserInvoked) {
+      console.log("user invoked change");
+      self.postMessage({
+        type: "fileContentChanged",
+        data: { detail: { file: { path, content } } },
+      });
+    }
   },
 
   /**

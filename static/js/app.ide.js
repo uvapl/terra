@@ -45,11 +45,6 @@ export default class IDEApp extends App {
   }
 
   async setupLayout() {
-    // Check what to start after the page loads (GitFS, LFS or local storage).
-    if (localStorageManager.getLocalStorageItem('git-repo')) {
-      console.log("git project detected upon init")
-      this.createGitFSWorker();
-    }
 
     if (this.browserHasLFSApi() && this.hasLFSProjectLoaded) {
       console.log("LFS project detected upon init")
@@ -60,6 +55,13 @@ export default class IDEApp extends App {
     }
 
     this.layout = this.createLayout();
+
+    // Check what to start after the page loads (GitFS, LFS or local storage).
+    if (localStorageManager.getLocalStorageItem('git-repo')) {
+      console.log("git project detected upon init")
+      this.createGitFSWorker();
+    }
+
   }
 
   async postSetupLayout() {

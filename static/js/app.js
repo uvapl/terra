@@ -167,7 +167,7 @@ export default class App {
    */
   async onEditorChange(editorComponent) {
     const path = editorComponent.getPath();
-    await this.vfs.writeFile(path, editorComponent.getContent())
+    await this.vfs.writeFile(path, editorComponent.getContent(), true)
   }
 
   /**

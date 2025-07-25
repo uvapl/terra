@@ -1,4 +1,4 @@
-import { getPartsFromPath } from './helpers/shared.js';
+import { getPartsFromPath } from "./helpers/shared.js";
 
 /**
  * VFS API for the main thread
@@ -77,7 +77,8 @@ export default class VirtualFileSystem {
 
   readFile = (path) => this._send("readFile", { path });
 
-  writeFile = (path, content) => this._send("writeFile", { path, content });
+  writeFile = (path, content, isUserInvoked = true) =>
+    this._send("writeFile", { path, content, isUserInvoked });
 
   createFile = (path, content = "") =>
     this._send("createFile", { path, content });
@@ -89,6 +90,8 @@ export default class VirtualFileSystem {
   findFilesInFolder = (path = "") => this._send("findFilesInFolder", path);
 
   getAllFiles = () => this._send("getAllFiles");
+
+  isEmpty = () => this._send("isEmpty");
 
   createFolder = (path) => this._send("createFolder", { path });
 
