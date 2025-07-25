@@ -1,7 +1,7 @@
 import { DROP_AREA_INDICATOR_CLASS } from './ide/constants.js';
-import { getFileExtension, getPartsFromPath, isValidFilename, seconds } from './helpers/shared.js'
-import { createModal, hideModal, showModal } from './modal.js'
-import Terra from './terra.js'
+import { getFileExtension, getPartsFromPath, isValidFilename } from './helpers/shared.js';
+import { createModal, hideModal, showModal } from './modal.js';
+import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
 import EditorComponent from './layout/editor.component.js';
 import tooltipManager from './tooltip-manager.js';
