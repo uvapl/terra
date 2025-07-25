@@ -145,7 +145,7 @@ class FileTreeManager {
     // Create the new file in the filesystem.
     const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
 
-    const file = await Terra.app.vfs.createFile({ path });
+    const file = await Terra.app.vfs.createFile(path);
     const key = parentPath ? `${parentPath}/${file.name}` : file.name;
 
     // Create the new node in the file tree.
@@ -265,33 +265,7 @@ class FileTreeManager {
    * @returns {array} List with file tree objects.
    */
   createFromVFS = async (path = '') => {
-    const folders = await Promise.all(
-      (await Terra.app.vfs.findFoldersInFolder(path)).map(async (folder) => {
-        const subpath = path ? `${path}/${folder.name}` : folder.name;
-        return {
-          key: subpath,
-          title: folder.name,
-          folder: true,
-          data: {
-            type: 'folder',
-            isFolder: true,
-          },
-          children: (await this.createFromVFS(subpath)),
-        };
-      })
-    )
-
-    const files = (await Terra.app.vfs.findFilesInFolder(path)).map((file) => ({
-      key: path ? `${path}/${file.name}` : file.name,
-      title: file.name,
-      folder: false,
-      data: {
-        type: 'file',
-        isFile: true,
-      },
-    }));
-
-    return folders.concat(files);
+    return await Terra.app.vfs.getFileTree(path);
   }
 
   /**

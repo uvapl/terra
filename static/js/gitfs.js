@@ -54,10 +54,10 @@ export default class GitFS {
   }
 
   bindVFSEvents = () => {
-    this.vfs.addEventListener('fileCreated', this.vfsFileCreatedHandler);
-    this.vfs.addEventListener('fileMoved', this.vfsFileMovedHandler);
-    this.vfs.addEventListener('fileContentChanged', this.vfsFileContentChangedHandler);
-    this.vfs.addEventListener('fileDeleted', this.vfsBeforeFileDeletedHandler);
+    this.vfs.onEvent('fileCreated', this.vfsFileCreatedHandler);
+    this.vfs.onEvent('fileMoved', this.vfsFileMovedHandler);
+    this.vfs.onEvent('fileContentChanged', this.vfsFileContentChangedHandler);
+    this.vfs.onEvent('fileDeleted', this.vfsBeforeFileDeletedHandler);
   }
 
   vfsFileCreatedHandler = (event) => {
@@ -339,10 +339,8 @@ export default class GitFS {
 
     const files = repoContents.filter((file) => file.type === 'blob');
     for (const file of files) {
-      await this.vfs.createFile({
-        path: file.path,
-        content: file.content,
-      }, false);
+      // TODO this had isUserInvoked=false
+      await this.vfs.createFile(file.path, file.content);
     }
 
     // Trigger a vfsChanged event, such that all editors reload their content.
