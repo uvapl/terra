@@ -19,20 +19,16 @@
 
 import { getPartsFromPath, seconds, slugify } from '../helpers/shared.js';
 
-const blacklistedPaths = [
-  'site-packages',
-  '__pycache__',
-  '.mypy_cache',
-  '.venv',
-  'venv',
-  'env',
-  '.DS_Store',
-  'dist',
-  'build',
-  'coverage',
-  '.nyc_output',
-  '.git',
-  'node_modules',
+blacklistedPaths = [
+  'site-packages',           // when user folder has python virtual env
+  '__pycache__',             // Python cache directory
+  '.mypy_cache',             // Mypy cache directory
+  '.venv', 'venv', 'env',    // virtual environment
+  '.DS_Store',               // Macos metadata file
+  'dist', 'build',           // compiled assets for various languages
+  'coverage', '.nyc_output', // code coverage reports
+  '.git',                    // Git directory
+  'node_modules',            // NodeJS projects
 ];
 
 /**
