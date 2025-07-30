@@ -7,8 +7,10 @@ import { getPartsFromPath } from './helpers/shared.js';
  * By default it will operate, through the worker, on the
  * origin private file system provided by the browser.
  */
-export default class VirtualFileSystem {
+export default class VirtualFileSystem extends EventTarget {
   constructor() {
+    super();
+
     this.worker = new Worker('static/js/workers/vfs.worker.js', {
       type: 'module',
     });
@@ -17,22 +19,9 @@ export default class VirtualFileSystem {
     this.pending = new Map(); // id → { resolve, reject }
     this._nextId = 1;
 
-    // for handlers of general events like "fs changed"
-    this.eventListeners = new Map();
-
     // connect us to the worker
     this.worker.addEventListener('message', (e) => this._handleMessage(e.data));
   }
-
-  /**
-   * Allows registering a VFS event handler
-   *
-   * @param {*} eventName
-   * @param {*} handler
-   */
-  onEvent = (eventName, handler) => {
-    this.eventListeners.set(eventName, handler);
-  };
 
   /**
    * Handles a message received from the VFS (virtual file system) worker.
@@ -62,8 +51,7 @@ export default class VirtualFileSystem {
       error ? reject(new Error(error)) : resolve(data);
     } else {
       // this is an event originating in the worker (e.g. FS changes)
-      const handler = this.eventListeners.get(type);
-      if (handler) handler(data);
+      this.dispatchEvent(new CustomEvent(type, { detail: data }))
     }
   }
 
@@ -106,7 +94,7 @@ export default class VirtualFileSystem {
 
   getAllFiles = () => this._send('getAllFiles');
 
-  pathExists = () => this._send('pathExists', [path]);
+  pathExists = (path) => this._send('pathExists', [path]);
 
   isEmpty = () => this._send('isEmpty');
 

@@ -19,16 +19,20 @@
 
 import { getPartsFromPath, seconds, slugify } from '../helpers/shared.js';
 
-blacklistedPaths = [
-  'site-packages',           // when user folder has python virtual env
-  '__pycache__',             // Python cache directory
-  '.mypy_cache',             // Mypy cache directory
-  '.venv', 'venv', 'env',    // virtual environment
-  '.DS_Store',               // Macos metadata file
-  'dist', 'build',           // compiled assets for various languages
-  'coverage', '.nyc_output', // code coverage reports
-  '.git',                    // Git directory
-  'node_modules',            // NodeJS projects
+const blacklistedPaths = [
+  'site-packages', // when user folder has python virtual env
+  '__pycache__', // Python cache directory
+  '.mypy_cache', // Mypy cache directory
+  '.venv',
+  'venv',
+  'env', // virtual environment
+  '.DS_Store', // Macos metadata file
+  'dist',
+  'build', // compiled assets for various languages
+  'coverage',
+  '.nyc_output', // code coverage reports
+  '.git', // Git directory
+  'node_modules', // NodeJS projects
 ];
 
 /**
@@ -158,7 +162,7 @@ const handlers = {
     console.log(`readFile: ${path}`);
 
     // throw on non-existing path // TODO can this be merged with getFileHandleByPath?
-    if (!(await pathExists(path))) {
+    if (!(await handlers.pathExists(path))) {
       throw new Error(`FileNotFound:${path}`);
     }
 
@@ -205,7 +209,7 @@ const handlers = {
     // getFolderHandleByPath handles root path, too
     const folder = await getFolderHandleByPath(parentPath);
 
-    while (await pathExists(`${parentPath}/${name}`)) {
+    while (await handlers.pathExists(`${parentPath}/${name}`)) {
       name = incrementString(name);
     }
 
@@ -219,7 +223,7 @@ const handlers = {
       const filepath = parentPath ? `${parentPath}/${name}` : name;
       self.postMessage({
         type: 'fileCreated',
-        data: { detail: { file: { path: filepath, content } } },
+        data: { file: { path: filepath, content } },
       });
     }
 
@@ -244,7 +248,7 @@ const handlers = {
     if (isUserInvoked) {
       self.postMessage({
         type: 'fileContentChanged',
-        data: { detail: { file: { path, content } } },
+        data: { file: { path, content } },
       });
     }
   },
@@ -257,7 +261,7 @@ const handlers = {
    * @returns {Promise<boolean>} Resolves to true if deleted successfully, false otherwise.
    */
   async deleteFile(path, isUserInvoked = true) {
-    if (!(await pathExists(path))) {
+    if (!(await handlers.pathExists(path))) {
       return false;
     }
 
@@ -270,7 +274,7 @@ const handlers = {
     if (isUserInvoked) {
       self.postMessage({
         type: 'fileDeleted',
-        data: { detail: { file: { path } } },
+        data: { file: { path } },
       });
     }
 
@@ -339,7 +343,7 @@ const handlers = {
       : await getRootHandle();
 
     // Ensure a unique folder name.
-    while (await pathExists(name, parentFolderHandle)) {
+    while (await handlers.pathExists(name, parentFolderHandle)) {
       name = incrementString(name);
     }
 
@@ -358,7 +362,7 @@ const handlers = {
    * @returns {Promise<boolean>} True if deleted successfully, false otherwise.
    */
   async deleteFolder(path) {
-    if (!(await pathExists(path))) {
+    if (!(await handlers.pathExists(path))) {
       return false;
     }
 
@@ -413,12 +417,10 @@ const handlers = {
     self.postMessage({
       type: 'fileMoved',
       data: {
-        detail: {
-          oldPath: src,
-          file: {
-            path: dest,
-            content: srcFileContent,
-          },
+        oldPath: src,
+        file: {
+          path: dest,
+          content: srcFileContent,
         },
       },
     });
@@ -436,8 +438,6 @@ const handlers = {
    * @returns {Promise}
    */
   async moveFolder(srcPath, dstPath) {
-    console.log(`moveFolder: ${srcPath} -> ${dstPath}`);
-
     // Create the destination folder before moving contents.
     await handlers.createFolder(dstPath);
 
@@ -523,6 +523,29 @@ const handlers = {
     const handles = await findFoldersInFolder(path);
     return handles.map((handle) => handle.name);
   },
+
+  /**
+   * Check if a given path exists, either as a file or a folder.
+   *
+   * @param {string} path - The path to check.
+   * @param {string|FileSystemDirectoryHandle} [parentFolder] - Check whether
+   * the path exists in this folder. Defaults to the root folder handle. Either
+   * the absolute folder path or a FileSystemDirectoryHandle can be provided.
+   * @returns {Promise<boolean>} True if the path exists, false otherwise.
+   */
+  async pathExists(path) {
+    // TODO this is much more basic than the original
+    const parts = path.split('/');
+    const last = parts.pop();
+    try {
+      const folder = await getFolderHandleByPath(parts.join('/'));
+      for await (const entry of folder.keys()) {
+        if (entry === last) return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
 };
 
 /**
@@ -544,9 +567,8 @@ function watchRootFolder() {
   }
 
   watchRootFolderInterval = setInterval(async () => {
-    console.log('checking fs changes');
+    console.log('Checking FS changes...');
     const newTree = await handlers.getFileTree();
-    // BUG: files are randomly ordered in object so finds changes even when not changed!
     if (JSON.stringify(newTree) !== JSON.stringify(previousTree)) {
       console.log(
         `event sent: fileSystemChanged ${JSON.stringify(newTree)} ${JSON.stringify(previousTree)}`,
@@ -628,7 +650,7 @@ async function getFolderHandleByPath(folderpath = '') {
  * @returns {Promise<FileSystemFileHandle|null>} The file handle if it exists.
  */
 async function getFileHandleByPath(filepath) {
-  if (!(await pathExists(filepath))) {
+  if (!(await handlers.pathExists(filepath))) {
     return null;
   }
 
@@ -643,28 +665,6 @@ async function getFileHandleByPath(filepath) {
   });
 
   return fileHandle;
-}
-
-/**
- * Check if a given path exists, either as a file or a folder.
- *
- * @param {string} path - The path to check.
- * @param {string|FileSystemDirectoryHandle} [parentFolder] - Check whether
- * the path exists in this folder. Defaults to the root folder handle. Either
- * the absolute folder path or a FileSystemDirectoryHandle can be provided.
- * @returns {Promise<boolean>} True if the path exists, false otherwise.
- */
-async function pathExists(path) {
-  // TODO this is much more basic than the original
-  const parts = path.split('/');
-  const last = parts.pop();
-  try {
-    const folder = await getFolderHandleByPath(parts.join('/'));
-    for await (const entry of folder.keys()) {
-      if (entry === last) return true;
-    }
-  } catch (_) {}
-  return false;
 }
 
 /**

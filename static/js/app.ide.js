@@ -86,7 +86,7 @@ export default class IDEApp extends App {
 
     // Start listening to file system changes.
     // (events will only be sent on local file system)
-    this.vfs.onEvent('fileSystemChanged', async () => {
+    this.vfs.addEventListener('fileSystemChanged', async () => {
       // We sometimes have a reason to not pick up changes,
       // e.g. when the user is actively renaming an item.
       if (Terra.v.blockFSPolling || !Terra.app.hasLFSProjectLoaded) return;
@@ -294,13 +294,13 @@ export default class IDEApp extends App {
   }
 
   /**
-   * Save the current file. Another part in the codebase is responsible for
-   * auto-saving the file. This function will be used mainly for any file that
-   * doesn't exist in th vfs yet. It will prompt the user with a modal for a
-   * filename and in which folder to save the file. Finally, the file will be
-   * created in the file-tree which automatically creates the file in the vfs.
+   * Save the current file on request by the user (i.e. CTRL-S).
+   * Another part in the codebase is responsible for auto-saving.
    *
-   * This function gets triggered on each 'save' keystroke, i.e. <cmd/ctrl + s>.
+   * This function is mainly used for any file that doesn't exist in the
+   * vfs yet. It will prompt the user with a modal for a filename and in
+   * which folder to save the file. Finally, the file will be created in
+   * the file-tree which automatically creates the file in the vfs.
    *
    * @async
    */
@@ -311,13 +311,9 @@ export default class IDEApp extends App {
 
     // If the file exists in the vfs, then return, because the contents will be
     // auto-saved already by the editor component.
-    //
-    // TODO this seems redundant if we KNOW saveFile is not triggered then
     const existingFilepath = editorComponent.getPath();
-    if (existingFilepath) {
-      const fileHandle = await this.vfs.getFileHandleByPath(existingFilepath);
-      if (fileHandle) return;
-    }
+    if (existingFilepath && (await this.vfs.pathExists(existingFilepath)))
+      return;
 
     this.layout.promptSaveFile(editorComponent);
   }
