@@ -92,7 +92,7 @@ const handlers = {
    * to a worker via postMessage, so this function will not be
    * called on Safari anyway.
    *
-   * @param {FileSystemDirectoryHandle?} handle
+   * @param {FileSystemDirectoryHandle | null} handle
    * @returns {Promise<void>} Resolves when ready.
    */
   async setRootHandle(handle) {
@@ -533,19 +533,48 @@ const handlers = {
    * the absolute folder path or a FileSystemDirectoryHandle can be provided.
    * @returns {Promise<boolean>} True if the path exists, false otherwise.
    */
-  async pathExists(path) {
-    // TODO this is much more basic than the original
+  async pathExists(path, parentFolder = null) {
+    const rootHandle = vfsRoot;
+
+    let parentFolderHandle = rootHandle;
+    if (typeof parentFolder === 'string') {
+      parentFolderHandle = await this.getFolderHandleByPath(parentFolder);
+    } else if (parentFolder instanceof FileSystemDirectoryHandle) {
+      parentFolderHandle = parentFolder;
+    }
+
+    if (!parentFolderHandle) {
+      parentFolderHandle = rootHandle;
+    }
+
     const parts = path.split('/');
     const last = parts.pop();
-    try {
-      const folder = await getFolderHandleByPath(parts.join('/'));
-      for await (const entry of folder.keys()) {
-        if (entry === last) return true;
-      }
-    } catch (_) {}
-    return false;
-  }
 
+    // Check if the parent folders exist.
+    let currentHandle = parentFolderHandle;
+    for (const part of parts) {
+      try {
+        currentHandle = await currentHandle.getDirectoryHandle(part, {
+          create: false,
+        });
+      } catch {
+        // If the handle does not exist, return false.
+        return false;
+      }
+    }
+
+    // At this point, we know the parent folder exists.
+    // The last part of the path could be either file or folder, so we just
+    // iterate over each entry and check if it exists.
+    for await (let name of currentHandle.keys()) {
+      if (name === last) {
+        // If the entry exists, return true.
+        return true;
+      }
+    }
+
+    return false;
+  },
 };
 
 /**
@@ -570,9 +599,6 @@ function watchRootFolder() {
     console.log('Checking FS changes...');
     const newTree = await handlers.getFileTree();
     if (JSON.stringify(newTree) !== JSON.stringify(previousTree)) {
-      console.log(
-        `event sent: fileSystemChanged ${JSON.stringify(newTree)} ${JSON.stringify(previousTree)}`,
-      );
       previousTree = newTree;
       self.postMessage({ type: 'fileSystemChanged', data: newTree });
     }
@@ -656,10 +682,7 @@ async function getFileHandleByPath(filepath) {
 
   const { name, parentPath } = getPartsFromPath(filepath);
 
-  // Get the parent folder's handle.
   let parentFolderHandle = await getFolderHandleByPath(parentPath);
-
-  // Get the file handle through its parent folder handle.
   const fileHandle = await parentFolderHandle.getFileHandle(name, {
     create: false,
   });

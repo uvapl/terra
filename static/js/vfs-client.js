@@ -51,7 +51,7 @@ export default class VirtualFileSystem extends EventTarget {
       error ? reject(new Error(error)) : resolve(data);
     } else {
       // this is an event originating in the worker (e.g. FS changes)
-      this.dispatchEvent(new CustomEvent(type, { detail: data }))
+      this.dispatchEvent(new CustomEvent(type, { detail: data }));
     }
   }
 
@@ -94,7 +94,8 @@ export default class VirtualFileSystem extends EventTarget {
 
   getAllFiles = () => this._send('getAllFiles');
 
-  pathExists = (path) => this._send('pathExists', [path]);
+  pathExists = (path, parentFolder = null) =>
+    this._send('pathExists', [path, parentFolder]);
 
   isEmpty = () => this._send('isEmpty');
 
