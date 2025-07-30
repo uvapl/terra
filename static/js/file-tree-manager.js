@@ -322,20 +322,21 @@ class FileTreeManager {
 
   /**
    * Close all files inside a folder, including nested files in subfolders.
+   * // TODO should be partially in main app?
    *
    * @async
    * @param {string} path - The absolute folderpath to close all files from.
    */
   closeFilesInFolderRecursively = async (path) => {
-    const subfiles = await Terra.app.vfs.findFilesInFolder(path);
-    for (const file of subfiles) {
-      const subfilepath = path ? `${path}/${file.name}` : file.name;
+    const subfiles = await Terra.app.vfs.listFilesInFolder(path);
+    for (const fileName of subfiles) {
+      const subfilepath = path ? `${path}/${fileName}` : fileName;
       Terra.app.closeFile(subfilepath);
     }
 
-    const subfolders = await Terra.app.vfs.findFoldersInFolder(path);
-    for (const folder of subfolders) {
-      const subfolderpath = path ? `${path}/${folder.name}` : folder.name;
+    const subfolders = await Terra.app.vfs.listFoldersInFolder(path);
+    for (const folderName of subfolders) {
+      const subfolderpath = path ? `${path}/${folderName}` : folderName;
       this.closeFilesInFolderRecursively(subfolderpath);
     }
   }

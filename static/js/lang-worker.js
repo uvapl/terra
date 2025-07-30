@@ -285,10 +285,10 @@ export default class LangWorker {
         }
       } else {
         // Otherwise, create a new file in the VFS.
-        await Terra.app.vfs.createFile({
-          path: file.path,
-          content: file.content,
-        });
+        await Terra.app.vfs.createFile(
+          file.path,
+          file.content,
+        );
       }
 
       // Recreate the file tree.

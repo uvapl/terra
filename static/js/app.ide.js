@@ -45,22 +45,19 @@ export default class IDEApp extends App {
   }
 
   async setupLayout() {
-
+    // Re-open previous LFS project if available.
     if (this.browserHasLFSApi() && this.hasLFSProjectLoaded) {
-      console.log("LFS project detected upon init")
-      // Set file-tree title to the root folder name.
-      const rootFolderHandle = await idbManager.getHandle("lfs", "root");
-      // Set file system root before loading the UI (O(1))
-      await this.vfs.setRootHandle(rootFolderHandle);
+      const rootFolderHandle = await this._reopenLFS();
+      // Might not succeed if saved LFS handle is stale.
+      if(rootFolderHandle) {
+        console.log('LFS project detected upon init');
+        await this.vfs.setRootHandle(rootFolderHandle);
+      } else {
+        this.closeLFSFolder();
+      }
     }
 
     this.layout = this.createLayout();
-
-    // Check what to start after the page loads (GitFS, LFS or local storage).
-    if (localStorageManager.getLocalStorageItem('git-repo')) {
-      console.log("git project detected upon init")
-      this.createGitFSWorker();
-    }
 
   }
 
@@ -71,24 +68,31 @@ export default class IDEApp extends App {
     } else if (this.hasLFSProjectLoaded) {
       // Enable close-folder menu item.
       $('#menu-item--close-folder').removeClass('disabled');
-      const rootFolderHandle = await idbManager.getHandle("lfs", "root"); // hmm
-      fileTreeManager.setTitle(rootFolderHandle.name);
+      fileTreeManager.setTitle(await this._getLFSFolderName());
     }
 
     // Initialize file tree depending on FS state.
     await fileTreeManager.createFileTree();
-    const repoLink = localStorageManager.getLocalStorageItem('git-repo'); // hmm
+    const repoLink = localStorageManager.getLocalStorageItem('git-repo');
     if (!repoLink && !this.hasLFSProjectLoaded) {
       fileTreeManager.showLocalStorageWarning();
     }
 
+    // Check what to start after the page loads (GitFS, LFS or local storage).
+    if (localStorageManager.getLocalStorageItem('git-repo')) {
+      console.log('Git project detected upon init')
+      this.createGitFSWorker();
+    }
+
     // Start listening to file system changes.
     // (events will only be sent on local file system)
-    this.vfs.onEvent("fileSystemChanged", async () => {
+    this.vfs.onEvent('fileSystemChanged', async () => {
       // We sometimes have a reason to not pick up changes,
       // e.g. when the user is actively renaming an item.
       if (Terra.v.blockFSPolling || !Terra.app.hasLFSProjectLoaded) return;
-      // Import again from the VFS.
+
+      // Re-import from the VFS.
+      console.log('Reloading file tree from fs change')
       await fileTreeManager.runFuncWithPersistedState(
         () => fileTreeManager.createFileTree()
       );
@@ -156,7 +160,7 @@ export default class IDEApp extends App {
     if (!filepath) return;
 
     try {
-      const content = await this.vfs.readFile(filepath, { MAX_FILE_SIZE });
+      const content = await this.vfs.readFile(filepath, MAX_FILE_SIZE);
 
       editorComponent.setContent(content);
 
@@ -171,9 +175,9 @@ export default class IDEApp extends App {
       if (err instanceof FileTooLargeError) {
         editor.exceededFileSize();
       } else if (err instanceof FileNotFoundError) {
-        console.warn("Editor file disappeared:", err.path);
+        console.warn('Editor file disappeared:', err.path);
       } else {
-        console.error("Unexpected error reading file:", err);
+        console.error('Unexpected error reading file:', err);
       }
     }
   }
@@ -368,7 +372,7 @@ export default class IDEApp extends App {
     return {
       path: filepath,
       content,
-      handle: this.vfs.getFileHandleByPath(filepath),
+      handle: this.vfs.getFileHandleByPath(filepath), // TODO remove handle
     }
   }
 
@@ -388,9 +392,8 @@ export default class IDEApp extends App {
    * @async
    */
   async terminateLFS() {
-    localStorageManager.setLocalStorageItem('use-lfs', false);
     await this.vfs.setRootHandle(null);
-    await idbManager.clearStores();
+    this._closeLFS();
     $('#menu-item--close-folder').addClass('disabled');
   }
 
@@ -415,28 +418,17 @@ export default class IDEApp extends App {
    * @returns {Promise<void>}
    */
   async openLFSFolder() {
-    let rootFolderHandle;
     try {
-      rootFolderHandle = await window.showDirectoryPicker();
-    } catch (err) {
-      // User most likely aborted.
-      return;
-    }
+      let rootFolderHandle = await this._openLFS();
 
-    const hasPermission =
-      await this._verifyLFSHandlePermission(rootFolderHandle);
-
-    if (hasPermission) {
-      // Make sure GitFS is stopped.
+      // Make sure GitFS is stopped before connecting LFS.
       if (this.hasGitFSWorker()) {
         this.gitfs.terminate();
         this.gitfs = null;
       }
 
       fileTreeManager.removeLocalStorageWarning();
-      localStorageManager.setLocalStorageItem('use-lfs', true);
       this.closeAllFiles();
-      await idbManager.saveHandle('lfs', 'root', rootFolderHandle);
       fileTreeManager.setTitle(rootFolderHandle.name);
       pluginManager.triggerEvent('onStorageChange', 'lfs');
 
@@ -445,6 +437,41 @@ export default class IDEApp extends App {
       // Render the LFS contents.
       await fileTreeManager.createFileTree();
     }
+    catch { }
+  }
+
+  async _reopenLFS() {
+    // Set file-tree title to the root folder name.
+    const rootFolderHandle = await idbManager.getHandle('lfs', 'root');
+    // TODO this is partially duplicated from openLFSFolder
+    if (await this._verifyLFSHandlePermission(rootFolderHandle)) {
+      return rootFolderHandle;
+    }
+  }
+
+  async _openLFS() {
+    let rootFolderHandle;
+    try {
+      rootFolderHandle = await window.showDirectoryPicker();
+    } catch (err) {
+      // User most likely aborted.
+      return;
+    }
+    await this._verifyLFSHandlePermission(rootFolderHandle, true);
+    localStorageManager.setLocalStorageItem('use-lfs', true);
+    await idbManager.saveHandle('lfs', 'root', rootFolderHandle);
+    return rootFolderHandle;
+
+  }
+
+  async _getLFSFolderName() {
+    const rootFolderHandle = await idbManager.getHandle('lfs', 'root');
+    return rootFolderHandle.name;
+  }
+
+  async _closeLFS() {
+    localStorageManager.setLocalStorageItem('use-lfs', false);
+    await idbManager.clearStores();
   }
 
   /**
@@ -454,17 +481,17 @@ export default class IDEApp extends App {
    * @param {string} [mode] - The mode to request permission for.
    * @returns {Promise<boolean>} True if permission is granted, false otherwise.
    */
-  _verifyLFSHandlePermission(handle, mode = "readwrite") {
-    const opts = { mode };
+  _verifyLFSHandlePermission(handle, userClick = false) {
+    const opts = { mode: 'readwrite' };
 
     return new Promise(async (resolve) => {
       // Check if we already have permission.
-      if ((await handle.queryPermission(opts)) === "granted") {
+      if ((await handle.queryPermission(opts)) === 'granted') {
         return resolve(true);
       }
 
       // Otherwise, request permission to the handle.
-      if ((await handle.requestPermission(opts)) === "granted") {
+      if (userClick && (await handle.requestPermission(opts)) === 'granted') {
         return resolve(true);
       }
 

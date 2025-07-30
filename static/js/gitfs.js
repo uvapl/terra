@@ -339,8 +339,7 @@ export default class GitFS {
 
     const files = repoContents.filter((file) => file.type === 'blob');
     for (const file of files) {
-      // TODO this had isUserInvoked=false
-      await this.vfs.createFile(file.path, file.content);
+      await this.vfs.createFile(file.path, file.content, false);
     }
 
     // Trigger a vfsChanged event, such that all editors reload their content.

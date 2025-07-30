@@ -43,10 +43,7 @@ export default class EmbedApp extends App {
     await this.vfs.clear();
 
     // Create the tab in the virtual filesystem.
-    await this.vfs.createFile({
-      path: queryParams.filename,
-      content: this.frameContent,
-    });
+    await this.vfs.createFile(queryParams.filename, this.frameContent);
 
     // Create tabs with the filename as key and empty string as the content.
     const tabs = {}

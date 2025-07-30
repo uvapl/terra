@@ -67,10 +67,10 @@ export default class ExamApp extends App {
 
           // Create the files inside the VFS.
           await Promise.all(
-            content.map((file) => Terra.app.vfs.createFile({
-              path: file.title,
-              content: file.componentState.value,
-            }))
+            content.map((file) => Terra.app.vfs.createFile(
+              file.title,
+              file.componentState.value,
+            ))
           )
         }
 

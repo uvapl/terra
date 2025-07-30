@@ -271,10 +271,10 @@ export default class IDELayout extends Layout {
       tooltipManager.destroyTooltip('saveFile');
 
       // Create a new file in the VFS and then refresh the file tree.
-      await Terra.app.vfs.createFile({
-        path: filepath,
-        content: editorComponent.getContent(),
-      });
+      await Terra.app.vfs.createFile(
+        filepath,
+        editorComponent.getContent(),
+      );
       await fileTreeManager.createFileTree();
 
       // Change the Untitled tab to the new filename.

@@ -404,7 +404,7 @@ Menubar.connectRepo = () => {
       fileTreeManager.showLocalStorageWarning();
 
       // Clear all files after disconnecting.
-      Terra.app.vfs.clear();
+      await Terra.app.vfs.clear();
       fileTreeManager.createFileTree();
       fileTreeManager.setTitle('local storage');
       fileTreeManager.removeInfoMsg();

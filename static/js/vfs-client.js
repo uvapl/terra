@@ -1,16 +1,16 @@
-import { getPartsFromPath } from "./helpers/shared.js";
+import { getPartsFromPath } from './helpers/shared.js';
 
 /**
- * VFS API for the main thread
- * delegates most of its work to a VFS worker module
+ * VFS interface for the main thread ---
+ * delegates most of its work to a VFS worker module.
  *
  * By default it will operate, through the worker, on the
  * origin private file system provided by the browser.
  */
 export default class VirtualFileSystem {
   constructor() {
-    this.worker = new Worker("static/js/workers/vfs.worker.js", {
-      type: "module",
+    this.worker = new Worker('static/js/workers/vfs.worker.js', {
+      type: 'module',
     });
 
     // for tracking responses from the worker
@@ -21,7 +21,7 @@ export default class VirtualFileSystem {
     this.eventListeners = new Map();
 
     // connect us to the worker
-    this.worker.addEventListener("message", (e) => this._handleMessage(e.data));
+    this.worker.addEventListener('message', (e) => this._handleMessage(e.data));
   }
 
   /**
@@ -35,10 +35,23 @@ export default class VirtualFileSystem {
   };
 
   /**
-   * Process a response or message from the vfs worker
+   * Handles a message received from the VFS (virtual file system) worker.
    *
-   * @param {*} param0
-   * @returns
+   * If the message includes an `id`, it is treated as a response to a
+   * previously issued request. The corresponding Promise in `this.pending`
+   * is resolved with the `data` or rejected with the `error`.
+   *
+   * If the message does not include an `id`, it is treated as an event
+   * originating from the worker (such as a filesystem change notification),
+   * and the registered event handler for the given `type` is called with `data`.
+   *
+   * @param {Object} message - The message object sent from the worker.
+   * @param {number|string} [message.id] - The ID correlating the message with a pending request (if any).
+   * @param {string} [message.type] - The type of event or response being sent.
+   * @param {*} [message.data] - The payload data of the message.
+   * @param {string} [message.error] - Error message if the worker encountered a problem.
+   *
+   * @returns {void}
    */
   _handleMessage({ id, type, data, error }) {
     if (id) {
@@ -71,37 +84,42 @@ export default class VirtualFileSystem {
 
   /* Pass-through to worker */
 
-  setRootHandle = (handle) => this._send("setRootHandle", { handle });
+  setRootHandle = (handle) => this._send('setRootHandle', [handle]);
 
-  clear = () => this._send("clear");
+  clear = () => this._send('clear');
 
-  readFile = (path) => this._send("readFile", { path });
+  readFile = (path, maxSize = null) => this._send('readFile', [path, maxSize]);
 
-  writeFile = (path, content, isUserInvoked = true) =>
-    this._send("writeFile", { path, content, isUserInvoked });
+  updateFile = (path, content, isUserInvoked = true) =>
+    this._send('updateFile', [path, content, isUserInvoked]);
 
-  createFile = (path, content = "") =>
-    this._send("createFile", { path, content });
+  createFile = (path, content = '', isUserInvoked = true) =>
+    this._send('createFile', [path, content, isUserInvoked]);
 
-  deleteFile = (path) => this._send("deleteFile", { path });
+  deleteFile = (path, isUserInvoked = true) =>
+    this._send('deleteFile', [path, isUserInvoked]);
 
-  findFoldersInFolder = (path = "") => this._send("findFoldersInFolder", path);
+  listFoldersInFolder = (path = '') =>
+    this._send('listFoldersInFolder', [path]);
 
-  findFilesInFolder = (path = "") => this._send("findFilesInFolder", path);
+  listFilesInFolder = (path = '') => this._send('listFilesInFolder', [path]);
 
-  getAllFiles = () => this._send("getAllFiles");
+  getAllFiles = () => this._send('getAllFiles');
 
-  isEmpty = () => this._send("isEmpty");
+  pathExists = () => this._send('pathExists', [path]);
 
-  createFolder = (path) => this._send("createFolder", { path });
+  isEmpty = () => this._send('isEmpty');
 
-  deleteFolder = (path) => this._send("deleteFolder", { path });
+  createFolder = (path, isUserInvoked = true) =>
+    this._send('createFolder', [path, isUserInvoked]);
 
-  moveFile = (src, dest) => this._send("moveFile", { src, dest });
+  deleteFolder = (path) => this._send('deleteFolder', [path]);
 
-  moveFolder = (src, dest) => this._send("moveFolder", { src, dest });
+  moveFile = (src, dst) => this._send('moveFile', [src, dst]);
 
-  getFileTree = (path = "") => this._send("getFileTree", { path });
+  moveFolder = (src, dst) => this._send('moveFolder', [src, dst]);
+
+  getFileTree = (path = '') => this._send('getFileTree', [path]);
 
   /**
    * Download a file through the browser by creating a new blob and using
@@ -112,7 +130,7 @@ export default class VirtualFileSystem {
   downloadFile = async (path) => {
     const content = await this.readFile(path);
     const { name } = getPartsFromPath(path);
-    const fileBlob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const fileBlob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     saveAs(fileBlob, name);
   };
 
@@ -122,7 +140,7 @@ export default class VirtualFileSystem {
 export class FileTooLargeError extends Error {
   constructor(path, size, max) {
     super(`File "${path}" is too large: ${size} > ${max}`);
-    this.name = "FileTooLargeError";
+    this.name = 'FileTooLargeError';
     this.path = path;
     this.size = size;
     this.max = max;
@@ -132,7 +150,7 @@ export class FileTooLargeError extends Error {
 export class FileNotFoundError extends Error {
   constructor(path) {
     super(`File not found: ${path}`);
-    this.name = "FileNotFoundError";
+    this.name = 'FileNotFoundError';
     this.path = path;
   }
 }

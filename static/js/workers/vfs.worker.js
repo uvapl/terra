@@ -17,32 +17,23 @@
  * operations.
  */
 
-import { getPartsFromPath, seconds, slugify } from "../helpers/shared.js";
+import { getPartsFromPath, seconds, slugify } from '../helpers/shared.js';
 
 const blacklistedPaths = [
-  "site-packages",
-  "__pycache__",
-  ".mypy_cache",
-  ".venv",
-  "venv",
-  "env",
-  ".DS_Store",
-  "dist",
-  "build",
-  "coverage",
-  ".nyc_output",
-  ".git",
-  "node_modules",
+  'site-packages',
+  '__pycache__',
+  '.mypy_cache',
+  '.venv',
+  'venv',
+  'env',
+  '.DS_Store',
+  'dist',
+  'build',
+  'coverage',
+  '.nyc_output',
+  '.git',
+  'node_modules',
 ];
-
-function incrementString(str) {
-  const match = /\((\d+)\)$/.exec(str);
-  if (match) {
-    const num = parseInt(match[1]) + 1;
-    return str.replace(/\((\d+)\)$/, `(${num})`);
-  }
-  return `${str} (1)`;
-}
 
 /**
  * When set, the vfsRoot should be a FileSystemDirectoryHandle
@@ -59,105 +50,39 @@ let vfsRoot = null;
 let watchRootFolderInterval;
 let previousTree = null;
 
-function isOPFS() {
-  return vfsRoot == null;
-}
-
 /**
- * Returns the root handle provided by the UI, or gets
- * an OPFS root handle.
- *
- * @returns {Promise<FileSystemDirectoryHandle>}
+ * Main message dispatcher for this worker.
+ * It calls functions in the `handler` variable.
+ * Errors are catched and translated to a postMessage to the main UI.
  */
-async function getRootHandle() {
-  return vfsRoot || (await navigator.storage.getDirectory());
-}
-
-/**
- * Get a folder handle by its absolute path.
- *
- * The example below returns the handle for folder3.
- * @example getFolderHandleByPath('folder1/folder2/folder3')
- *
- * The examples below return the root handle.
- * @example getFolderHandleByPath('')
- * @example getFolderHandleByPath()
- *
- * @async
- * @param {string} folderpath - The absolute folder path.
- * @returns {Promise<FileSystemDirectoryHandle>} The folder handle.
- */
-async function getFolderHandleByPath(folderpath = "") {
-  const rootHandle = await getRootHandle();
-  if (!folderpath) return rootHandle;
-
-  let handle = rootHandle;
-  const parts = folderpath.split("/");
-
-  // Walk path segments
-  while (handle && parts.length > 0) {
-    handle = await handle.getDirectoryHandle(parts.shift(), { create: true });
+self.onmessage = async (event) => {
+  const { id, type, data } = event.data;
+  if (!handlers[type]) {
+    self.postMessage({
+      id,
+      type: `${type}:error`,
+      error: `Unknown method: ${type}`,
+    });
+    return;
   }
+  console.log(`vfs worker message: ${type}`);
 
-  return handle;
-}
+  // Call function, wait for result to resolve, and post that back
+  const result = await handlers[type](...(data ?? []));
+  self.postMessage({ id, type: `${type}:result`, data: result });
 
-/**
- * Get a file handle by its absolute path.
- *
- * The example below returns the handle for `myfile.txt`.
- * @example getFileHandleByPath('folder1/folder2/myfile.txt')
- *
- * @async
- * @param {string} filepath - The absolute file path.
- * @returns {Promise<FileSystemFileHandle|null>} The file handle if it exists.
- */
-async function getFileHandleByPath(filepath) {
-  if (!(await pathExists(filepath))) {
-    return null;
-  }
-
-  const { name, parentPath } = getPartsFromPath(filepath);
-
-  // Get the parent folder's handle.
-  let parentFolderHandle = await getFolderHandleByPath(parentPath);
-
-  // Get the file handle through its parent folder handle.
-  const fileHandle = await parentFolderHandle.getFileHandle(name, {
-    create: false,
-  });
-
-  return fileHandle;
-}
-
-/**
- * Check if a given path exists, either as a file or a folder.
- *
- * @async
- * @param {string} path - The path to check.
- * @param {string|FileSystemDirectoryHandle} [parentFolder] - Check whether
- * the path exists in this folder. Defaults to the root folder handle. Either
- * the absolute folder path or a FileSystemDirectoryHandle can be provided.
- * @returns {Promise<boolean>} True if the path exists, false otherwise.
- */
-async function pathExists(path) {
-  // TODO this is much more basic than the original
-  const parts = path.split("/");
-  const last = parts.pop();
-  try {
-    const folder = await getFolderHandleByPath(parts.join("/"));
-    for await (const entry of folder.keys()) {
-      if (entry === last) return true;
-    }
-  } catch (_) {}
-  return false;
-}
+  /* note: exception handling disabled to get good tracebacks on the worker */
+  // try {
+  // } catch (err) {
+  //   self.postMessage({ id, type: `${type}:error`, error: err.message });
+  // }
+};
 
 // Operation handlers
 const handlers = {
   /**
-   * Link the file system to a local FS handle provided by the UI,
-   * or reset to null to use the origin private file system (OPFS).
+   * Connect the file system to a local FS handle provided by the UI,
+   * or reset to `null` to use the origin private file system (OPFS).
    *
    * If set to a FS handle, this will automatically activate change
    * polling. Any external change to the FS will trigger an event.
@@ -167,12 +92,13 @@ const handlers = {
    * to a worker via postMessage, so this function will not be
    * called on Safari anyway.
    *
-   * @param {{ handle: FileSystemDirectoryHandle? }} param0
+   * @param {FileSystemDirectoryHandle?} handle
+   * @returns {Promise<void>} Resolves when ready.
    */
-  async setRootHandle({ handle }) {
+  async setRootHandle(handle) {
     vfsRoot = handle;
 
-    // (de)activate external changes watcher
+    // (de)activate external changes polling
     if (isOPFS()) {
       clearTimeout(watchRootFolderInterval);
     } else {
@@ -198,7 +124,7 @@ const handlers = {
       // To date, the 'remove' function is only available in Chromium-based
       // browsers. For other browsers, we iteratore through the first level of
       // files and folders and delete them one by one.
-      if ("remove" in FileSystemDirectoryHandle.prototype) {
+      if ('remove' in FileSystemDirectoryHandle.prototype) {
         await rootHandle.remove({ recursive: true });
       } else {
         // Fallback for non-Chromium browsers.
@@ -214,28 +140,28 @@ const handlers = {
   /**
    * Check whether the virtual filesystem is empty.
    *
-   * @async
    * @returns {Promise<boolean>} True if VFS is empty, false otherwise.
    */
   async isEmpty() {
     // Count the root folders and files.
-    const files = await handlers.findFilesInFolder();
-    const folders = await handlers.findFoldersInFolder();
+    const files = await findFilesInFolder();
+    const folders = await findFoldersInFolder();
 
     return files.length === 0 && folders.length === 0;
   },
 
   /**
-   * Obtain the content of a file by its absolute path.
+   * Retrieve the content of a file as string.
+   * Error thrown when not found or specified size exceeded.
    *
-   * @async
    * @param {string} filepath - The absolute file path.
+   * @param {number} maxSize - Maximum allowed content size to return.
    * @returns {Promise<string>} The file content.
    */
-  async readFile({ path, maxSize }) {
+  async readFile(path, maxSize) {
     console.log(`readFile: ${path}`);
 
-    // Throw on non-existing path
+    // throw on non-existing path // TODO can this be merged with getFileHandleByPath?
     if (!(await pathExists(path))) {
       throw new Error(`FileNotFound:${path}`);
     }
@@ -243,7 +169,7 @@ const handlers = {
     const handle = await getFileHandleByPath(path);
 
     if (isOPFS()) {
-      // use Safari-compatible API
+      // Use Safari-compatible API.
       const accessHandle = await handle.createSyncAccessHandle();
       const size = accessHandle.getSize();
       if (maxSize && size > maxSize) {
@@ -255,7 +181,7 @@ const handlers = {
       accessHandle.close();
       return new TextDecoder().decode(buffer);
     } else {
-      // use general FS API
+      // Use general FS API.
       const file = await handle.getFile();
       const size = file.size;
       if (maxSize && size > maxSize) {
@@ -268,20 +194,17 @@ const handlers = {
   /**
    * Create a new file.
    *
-   * @param {object} fileObj - The file object to create.
-   * @param {string} [fileObj.path] - The name of the file. Leave empty to
+   * @param {string} path - The name of the file. Leave empty to
    * create a new Untitled file in the root directory.
-   * @param {string} [fileObj.content] - The content of the file.
+   * @param {string} content - The initial content of the file.
    * // TODO had isUserInvoked but is this needed?
-   * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
-   * @returns {FileSystemFileHandle} The new file handle.
+   * @param {boolean} isUserInvoked - Whether user invoked the action.
+   * @returns {Promise<string>} The path for the new file. // TODO is object actually
    */
-  async createFile({ path, content }) {
-    console.log(`createFile: ${path}`);
-
-    const parts = path ? path.split("/") : [];
-    let name = path ? parts.pop() : "Untitled";
-    const parentPath = parts.join("/");
+  async createFile(path, content, isUserInvoked = true) {
+    const parts = path ? path.split('/') : [];
+    let name = path ? parts.pop() : 'Untitled';
+    const parentPath = parts.join('/');
 
     // getFolderHandleByPath handles root path, too
     const folder = await getFolderHandleByPath(parentPath);
@@ -290,17 +213,18 @@ const handlers = {
       name = incrementString(name);
     }
 
-    // Create an empty file.
-    const fileHandle = await folder.getFileHandle(name, { create: true });
-
-    // TODO should be handled by writeFile, probably
+    // Create an empty file and add content if provided.
+    const handle = await folder.getFileHandle(name, { create: true });
     if (content) {
-      const accessHandle = await fileHandle.createSyncAccessHandle();
-      const data = new TextEncoder().encode(content);
-      accessHandle.truncate(data.byteLength);
-      accessHandle.write(data, { at: 0 });
-      accessHandle.flush();
-      accessHandle.close();
+      writeFile(handle, content);
+    }
+
+    if (isUserInvoked) {
+      const filepath = parentPath ? `${parentPath}/${name}` : name;
+      self.postMessage({
+        type: 'fileCreated',
+        data: { detail: { file: { path: filepath, content } } },
+      });
     }
 
     return { name, path: `${parentPath}/${name}` };
@@ -310,37 +234,20 @@ const handlers = {
    * Update a file in the virtual filesystem.
    *
    * @param {string} path - The file path.
-   * @param {object} content - The new content of the file.
-   * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
-   * @returns {FileSystemFileHandle} The updated file handle.
+   * @param {string} content - The new content of the file.
+   * @param {boolean} isUserInvoked - Whether user invoked the action.
+   * @returns {Promise<FileSystemFileHandle>} The updated file handle.
    */
-  async writeFile({ path, content, isUserInvoked }) {
-    console.log(`writeFile: ${path} ${isUserInvoked}`);
+  async updateFile(path, content, isUserInvoked = true) {
     const handle = await getFileHandleByPath(path);
     if (!handle) return;
 
-    // TODO where should debouncing go? See original.
-
-    if (isOPFS()) {
-      // use Safari-compatible API
-      console.log("writeFile to OPFS");
-      const accessHandle = await handle.createSyncAccessHandle();
-      const data = new TextEncoder().encode(content);
-      accessHandle.truncate(data.byteLength);
-      accessHandle.write(data, { at: 0 });
-      accessHandle.flush();
-      accessHandle.close();
-    } else {
-      // use general FS API
-      const writable = await handle.createWritable();
-      await writable.write(content);
-      await writable.close();
-    }
+    // TODO why debounce this? See original `updateFileContent`.
+    writeFile(handle, content);
 
     if (isUserInvoked) {
-      console.log("user invoked change");
       self.postMessage({
-        type: "fileContentChanged",
+        type: 'fileContentChanged',
         data: { detail: { file: { path, content } } },
       });
     }
@@ -349,64 +256,66 @@ const handlers = {
   /**
    * Delete a file.
    *
-   * @param {string} id - The path of the file to delete.
-   * @param {boolean} [isSingleFileDelete] - whether this function is called for
-   * a single file or is called from the `deleteFolder` function.
-   * @returns {boolean} True if deleted successfully, false otherwise.
+   * @param {string} path - The path of the file to delete.
+   * @param {boolean} isUserInvoked - Whether the action was user-invoked.
+   * @returns {Promise<boolean>} Resolves to true if deleted successfully, false otherwise.
    */
-  async deleteFile({ path, isUserInvoked = true }) {
+  async deleteFile(path, isUserInvoked = true) {
     if (!(await pathExists(path))) {
       return false;
     }
 
-    const parts = path.split("/");
+    const parts = path.split('/');
     const filename = parts.pop();
-    const parentPath = parts.join("/");
+    const parentPath = parts.join('/');
     const parent = await getFolderHandleByPath(parentPath);
     await parent.removeEntry(filename);
 
-    // if (isUserInvoked) {
-    //   this.dispatchEvent(
-    //     new CustomEvent("fileDeleted", {
-    //       detail: {
-    //         file: { path },
-    //       },
-    //     }),
-    //   );
-    // }
+    if (isUserInvoked) {
+      self.postMessage({
+        type: 'fileDeleted',
+        data: { detail: { file: { path } } },
+      });
+    }
 
     // TODO
-    return { ok: true };
+    return true;
   },
 
   /**
    * Gathers all files from the VFS.
    * Formerly known as getAllEditorFiles.
    *
-   * @async
-   * @param {string} [folderpath=''] - The folder path to start searching from.
    * @returns {Promise<object[]>} List of objects, each containing the filepath
    * and content of the corresponding file.
    */
   async getAllFiles() {
-    console.log(`getAllFiles:`);
     const root = await getRootHandle();
     const files = [];
 
-    async function walk(folderHandle, currentPath = "") {
+    async function walk(folderHandle, currentPath = '') {
       for await (const [name, handle] of folderHandle.entries()) {
         if (blacklistedPaths.includes(name)) continue;
         const path = currentPath ? `${currentPath}/${name}` : name;
 
-        if (handle.kind === "file") {
-          const accessHandle = await handle.createSyncAccessHandle();
-          const size = accessHandle.getSize();
-          const buffer = new Uint8Array(size);
-          accessHandle.read(buffer, { at: 0 });
-          accessHandle.close();
-          const content = new TextDecoder().decode(buffer);
-          files.push({ path, content });
-        } else if (handle.kind === "directory") {
+        if (handle.kind === 'file') {
+          // TODO this is safari api, is this needed?
+          if (isOPFS()) {
+            // Use Safari-compatible API.
+            const accessHandle = await handle.createSyncAccessHandle();
+            const size = accessHandle.getSize();
+            const buffer = new Uint8Array(size);
+            accessHandle.read(buffer, { at: 0 });
+            accessHandle.close();
+            const content = new TextDecoder().decode(buffer);
+            files.push({ path, content });
+          } else {
+            // Use general FS API.
+            const file = await handle.getFile();
+            const content = await file.text();
+            files.push({ path, content });
+          }
+        } else if (handle.kind === 'directory') {
           await walk(handle, path);
         }
       }
@@ -418,16 +327,16 @@ const handlers = {
 
   /**
    * Create a new folder.
+   * TODO `isUserInvoked` is unused.
    *
-   * @param {object} folderpath - The path where the new folder will be created.
+   * @param {object} path - The path where the new folder will be created.
    * Leave empty to create a new Untitled folder in the root directory.
-   * @param {boolean} [isUserInvoked] - Whether to user invoked the action.
-   * @returns {FileSystemDirectoryHandle} The new folder handle.
+   * @returns {Promise<FileSystemDirectoryHandle>} The new folder handle.
    */
-  async createFolder({ path }) {
-    const parts = path ? path.split("/") : [];
-    let name = path ? parts.pop() : "Untitled";
-    const parentPath = parts.join("/");
+  async createFolder(path, isUserInvoked = true) {
+    const parts = path ? path.split('/') : [];
+    let name = path ? parts.pop() : 'Untitled';
+    const parentPath = parts.join('/');
 
     let parentFolderHandle = parentPath
       ? await getFolderHandleByPath(parentPath)
@@ -450,31 +359,31 @@ const handlers = {
    * Delete a folder recursively from the VFS.
    *
    * @param {string} path - The folder path to delete.
-   * @returns {boolean} True if deleted successfully, false otherwise.
+   * @returns {Promise<boolean>} True if deleted successfully, false otherwise.
    */
-  async deleteFolder({ path }) {
+  async deleteFolder(path) {
     if (!(await pathExists(path))) {
       return false;
     }
 
     // Gather all subfiles and trigger a deleteFile on them.
-    const files = await handlers.findFilesInFolder(path);
+    const files = await findFilesInFolder(path);
     for (const file of files) {
       const filepath = `${path}/${file.name}`;
       await handlers.deleteFile(filepath, true);
     }
 
     // Delete all the nested folders inside the current folder.
-    const folders = await handlers.findFoldersInFolder(path);
+    const folders = await findFoldersInFolder(path);
     for (const folder of folders) {
       const folderpath = `${path}/${folder.name}`;
       await handlers.deleteFolder(folderpath, false);
     }
 
     // Finally, delete the folder itself from OPFS recursively.
-    const parts = path.split("/");
+    const parts = path.split('/');
     const foldername = parts.pop();
-    const parentPath = parts.join("/");
+    const parentPath = parts.join('/');
     const parentFolderHandle = await getFolderHandleByPath(parentPath);
     await parentFolderHandle.removeEntry(foldername, { recursive: true });
 
@@ -486,37 +395,37 @@ const handlers = {
    *
    * @example moveFile('folder1/myfile.txt', 'folder2/myfile.txt')
    *
-   * @async
    * @param {string} srcPath - The source path of the file to move.
    * @param {string} destPath - The destination path where the file should be moved to.
+   * @returns {Promise}
    */
-  async moveFile({ src, dest }) {
+  async moveFile(src, dest) {
     console.log(`moveFile: ${src} -> ${dest}`);
 
-    const srcFileContent = await handlers.readFile({ path: src });
+    const srcFileContent = await handlers.readFile(src);
 
     // Create the file in the new destination path.
     const newFileHandle = await handlers.createFile(
-      {
-        path: dest,
-        content: srcFileContent,
-      },
+      dest,
+      srcFileContent,
       false,
     );
 
     // Delete the old file.
-    await handlers.deleteFile({ path: src, isUserInvoked: false });
+    await handlers.deleteFile(src, false);
 
-    // TODO needed?
-    // this.dispatchEvent(new CustomEvent('fileMoved', {
-    //   detail: {
-    //     oldPath: src,
-    //     file: {
-    //       path: dest,
-    //       content: srcFileContent,
-    //     }
-    //   },
-    // }));
+    self.postMessage({
+      type: 'fileMoved',
+      data: {
+        detail: {
+          oldPath: src,
+          file: {
+            path: dest,
+            content: srcFileContent,
+          },
+        },
+      },
+    });
   },
 
   /**
@@ -526,57 +435,53 @@ const handlers = {
    * @example moveFolder('folder1/folder2', 'folder3/folder2')
    *
    * @param {string} srcPath - The absolute path of the source folder.
-   * @param {string} destPath - The absolute path where the source folder should
+   * @param {string} dstPath - The absolute path where the source folder should
    * be moved to.
+   * @returns {Promise}
    */
-  async moveFolder({ src, dest }) {
-    console.log(`moveFolder: ${src} -> ${dest}`);
+  async moveFolder(srcPath, dstPath) {
+    console.log(`moveFolder: ${srcPath} -> ${dstPath}`);
 
     // Create the destination folder before moving contents.
-    await handlers.createFolder({ path: dest });
+    await handlers.createFolder(dstPath);
 
     // Move all files inside the folder to the new destination path.
-    const files = await handlers.findFilesInFolder(src);
+    const files = await findFilesInFolder(srcPath);
     for (const file of files) {
-      const filePath = `${src}/${file.name}`;
-      const newFilePath = dest ? `${dest}/${file.name}` : file.name;
+      const filePath = `${srcPath}/${file.name}`;
+      const newFilePath = dstPath ? `${dstPath}/${file.name}` : file.name;
       await handlers.moveFile(filePath, newFilePath);
     }
 
     // Recurse on folders inside the folder.
-    const folders = await handlers.findFoldersInFolder(src);
+    const folders = await findFoldersInFolder(srcPath);
     for (const folder of folders) {
-      const folderPath = `${src}/${folder.name}`;
-      const newFolderPath = dest ? `${dest}/${folder.name}` : folder.name;
-      await handlers.moveFolder(folderPath, newFolderPath);
+      const subFolderPath = `${srcPath}/${folder.name}`;
+      const newFolderPath = dstPath ? `${dstPath}/${folder.name}` : folder.name;
+      await handlers.moveFolder(subFolderPath, newFolderPath);
     }
 
     // Delete source folder recursively.
-    await handlers.deleteFolder({ path: src });
+    await handlers.deleteFolder(srcPath);
   },
 
   /**
    * Create a file tree list from the VFS compatible with FancyTree.
    *
-   * @async
-   * @param {string} [path] - The parent folder absolute path.
+   * @param {string} path - The parent folder absolute path.
    * @returns {Promise<array>} List with file tree objects.
    */
-  async getFileTree({ path = "" }) {
-    // console.log(`getFileTree: ${path}`);
+  async getFileTree(path = '') {
     const folders = await Promise.all(
-      (await handlers.findFoldersInFolder(path)).map(async (folder) => {
+      (await findFoldersInFolder(path)).map(async (folder) => {
         const subpath = path ? `${path}/${folder.name}` : folder.name;
-        // console.log(`found ${subpath}`);
-        const subtree = subpath
-          ? await handlers.getFileTree({ path: subpath })
-          : null;
+        const subtree = subpath ? await handlers.getFileTree(subpath) : null;
         return {
           key: subpath,
           title: folder.name,
           folder: true,
           data: {
-            type: "folder",
+            type: 'folder',
             isFolder: true,
           },
           children: subtree,
@@ -584,12 +489,12 @@ const handlers = {
       }),
     );
 
-    const files = (await handlers.findFilesInFolder(path)).map((file) => ({
+    const files = (await findFilesInFolder(path)).map((file) => ({
       key: path ? `${path}/${file.name}` : file.name,
       title: file.name,
       folder: false,
       data: {
-        type: "file",
+        type: 'file',
         isFile: true,
       },
     }));
@@ -602,51 +507,25 @@ const handlers = {
   },
 
   /**
-   * Get all folder handles inside a given folder path (NOT recursive).
+   * Get all names of files inside a given folder.
    *
-   * @async
-   * @param {string} folderpath - The absolute folder path to search in.
-   * @returns {Promise<FileSystemDirectoryHandle[]>} Array of folder handles.
+   * @param {string} path - The absolute folder path.
+   * @returns {Promise<string[]>} Array of file paths.
    */
-  async findFoldersInFolder(folderpath) {
-    // console.log(`findFoldersInFolder ${folderpath}`);
-    // Obtain the folder handle recursively.
-    const folderHandle = await getFolderHandleByPath(folderpath);
-
-    // Gather all subfolder handles.
-    const subfolders = [];
-    for await (let handle of folderHandle.values()) {
-      if (
-        handle.kind === "directory" &&
-        !blacklistedPaths.includes(handle.name)
-      ) {
-        subfolders.push(handle);
-      }
-    }
-
-    return subfolders;
+  async listFilesInFolder(path) {
+    const handles = await findFilesInFolder(path);
+    return handles.map((handle) => handle.name);
   },
 
   /**
-   * Get all file handles inside a given path (NOT recursive).
+   * Get all names of folders inside a given folder.
    *
-   * @async
-   * @param {string} folderpath - The absolute folder path to search in.
-   * @returns {Promise<FileSystemFileHandle[]>} Array of file handles.
+   * @param {string} path - The absolute folder path to search in.
+   * @returns {Promise<FileSystemDirectoryHandle[]>} Array of folder handles.
    */
-  async findFilesInFolder(folderpath) {
-    // Obtain the folder handle recursively.
-    const folderHandle = await getFolderHandleByPath(folderpath);
-
-    // Gather all subfile handles.
-    const subfiles = [];
-    for await (let handle of folderHandle.values()) {
-      if (handle.kind === "file" && !blacklistedPaths.includes(handle.name)) {
-        subfiles.push(handle);
-      }
-    }
-
-    return subfiles;
+  async listFoldersInFolder(path) {
+    const handles = await findFoldersInFolder(path);
+    return handles.map((handle) => handle.name);
   },
 };
 
@@ -669,15 +548,15 @@ function watchRootFolder() {
   }
 
   watchRootFolderInterval = setInterval(async () => {
-    console.log("checking fs changes");
-    const newTree = await handlers.getFileTree({});
+    console.log('checking fs changes');
+    const newTree = await handlers.getFileTree();
     // BUG: files are randomly ordered in object so finds changes even when not changed!
     if (JSON.stringify(newTree) !== JSON.stringify(previousTree)) {
       console.log(
         `event sent: fileSystemChanged ${JSON.stringify(newTree)} ${JSON.stringify(previousTree)}`,
       );
       previousTree = newTree;
-      self.postMessage({ type: "fileSystemChanged", data: newTree });
+      self.postMessage({ type: 'fileSystemChanged', data: newTree });
     }
   }, seconds(5));
 }
@@ -688,26 +567,176 @@ function watchRootFolder() {
  * not reported as a change.
  */
 async function resetTreeState() {
-  previousTree = await handlers.getFileTree({});
+  previousTree = await handlers.getFileTree();
 }
 
-// Message dispatcher calls functions in the handler variable
-// this catches errors and translates to a postMessage to the main UI
-self.onmessage = async (event) => {
-  const { id, type, data } = event.data;
-  if (!handlers[type]) {
-    self.postMessage({
-      id,
-      type: `${type}:error`,
-      error: `Unknown method: ${type}`,
-    });
-    return;
+function incrementString(str) {
+  const match = /\((\d+)\)$/.exec(str);
+  if (match) {
+    const num = parseInt(match[1]) + 1;
+    return str.replace(/\((\d+)\)$/, `(${num})`);
   }
-  /* note: exception handling disabled to get good tracebacks on the worker */
-  // try {
-  const result = await handlers[type](data);
-  self.postMessage({ id, type: `${type}:result`, data: result });
-  // } catch (err) {
-  //   self.postMessage({ id, type: `${type}:error`, error: err.message });
-  // }
-};
+  return `${str} (1)`;
+}
+
+function isOPFS() {
+  return vfsRoot == null;
+}
+
+/**
+ * Returns the root handle provided by the UI, or gets
+ * an OPFS root handle.
+ *
+ * @returns {Promise<FileSystemDirectoryHandle>}
+ */
+async function getRootHandle() {
+  return vfsRoot || (await navigator.storage.getDirectory());
+}
+
+/**
+ * Get a folder handle by its absolute path.
+ *
+ * The example below returns the handle for folder3.
+ * @example getFolderHandleByPath('folder1/folder2/folder3')
+ *
+ * The examples below return the root handle.
+ * @example getFolderHandleByPath('')
+ * @example getFolderHandleByPath()
+ *
+ * @param {string} folderpath - The absolute folder path.
+ * @returns {Promise<FileSystemDirectoryHandle>} The folder handle.
+ */
+async function getFolderHandleByPath(folderpath = '') {
+  // console.log(`${folderpath}`);
+  const rootHandle = await getRootHandle();
+  if (!folderpath) return rootHandle;
+
+  let handle = rootHandle;
+  const parts = folderpath.split('/');
+
+  // Walk path segments
+  while (handle && parts.length > 0) {
+    handle = await handle.getDirectoryHandle(parts.shift(), { create: true });
+  }
+
+  return handle;
+}
+
+/**
+ * Get a file handle by its absolute path.
+ *
+ * The example below returns the handle for `myfile.txt`.
+ * @example getFileHandleByPath('folder1/folder2/myfile.txt')
+ *
+ * @param {string} filepath - The absolute file path.
+ * @returns {Promise<FileSystemFileHandle|null>} The file handle if it exists.
+ */
+async function getFileHandleByPath(filepath) {
+  if (!(await pathExists(filepath))) {
+    return null;
+  }
+
+  const { name, parentPath } = getPartsFromPath(filepath);
+
+  // Get the parent folder's handle.
+  let parentFolderHandle = await getFolderHandleByPath(parentPath);
+
+  // Get the file handle through its parent folder handle.
+  const fileHandle = await parentFolderHandle.getFileHandle(name, {
+    create: false,
+  });
+
+  return fileHandle;
+}
+
+/**
+ * Check if a given path exists, either as a file or a folder.
+ *
+ * @param {string} path - The path to check.
+ * @param {string|FileSystemDirectoryHandle} [parentFolder] - Check whether
+ * the path exists in this folder. Defaults to the root folder handle. Either
+ * the absolute folder path or a FileSystemDirectoryHandle can be provided.
+ * @returns {Promise<boolean>} True if the path exists, false otherwise.
+ */
+async function pathExists(path) {
+  // TODO this is much more basic than the original
+  const parts = path.split('/');
+  const last = parts.pop();
+  try {
+    const folder = await getFolderHandleByPath(parts.join('/'));
+    for await (const entry of folder.keys()) {
+      if (entry === last) return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
+/**
+ * Get all folder handles inside a given folder path (NOT recursive).
+ *
+ * @param {string} folderpath - The absolute folder path to search in.
+ * @returns {Promise<FileSystemDirectoryHandle[]>} Array of folder handles.
+ */
+async function findFoldersInFolder(folderpath) {
+  // Obtain the folder handle recursively.
+  const folderHandle = await getFolderHandleByPath(folderpath);
+
+  // Gather all subfolder handles.
+  const subfolders = [];
+  for await (let handle of folderHandle.values()) {
+    if (
+      handle.kind === 'directory' &&
+      !blacklistedPaths.includes(handle.name)
+    ) {
+      subfolders.push(handle);
+    }
+  }
+
+  return subfolders;
+}
+
+/**
+ * Get all file handles inside a given path (NOT recursive).
+ *
+ * @param {string} folderpath - The absolute folder path to search in.
+ * @returns {Promise<FileSystemFileHandle[]>} Array of file handles.
+ */
+async function findFilesInFolder(folderpath) {
+  // Obtain the folder handle recursively.
+  const folderHandle = await getFolderHandleByPath(folderpath);
+
+  // Gather all subfile handles.
+  const subfiles = [];
+  for await (let handle of folderHandle.values()) {
+    if (handle.kind === 'file' && !blacklistedPaths.includes(handle.name)) {
+      subfiles.push(handle);
+    }
+  }
+
+  return subfiles;
+}
+
+/**
+ * Writes data to a file.
+ *
+ * @param {FileSystemFileHandle} handle - The handle of the file to write.
+ * @param {string} content - The content to write to the file.
+ * @returns {Promise<void>} Resolves when the file is successfully written.
+ */
+async function writeFile(handle, content) {
+  if (isOPFS()) {
+    // Use Safari-compatible API.
+    console.log('writeFile to OPFS');
+    const accessHandle = await handle.createSyncAccessHandle();
+    const data = new TextEncoder().encode(content);
+    accessHandle.truncate(data.byteLength);
+    accessHandle.write(data, { at: 0 });
+    accessHandle.flush();
+    accessHandle.close();
+  } else {
+    // Use general FS API.
+    const writable = await handle.createWritable();
+    await writable.write(content);
+    await writable.close();
+  }
+}
