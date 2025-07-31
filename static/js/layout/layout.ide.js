@@ -322,6 +322,7 @@ export default class IDELayout extends Layout {
         if (tabComponents[0].getContent() === '') {
           removeFirstTab = true;
         } else {
+          // TODO wait this deletes what you've typed and not saved, and nothing else??
           tabComponents[0].clearContent();
           return;
         }
@@ -348,6 +349,10 @@ export default class IDELayout extends Layout {
 
           // Close Untitled tab.
           tabComponents[0].close();
+
+          // This function call restores the layout. That should
+          // not be needed, but at this moment it is.
+          tabComponents[1].setActive();
         }
       }
     }

@@ -161,34 +161,17 @@ const handlers = {
   async readFile(path, maxSize) {
     console.log(`readFile: ${path}`);
 
-    // throw on non-existing path // TODO can this be merged with getFileHandleByPath?
-    if (!(await handlers.pathExists(path))) {
+    const handle = await getFileHandleByPath(path);
+    if (!handle) {
       throw new Error(`FileNotFound:${path}`);
     }
 
-    const handle = await getFileHandleByPath(path);
-
-    if (isOPFS()) {
-      // Use Safari-compatible API.
-      const accessHandle = await handle.createSyncAccessHandle();
-      const size = accessHandle.getSize();
-      if (maxSize && size > maxSize) {
-        accessHandle.close();
-        throw new Error(`FileTooLarge:${handle.name}:${size}:${maxSize}`);
-      }
-      const buffer = new Uint8Array(size);
-      accessHandle.read(buffer, { at: 0 });
-      accessHandle.close();
-      return new TextDecoder().decode(buffer);
-    } else {
-      // Use general FS API.
-      const file = await handle.getFile();
-      const size = file.size;
-      if (maxSize && size > maxSize) {
-        throw new Error(`FileTooLarge:${handle.name}:${size}:${maxSize}`);
-      }
-      return await file.text();
+    const file = await handle.getFile();
+    const size = file.size;
+    if (maxSize && size > maxSize) {
+      throw new Error(`FileTooLarge:${handle.name}:${size}:${maxSize}`);
     }
+    return await file.text();
   },
 
   /**
@@ -534,7 +517,7 @@ const handlers = {
    * @returns {Promise<boolean>} True if the path exists, false otherwise.
    */
   async pathExists(path, parentFolder = null) {
-    const rootHandle = vfsRoot;
+    const rootHandle = await getRootHandle();
 
     let parentFolderHandle = rootHandle;
     if (typeof parentFolder === 'string') {
@@ -745,7 +728,6 @@ async function findFilesInFolder(folderpath) {
 async function writeFile(handle, content) {
   if (isOPFS()) {
     // Use Safari-compatible API.
-    console.log('writeFile to OPFS');
     const accessHandle = await handle.createSyncAccessHandle();
     const data = new TextEncoder().encode(content);
     accessHandle.truncate(data.byteLength);
