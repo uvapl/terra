@@ -281,23 +281,10 @@ const handlers = {
         if (blacklistedPaths.includes(name)) continue;
         const path = currentPath ? `${currentPath}/${name}` : name;
 
-        if (handle.kind === 'file') {
-          // TODO this is safari api, is this needed?
-          if (isOPFS()) {
-            // Use Safari-compatible API.
-            const accessHandle = await handle.createSyncAccessHandle();
-            const size = accessHandle.getSize();
-            const buffer = new Uint8Array(size);
-            accessHandle.read(buffer, { at: 0 });
-            accessHandle.close();
-            const content = new TextDecoder().decode(buffer);
-            files.push({ path, content });
-          } else {
-            // Use general FS API.
+        if (handle.kind === 'file') {            // Use general FS API.
             const file = await handle.getFile();
             const content = await file.text();
             files.push({ path, content });
-          }
         } else if (handle.kind === 'directory') {
           await walk(handle, path);
         }
