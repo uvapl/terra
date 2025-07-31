@@ -438,7 +438,6 @@ export default class IDEApp extends App {
   async _reopenLFS() {
     // Set file-tree title to the root folder name.
     const rootFolderHandle = await idbManager.getHandle('lfs', 'root');
-    // TODO this is partially duplicated from openLFSFolder
     if (await this._verifyLFSHandlePermission(rootFolderHandle)) {
       return rootFolderHandle;
     }

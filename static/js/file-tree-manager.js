@@ -322,7 +322,6 @@ class FileTreeManager {
 
   /**
    * Close all files inside a folder, including nested files in subfolders.
-   * // TODO should be partially in main app?
    *
    * @async
    * @param {string} path - The absolute folderpath to close all files from.

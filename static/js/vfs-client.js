@@ -93,7 +93,7 @@ export default class VirtualFileSystem extends EventTarget {
 
   listFilesInFolder = (path = '') => this._send('listFilesInFolder', [path]);
 
-  getAllFiles = () => this._send('getAllFiles');
+  getAllFiles = (path = '') => this._send('getAllFiles', [path]);
 
   pathExists = (path) => this._send('pathExists', [path]);
 
@@ -123,7 +123,29 @@ export default class VirtualFileSystem extends EventTarget {
     saveAs(fileBlob, name);
   };
 
-  // TODO ZIP file generation and downloadFolder
+  /**
+   * Download a folder as a zip file. This includes all files in the folder as
+   * well as all the nested folders.
+   *
+   * @param {string} path - The absolute folder path.
+   */
+  downloadFolder = async (path) => {
+    const { name } = getPartsFromPath(path);
+
+    const zip = new JSZip();
+    const rootFolderZip = zip.folder(name);
+
+    // Put all files from this folder into the zip file.
+    // Note that empty directories will not be zipped.
+    const allFiles = await this.getAllFiles(path);
+    for (const file of allFiles) {
+      rootFolderZip.file(file.path, file.content);
+    }
+
+    zip.generateAsync({ type: 'blob' }).then((content) => {
+      saveAs(content, `${name}.zip`);
+    });
+  };
 }
 
 export class FileTooLargeError extends Error {

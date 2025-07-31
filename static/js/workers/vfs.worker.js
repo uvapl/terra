@@ -276,8 +276,9 @@ const handlers = {
    * @returns {Promise<object[]>} List of objects, each containing the filepath
    * and content of the corresponding file.
    */
-  async getAllFiles() {
-    const root = await getRootFolderHandle();
+  async getAllFiles(path) {
+    const root =
+      (await getFolderHandleByPath(path)) || (await getRootFolderHandle());
     const files = [];
 
     async function walk(folderHandle, currentPath = '') {
