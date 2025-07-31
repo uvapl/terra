@@ -263,7 +263,7 @@ class FileTreeManager {
    * @returns {Promise<array>} List with file tree objects.
    */
   createFromVFS = async () => {
-    const basicTree = await Terra.app.vfs.getFileTree('');
+    const basicTree = await Terra.app.vfs.getFileTree();
 
     /**
      * Convert a minimal file tree into FancyTree-compatible format.
