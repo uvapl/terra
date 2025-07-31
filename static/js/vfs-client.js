@@ -72,7 +72,8 @@ export default class VirtualFileSystem extends EventTarget {
 
   /* Pass-through to worker */
 
-  setRootHandle = (handle) => this._send('setRootHandle', [handle]);
+  connect = (handle, rootFolder = '') =>
+    this._send('connect', [handle, rootFolder]);
 
   clear = () => this._send('clear');
 
@@ -94,8 +95,7 @@ export default class VirtualFileSystem extends EventTarget {
 
   getAllFiles = () => this._send('getAllFiles');
 
-  pathExists = (path, parentFolder = null) =>
-    this._send('pathExists', [path, parentFolder]);
+  pathExists = (path) => this._send('pathExists', [path]);
 
   isEmpty = () => this._send('isEmpty');
 

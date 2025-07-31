@@ -12,7 +12,7 @@
  * translated into method or event handler calls on each side.
  *
  * Switching to another file system is done by calling
- * handlers.setRootHandle(). This does nothing more than
+ * handlers.connect(). This does nothing more than
  * setting a variable, which is used from then on in FS
  * operations.
  */
@@ -36,13 +36,17 @@ const blacklistedPaths = [
 ];
 
 /**
- * When set, the vfsRoot should be a FileSystemDirectoryHandle
+ * When set, the _vfsRoot should be a FileSystemDirectoryHandle
  * pointing to a local file system.
  *
  * When null, this means that we will be working in the
  * "origin private file system" (OPFS), managed by the browser.
+ *
+ * The _vfsBaseFolder is the subfolder to be used as the base
+ * project root.
  */
-let vfsRoot = null;
+let _vfsRoot = null;
+let _vfsBaseFolder = '';
 
 /**
  * For polling or external changes in the FS.
@@ -93,12 +97,14 @@ const handlers = {
    * called on Safari anyway.
    *
    * @param {FileSystemDirectoryHandle | null} handle
+   * @param {string} baseFolder
    * @returns {Promise<void>} Resolves when ready.
    */
-  async setRootHandle(handle) {
-    vfsRoot = handle;
+  async connect(handle, baseFolder = '') {
+    _vfsRoot = handle;
+    _vfsBaseFolder = baseFolder;
 
-    // (de)activate external changes polling
+    // (De)activate external changes polling.
     if (isOPFS()) {
       clearTimeout(watchRootFolderInterval);
     } else {
@@ -119,7 +125,7 @@ const handlers = {
     // (origin private) is connected and not when the real file
     // system is connected.
     if (isOPFS()) {
-      const rootHandle = await getRootHandle();
+      const rootHandle = await getRootFolderHandle();
 
       // To date, the 'remove' function is only available in Chromium-based
       // browsers. For other browsers, we iteratore through the first level of
@@ -180,9 +186,8 @@ const handlers = {
    * @param {string} path - The name of the file. Leave empty to
    * create a new Untitled file in the root directory.
    * @param {string} content - The initial content of the file.
-   * // TODO had isUserInvoked but is this needed?
    * @param {boolean} isUserInvoked - Whether user invoked the action.
-   * @returns {Promise<string>} The path for the new file. // TODO is object actually
+   * @returns {Promise<string>} The generated name for the new file.
    */
   async createFile(path, content, isUserInvoked = true) {
     const parts = path ? path.split('/') : [];
@@ -210,7 +215,7 @@ const handlers = {
       });
     }
 
-    return { name, path: `${parentPath}/${name}` };
+    return name;
   },
 
   /**
@@ -261,7 +266,6 @@ const handlers = {
       });
     }
 
-    // TODO
     return true;
   },
 
@@ -273,7 +277,7 @@ const handlers = {
    * and content of the corresponding file.
    */
   async getAllFiles() {
-    const root = await getRootHandle();
+    const root = await getRootFolderHandle();
     const files = [];
 
     async function walk(folderHandle, currentPath = '') {
@@ -281,10 +285,10 @@ const handlers = {
         if (blacklistedPaths.includes(name)) continue;
         const path = currentPath ? `${currentPath}/${name}` : name;
 
-        if (handle.kind === 'file') {            // Use general FS API.
-            const file = await handle.getFile();
-            const content = await file.text();
-            files.push({ path, content });
+        if (handle.kind === 'file') {
+          const file = await handle.getFile();
+          const content = await file.text();
+          files.push({ path, content });
         } else if (handle.kind === 'directory') {
           await walk(handle, path);
         }
@@ -310,10 +314,10 @@ const handlers = {
 
     let parentFolderHandle = parentPath
       ? await getFolderHandleByPath(parentPath)
-      : await getRootHandle();
+      : await getRootFolderHandle();
 
     // Ensure a unique folder name.
-    while (await handlers.pathExists(name, parentFolderHandle)) {
+    while (await nameExistsInFolder(parentFolderHandle, name)) {
       name = incrementString(name);
     }
 
@@ -375,11 +379,7 @@ const handlers = {
     const srcFileContent = await handlers.readFile(src);
 
     // Create the file in the new destination path.
-    const newFileHandle = await handlers.createFile(
-      dest,
-      srcFileContent,
-      false,
-    );
+    await handlers.createFile(dest, srcFileContent, false);
 
     // Delete the old file.
     await handlers.deleteFile(src, false);
@@ -465,7 +465,7 @@ const handlers = {
       },
     }));
 
-    // sort the tree so it can be compared in watchRootFolder
+    // Sort the tree so it can be compared in watchRootFolder.
     folders.sort((a, b) => a.key.localeCompare(b.key));
     files.sort((a, b) => a.key.localeCompare(b.key));
 
@@ -498,52 +498,32 @@ const handlers = {
    * Check if a given path exists, either as a file or a folder.
    *
    * @param {string} path - The path to check.
-   * @param {string|FileSystemDirectoryHandle} [parentFolder] - Check whether
-   * the path exists in this folder. Defaults to the root folder handle. Either
-   * the absolute folder path or a FileSystemDirectoryHandle can be provided.
    * @returns {Promise<boolean>} True if the path exists, false otherwise.
    */
-  async pathExists(path, parentFolder = null) {
-    const rootHandle = await getRootHandle();
+  async pathExists(path) {
+    // First parts of the path are directories, the last
+    // is the name of what we need to find (be it a file
+    // or directory name).
+    const pathParts = path.split('/');
+    const lastPart = pathParts.pop();
 
-    let parentFolderHandle = rootHandle;
-    if (typeof parentFolder === 'string') {
-      parentFolderHandle = await this.getFolderHandleByPath(parentFolder);
-    } else if (parentFolder instanceof FileSystemDirectoryHandle) {
-      parentFolderHandle = parentFolder;
-    }
+    let currentHandle = await getRootFolderHandle();
 
-    if (!parentFolderHandle) {
-      parentFolderHandle = rootHandle;
-    }
-
-    const parts = path.split('/');
-    const last = parts.pop();
-
-    // Check if the parent folders exist.
-    let currentHandle = parentFolderHandle;
-    for (const part of parts) {
-      try {
-        currentHandle = await currentHandle.getDirectoryHandle(part, {
-          create: false,
-        });
-      } catch {
-        // If the handle does not exist, return false.
-        return false;
+    if (!(pathParts.length == 1 && pathParts[0] === '')) {
+      // Check if the parent folders exist.
+      for (const part of pathParts) {
+        try {
+          currentHandle = await currentHandle.getDirectoryHandle(part, {
+            create: false,
+          });
+        } catch {
+          // If the handle does not exist, return false.
+          return false;
+        }
       }
     }
 
-    // At this point, we know the parent folder exists.
-    // The last part of the path could be either file or folder, so we just
-    // iterate over each entry and check if it exists.
-    for await (let name of currentHandle.keys()) {
-      if (name === last) {
-        // If the entry exists, return true.
-        return true;
-      }
-    }
-
-    return false;
+    return nameExistsInFolder(currentHandle, lastPart);
   },
 };
 
@@ -594,17 +574,21 @@ function incrementString(str) {
 }
 
 function isOPFS() {
-  return vfsRoot == null;
+  return _vfsRoot == null;
 }
 
 /**
- * Returns the root handle provided by the UI, or gets
- * an OPFS root handle.
+ * Returns the connected root folder.
  *
  * @returns {Promise<FileSystemDirectoryHandle>}
  */
-async function getRootHandle() {
-  return vfsRoot || (await navigator.storage.getDirectory());
+async function getRootFolderHandle() {
+  const baseHandle = _vfsRoot || (await navigator.storage.getDirectory());
+  if (_vfsBaseFolder !== '') {
+    return baseHandle.getDirectoryHandle(_vfsBaseFolder, { create: true });
+  } else {
+    return baseHandle;
+  }
 }
 
 /**
@@ -621,8 +605,7 @@ async function getRootHandle() {
  * @returns {Promise<FileSystemDirectoryHandle>} The folder handle.
  */
 async function getFolderHandleByPath(folderpath = '') {
-  // console.log(`${folderpath}`);
-  const rootHandle = await getRootHandle();
+  const rootHandle = await getRootFolderHandle();
   if (!folderpath) return rootHandle;
 
   let handle = rootHandle;
@@ -727,4 +710,21 @@ async function writeFile(handle, content) {
     await writable.write(content);
     await writable.close();
   }
+}
+
+/**
+ * Checks if file or folder with a specified nodeName
+ * exists in the specified folder.
+ *
+ * @param {FileSystemDirectoryHandle} parentFolderHandle
+ * @param {string} nodeName
+ * @returns {Promise<boolean>}
+ */
+async function nameExistsInFolder(parentFolderHandle, nodeName) {
+  for await (let name of parentFolderHandle.keys()) {
+    if (name === nodeName) {
+      return true;
+    }
+  }
+  return false;
 }

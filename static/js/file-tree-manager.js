@@ -145,13 +145,13 @@ class FileTreeManager {
     // Create the new file in the filesystem.
     const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
 
-    const file = await Terra.app.vfs.createFile(path);
-    const key = parentPath ? `${parentPath}/${file.name}` : file.name;
+    const fileName = await Terra.app.vfs.createFile(path);
+    const key = parentPath ? `${parentPath}/${fileName}` : fileName;
 
     // Create the new node in the file tree.
     const newChildProps = {
       key,
-      title: file.name,
+      title: fileName,
       folder: false,
       data: {
         type: 'file',

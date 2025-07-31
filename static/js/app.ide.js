@@ -51,7 +51,7 @@ export default class IDEApp extends App {
       // Might not succeed if saved LFS handle is stale.
       if(rootFolderHandle) {
         console.log('LFS project detected upon init');
-        await this.vfs.setRootHandle(rootFolderHandle);
+        await this.vfs.connect(rootFolderHandle);
       } else {
         this.closeLFSFolder();
       }
@@ -367,8 +367,7 @@ export default class IDEApp extends App {
     const content = await this.vfs.getFileContentByPath(filepath);
     return {
       path: filepath,
-      content,
-      handle: this.vfs.getFileHandleByPath(filepath), // TODO remove handle
+      content
     }
   }
 
@@ -388,7 +387,7 @@ export default class IDEApp extends App {
    * @async
    */
   async terminateLFS() {
-    await this.vfs.setRootHandle(null);
+    await this.vfs.connect(null);
     this._closeLFS();
     $('#menu-item--close-folder').addClass('disabled');
   }
@@ -428,7 +427,7 @@ export default class IDEApp extends App {
       fileTreeManager.setTitle(rootFolderHandle.name);
       pluginManager.triggerEvent('onStorageChange', 'lfs');
 
-      await this.vfs.setRootHandle(rootFolderHandle);
+      await this.vfs.connect(rootFolderHandle);
 
       // Render the LFS contents.
       await fileTreeManager.createFileTree();
