@@ -416,8 +416,10 @@ export default class IDEApp extends App {
     try {
       let rootFolderHandle = await this._openLFS();
 
-      // Make sure GitFS is stopped before connecting LFS.
+      // Make sure GitFS is stopped before connecting LFS,
+      // and VFS cache for Git is cleared.
       if (this.hasGitFSWorker()) {
+        await this.vfs.clear();
         this.gitfs.terminate();
         this.gitfs = null;
       }
@@ -455,7 +457,6 @@ export default class IDEApp extends App {
     localStorageManager.setLocalStorageItem('use-lfs', true);
     await idbManager.saveHandle('lfs', 'root', rootFolderHandle);
     return rootFolderHandle;
-
   }
 
   async _getLFSFolderName() {
