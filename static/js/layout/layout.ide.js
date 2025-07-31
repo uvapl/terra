@@ -348,10 +348,6 @@ export default class IDELayout extends Layout {
 
           // Close Untitled tab.
           tabComponents[0].close();
-
-          // This function call restores the layout. That should
-          // not be needed, but at this moment it is.
-          tabComponents[1].setActive();
         }
       }
     }
