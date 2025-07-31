@@ -444,31 +444,21 @@ const handlers = {
         const subpath = path ? `${path}/${folder.name}` : folder.name;
         const subtree = subpath ? await handlers.getFileTree(subpath) : null;
         return {
-          key: subpath,
           title: folder.name,
           folder: true,
-          data: {
-            type: 'folder',
-            isFolder: true,
-          },
           children: subtree,
         };
       }),
     );
 
     const files = (await findFilesInFolder(path)).map((file) => ({
-      key: path ? `${path}/${file.name}` : file.name,
       title: file.name,
       folder: false,
-      data: {
-        type: 'file',
-        isFile: true,
-      },
     }));
 
     // Sort the tree so it can be compared in watchRootFolder.
-    folders.sort((a, b) => a.key.localeCompare(b.key));
-    files.sort((a, b) => a.key.localeCompare(b.key));
+    folders.sort((a, b) => a.title.localeCompare(b.key));
+    files.sort((a, b) => a.title.localeCompare(b.key));
 
     return folders.concat(files);
   },

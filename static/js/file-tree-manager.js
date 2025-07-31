@@ -260,12 +260,40 @@ class FileTreeManager {
   /**
    * Create a file tree list from the VFS compatible with FancyTree.
    *
-   * @async
-   * @param {string} [path] - The parent folder absolute path.
-   * @returns {array} List with file tree objects.
+   * @returns {Promise<array>} List with file tree objects.
    */
-  createFromVFS = async (path = '') => {
-    return await Terra.app.vfs.getFileTree(path);
+  createFromVFS = async () => {
+    const basicTree = await Terra.app.vfs.getFileTree(path);
+
+    /**
+     * Convert a minimal file tree into FancyTree-compatible format.
+     *
+     * @param {object[]} tree - Minimal tree (title, folder, children).
+     * @param {string} path - Path prefix for keys.
+     * @returns {object[]} FancyTree-compatible structure.
+     */
+    function toFancyTree(tree, path = '') {
+      return tree.map((node) => {
+        const key = path ? `${path}/${node.title}` : node.title;
+        const isFolder = node.folder;
+
+        return {
+          key,
+          title: node.title,
+          folder: isFolder,
+          data: {
+            type: isFolder ? 'folder' : 'file',
+            isFolder,
+            isFile: !isFolder,
+          },
+          ...(isFolder && node.children
+            ? { children: toFancyTree(node.children, key) }
+            : {}),
+        };
+      });
+    }
+
+    return toFancyTree(basicTree);
   }
 
   /**
