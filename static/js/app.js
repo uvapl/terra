@@ -167,7 +167,7 @@ export default class App {
    */
   async onEditorChange(editorComponent) {
     const path = editorComponent.getPath();
-    await this.vfs.updateFile(path, editorComponent.getContent(), true)
+    await this.vfs.updateFile(path, editorComponent.getContent());
   }
 
   /**
@@ -213,7 +213,7 @@ export default class App {
 
 
   /**
-   * Reload the file content either from VFS or LFS.
+   * Reload the file content from VFS.
    *
    * @async
    * @param {EditorComponent} editorComponent - The editor component instance.
@@ -222,7 +222,7 @@ export default class App {
     const path = editorComponent.getPath();
     if (!path) return;
 
-    const content = await this.vfs.getFileContentByPath(path);
+    const content = await this.vfs.readFile(path);
     editorComponent.setContent(content);
   }
 

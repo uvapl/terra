@@ -278,7 +278,7 @@ export default class GitFS {
 
         this.importToVFS(payload.repoContents).then(() => {
           Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
-          fileTreeManager.createFileTree();
+          fileTreeManager.createFileTree(true);
         });
         break;
 

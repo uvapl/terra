@@ -479,7 +479,7 @@ export default class ExamApp extends App {
       this.layout.getEditorComponents().map(async (editorComponent) => {
         const filename = editorComponent.getFilename();
         const filepath = editorComponent.getPath();
-        const content = await Terra.app.vfs.getFileContentByPath(filepath);
+        const content = await Terra.app.vfs.readFile(filepath);
         const blob = new Blob([content], { type: 'text/plain' });
         formData.append(`files[${filename}]`, blob, filename);
       })

@@ -15,11 +15,11 @@ export default class VirtualFileSystem extends EventTarget {
       type: 'module',
     });
 
-    // for tracking responses from the worker
+    // For tracking responses from the worker.
     this.pending = new Map(); // id → { resolve, reject }
     this._nextId = 1;
 
-    // connect us to the worker
+    // Connect us to the worker.
     this.worker.addEventListener('message', (e) => this._handleMessage(e.data));
   }
 
@@ -39,34 +39,34 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {string} [message.type] - The type of event or response being sent.
    * @param {*} [message.data] - The payload data of the message.
    * @param {string} [message.error] - Error message if the worker encountered a problem.
-   *
-   * @returns {void}
    */
   _handleMessage({ id, type, data, error }) {
     if (id) {
-      // this is a numbered response to an earlier request
+      // This is a numbered response to an earlier request.
       if (!this.pending.has(id)) return;
       const { resolve, reject } = this.pending.get(id);
       this.pending.delete(id);
       error ? reject(new Error(error)) : resolve(data);
     } else {
-      // this is an event originating in the worker (e.g. FS changes)
+      // This is an event originating in the worker (e.g. FS changes).
       this.dispatchEvent(new CustomEvent(type, { detail: data }));
     }
   }
 
   /**
-   * Send a message to the vfs worker
-   * automatically numbered to match in _handleMessage
+   * Send a message to the vfs worker, automatically numbered to match
+   * the incoming response in _handleMessage.
    *
-   * @param {*} type
-   * @param {*} data
+   * A function is called in the worker upon receipt of the message.
+   *
+   * @param {string} name
+   * @param {array} params
    */
-  _send(type, data) {
+  _send(name, params) {
     const id = `vfs-${this._nextId++}`;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
-      this.worker.postMessage({ id, type, data });
+      this.worker.postMessage({ id, type: name, data: params });
     });
   }
 
@@ -78,6 +78,8 @@ export default class VirtualFileSystem extends EventTarget {
   clear = () => this._send('clear');
 
   readFile = (path, maxSize = null) => this._send('readFile', [path, maxSize]);
+
+  getFileURL = (path) => this._send('getFileURL', [path]);
 
   updateFile = (path, content, isUserInvoked = true) =>
     this._send('updateFile', [path, content, isUserInvoked]);

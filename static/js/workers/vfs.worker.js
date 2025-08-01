@@ -180,6 +180,16 @@ const handlers = {
     return await file.text();
   },
 
+  async getFileURL(path) {
+    const handle = await getFileHandleByPath(path);
+    if (!handle) {
+      throw new Error(`FileNotFound:${path}`);
+    }
+
+    const file = await handle.getFile();
+    return URL.createObjectURL(file);
+  },
+
   /**
    * Create a new file.
    *
@@ -457,8 +467,8 @@ const handlers = {
     }));
 
     // Sort the tree so it can be compared in watchRootFolder.
-    folders.sort((a, b) => a.title.localeCompare(b.key));
-    files.sort((a, b) => a.title.localeCompare(b.key));
+    folders.sort((a, b) => a.title.localeCompare(b.title));
+    files.sort((a, b) => a.title.localeCompare(b.title));
 
     return folders.concat(files);
   },
