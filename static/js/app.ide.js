@@ -36,7 +36,7 @@ export default class IDEApp extends App {
         console.log('LFS project detected upon init');
         await this.vfs.connect(rootFolderHandle);
       } else {
-        console.log("Tried to reopen LFS but handle was stale.")
+        console.log('Tried to reopen LFS but handle was stale.');
         await this.closeLFSFolder();
       }
     }
@@ -64,7 +64,7 @@ export default class IDEApp extends App {
 
     // Start GitFS if already connected.
     if (localStorageManager.getLocalStorageItem('git-repo')) {
-      console.log('Git project detected upon init')
+      console.log('Git project detected upon init');
       this.createGitFSWorker();
     }
 
@@ -181,7 +181,6 @@ export default class IDEApp extends App {
         console.error('Unexpected error reading file:', err);
       }
     }
-
   }
 
   /**
@@ -340,8 +339,8 @@ export default class IDEApp extends App {
     const content = await this.vfs.readFile(filepath);
     return {
       path: filepath,
-      content
-    }
+      content,
+    };
   }
 
   /**
@@ -416,9 +415,9 @@ export default class IDEApp extends App {
       if (Terra.v.blockFSPolling || !LFS.hasProjectLoaded()) return;
 
       // Re-import from the VFS.
-      console.log('Reloading file tree from fs change')
-      await fileTreeManager.runFuncWithPersistedState(
-        () => fileTreeManager.createFileTree()
+      console.log('Reloading file tree from fs change');
+      await fileTreeManager.runFuncWithPersistedState(() =>
+        fileTreeManager.createFileTree(),
       );
     });
   }
