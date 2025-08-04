@@ -2,7 +2,8 @@ import { isImageExtension } from '../helpers/image.js';
 import { Octokit } from '../vendor/octokit-core-6.1.3.min.js';
 import TaskQueue from '../task-queue.js';
 
-const GITHUB_REPO_URL_PATTERN = /^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/;
+const GITHUB_REPO_URL_PATTERN =
+  /^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/;
 
 class API {
   /**
@@ -49,8 +50,8 @@ class API {
    */
   committer = {
     name: 'UvA Programming Lab',
-    email: 'terra@proglab.nl'
-  }
+    email: 'terra@proglab.nl',
+  };
 
   /**
    * Defines the URL to the proxy server used for local development.
@@ -88,7 +89,7 @@ class API {
     this.onRequestSuccess = options.onRequestSuccess;
 
     this.queue = new TaskQueue('Git');
-    this.queue.addEventListener('busy', () => options.onQueueBusy())
+    this.queue.addEventListener('busy', () => options.onQueueBusy());
     this.queue.addEventListener('done', () => options.onQueueDone());
 
     this.setRepoLink(options.repoLink);
@@ -96,7 +97,8 @@ class API {
     this._init()
       .then(() => {
         options.readyCallback();
-      }).catch((err) => {
+      })
+      .catch((err) => {
         console.info('Failed to initialise git worker');
         console.error(err);
       });
@@ -144,7 +146,7 @@ class API {
         onSecondaryRateLimit: (retryAfter, options, octokit) => {
           this.onRateLimit(retryAfter);
         },
-      }
+      },
     });
 
     if (await this.repoExists()) {
@@ -160,16 +162,22 @@ class API {
     if (userInfo.data.name) {
       this.committer.name = userInfo.data.name;
     } else {
-      this._info(`User has no name set in their GitHub, using default: ${this.committer.name}`);
+      this._info(
+        `User has no name set in their GitHub, using default: ${this.committer.name}`,
+      );
     }
 
     if (userInfo.data.email) {
       this.committer.email = userInfo.data.email;
     } else {
-      this._info(`User has no email set in their GitHub, using default: ${this.committer.email}`);
+      this._info(
+        `User has no email set in their GitHub, using default: ${this.committer.email}`,
+      );
     }
 
-    this._info(`Committing as: ${this.committer.name} <${this.committer.email}>`);
+    this._info(
+      `Committing as: ${this.committer.name} <${this.committer.email}>`,
+    );
   }
 
   /**
@@ -188,14 +196,14 @@ class API {
         ...options,
         headers: {
           ...options.headers,
-          'Accept': 'application/vnd.github+json',
+          Accept: 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
 
           // This header disables GitHub cache.
           // See https://octokit.github.io/routes/cache/api.github.com/v3/index.html#conditional-requests
-          'If-None-Match': ''
+          'If-None-Match': '',
         },
-      }
+      };
 
       if (!shouldOmitRepoParams) {
         requestOptions.owner = this.repoOwner;
@@ -204,7 +212,10 @@ class API {
 
       delete requestOptions.ignoreRequestError;
 
-      const res = await this.octokit.request(`${method} ${url}`, requestOptions);
+      const res = await this.octokit.request(
+        `${method} ${url}`,
+        requestOptions,
+      );
       this.onRequestSuccess();
       return res;
     } catch (err) {
@@ -245,17 +256,20 @@ class API {
     }
 
     // Get other branches.
-    const branchInfo = await this._request('GET', '/repos/{owner}/{repo}/branches');
+    const branchInfo = await this._request(
+      'GET',
+      '/repos/{owner}/{repo}/branches',
+    );
     const branches = branchInfo.data
-      .map(branch => ({
+      .map((branch) => ({
         name: branch.name,
         current: branch.name === this.repoBranch,
         default: branch.name === this.defaultBranch,
       }))
-      .sort((a, b) => (
+      .sort((a, b) =>
         // Put the default branch on top.
-        b.default ? 1 : 0
-      ));
+        b.default ? 1 : 0,
+      );
 
     // When the repo is new with no contents, the /repos/{owner}/{repo}/branches
     // endpoint will not return anything, so have we to add the default branch
@@ -286,14 +300,18 @@ class API {
 
     try {
       // Request a recursive tree of the main branch.
-      repoContents = await this._request('GET', '/repos/{owner}/{repo}/git/trees/{branch}', {
-        branch: this.repoBranch,
-        recursive: true,
-        ignoreRequestError: true,
-      });
+      repoContents = await this._request(
+        'GET',
+        '/repos/{owner}/{repo}/git/trees/{branch}',
+        {
+          branch: this.repoBranch,
+          recursive: true,
+          ignoreRequestError: true,
+        },
+      );
     } catch {
       // If this request fails, then the repo is empty, which is fine.
-      this._log('Repository is most likely empty.')
+      this._log('Repository is most likely empty.');
     }
 
     if (repoContents) {
@@ -301,26 +319,30 @@ class API {
         repoContents.data.tree.map(async (fileOrFolder) => {
           if (fileOrFolder.type === 'blob') {
             try {
-              const res = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
-                branch: this.repoBranch,
-                path: fileOrFolder.path,
-              });
+              const res = await this._request(
+                'GET',
+                '/repos/{owner}/{repo}/contents/{path}',
+                {
+                  branch: this.repoBranch,
+                  path: fileOrFolder.path,
+                },
+              );
 
               this.fileShaMap[fileOrFolder.path] = fileOrFolder.sha;
 
               const content = atob(res.data.content);
               if (isImageExtension(fileOrFolder.path)) {
                 // Use the base64 string to create a blob URL later.
-                fileOrFolder.content = res.data.content.replace(/\n/g, "");
+                fileOrFolder.content = res.data.content.replace(/\n/g, '');
               } else if (content) {
                 fileOrFolder.content = content;
               }
             } catch {
-              this._log('Possibly empty file:', fileOrFolder.path)
+              this._log('Possibly empty file:', fileOrFolder.path);
             }
           }
           return fileOrFolder;
-        })
+        }),
       );
     }
 
@@ -339,14 +361,18 @@ class API {
     this._log('Committing', filepath);
     const sha = this.fileShaMap[filepath];
 
-    const response = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
-      path: filepath,
-      message: `Update ${filepath}`,
-      committer: this.committer,
-      content: isImageExtension(filepath) ? filecontents : btoa(filecontents),
-      branch: this.repoBranch,
-      sha,
-    });
+    const response = await this._request(
+      'PUT',
+      '/repos/{owner}/{repo}/contents/{path}',
+      {
+        path: filepath,
+        message: `Update ${filepath}`,
+        committer: this.committer,
+        content: isImageExtension(filepath) ? filecontents : btoa(filecontents),
+        branch: this.repoBranch,
+        sha,
+      },
+    );
 
     this.fileShaMap[filepath] = response.data.content.sha;
   }
@@ -381,13 +407,17 @@ class API {
    */
   async moveFile(oldPath, newPath, newContent) {
     // Create the new file with the new content.
-    const result = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
-      path: newPath,
-      message: `Rename ${oldPath} to ${newPath}`,
-      branch: this.repoBranch,
-      committer: this.committer,
-      content: isImageExtension(newPath) ? newContent : btoa(newContent),
-    });
+    const result = await this._request(
+      'PUT',
+      '/repos/{owner}/{repo}/contents/{path}',
+      {
+        path: newPath,
+        message: `Rename ${oldPath} to ${newPath}`,
+        branch: this.repoBranch,
+        committer: this.committer,
+        content: isImageExtension(newPath) ? newContent : btoa(newContent),
+      },
+    );
 
     // Delete the old file.
     await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
@@ -414,21 +444,29 @@ class API {
     for (const file of files) {
       // Get the source file content.
       console.log('file', file);
-      const contentResponse = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
-        branch: this.repoBranch,
-        path: file.srcPath,
-      });
+      const contentResponse = await this._request(
+        'GET',
+        '/repos/{owner}/{repo}/contents/{path}',
+        {
+          branch: this.repoBranch,
+          path: file.srcPath,
+        },
+      );
 
       const content = atob(contentResponse.data.content);
 
       // Create the new file.
-      const newFileResponse = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
-        path: file.destPath,
-        message: `Rename ${file.srcPath} to ${file.destPath}`,
-        branch: this.repoBranch,
-        committer: this.committer,
-        content,
-      });
+      const newFileResponse = await this._request(
+        'PUT',
+        '/repos/{owner}/{repo}/contents/{path}',
+        {
+          path: file.destPath,
+          message: `Rename ${file.srcPath} to ${file.destPath}`,
+          branch: this.repoBranch,
+          committer: this.committer,
+          content,
+        },
+      );
 
       // Delete the old files.
       await this._request('DELETE', '/repos/{owner}/{repo}/contents/{path}', {
@@ -470,25 +508,25 @@ self.onmessage = (event) => {
         onRateLimit(retryAfter) {
           postMessage({
             id: 'rate-limit',
-            data: { retryAfter }
+            data: { retryAfter },
           });
         },
 
         onRequestSuccess() {
-          postMessage({ id: 'request-success' })
+          postMessage({ id: 'request-success' });
         },
 
         onRequestError(error) {
           postMessage({
             id: 'request-error',
             data: { error },
-          })
+          });
         },
 
         fetchBranchesSuccessCallback(branches) {
           postMessage({
             id: 'fetch-branches-success',
-            data: { branches }
+            data: { branches },
           });
         },
 
@@ -500,14 +538,14 @@ self.onmessage = (event) => {
         },
 
         cloneFailCallback() {
-          postMessage({ id: 'clone-fail' })
+          postMessage({ id: 'clone-fail' });
         },
 
         cloneSuccessCallback(repoContents) {
           postMessage({
             id: 'clone-success',
-            data: { repoContents }
-          })
+            data: { repoContents },
+          });
         },
 
         onQueueBusy() {
@@ -517,7 +555,6 @@ self.onmessage = (event) => {
         onQueueDone() {
           postMessage({ id: 'queue-done' });
         },
-
       });
       break;
 
@@ -534,10 +571,9 @@ self.onmessage = (event) => {
       break;
 
     case 'commit':
-      api.queue.schedule(() => api.commit(
-        payload.filepath,
-        payload.filecontents,
-      ));
+      api.queue.schedule(() =>
+        api.commit(payload.filepath, payload.filecontents),
+      );
       break;
 
     case 'rm':
@@ -545,11 +581,9 @@ self.onmessage = (event) => {
       break;
 
     case 'moveFile':
-      api.queue.schedule(() => api.moveFile(
-        payload.oldPath,
-        payload.newPath,
-        payload.newContent
-      ));
+      api.queue.schedule(() =>
+        api.moveFile(payload.oldPath, payload.newPath, payload.newContent),
+      );
       break;
 
     case 'moveFolder':
