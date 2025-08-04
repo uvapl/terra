@@ -34,14 +34,6 @@ export default class ExamApp extends App {
    */
   editorContentChanged = false;
 
-  constructor() {
-    super();
-
-    // Files for a specific exam are hosted in a subdirectory of the VFS.
-    const slug = slugify(this.config.configUrl);
-    this.vfs.setBaseFolder(`exam-${slug}`)
-  }
-
   onEditorStartEditing(editorComponent) {
     this.editorContentChanged = true;
   }
@@ -49,6 +41,10 @@ export default class ExamApp extends App {
   setupLayout() {
     return new Promise((resolve, reject) => {
       this.loadConfig().then(async (isNewExam) => {
+        // Files for a specific exam are hosted in a subdirectory of the VFS.
+        const slug = slugify(this.config.configUrl);
+        this.vfs.setBaseFolder(`exam-${slug}`)
+
         if (!this.config.tabs) {
           this.config.tabs = {};
         }

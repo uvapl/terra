@@ -306,7 +306,7 @@ export default class IDEApp extends App {
    */
   async openGitFS() {
     await this.terminateLFS();
-    this.vfs.connect(null, 'ide-git');
+    await this.vfs.connect(null, 'ide-git');
 
     const accessToken = localStorageManager.getLocalStorageItem('git-access-token');
     const repoLink = localStorageManager.getLocalStorageItem('git-repo');
@@ -348,8 +348,8 @@ export default class IDEApp extends App {
    */
   async closeGitFS() {
     this.closeAllFiles();
-    this.stopGitFS();
-    this.finishSwitchToLocalStorage();
+    await this.stopGitFS();
+    await this.finishSwitchToLocalStorage();
   }
 
   isGitConfigured() {
@@ -404,6 +404,7 @@ export default class IDEApp extends App {
    */
   async openLFSFolder() {
     let rootFolderHandle = await LFS.choose();
+    if (!rootFolderHandle) return;
 
     this.closeAllFiles();
 

@@ -18,16 +18,12 @@ export default class EmbedApp extends App {
    */
   frameContent = null;
 
-  constructor() {
-    super();
+  async setupLayout() {
+    this.registerFrameListener();
 
     // Files for a specific embed are hosted in a subdirectory of the VFS.
     const slug = slugify(window.location.href);
     this.vfs.setBaseFolder(`embed-${slug}`)
-  }
-
-  async setupLayout() {
-    this.registerFrameListener();
 
     const queryParams = parseQueryParams();
     if (typeof queryParams.filename !== 'string') {
