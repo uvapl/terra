@@ -114,7 +114,7 @@ export default class GitFS {
 
     console.log('Spawning new git worker');
 
-    this.worker = new Worker('static/js/workers/git.worker.js', {
+    this.worker = new Worker('static/js/fs/git.worker.js', {
       type: 'module',
     });
     this.worker.onmessage = this.onmessage.bind(this);
