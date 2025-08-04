@@ -1,7 +1,7 @@
 import { getFileExtension, isObject } from './helpers/shared.js'
 import LangWorker from './lang-worker.js';
 import Terra from './terra.js';
-import VirtualFileSystem from './vfs-client.js';
+import VirtualFileSystem from './fs/vfs.js';
 
 /**
  * Base class that is extended for each of the apps.

@@ -1,9 +1,9 @@
-import { createModal, hideModal, showModal } from './modal.js';
-import Terra from './terra.js';
-import localStorageManager from './local-storage-manager.js';
-import fileTreeManager from './file-tree-manager.js';
-import { seconds, slugify } from './helpers/shared.js';
-import { GITHUB_URL_PATTERN } from './ide/constants.js';
+import { createModal, hideModal, showModal } from '../modal.js';
+import Terra from '../terra.js';
+import localStorageManager from '../local-storage-manager.js';
+import fileTreeManager from '../file-tree-manager.js';
+import { seconds, slugify } from '../helpers/shared.js';
+import { GITHUB_URL_PATTERN } from '../ide/constants.js';
 
 /**
  * GitFS worker class that handles all Git operations.
@@ -266,7 +266,7 @@ export default class GitFS {
         // Import the renderGitRepoBranches dynamically, because if we put this
         // at the top then the menubar.js will also be loaded for the Exam and
         // Embed application, which is something we do not want.
-        import('./ide/menubar.js').then((module) => {
+        import('../ide/menubar.js').then((module) => {
           const { renderGitRepoBranches } = module;
           renderGitRepoBranches(payload.branches);
         });

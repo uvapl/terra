@@ -7,7 +7,7 @@
  * operations will *always* work, because by default, it is
  * connected to the OPFS.
  *
- * The worker is managed by the VFS class in vfs-client.js.
+ * The worker is managed by the VFS class in fs/vfs.js.
  * Information is exchanged via postMessage calls and
  * translated into method or event handler calls on each side.
  *

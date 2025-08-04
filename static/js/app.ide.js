@@ -7,8 +7,8 @@ import LangWorker from './lang-worker.js';
 import localStorageManager from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
 import pluginManager from './plugin-manager.js';
-import GitFS from './gitfs.js';
-import { FileNotFoundError, FileTooLargeError } from './vfs-client.js';
+import GitFS from './fs/gitfs.js';
+import { FileNotFoundError, FileTooLargeError } from './fs/vfs.js';
 import * as LFS from './fs/lfs.js';
 
 export default class IDEApp extends App {

@@ -1,4 +1,4 @@
-import { getPartsFromPath } from './helpers/shared.js';
+import { getPartsFromPath } from '../helpers/shared.js';
 
 /**
  * VFS interface for the main thread ---
@@ -11,7 +11,7 @@ export default class VirtualFileSystem extends EventTarget {
   constructor() {
     super();
 
-    this.worker = new Worker('static/js/workers/vfs.worker.js', {
+    this.worker = new Worker('static/js/fs/vfs.worker.js', {
       type: 'module',
     });
 
