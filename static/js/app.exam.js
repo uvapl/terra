@@ -34,9 +34,12 @@ export default class ExamApp extends App {
    */
   editorContentChanged = false;
 
-  getOPFSRootFolderName() {
+  constructor() {
+    super();
+
+    // Files for a specific exam are hosted in a subdirectory of the VFS.
     const slug = slugify(this.config.configUrl);
-    return `exam-${slug}`;
+    this.vfs.setBaseFolder(`exam-${slug}`)
   }
 
   onEditorStartEditing(editorComponent) {

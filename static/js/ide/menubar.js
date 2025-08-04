@@ -208,7 +208,6 @@ Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-folder').hasClass('disabled')) return;
 
   Terra.app.closeLFSFolder();
-  Terra.app.closeAllFiles();
   closeActiveMenuBarMenu(event);
 };
 
@@ -382,89 +381,28 @@ Menubar.connectRepo = () => {
 
   $connectModal.find('.cancel-btn').click(() => hideModal($connectModal));
   $connectModal.find('.confirm-btn').click(async () => {
-    const repoLink = $connectModal.find('.repo-link').val().trim();
+    const newRepoLink = $connectModal.find('.repo-link').val().trim();
 
     // For now, we only allow GitHub-HTTPS repo links.
-    if (repoLink && !GITHUB_URL_PATTERN.test(repoLink)) {
+    if (newRepoLink && !GITHUB_URL_PATTERN.test(newRepoLink)) {
       alert('Invalid GitHub repository');
       return;
     }
+
+    hideModal($connectModal);
 
     // Remove previously selected branch such that the clone will use the
     // default branch for the new repo.
     localStorageManager.removeLocalStorageItem('git-branch');
 
-    if (repoLink) {
-      localStorageManager.setLocalStorageItem('git-repo', repoLink);
-      console.log('Connecting to repository:', repoLink);
+    if (newRepoLink) {
+      console.log('Connecting to repository:', newRepoLink);
+      localStorageManager.setLocalStorageItem('git-repo', newRepoLink);
+      Terra.app.openGitFS();
     } else {
-      // Disconnect
+      console.log('Disconnecting from repository.');
       localStorageManager.removeLocalStorageItem('git-repo');
-
-      fileTreeManager.showLocalStorageWarning();
-
-      // Clear all files after disconnecting.
-      await Terra.app.vfs.clear();
-      fileTreeManager.createFileTree();
-      fileTreeManager.setTitle('local storage');
-      fileTreeManager.removeInfoMsg();
-
-      pluginManager.triggerEvent('onStorageChange', 'local');
-    }
-
-    hideModal($connectModal);
-
-    // Confirms with the user whether they want to discard their local files
-    // permanently before connecting to a new repository.
-    // This happens in two cases:
-    // 1) The user is connected to a repo and wants to connect to another one,
-    //    so we are certain that there are files in the VFS.
-    // 2) The user is not connected to a repo, but there are files in the VFS.
-    if (!currentRepoLink && !(await Terra.app.vfs.isEmpty())) {
-      // Create a new modal after the previous one is hidden.
-      setTimeout(() => {
-        const $confirmModal = createModal({
-          title: 'Are you sure?',
-          body: `
-            <p>
-              You have local files that are not connected to any repository.
-              Connecting to your repository will lead to these files being
-              discarded permanently.
-            </p>
-            <p>Are you sure you want to proceed?</p>
-          `,
-          footer: `
-            <button type="button" class="button cancel-btn">No, bring me back</button>
-            <button type="button" class="button primary-btn confirm-btn">Yes, I'm sure</button>
-          `,
-          attrs: {
-            id: 'ide-confirm-connect-repo-modal',
-            class: 'modal-width-small',
-          }
-        });
-
-        showModal($confirmModal);
-
-        $confirmModal.find('.cancel-btn').click(() => {
-          // Remove the connected repo link from local storage, because if the
-          // user would (accidentally) refresh, then it would automatically
-          // clone, which we want to prevent.
-          localStorageManager.removeLocalStorageItem('git-repo');
-
-          hideModal($confirmModal);
-        });
-        $confirmModal.find('.confirm-btn').click(() => {
-          hideModal($confirmModal);
-          Terra.app.createGitFSWorker();
-
-          // Close all tabs, because we know we will change from either local
-          // storage to git, or from one git repo to another.
-          Terra.app.closeAllFiles();
-        });
-
-      }, MODAL_ANIM_DURATION);
-    } else {
-      Terra.app.createGitFSWorker();
+      Terra.app.closeGitFS();
     }
   });
 };

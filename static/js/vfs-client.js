@@ -72,8 +72,11 @@ export default class VirtualFileSystem extends EventTarget {
 
   /* Pass-through to worker */
 
-  connect = (handle, rootFolder = '') =>
-    this._send('connect', [handle, rootFolder]);
+  connect = (handle, baseFolder = '') =>
+    this._send('connect', [handle, baseFolder]);
+
+  setBaseFolder = (baseFolder) =>
+    this._send('setBaseFolder', [baseFolder])
 
   clear = () => this._send('clear');
 

@@ -97,12 +97,14 @@ const handlers = {
    * called on Safari anyway.
    *
    * @param {FileSystemDirectoryHandle | null} handle
-   * @param {string} baseFolder
+   * @param {string} baseFolderName
    * @returns {Promise<void>} Resolves when ready.
    */
-  async connect(handle, baseFolder = '') {
+  async connect(handle, baseFolderName = '') {
     _vfsRoot = handle;
-    _vfsBaseFolder = baseFolder;
+    _vfsBaseFolder = baseFolderName;
+
+    console.log(`base folder: ${baseFolderName} in ${handle}`)
 
     // (De)activate external changes polling.
     if (isOPFS()) {
@@ -111,6 +113,17 @@ const handlers = {
       await resetTreeState();
       watchRootFolder();
     }
+  },
+
+  /**
+   * Set the base directory in the file system. Any paths will be considered
+   * relative to this directory.
+   *
+   * @param {string} baseFolderName
+   */
+  setBaseFolder(baseFolderName) {
+    console.log(`base folder: ${baseFolderName}`)
+    _vfsBaseFolder = baseFolderName;
   },
 
   /**
@@ -579,13 +592,14 @@ function isOPFS() {
 }
 
 /**
- * Returns the connected root folder.
+ * Returns the connected root folder. If the root is in the OPFS, it
+ * checks whether a base directory was set and uses that.
  *
  * @returns {Promise<FileSystemDirectoryHandle>}
  */
 async function getRootFolderHandle() {
   const baseHandle = _vfsRoot || (await navigator.storage.getDirectory());
-  if (_vfsBaseFolder !== '') {
+  if (baseHandle != _vfsRoot && _vfsBaseFolder !== '') {
     return baseHandle.getDirectoryHandle(_vfsBaseFolder, { create: true });
   } else {
     return baseHandle;

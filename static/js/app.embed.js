@@ -18,9 +18,12 @@ export default class EmbedApp extends App {
    */
   frameContent = null;
 
-  getOPFSRootFolderName() {
+  constructor() {
+    super();
+
+    // Files for a specific embed are hosted in a subdirectory of the VFS.
     const slug = slugify(window.location.href);
-    return `embed-${slug}`;
+    this.vfs.setBaseFolder(`embed-${slug}`)
   }
 
   async setupLayout() {
