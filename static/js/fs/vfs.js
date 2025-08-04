@@ -42,13 +42,18 @@ export default class VirtualFileSystem extends EventTarget {
    */
   _handleMessage({ id, type, data, error }) {
     if (id) {
-      // This is a numbered response to an earlier request.
+      // This handles a numbered response to an earlier request.
       if (!this.pending.has(id)) return;
       const { resolve, reject } = this.pending.get(id);
       this.pending.delete(id);
-      error ? reject(new Error(error)) : resolve(data);
+
+      if (error) {
+        reject(_makeError(error));
+      } else {
+        resolve(data);
+      }
     } else {
-      // This is an event originating in the worker (e.g. FS changes).
+      // This handles an event originating in the worker (e.g. FS changes).
       this.dispatchEvent(new CustomEvent(type, { detail: data }));
     }
   }
@@ -75,8 +80,7 @@ export default class VirtualFileSystem extends EventTarget {
   connect = (handle, baseFolder = '') =>
     this._send('connect', [handle, baseFolder]);
 
-  setBaseFolder = (baseFolder) =>
-    this._send('setBaseFolder', [baseFolder])
+  setBaseFolder = (baseFolder) => this._send('setBaseFolder', [baseFolder]);
 
   clear = () => this._send('clear');
 
@@ -153,20 +157,24 @@ export default class VirtualFileSystem extends EventTarget {
   };
 }
 
-export class FileTooLargeError extends Error {
-  constructor(path, size, max) {
-    super(`File "${path}" is too large: ${size} > ${max}`);
-    this.name = 'FileTooLargeError';
-    this.path = path;
-    this.size = size;
-    this.max = max;
-  }
-}
+export class FileTooLargeError extends Error {}
+export class FileNotFoundError extends Error {}
 
-export class FileNotFoundError extends Error {
-  constructor(path) {
-    super(`File not found: ${path}`);
-    this.name = 'FileNotFoundError';
-    this.path = path;
+const _errorTypes = [
+  {
+    pattern: /^FileTooLarge$/,
+    ErrorClass: FileTooLargeError,
+  },
+  {
+    pattern: /^FileNotFound$/,
+    ErrorClass: FileNotFoundError,
+  },
+];
+
+function _makeError(errorMsg) {
+  for (const { pattern, ErrorClass, args } of _errorTypes) {
+    const m = pattern.exec(errorMsg);
+    if (m) return new ErrorClass();
   }
+  return new Error(errorMsg);
 }

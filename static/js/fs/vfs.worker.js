@@ -73,16 +73,25 @@ self.onmessage = async (event) => {
 
   // Call function, wait for result to resolve, and post that back
   const result = await handlers[type](...(data ?? []));
-  self.postMessage({ id, type: `${type}:result`, data: result });
-
-  /* note: exception handling disabled to get good tracebacks on the worker */
-  // try {
-  // } catch (err) {
-  //   self.postMessage({ id, type: `${type}:error`, error: err.message });
-  // }
+  if (result && result.error) {
+    self.postMessage({ id, type: `${type}:error`, error: result.error });
+  } else {
+    self.postMessage({ id, type: `${type}:result`, data: result });
+  }
 };
 
-// Operation handlers
+/**
+ * Handlers for each operation that is made available.
+ *
+ * When writing a handler, you can return any of these:
+ *   - a normal JS value
+ *   - a promise (i.e. if the function is async)
+ *   - nothing
+ *   - an error object like { error: 'FileNotFound' }
+ *
+ * In vfs.js you can define error classes that will be thrown
+ * as a result of returning those error objects.
+ */
 const handlers = {
   /**
    * Connect the file system to a local FS handle provided by the UI,
@@ -104,7 +113,7 @@ const handlers = {
     _vfsRoot = handle;
     _vfsBaseFolder = baseFolderName;
 
-    console.log(`base folder: ${baseFolderName} in ${handle}`)
+    console.log(`base folder set: ${baseFolderName} in ${handle}`);
 
     // (De)activate external changes polling.
     if (isOPFS()) {
@@ -122,7 +131,7 @@ const handlers = {
    * @param {string} baseFolderName
    */
   setBaseFolder(baseFolderName) {
-    console.log(`base folder: ${baseFolderName}`)
+    console.log(`base folder: ${baseFolderName}`);
     _vfsBaseFolder = baseFolderName;
   },
 
@@ -182,13 +191,13 @@ const handlers = {
 
     const handle = await getFileHandleByPath(path);
     if (!handle) {
-      throw new Error(`FileNotFound:${path}`);
+      return { error: 'FileNotFound' };
     }
 
     const file = await handle.getFile();
     const size = file.size;
     if (maxSize && size > maxSize) {
-      throw new Error(`FileTooLarge:${handle.name}:${size}:${maxSize}`);
+      return { error: 'FileTooLarge' };
     }
     return await file.text();
   },

@@ -45,49 +45,57 @@ export default class GitFS {
   bindPageReloadEvent = () => {
     $(window).on('beforeunload', (e) => {
       if (fileTreeManager.hasBottomMsg()) {
-        const message = 'The app is currently syncing changes to GitHub. Are you sure you want to reload the page?';
+        const message =
+          'The app is currently syncing changes to GitHub. Are you sure you want to reload the page?';
         e.preventDefault();
         e.returnValue = message;
         return message;
       }
     });
-  }
+  };
 
   bindVFSEvents = () => {
     this.vfs.addEventListener('fileCreated', this.vfsFileCreatedHandler);
     this.vfs.addEventListener('fileMoved', this.vfsFileMovedHandler);
-    this.vfs.addEventListener('fileContentChanged', this.vfsFileContentChangedHandler);
+    this.vfs.addEventListener(
+      'fileContentChanged',
+      this.vfsFileContentChangedHandler,
+    );
     this.vfs.addEventListener('fileDeleted', this.vfsBeforeFileDeletedHandler);
-  }
+  };
 
   vfsFileCreatedHandler = (event) => {
     const { file } = event.detail;
     this.commit(file.path, file.content);
-  }
+  };
 
   vfsFileMovedHandler = (event) => {
     const { file, oldPath } = event.detail;
     this.moveFile(oldPath, file.path, file.content);
-  }
+  };
 
   vfsFileContentChangedHandler = (event) => {
     const { file } = event.detail;
 
     // Only commit changes after 2 seconds of inactivity.
-    Terra.app.registerTimeoutHandler(`commit-${slugify(file.path)}`, seconds(2), () => {
-      this.commit(file.path, file.content);
-    });
-  }
+    Terra.app.registerTimeoutHandler(
+      `commit-${slugify(file.path)}`,
+      seconds(2),
+      () => {
+        this.commit(file.path, file.content);
+      },
+    );
+  };
 
   vfsBeforeFileDeletedHandler = (event) => {
     const { file } = event.detail;
     this.rm(file.path);
-  }
+  };
 
   vfsFolderMovedHandler = (event) => {
     const { filesMoved } = event.detail;
     this.moveFolder(filesMoved);
-  }
+  };
 
   /**
    * Creates a new worker process.
@@ -96,15 +104,19 @@ export default class GitFS {
    */
   _createWorker = (accessToken) => {
     if (this.worker instanceof Worker) {
-      console.error('[GitFS] failed to create a new worker as an instance is already running');
+      console.error(
+        '[GitFS] failed to create a new worker as an instance is already running',
+      );
       return;
-    };
+    }
 
     this.isReady = false;
 
     console.log('Spawning new git worker');
 
-    this.worker = new Worker('static/js/workers/git.worker.js', { type: 'module' });
+    this.worker = new Worker('static/js/workers/git.worker.js', {
+      type: 'module',
+    });
     this.worker.onmessage = this.onmessage.bind(this);
 
     this.worker.postMessage({
@@ -115,15 +127,15 @@ export default class GitFS {
         branch: localStorageManager.getLocalStorageItem('git-branch'),
       },
     });
-  }
+  };
 
   /**
    * Terminate the current worker instance.
    *
-  * @param {boolean} clear - Whether to clear related local storage items.
+   * @param {boolean} clear - Whether to clear related local storage items.
    */
   terminate = (clear = true) => {
-    console.log('Terminating existing GitFS worker')
+    console.log('Terminating existing GitFS worker');
 
     if (clear) {
       localStorageManager.setLocalStorageItem('git-repo', '');
@@ -131,10 +143,12 @@ export default class GitFS {
     }
 
     $('#menu-item--branch')
-      .removeClass('has-dropdown').addClass('disabled')
-      .find('ul').remove();
+      .removeClass('has-dropdown')
+      .addClass('disabled')
+      .find('ul')
+      .remove();
     this.worker.terminate();
-  }
+  };
 
   /**
    * Set the current repository link that is cloned in the UI.
@@ -146,14 +160,14 @@ export default class GitFS {
         repoLink: this._repoLink,
       },
     });
-  }
+  };
 
   setRepoBranch = (branch) => {
     this.worker.postMessage({
       id: 'setRepoBranch',
       data: { branch },
     });
-  }
+  };
 
   /**
    * Clone the current repository.
@@ -161,7 +175,7 @@ export default class GitFS {
   clone = () => {
     this.isReady = false;
     this.worker.postMessage({ id: 'clone' });
-  }
+  };
 
   /**
    * Commit the changes to the current repository.
@@ -174,7 +188,7 @@ export default class GitFS {
       id: 'commit',
       data: { filepath, filecontents },
     });
-  }
+  };
 
   /**
    * Remove a filepath from the current repository.
@@ -186,7 +200,7 @@ export default class GitFS {
       id: 'rm',
       data: { filepath },
     });
-  }
+  };
 
   /**
    * Move a file from one location to another.
@@ -201,7 +215,7 @@ export default class GitFS {
       id: 'moveFile',
       data: { oldPath, newPath, newContent },
     });
-  }
+  };
 
   /**
    * Move a folder and its contents from one location to another.
@@ -217,7 +231,7 @@ export default class GitFS {
       id: 'moveFolder',
       data: { files },
     });
-  }
+  };
 
   /**
    * Message event handler for the worker.
@@ -253,7 +267,7 @@ export default class GitFS {
           attrs: {
             id: 'ide-git-exceeded-quota-modal',
             class: 'modal-width-small',
-          }
+          },
         });
 
         showModal($modal);
@@ -277,7 +291,9 @@ export default class GitFS {
         fileTreeManager.removeLocalStorageWarning();
 
         this.importToVFS(payload.repoContents).then(() => {
-          Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
+          Terra.app.layout
+            .getEditorComponents()
+            .forEach((editorComponent) => editorComponent.unlock());
           fileTreeManager.createFileTree(true);
         });
         break;
@@ -295,7 +311,8 @@ export default class GitFS {
         let errMsg = payload.error.message;
 
         if (errMsg.toLowerCase().includes('bad credentials')) {
-          errMsg = 'Personal access token was not accepted. Could it be expired?';
+          errMsg =
+            'Personal access token was not accepted. Could it be expired?';
         } else if (errMsg.toLowerCase().includes('not found')) {
           const gitRepo = localStorageManager.getLocalStorageItem('git-repo');
           const match = GITHUB_URL_PATTERN.exec(gitRepo);
@@ -306,8 +323,9 @@ export default class GitFS {
           }
         }
 
-
-        fileTreeManager.setErrorMsg(`Failed to clone repository<br/><br/>${errMsg}`);
+        fileTreeManager.setErrorMsg(
+          `Failed to clone repository<br/><br/>${errMsg}`,
+        );
         break;
 
       case 'clone-fail':
@@ -322,7 +340,7 @@ export default class GitFS {
         fileTreeManager.removeBottomMsg();
         break;
     }
-  }
+  };
 
   /**
    * Import files and folders from a git repository into the virtual filesystem.
@@ -344,5 +362,5 @@ export default class GitFS {
 
     // Trigger a vfsChanged event, such that all editors reload their content.
     Terra.app.layout.emitToAllComponents('vfsChanged');
-  }
+  };
 }
