@@ -351,7 +351,7 @@ export default class IDEApp extends App {
 
   /**
    * Create a new GitFSWorker instance if it doesn't exist yet and only if the
-   * the user provided an ssh-key and repository link that are saved in local
+   * the user provided an access token and repository link that are saved in local
    * storage. Otherwise, a worker will be created automatically when the user
    * adds a new repository.
    */
