@@ -26,10 +26,13 @@ export default class IDEApp extends App {
   }
 
   async setupLayout() {
-    // We call this function here so open files can be read when initializing
-    // layout. It would be better to defer that.
-    await this.initLFSAtStart();
-    this.layout = this.createLayout();
+    // LFS or Git may have been previously connected. Here, we try to
+    // reinstate the connection. If either succeeds, we can reopen files
+    // that we open earlier, otherwise we will open a fresh Untitled.
+    const reset =
+      !(await this.initLFSAtStart()) && !(await this.initGitFSAtStart());
+    console.log(reset);
+    this.layout = this.createLayout(reset);
   }
 
   async postSetupLayout() {
@@ -47,7 +50,9 @@ export default class IDEApp extends App {
     await fileTreeManager.createFileTree();
 
     // Start GitFS if already connected.
-    await this.initGitFSAtStart();
+    if (this.isGitConfigured()) {
+      await this.startGitFS();
+    }
 
     // Warn if no external file system is connected.
     if (!this.isGitConfigured() && !LFS.hasProjectLoaded()) {
@@ -290,12 +295,58 @@ export default class IDEApp extends App {
   /**
    * Called when starting the app to restore a previous Git connection, if
    * available.
+   *
+   * @returns {Promise<boolean>} True if not configured OR re-connected.
    */
   async initGitFSAtStart() {
     if (this.isGitConfigured()) {
       console.log('Git project detected upon init');
-      this.openGitFS();
+      return true;
     }
+
+    // In fact, this function currently always returns true because making
+    // the Git connection is deferred until later.
+    return true;
+  }
+
+  /**
+   * Initiate connection to GitFS.
+   *
+   * To be called from menu by user.
+   */
+  async openGitFS() {
+    this.closeAllFiles();
+    await this.stopLFS();
+    await this.startGitFS();
+  }
+
+  /**
+   * Close connection to GitFS, reverting to browser temporary storage.
+   *
+   * To be called from menu by user.
+   */
+  async closeGitFS() {
+    this.closeAllFiles();
+    await this.stopGitFS();
+    await this.finishSwitchToLocalStorage();
+  }
+
+  /**
+   * Determines whether a Git repo is configured for use.
+   *
+   * @returns {boolean} True if configured and should be able to connect.
+   */
+  isGitConfigured() {
+    return localStorageManager.getLocalStorageItem('git-repo');
+  }
+
+  /**
+   * Check whether the GitFS worker has been initialised.
+   *
+   * @returns {boolean} True if the worker has been initialised, false otherwise.
+   */
+  hasGitFSWorker() {
+    return this.gitfs instanceof GitFS;
   }
 
   /**
@@ -304,8 +355,7 @@ export default class IDEApp extends App {
    * storage. Otherwise, a worker will be created automatically when the user
    * adds a new repository.
    */
-  async openGitFS() {
-    await this.terminateLFS();
+  async startGitFS() {
     await this.vfs.connect(null, 'ide-git');
 
     const accessToken = localStorageManager.getLocalStorageItem('git-access-token');
@@ -344,28 +394,6 @@ export default class IDEApp extends App {
   }
 
   /**
-   * To be called from menu by user.
-   */
-  async closeGitFS() {
-    this.closeAllFiles();
-    await this.stopGitFS();
-    await this.finishSwitchToLocalStorage();
-  }
-
-  isGitConfigured() {
-    return localStorageManager.getLocalStorageItem('git-repo');
-  }
-
-  /**
-   * Check whether the GitFS worker has been initialised.
-   *
-   * @returns {boolean} True if the worker has been initialised, false otherwise.
-   */
-  hasGitFSWorker() {
-    return this.gitfs instanceof GitFS;
-  }
-
-  /**
    * Disconnect GitFS, removing file cache.
    */
   async stopGitFS() {
@@ -382,6 +410,8 @@ export default class IDEApp extends App {
   /**
    * Called when starting the app to restore a previous LFS connection, if
    * available.
+   *
+   * @returns {Promise<boolean>} True if not configured OR re-connected.
    */
   async initLFSAtStart() {
     // Re-open previous LFS project if available.
@@ -392,15 +422,19 @@ export default class IDEApp extends App {
       if (rootFolderHandle) {
         console.log('LFS project detected upon init');
         await this.vfs.connect(rootFolderHandle);
+        return true;
       } else {
         console.log('Tried to reopen LFS but handle was stale.');
-        await this.closeLFSFolder();
+        return false;
       }
     }
+    return true;
   }
 
   /**
-   * Open a directory picker dialog and returns the selected directory.
+   * Open a directory picker dialog and connects VFS to the selected directory.
+   *
+   * To be called from menu by user.
    */
   async openLFSFolder() {
     let rootFolderHandle = await LFS.choose();
@@ -430,7 +464,7 @@ export default class IDEApp extends App {
    */
   async closeLFSFolder() {
     this.closeAllFiles();
-    await this.terminateLFS();
+    await this.stopLFS();
     this.finishSwitchToLocalStorage();
   }
 
@@ -438,7 +472,7 @@ export default class IDEApp extends App {
    * Disconnect the LFS from the current folder.
    * Gets called when LFS is closed, or when a Git repo is connected.
    */
-  async terminateLFS() {
+  async stopLFS() {
     if (!LFS.hasProjectLoaded()) return;
 
     await this.vfs.connect(null, 'ide');

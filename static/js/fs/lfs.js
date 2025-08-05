@@ -43,12 +43,11 @@ export async function choose() {
 }
 
 /**
- * Reopens the Local File System (LFS) and sets the file-tree title to the root
- * folder name. This is called when the application is loaded and a LFS folder
- * was open from last time.
+ * Reopens the Local File System (LFS). This is called when the application is
+ * loaded and a LFS folder was open from last time.
  *
- * The handle may become invalid, in which case
- * the open() function should be used to let the user open the folder again.
+ * The handle may become invalid, in which case the open() function should be
+ * used to let the user open the folder again.
  *
  * @returns {Promise<FileSystemDirectoryHandle>} The root folder handle if permission is granted.
  */
@@ -56,6 +55,8 @@ export async function reopen() {
   const rootFolderHandle = await idbManager.getHandle('lfs', 'root');
   if (await _verifyLFSHandlePermission(rootFolderHandle)) {
     return rootFolderHandle;
+  } else {
+    this.close();
   }
 }
 
@@ -70,7 +71,8 @@ export async function getBaseFolderName() {
 }
 
 /**
- * Closes the Local File System (LFS) by clearing the stored handles and updating the local storage.
+ * Closes the Local File System (LFS) by clearing the stored handles and
+ * updating the local storage.
  *
  * @returns {Promise<void>}
  */
@@ -80,10 +82,12 @@ export async function close() {
 }
 
 /**
- * Verify existing permission for a given LFS handle.
+ * Verify and renew existing permission for a given LFS handle.
  *
- * If the action was initiated by the user (e.g. clicking somewhere),
- * we can also newly request the permission.
+ * If the action was initiated by the user (e.g. clicking a menu), we can also
+ * newly request the permission. This is a browser security limitation. The
+ * implication is that we can't initiate a new permission dialog when first
+ * loading the app.
  *
  * @param {FileSystemDirectoryHandle|FileSystemFileHandle} handle - The handle to verify permission for.
  * @param {boolean} isUserInvoked - Whether the action was initiated by the user.
@@ -99,7 +103,7 @@ async function _verifyLFSHandlePermission(handle, isUserInvoked = false) {
     }
 
     // Otherwise, request permission to the handle.
-    if (userClick && (await handle.requestPermission(opts)) === 'granted') {
+    if (isUserInvoked && (await handle.requestPermission(opts)) === 'granted') {
       return resolve(true);
     }
 

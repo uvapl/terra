@@ -171,10 +171,17 @@ const _errorTypes = [
   },
 ];
 
-function _makeError(errorMsg) {
+/**
+ * Creates an error of the class specified in a string, or if the class is
+ * unknown, a generic Error instance.
+ *
+ * @param {string} errorName
+ * @returns {Error}
+ */
+function _makeError(errorName) {
   for (const { pattern, ErrorClass, args } of _errorTypes) {
-    const m = pattern.exec(errorMsg);
+    const m = pattern.exec(errorName);
     if (m) return new ErrorClass();
   }
-  return new Error(errorMsg);
+  return new Error(errorName);
 }
