@@ -316,6 +316,9 @@ export default class IDELayout extends Layout {
   /**
    * Open a file in the editor, or switch to the tab if it's already open.
    *
+   * N.B. This function assumes that any other editor tab is already present
+   * in the IDE (cf. getActiveEditor()).
+   *
    * @param {string} filepath - The path of the file to open.
    */
   addFileTab(filepath) {
