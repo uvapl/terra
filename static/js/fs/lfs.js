@@ -47,7 +47,7 @@ export async function choose() {
  * folder name. This is called when the application is loaded and a LFS folder
  * was open from last time.
  *
- * It is very well possible that the handle is not valid anymore, in which case
+ * The handle may become invalid, in which case
  * the open() function should be used to let the user open the folder again.
  *
  * @returns {Promise<FileSystemDirectoryHandle>} The root folder handle if permission is granted.
