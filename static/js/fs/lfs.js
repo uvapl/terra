@@ -47,7 +47,7 @@ export async function choose() {
  * folder name. This is called when the application is loaded and a LFS folder
  * was open from last time.
  *
- * It is very well possible that the handle is not valid anymore, in which case
+ * The handle may become invalid, in which case
  * the open() function should be used to let the user open the folder again.
  *
  * @returns {Promise<FileSystemDirectoryHandle>} The root folder handle if permission is granted.
@@ -86,10 +86,10 @@ export async function close() {
  * we can also newly request the permission.
  *
  * @param {FileSystemDirectoryHandle|FileSystemFileHandle} handle - The handle to verify permission for.
- * @param {boolean} userClick - Whether the action was initiated by the user.
+ * @param {boolean} isUserInvoked - Whether the action was initiated by the user.
  * @returns {Promise<boolean>} True if permission is granted, false otherwise.
  */
-async function _verifyLFSHandlePermission(handle, userClick = false) {
+async function _verifyLFSHandlePermission(handle, isUserInvoked = false) {
   const opts = { mode: 'readwrite' };
 
   return new Promise(async (resolve) => {
