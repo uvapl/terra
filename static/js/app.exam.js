@@ -43,7 +43,7 @@ export default class ExamApp extends App {
       this.loadConfig().then(async (isNewExam) => {
         // Files for a specific exam are hosted in a subdirectory of the VFS.
         const slug = slugify(this.config.configUrl);
-        await this.vfs.setBaseFolder(`exam-${slug}`)
+        await this.vfs.setBaseFolder(`exam-${slug}`);
 
         if (!this.config.tabs) {
           this.config.tabs = {};
