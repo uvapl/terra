@@ -23,7 +23,7 @@ export default class EmbedApp extends App {
 
     // Files for a specific embed are hosted in a subdirectory of the VFS.
     const slug = slugify(window.location.href);
-    await this.vfs.setBaseFolder(`embed-${slug}`)
+    await this.vfs.setBaseFolder(`embed-${slug}`);
 
     const queryParams = parseQueryParams();
     if (typeof queryParams.filename !== 'string') {
