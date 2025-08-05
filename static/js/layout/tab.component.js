@@ -14,19 +14,6 @@ export default class TabComponent extends EventTarget {
    */
   state = null;
 
-  /**
-   * Whether the onContainerOpen event has been triggered falsely.
-   * This happens when there is a single empty Untitled tab where the user
-   * clicks on the left-sidebar to open another file. At this moment, the
-   * Untitled tab will be closed, however, GoldenLayout switches to the Untitled
-   * tab, closes it and then switches back to the newly inserted tab, which
-   * triggers another 'show' event, which leads to code being run twice and thus
-   * leading in an unexpected onfilechange event triggered, while the only thing
-   * that the user did was open file.
-   */
-  fakeOnContainerOpenEvent = false;
-  fakeOnEditorFocusEvent = false;
-
   constructor(container, state) {
     super();
     this.container = container;
