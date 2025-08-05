@@ -34,11 +34,6 @@ export default class ExamApp extends App {
    */
   editorContentChanged = false;
 
-  getOPFSRootFolderName() {
-    const slug = slugify(this.config.configUrl);
-    return `exam-${slug}`;
-  }
-
   onEditorStartEditing(editorComponent) {
     this.editorContentChanged = true;
   }
@@ -46,6 +41,10 @@ export default class ExamApp extends App {
   setupLayout() {
     return new Promise((resolve, reject) => {
       this.loadConfig().then(async (isNewExam) => {
+        // Files for a specific exam are hosted in a subdirectory of the VFS.
+        const slug = slugify(this.config.configUrl);
+        await this.vfs.setBaseFolder(`exam-${slug}`);
+
         if (!this.config.tabs) {
           this.config.tabs = {};
         }
@@ -67,10 +66,10 @@ export default class ExamApp extends App {
 
           // Create the files inside the VFS.
           await Promise.all(
-            content.map((file) => Terra.app.vfs.createFile({
-              path: file.title,
-              content: file.componentState.value,
-            }))
+            content.map((file) => Terra.app.vfs.createFile(
+              file.title,
+              file.componentState.value,
+            ))
           )
         }
 
@@ -479,7 +478,7 @@ export default class ExamApp extends App {
       this.layout.getEditorComponents().map(async (editorComponent) => {
         const filename = editorComponent.getFilename();
         const filepath = editorComponent.getPath();
-        const content = await Terra.app.vfs.getFileContentByPath(filepath);
+        const content = await Terra.app.vfs.readFile(filepath);
         const blob = new Blob([content], { type: 'text/plain' });
         formData.append(`files[${filename}]`, blob, filename);
       })

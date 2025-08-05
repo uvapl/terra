@@ -177,14 +177,14 @@ export default class IDELayout extends Layout {
    * subfolders will be fetched from.
    * @param {string} [html] - The HTML string to append to.
    * @param {string} [indent] - The visual indent indicator.
-   * @returns {string} The HTML string with the folder options.
+   * @returns {Promise<string>} The HTML string with the folder options.
    */
   async createFolderOptionsHtml(parentPath = '', html = '', indent = '--') {
-    const subfolders = await Terra.app.vfs.findFoldersInFolder(parentPath);
+    const subfolders = await Terra.app.vfs.listFoldersInFolder(parentPath);
 
-    for (const folder of subfolders) {
-      const subfolderpath = parentPath ? `${parentPath}/${folder.name}` : folder.name;
-      html += `<option value="${subfolderpath}">${indent} ${folder.name}</option>`;
+    for (const folderName of subfolders) {
+      const subfolderpath = parentPath ? `${parentPath}/${folderName}` : folderName;
+      html += `<option value="${subfolderpath}">${indent} ${folderName}</option>`;
       html += await this.createFolderOptionsHtml(subfolderpath, '', indent + '--');
     }
 
@@ -271,10 +271,10 @@ export default class IDELayout extends Layout {
       tooltipManager.destroyTooltip('saveFile');
 
       // Create a new file in the VFS and then refresh the file tree.
-      await Terra.app.vfs.createFile({
-        path: filepath,
-        content: editorComponent.getContent(),
-      });
+      await Terra.app.vfs.createFile(
+        filepath,
+        editorComponent.getContent(),
+      );
       await fileTreeManager.createFileTree();
 
       // Change the Untitled tab to the new filename.

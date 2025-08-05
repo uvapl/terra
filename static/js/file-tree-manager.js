@@ -145,13 +145,13 @@ class FileTreeManager {
     // Create the new file in the filesystem.
     const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
 
-    const file = await Terra.app.vfs.createFile({ path });
-    const key = parentPath ? `${parentPath}/${file.name}` : file.name;
+    const fileName = await Terra.app.vfs.createFile(path);
+    const key = parentPath ? `${parentPath}/${fileName}` : fileName;
 
     // Create the new node in the file tree.
     const newChildProps = {
       key,
-      title: file.name,
+      title: fileName,
       folder: false,
       data: {
         type: 'file',
@@ -260,38 +260,40 @@ class FileTreeManager {
   /**
    * Create a file tree list from the VFS compatible with FancyTree.
    *
-   * @async
-   * @param {string} [path] - The parent folder absolute path.
-   * @returns {array} List with file tree objects.
+   * @returns {Promise<array>} List with file tree objects.
    */
-  createFromVFS = async (path = '') => {
-    const folders = await Promise.all(
-      (await Terra.app.vfs.findFoldersInFolder(path)).map(async (folder) => {
-        const subpath = path ? `${path}/${folder.name}` : folder.name;
+  createFromVFS = async () => {
+    const basicTree = await Terra.app.vfs.getFileTree();
+
+    /**
+     * Convert a minimal file tree into FancyTree-compatible format.
+     *
+     * @param {object[]} tree - Minimal tree (title, folder, children).
+     * @param {string} path - Path prefix for keys.
+     * @returns {object[]} FancyTree-compatible structure.
+     */
+    function toFancyTree(tree, path = '') {
+      return tree.map((node) => {
+        const key = path ? `${path}/${node.title}` : node.title;
+        const isFolder = node.folder;
+
         return {
-          key: subpath,
-          title: folder.name,
-          folder: true,
+          key,
+          title: node.title,
+          folder: isFolder,
           data: {
-            type: 'folder',
-            isFolder: true,
+            type: isFolder ? 'folder' : 'file',
+            isFolder,
+            isFile: !isFolder,
           },
-          children: (await this.createFromVFS(subpath)),
+          ...(isFolder && node.children
+            ? { children: toFancyTree(node.children, key) }
+            : {}),
         };
-      })
-    )
+      });
+    }
 
-    const files = (await Terra.app.vfs.findFilesInFolder(path)).map((file) => ({
-      key: path ? `${path}/${file.name}` : file.name,
-      title: file.name,
-      folder: false,
-      data: {
-        type: 'file',
-        isFile: true,
-      },
-    }));
-
-    return folders.concat(files);
+    return toFancyTree(basicTree);
   }
 
   /**
@@ -353,15 +355,15 @@ class FileTreeManager {
    * @param {string} path - The absolute folderpath to close all files from.
    */
   closeFilesInFolderRecursively = async (path) => {
-    const subfiles = await Terra.app.vfs.findFilesInFolder(path);
-    for (const file of subfiles) {
-      const subfilepath = path ? `${path}/${file.name}` : file.name;
+    const subfiles = await Terra.app.vfs.listFilesInFolder(path);
+    for (const fileName of subfiles) {
+      const subfilepath = path ? `${path}/${fileName}` : fileName;
       Terra.app.closeFile(subfilepath);
     }
 
-    const subfolders = await Terra.app.vfs.findFoldersInFolder(path);
-    for (const folder of subfolders) {
-      const subfolderpath = path ? `${path}/${folder.name}` : folder.name;
+    const subfolders = await Terra.app.vfs.listFoldersInFolder(path);
+    for (const folderName of subfolders) {
+      const subfolderpath = path ? `${path}/${folderName}` : folderName;
       this.closeFilesInFolderRecursively(subfolderpath);
     }
   }

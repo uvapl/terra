@@ -1,9 +1,9 @@
-import { createModal, hideModal, showModal } from './modal.js';
-import Terra from './terra.js';
-import localStorageManager from './local-storage-manager.js';
-import fileTreeManager from './file-tree-manager.js';
-import { seconds, slugify } from './helpers/shared.js';
-import { GITHUB_URL_PATTERN } from './ide/constants.js';
+import { createModal, hideModal, showModal } from '../modal.js';
+import Terra from '../terra.js';
+import localStorageManager from '../local-storage-manager.js';
+import fileTreeManager from '../file-tree-manager.js';
+import { seconds, slugify } from '../helpers/shared.js';
+import { GITHUB_URL_PATTERN } from '../ide/constants.js';
 
 /**
  * GitFS worker class that handles all Git operations.
@@ -104,7 +104,9 @@ export default class GitFS {
 
     console.log('Spawning new git worker');
 
-    this.worker = new Worker('static/js/workers/git.worker.js', { type: 'module' });
+    this.worker = new Worker('static/js/fs/git.worker.js', {
+      type: 'module',
+    });
     this.worker.onmessage = this.onmessage.bind(this);
 
     this.worker.postMessage({
@@ -266,7 +268,7 @@ export default class GitFS {
         // Import the renderGitRepoBranches dynamically, because if we put this
         // at the top then the menubar.js will also be loaded for the Exam and
         // Embed application, which is something we do not want.
-        import('./ide/menubar.js').then((module) => {
+        import('../ide/menubar.js').then((module) => {
           const { renderGitRepoBranches } = module;
           renderGitRepoBranches(payload.branches);
         });
@@ -278,7 +280,7 @@ export default class GitFS {
 
         this.importToVFS(payload.repoContents).then(() => {
           Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
-          fileTreeManager.createFileTree();
+          fileTreeManager.createFileTree(true);
         });
         break;
 
@@ -339,10 +341,7 @@ export default class GitFS {
 
     const files = repoContents.filter((file) => file.type === 'blob');
     for (const file of files) {
-      await this.vfs.createFile({
-        path: file.path,
-        content: file.content,
-      }, false);
+      await this.vfs.createFile(file.path, file.content, false);
     }
 
     // Trigger a vfsChanged event, such that all editors reload their content.
