@@ -14,6 +14,12 @@ import localStorageManager from '../local-storage-manager.js';
 import Terra from '../terra.js';
 
 /**
+ * Current version of the default layout config. Increase if breaking changes
+ * require all users to reload a fresh config.
+ */
+const LAYOUT_CONFIG_VERSION = 2;
+
+/**
  * Default layout config that is used when the layout is created for the first
  * time (and thus not saved in local storage yet) or when the layout is reset.
  * @type {object}
@@ -36,6 +42,7 @@ const DEFAULT_LAYOUT_CONFIG = {
       content: [
         {
           type: 'stack',
+          id: 'editorStack',
           isClosable: false,
         },
         {
@@ -109,6 +116,12 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   tabs = [];
 
   /**
+   * Reference to tab Stack element in the GoldenLayout hierarchy.
+   * @type {GoldenLayout.Stack}
+   */
+  editorStack = null;
+
+  /**
    * Reference to all hidden files which will *never* be shown in the UI, but
    * will be sent to the workers and written to worker's filesystem.
    * @type {object<string, string>}
@@ -123,10 +136,25 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
   constructor(additionalLayoutConfig, options = {}) {
     let layoutConfig = localStorageManager.getLocalStorageItem('layout');
-    if (layoutConfig && !options.forceDefaultLayout) {
-      layoutConfig = JSON.parse(layoutConfig);
+
+    const layoutConfigVersion =
+      localStorageManager.getLocalStorageItem('layoutVersion');
+    const layoutConfigVersionNumber = parseInt(layoutConfigVersion, 10);
+
+    if (
+      !layoutConfig ||
+      options.forceDefaultLayout ||
+      isNaN(layoutConfigVersionNumber) ||
+      layoutConfigVersionNumber < LAYOUT_CONFIG_VERSION
+    ) {
+      // Load default config.
+      layoutConfig =
+        mergeObjects(DEFAULT_LAYOUT_CONFIG, additionalLayoutConfig);
+      localStorageManager.setLocalStorageItem('layoutVersion',
+        LAYOUT_CONFIG_VERSION)
     } else {
-      layoutConfig = mergeObjects(DEFAULT_LAYOUT_CONFIG, additionalLayoutConfig);
+      // Load previous config from user's storage.
+      layoutConfig = JSON.parse(layoutConfig);
     }
 
     super(layoutConfig, $('#layout'));
@@ -395,6 +423,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @param {object} options - Options passed to the layout.
    */
   onStackCreated(stack, options) {
+    if (stack.config.id === 'editorStack') {
+      this.editorStack = stack;
+    }
     if (this.initialised) return;
 
     this.initialised = true;

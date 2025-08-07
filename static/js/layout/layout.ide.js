@@ -332,20 +332,16 @@ export default class IDELayout extends Layout {
       return;
     }
 
-    // Take first tab and determine its parent.
-    const firstItem = tabComponents[0].container.parent;
-    const parentStack = firstItem.parent;
-
     // An empty Untitled tab will be removed before adding the new tab.
     if (this.onlyHasEmptyUntitled()) {
       this.resetLayout = true;
-      firstItem.close();
+      tabComponents[0].close();
       this.resetLayout = false;
     }
 
     // Add new tab.
     const filename = filepath.split('/').pop();
-    parentStack.addChild(
+    this.editorStack.addChild(
       this._createEditorTab({
         title: filename,
         componentState: { path: filepath },
