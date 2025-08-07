@@ -417,17 +417,28 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   /**
-   * Callback when the layout is initialised and the stack is created.
+   * Callback when the layout is initialised and a stack is created.
+   *
+   * There are two stacks in some layouts: one for the code editors, and
+   * one for the terminal. Here, we're interested in the code editor stack.
    *
    * @param {GoldenLayout.Stack} stack - Object representing the root structure.
    * @param {object} options - Options passed to the layout.
    */
   onStackCreated(stack, options) {
+    // When we find a newly made code editor stack, register it locally
+    // and use it to keep track of the currently selected tab.
     if (stack.config.id === 'editorStack') {
       this.editorStack = stack;
-    }
-    if (this.initialised) return;
 
+      // This partially duplicates what happens in onEditorFocus, but
+      // it's needed to be able to close image tabs, which do not get focus.
+      this.editorStack.on('activeContentItemChanged', (param) => {
+        this.activeTab = param;
+      });
+    }
+
+    if (this.initialised) return;
     this.initialised = true;
 
     // Do a set-timeout trick to make sure the components are registered

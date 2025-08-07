@@ -107,7 +107,7 @@ export default class ImageComponent extends TabComponent {
    * Callback function when the image component is hidden/closed.
    */
   onHide = () =>  {
-    this.getParentComponentElement().classList.remove('component-container', 'image-component-container');
+    // Function deleted because removing the classes only causes problems.
   }
 
   /**

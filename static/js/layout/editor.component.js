@@ -185,7 +185,7 @@ export default class EditorComponent extends TabComponent {
 
   onHide = () => {
     // Remove class that was added.
-    this.getParentComponentElement().classList.remove('component-container', 'editor-component-container');
+    // Function deleted because removing the classes only causes problems.
   }
 
   /**
