@@ -434,7 +434,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       // This partially duplicates what happens in onEditorFocus, but
       // it's needed to be able to close image tabs, which do not get focus.
       this.editorStack.on('activeContentItemChanged', (param) => {
-        this.activeTab = param;
+        this.activeTab = param.container.getComponent();
       });
     }
 

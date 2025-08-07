@@ -43,6 +43,7 @@ export default class EditorComponent extends TabComponent {
 
   init = () => {
     this.container.parent.isEditor = true;
+    this.container.getComponent = () => this;
 
     this.bindContainerEvents();
     this.initEditor();

@@ -2,6 +2,7 @@ import { getFileExtension, isObject } from './helpers/shared.js'
 import LangWorker from './lang-worker.js';
 import Terra from './terra.js';
 import VirtualFileSystem from './fs/vfs.js';
+import Layout from './layout/layout.js';
 
 /**
  * Base class that is extended for each of the apps.
@@ -9,7 +10,7 @@ import VirtualFileSystem from './fs/vfs.js';
 export default class App {
   /**
    * Reference to the GoldenLayout instance.
-   * @type {GoldenLayout.Layout}
+   * @type {Layout}
    */
   layout = null;
 

@@ -349,4 +349,22 @@ export default class IDELayout extends Layout {
       })
     );
   }
+
+  closeAllFiles() {
+    const stack = this.editorStack;
+    const originalSetActive = stack.setActiveContentItem;
+    const tabs = [...stack.contentItems];
+
+    // Temporarily disable activation of next tab by switching off a function.
+    stack.setActiveContentItem = () => {};
+
+    for (let i = 0; i < tabs.length; i++) {
+      // If this is the last tab, restore the original activation logic,
+      // so it will be nicely replaced by an active Untitled tab.
+      if (i === tabs.length - 1) {
+        stack.setActiveContentItem = originalSetActive;
+      }
+      tabs[i].remove();
+    }
+  }
 }

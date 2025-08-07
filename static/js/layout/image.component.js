@@ -14,6 +14,7 @@ export default class ImageComponent extends TabComponent {
 
   init = () => {
     this.container.parent.isImage = true;
+    this.container.getComponent = () => this;
 
     this.bindContainerEvents();
     this.initImageElement();
