@@ -95,24 +95,6 @@ export default class TabComponent extends EventTarget {
     this.container.close();
   }
 
-  /**
-   * Add a new Untitled sibling tab next to the current editor.
-   *
-   * @param {GoldenLayout.ContentItem} config - Content item config object.
-   */
-  addSiblingTab = (config = {}) => {
-    this.container.parent.parent.addChild({
-      type: 'component',
-      componentName: 'editor',
-      title: 'Untitled',
-      componentState: {
-        fontSize: BASE_FONT_SIZE,
-        ...config.componentState
-      },
-      ...config,
-    });
-  }
-
   setActive = () => {
     this.container.parent.parent.setActiveContentItem(this.container.parent);
   }

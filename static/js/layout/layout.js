@@ -363,9 +363,29 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     const tabComponents = this.getTabComponents();
 
     if (tabComponents.length === 1 && !this.resetLayout) {
-      const firstTabComponent = tabComponents[0];
-      firstTabComponent.addSiblingTab();
+      tabComponents[0].container.parent.parent.addChild(
+        this._createEditorTab()
+      );
     }
+  }
+
+  /**
+   * Create a new editor tab with provided config, or default to Untitled.
+   *
+   * @param {GoldenLayout.ContentItem} config - Content item config object.
+   * @returns {object} - Fully configured object.
+   */
+  _createEditorTab(config = {}) {
+    return({
+      type: 'component',
+      componentName: 'editor',
+      title: 'Untitled',
+      componentState: {
+        fontSize: BASE_FONT_SIZE,
+        ...config.componentState
+      },
+      ...config,
+    });
   }
 
   /**

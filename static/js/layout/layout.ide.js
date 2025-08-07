@@ -316,15 +316,14 @@ export default class IDELayout extends Layout {
   /**
    * Open a file in the editor, or switch to the tab if it's already open.
    *
-   * N.B. This function assumes that any other editor tab is already present
-   * in the IDE (cf. getActiveEditor()).
+   * N.B. This function assumes that another editor tab is already present.
    *
    * @param {string} filepath - The path of the file to open.
    */
   addFileTab(filepath) {
     let tabComponents = this.getTabComponents();
 
-    // Try to switch to file that is already open.
+    // Switch to the selected file if that is already open.
     const tabComponent = tabComponents.find(
       (component) => component.getPath() === filepath
     );
@@ -333,39 +332,25 @@ export default class IDELayout extends Layout {
       return;
     }
 
-    const activeEditorComponent = this.getActiveEditor();
-    const filename = filepath.split('/').pop();
+    // Take first tab and determine its parent.
+    const firstItem = tabComponents[0].container.parent;
+    const parentStack = firstItem.parent;
 
+    // An empty Untitled tab will be removed before adding the new tab.
     if (this.onlyHasEmptyUntitled()) {
-      // Replace Untitled by the requested file.
-      const untitledItem = tabComponents[0].container.parent;
-      const parentStack = untitledItem.parent;
-
-      // Close the Untitled tab, surrounded by a flag to ensure
-      // that onTabDestroy does not immediately recreate it.
       this.resetLayout = true;
-      untitledItem.close();
+      firstItem.close();
       this.resetLayout = false;
+    }
 
-      // Now insert a new Stack with the file component
-      parentStack.addChild(
-        {
-          type: 'component',
-          componentName: isImageExtension(filename) ? 'image' : 'editor',
-          title: filename,
-          componentState: {
-            fontSize: BASE_FONT_SIZE,
-            path: filepath
-          },
-        }
-      );
-    } else {
-      // Add a new tab next to the current active tab.
-      activeEditorComponent.addSiblingTab({
+    // Add new tab.
+    const filename = filepath.split('/').pop();
+    parentStack.addChild(
+      this._createEditorTab({
         title: filename,
         componentState: { path: filepath },
         componentName: isImageExtension(filename) ? 'image' : 'editor',
-      });
-    }
+      })
+    );
   }
 }
