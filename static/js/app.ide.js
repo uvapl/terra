@@ -270,7 +270,7 @@ export default class IDEApp extends App {
    * Close all tabs in the editor.
    */
   closeAllFiles() {
-    this.layout.closeAllFiles();
+    this.layout.closeAllTabs();
   }
 
   /**

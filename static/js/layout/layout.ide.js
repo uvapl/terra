@@ -350,7 +350,7 @@ export default class IDELayout extends Layout {
     );
   }
 
-  closeAllFiles() {
+  closeAllTabs() {
     const stack = this.editorStack;
     const originalSetActive = stack.setActiveContentItem;
     const tabs = [...stack.contentItems];
