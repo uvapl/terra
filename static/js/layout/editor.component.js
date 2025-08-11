@@ -43,6 +43,7 @@ export default class EditorComponent extends TabComponent {
 
   init = () => {
     this.container.parent.isEditor = true;
+    this.container.getComponent = () => this;
 
     this.bindContainerEvents();
     this.initEditor();
@@ -158,11 +159,6 @@ export default class EditorComponent extends TabComponent {
    * Callback when the user's cursor is focused on the editor.
    */
   onEditorFocus = () => {
-    if (this.fakeOnEditorFocusEvent) {
-      this.fakeOnEditorFocusEvent = false;
-      return;
-    }
-
     this.dispatchEvent(new Event('focus'));
 
     // Spawn a new worker if necessary.
@@ -175,17 +171,6 @@ export default class EditorComponent extends TabComponent {
    */
   onShow = () => {
     if (!this.editor) return;
-
-    if (this.fakeOnContainerOpenEvent) {
-      this.fakeOnContainerOpenEvent = false;
-
-      // This focus is needed when there's solely an Untitled tab and the user
-      // is opening another tab from the file-tree in the IDE. This ensures the
-      // `this.fakeOnEditorFocusEvent` is willl be set to false in the
-      // `onEditorFocus` method.
-      this.editor.focus();
-      return;
-    }
 
     // This focus is needed when switching between tabs where we use a
     // set-timeout to make sure the editor is fully rendered.
@@ -201,7 +186,7 @@ export default class EditorComponent extends TabComponent {
 
   onHide = () => {
     // Remove class that was added.
-    this.getParentComponentElement().classList.remove('component-container', 'editor-component-container');
+    // Function deleted because removing the classes only causes problems.
   }
 
   /**

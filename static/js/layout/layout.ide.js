@@ -79,6 +79,7 @@ export default class IDELayout extends Layout {
         name: 'closeFile',
         bindKey: 'Ctrl+W',
         exec: () => Terra.app.closeFile(),
+        readOnly: true,
       },
       {
         name: 'createNewFileTreeFile',
@@ -298,59 +299,73 @@ export default class IDELayout extends Layout {
   }
 
   /**
+   * Checks if an Untitled tab is the only one open in the editor,
+   * and that no content has been added to it (and thus unsaved).
+   *
+   * @returns {boolean}
+   */
+  onlyHasEmptyUntitled() {
+    let tabComponents = this.getTabComponents();
+    return (
+      tabComponents.length === 1 &&
+      tabComponents[0].getFilename() === 'Untitled' &&
+      !tabComponents[0].getPath() &&
+      tabComponents[0].getContent() === ''
+    );
+  }
+
+  /**
    * Open a file in the editor, or switch to the tab if it's already open.
+   *
+   * N.B. This function assumes that another editor tab is already present.
    *
    * @param {string} filepath - The path of the file to open.
    */
   addFileTab(filepath) {
     let tabComponents = this.getTabComponents();
 
-    // Try to find the tab component with the given filepath.
+    // Switch to the selected file if that is already open.
     const tabComponent = tabComponents.find(
       (component) => component.getPath() === filepath
     );
-
     if (tabComponent) {
-      // Switch to the active tab that is already open.
       tabComponent.setActive();
-    } else {
-      let removeFirstTab = false;
-
-      // Check if first tab is an Untitled tab with no content.
-      // If so, then remove it after we've inserted the new tab.
-      if (tabComponents.length === 1 && tabComponents[0].getFilename() === 'Untitled') {
-        if (tabComponents[0].getContent() === '') {
-          removeFirstTab = true;
-        } else {
-          tabComponents[0].clearContent();
-          return;
-        }
-      }
-
-      const activeEditorComponent = this.getActiveEditor();
-      if (activeEditorComponent) {
-        const filename = filepath.split('/').pop();
-
-        // Add a new tab next to the current active tab.
-        activeEditorComponent.addSiblingTab({
-          title: filename,
-          componentState: { path: filepath },
-          componentName: isImageExtension(filename) ? 'image' : 'editor',
-        });
-
-        tabComponents = this.getTabComponents();
-
-        if (removeFirstTab) {
-          tabComponents[0].fakeOnContainerOpenEvent = true;
-          tabComponents[0].fakeOnEditorFocusEvent = true;
-          tabComponents[1].fakeOnContainerOpenEvent = true;
-          tabComponents[1].fakeOnEditorFocusEvent = true;
-
-          // Close Untitled tab.
-          tabComponents[0].close();
-        }
-      }
+      return;
     }
+
+    // An empty Untitled tab will be removed before adding the new tab.
+    if (this.onlyHasEmptyUntitled()) {
+      this.resetLayout = true;
+      tabComponents[0].close();
+      this.resetLayout = false;
+    }
+
+    // Add new tab.
+    const filename = filepath.split('/').pop();
+    this.editorStack.addChild(
+      this._createEditorTab({
+        title: filename,
+        componentState: { path: filepath },
+        componentName: isImageExtension(filename) ? 'image' : 'editor',
+      })
+    );
   }
 
+  closeAllTabs() {
+    const stack = this.editorStack;
+    const originalSetActive = stack.setActiveContentItem;
+    const tabs = [...stack.contentItems];
+
+    // Temporarily disable activation of next tab by switching off a function.
+    stack.setActiveContentItem = () => {};
+
+    for (let i = 0; i < tabs.length; i++) {
+      // If this is the last tab, restore the original activation logic,
+      // so it will be nicely replaced by an active Untitled tab.
+      if (i === tabs.length - 1) {
+        stack.setActiveContentItem = originalSetActive;
+      }
+      tabs[i].remove();
+    }
+  }
 }

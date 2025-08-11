@@ -31,7 +31,6 @@ export default class IDEApp extends App {
     // that we open earlier, otherwise we will open a fresh Untitled.
     const reset =
       !(await this.initLFSAtStart()) && !(await this.initGitFSAtStart());
-    console.log(reset);
     this.layout = this.createLayout(reset);
   }
 
@@ -271,7 +270,7 @@ export default class IDEApp extends App {
    * Close all tabs in the editor.
    */
   closeAllFiles() {
-    this.layout.getTabComponents().forEach((component) => component.close());
+    this.layout.closeAllTabs();
   }
 
   /**
