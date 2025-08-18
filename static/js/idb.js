@@ -2,7 +2,7 @@
  * IndexedDBManager class to handle IndexedDB operations for the Terra app.
  */
 class IndexedDBManager {
-  IDB_VERSION = 1;
+  IDB_VERSION = 2;
   IDB_NAME = 'terra';
   STORE_NAMES = ['lfs'];
 
