@@ -5,6 +5,8 @@
 Exam website that ships with an editor and a terminal that can run C or Python
 code completely offline using WebAssembly.
 
+[Use it now!](https://ide.proglab.nl)
+
 # Table of Contents
 
 - [Terra IDE](#terra-ide)
