@@ -646,7 +646,11 @@ class API extends BaseAPI {
       objectFiles.push(obj);
     }
 
-    await this.link(objectFiles, wasm);
+    try {
+      await this.link(objectFiles, wasm);
+    } catch {
+      this.runUserCodeCallback();
+    }
 
     const buffer = this.memfs.getFileContents(wasm);
     const testMod = await WebAssembly.compile(buffer);
