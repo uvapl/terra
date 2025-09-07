@@ -18,6 +18,7 @@
  */
 
 import { getPartsFromPath, seconds, slugify } from '../helpers/shared.js';
+import debouncer from '../debouncer.js';
 
 const blacklistedPaths = [
   'site-packages', // when user folder has python virtual env
@@ -262,8 +263,11 @@ const handlers = {
     const handle = await getFileHandleByPath(path);
     if (!handle) return;
 
-    // TODO why debounce this? See original `updateFileContent`.
-    writeFile(handle, content);
+    debouncer.debounce(
+      `file-update-${slugify(path)}`,
+      seconds(0.2),
+      () => writeFile(handle, content)
+    );
 
     if (isUserInvoked) {
       self.postMessage({

@@ -4,6 +4,7 @@ import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
 import { seconds, slugify } from '../helpers/shared.js';
 import { GITHUB_URL_PATTERN } from '../ide/constants.js';
+import debouncer from '../debouncer.js';
 
 /**
  * GitFS worker class that handles all Git operations.
@@ -74,9 +75,11 @@ export default class GitFS {
     const { file } = event.detail;
 
     // Only commit changes after 2 seconds of inactivity.
-    Terra.app.registerTimeoutHandler(`commit-${slugify(file.path)}`, seconds(2), () => {
-      this.commit(file.path, file.content);
-    });
+    debouncer.debounce(
+      `commit-${slugify(file.path)}`,
+      seconds(2),
+      () => this.commit(file.path, file.content)
+    );
   }
 
   vfsBeforeFileDeletedHandler = (event) => {
