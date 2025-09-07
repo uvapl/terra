@@ -13,6 +13,47 @@ class FileTreeManager {
    */
   tree = null;
 
+  constructor() {
+    this.setupFileDrop();
+  }
+
+  /**
+   * Since FancyTree handles DnD on a node-level, we need another droparea that
+   * allows dropping files/folders from the filesystem onto the file tree.
+   */
+  setupFileDrop = () => {
+    const $dropzone = $('#file-dropzone');
+
+    $dropzone.on('dragover', (e) => {
+      // This prevents the browser from opening the file.
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    $dropzone.on('dragenter', (e) => {
+      $('#file-tree').addClass(DROP_AREA_INDICATOR_CLASS);
+      $dropzone.addClass('drag-over');
+    });
+
+    $dropzone.on('dragleave', (e) => {
+      $dropzone.removeClass('drag-over');
+      $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
+    });
+
+    $dropzone.on('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
+      $dropzone.removeClass('drag-over');
+
+      const files = e.originalEvent.dataTransfer.items;
+      for (var i = 0; i < files.length; i++) {
+        const item = files[i].webkitGetAsEntry();
+        this._createFileSystemEntryInVFS(item);
+      }
+    });
+  }
+
   /**
    * Set the file tree title.
    *
@@ -556,6 +597,7 @@ class FileTreeManager {
           autoExpandMS: 400,
           dragStart: this._dragStartCallback,
           dragEnter: this._dragEnterCallback,
+          dragLeave: this._dragLeaveCallback,
           dragDrop: this._dragStopCallback,
           dragEnd: this._dragEndCallback,
         },
@@ -772,9 +814,10 @@ class FileTreeManager {
    * @returns {boolean} True if the user is allowed to drag onto the node.
    */
   _dragEnterCallback = (targetNode, data) => {
-    // Add a visual drag area indicator.
+    // Remove all existing visual drag area indicators.
     $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
 
+    // Add a visual drag area indicator.
     if ((targetNode.parent.title.startsWith('root') && targetNode.data.isFile) || targetNode.title === 'root') {
       $('#file-tree').addClass(DROP_AREA_INDICATOR_CLASS);
     }
@@ -785,39 +828,53 @@ class FileTreeManager {
       $(targetNode.li).addClass(DROP_AREA_INDICATOR_CLASS);
     }
 
-    // Prevent dropping if there exists already a file with the same name on the
-    // target folder.
+    // NOTE: sourceNode is undefined when user drags a filesystem file/folder
+    // onto the file tree. Additionally, for security reasons, the `data.files`
+    // list remains empty during dragEnter and dragOver events, so there is no
+    // way to check for a duplicate in this case. Essentially it just creates
+    // the file with "(1)" appended to it if a file with the same name already
+    // exists in the folder.
     const sourceNode = data.otherNode;
-    const containsDuplicate = (
-      (
-        targetNode.data.isFile &&
-        this._nodePathExists(sourceNode.title, targetNode.parent.key, [sourceNode.key])
-      )
+
+    if (sourceNode) {
+      // Prevent dropping if there exists already a file with the same name on
+      // the target folder.
+      const containsDuplicate = (
+        (
+          targetNode.data.isFile &&
+          this._nodePathExists(sourceNode.title, targetNode.parent.key, [sourceNode.key])
+        )
         ||
-      (
-        targetNode.data.isFolder &&
-        this._nodePathExists(sourceNode.title, targetNode.key, [sourceNode.key])
-      )
-    );
+        (
+          targetNode.data.isFolder &&
+          this._nodePathExists(sourceNode.title, targetNode.key, [sourceNode.key])
+        )
+      );
 
-    tooltipManager.destroyTooltip('dndDuplicate');
+      tooltipManager.destroyTooltip('dndDuplicate');
 
-    if (containsDuplicate) {
-      // Create new tooltip.
-      const anchor = targetNode.data.isFile
-        ? (targetNode.parent.title.startsWith('root') ? $('.file-tree-container .title')[0] : targetNode.parent.span)
-        : targetNode.span;
+      if (containsDuplicate) {
+        // Create new tooltip.
+        const anchor = targetNode.data.isFile
+          ? (targetNode.parent.title.startsWith('root') ? $('.file-tree-container .title')[0] : targetNode.parent.span)
+          : targetNode.span;
 
-      const msg = `There already exists a "${sourceNode.title}" file or folder`;
-      tooltipManager.createTooltip('dndDuplicate', anchor, msg, {
-        placement: 'right',
-        theme: 'error',
-      });
+        const msg = `There already exists a "${sourceNode.title}" file or folder`;
+        tooltipManager.createTooltip('dndDuplicate', anchor, msg, {
+          placement: 'right',
+          theme: 'error',
+        });
 
-      return false;
+        return false;
+      }
     }
 
     return true;
+  }
+
+  _dragLeaveCallback = (a, b) => {
+    // Remove the visual drag area indicator.
+    $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
   }
 
   /**
@@ -837,13 +894,44 @@ class FileTreeManager {
   /**
    * Callback when the user stops dragging a node in the file tree.
    */
-  _dragEndCallback = () => {
+  _dragEndCallback = (a, b) => {
     // Remove the visual drag area indicator.
     $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
 
     tooltipManager.destroyTooltip('dndDuplicate');
     this.sortFileTree()
     Terra.v.blockFSPolling = false;
+  }
+
+  /**
+   * Create a file or folder in the VFS from a FileSystemFileEntry object.
+   *
+   * @param {FileSystemFileEntry} item - The file or folder entry.
+   * @param {string} [path] - The path of the entry.
+   * @param {string} [targetNodePath] - The path of the node it was dropped onto.
+   */
+  _createFileSystemEntryInVFS = (item, path = '', targetNodePath = null) => {
+    if (item.isFile) {
+      item.file((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const content = e.target.result;
+          const destPath = [targetNodePath, path, file.name].filter((s) => s).join('/');
+          Terra.app.vfs.createFile(destPath, content).then(() => {
+            this.createFileTree();
+          });
+        };
+        reader.readAsText(file);
+      });
+    } else if (item.isDirectory) {
+      const dirReader = item.createReader();
+      dirReader.readEntries((entries) => {
+        for (const entry of entries) {
+          const subpath = path ? `${path}/${item.name}` : item.name;
+          this._createFileSystemEntryInVFS(entry, subpath, targetNodePath);
+        }
+      });
+    }
   }
 
   /**
@@ -855,46 +943,53 @@ class FileTreeManager {
   _dragStopCallback = (targetNode, data) => {
     const sourceNode = data.otherNode;
 
-    // If the dropped node became a root node, unset parentId.
-    let parentPath = (targetNode.data.isFolder)
-      ? targetNode.key
-      : (targetNode.parent.title.startsWith('root') ? null : targetNode.parent.key);
+    const parentPath = (targetNode.data.isFolder)
+        ? targetNode.key
+        : (targetNode.parent.title.startsWith('root') ? null : targetNode.parent.key);
 
-    const srcPath = sourceNode.key;
-    const fn = sourceNode.data.isFolder
-      ? Terra.app.vfs.moveFolder
-      : Terra.app.vfs.moveFile;
-
-    const destPath = parentPath ? `${parentPath}/${sourceNode.title}` : sourceNode.title;
-
-    if (srcPath == destPath) {
-      // Nothing happened (rare case, but it might occur).
-      return true;
-    }
-
-    // Move the node in the tree, but when files or files are dropped onto other
-    // files, prevent a new folder being created and just insert the source file
-    // as a sibling next to the target file.
-    if (data.hitMode === 'over' && targetNode.data.isFile) {
-      sourceNode.moveTo(targetNode, 'before');
-    } else {
-      sourceNode.moveTo(targetNode, data.hitMode);
-      targetNode.setExpanded();
-    }
-
-
-    fn(srcPath, destPath).then(() => {
-      // Update the node keys.
-      if (sourceNode.data.isFile) {
-        sourceNode.key = destPath;
-
-        // If the moved file is also the active editor tab, update the tab's
-        // filename and path in-place.
-        this._updateOpenTab(srcPath, destPath);
-      } else if (sourceNode.data.isFolder) {
-        this._updateFolderKeysRecursively(sourceNode);
+    if (data.files.length > 0) { // user dropped one or more filesystem file/folder
+      for (var i = 0; i < data.files.length; i++) {
+        const item = data.dataTransfer.items[i].webkitGetAsEntry();
+        this._createFileSystemEntryInVFS(item, '', parentPath);
       }
-    });
+    } else if (sourceNode) { // user moved a node in the file tree
+      // If the dropped node became a root node, unset parentId.
+      const srcPath = sourceNode.key;
+      const fn = sourceNode.data.isFolder
+        ? Terra.app.vfs.moveFolder
+        : Terra.app.vfs.moveFile;
+
+      const destPath = parentPath ? `${parentPath}/${sourceNode.title}` : sourceNode.title;
+
+      if (srcPath == destPath) {
+        // Nothing happened (rare case, but it might occur).
+        return true;
+      }
+
+      // Move the node in the tree, but when files or files are dropped onto other
+      // files, prevent a new folder being created and just insert the source file
+      // as a sibling next to the target file.
+      if (data.hitMode === 'over' && targetNode.data.isFile) {
+        sourceNode.moveTo(targetNode, 'before');
+      } else {
+        sourceNode.moveTo(targetNode, data.hitMode);
+        targetNode.setExpanded();
+      }
+
+
+      fn(srcPath, destPath).then(() => {
+        // Update the node keys.
+        if (sourceNode.data.isFile) {
+          sourceNode.key = destPath;
+
+          // If the moved file is also the active editor tab, update the tab's
+          // filename and path in-place.
+          this._updateOpenTab(srcPath, destPath);
+        } else if (sourceNode.data.isFolder) {
+          this._updateFolderKeysRecursively(sourceNode);
+        }
+      });
+    }
   }
 
   /**
