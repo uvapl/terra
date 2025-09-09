@@ -180,10 +180,12 @@ class FileTreeManager {
 
     this.sortFileTree();
 
+    Terra.app.openFile(key);
+
     // Trigger edit mode for the new node.
     setTimeout(() => {
       newNode.editStart();
-    }, 0);
+    }, 100);
   }
 
   /**
