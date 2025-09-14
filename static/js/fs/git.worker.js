@@ -341,12 +341,9 @@ class API {
     this._log('Committing', filepath);
     const sha = this.fileShaMap[filepath];
 
-    let content;
-    if (filecontents instanceof ArrayBuffer) {
-      content = arrayBufferToBase64(filecontents);
-    } else {
-      content = btoa(filecontents);
-    }
+    const content = filecontents instanceof ArrayBuffer
+      ? arrayBufferToBase64(filecontents)
+      : btoa(filecontents);
 
     const response = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
       path: filepath,
@@ -386,7 +383,7 @@ class API {
    *
    * @param {string} oldPath - The absolute filepath of the file to move.
    * @param {string} newPath - The absolute filepath to the new file.
-   * @param {string} newContent - The new content of the file.
+   * @param {string|ArrayBuffer} newContent - The new content of the file.
    */
   async moveFile(oldPath, newPath, newContent) {
     // Create the new file with the new content.
@@ -395,7 +392,9 @@ class API {
       message: `Rename ${oldPath} to ${newPath}`,
       branch: this.repoBranch,
       committer: this.committer,
-      content: isImageExtension(newPath) ? newContent : btoa(newContent),
+      content: newContent instanceof ArrayBuffer
+        ? arrayBufferToBase64(newContent)
+        : btoa(newContent),
     });
 
     // Delete the old file.
