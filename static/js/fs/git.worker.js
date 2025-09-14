@@ -301,20 +301,22 @@ class API {
         repoContents.data.tree.map(async (fileOrFolder) => {
           if (fileOrFolder.type === 'blob') {
             try {
-              const res = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
-                branch: this.repoBranch,
-                path: fileOrFolder.path,
-              });
+              if (isImageExtension(fileOrFolder.path)) {
+                // Octokit returns images as base64, but we want to have them as
+                // an ArrayBuffer, thus we fetch them directly from the raw URL.
+                const rawUrl = `https://raw.githubusercontent.com/${this.repoOwner}/${this.repoName}/${this.repoBranch}/${fileOrFolder.path}`;
+                const resp = await fetch(rawUrl);
+                fileOrFolder.content = await resp.arrayBuffer();
+              } else {
+                const res = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
+                  branch: this.repoBranch,
+                  path: fileOrFolder.path,
+                });
+
+                fileOrFolder.content = atob(res.data.content);
+              }
 
               this.fileShaMap[fileOrFolder.path] = fileOrFolder.sha;
-
-              const content = atob(res.data.content);
-              if (isImageExtension(fileOrFolder.path)) {
-                // Use the base64 string to create a blob URL later.
-                fileOrFolder.content = res.data.content.replace(/\n/g, "");
-              } else if (content) {
-                fileOrFolder.content = content;
-              }
             } catch {
               this._log('Possibly empty file:', fileOrFolder.path)
             }

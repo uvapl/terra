@@ -17,6 +17,7 @@
  * operations.
  */
 
+import { isImageExtension } from '../helpers/image.js';
 import { getPartsFromPath, seconds, slugify } from '../helpers/shared.js';
 import debouncer from '../debouncer.js';
 
@@ -185,7 +186,7 @@ const handlers = {
    *
    * @param {string} filepath - The absolute file path.
    * @param {number} maxSize - Maximum allowed content size to return.
-   * @returns {Promise<string>} The file content.
+   * @returns {Promise<ArrayBuffer>} The file content.
    */
   async readFile(path, maxSize) {
     console.log(`readFile: ${path}`);
@@ -200,7 +201,8 @@ const handlers = {
     if (maxSize && size > maxSize) {
       return { error: 'FileTooLarge' };
     }
-    return await file.text();
+
+    return isImageExtension(path) ? await file.arrayBuffer() : await file.text();
   },
 
   async getFileURL(path) {
@@ -227,7 +229,6 @@ const handlers = {
     let name = path ? parts.pop() : 'Untitled';
     const parentPath = parts.join('/');
 
-    // getFolderHandleByPath handles root path, too
     const folder = await getFolderHandleByPath(parentPath);
 
     while (await handlers.pathExists(`${parentPath}/${name}`)) {
@@ -742,7 +743,7 @@ async function writeFile(handle, content) {
   } else {
     // General FS API
     const writable = await handle.createWritable();
-    await writable.write(data);
+    await writable.write({ type: "write", data });
     await writable.close();
   }
 }
