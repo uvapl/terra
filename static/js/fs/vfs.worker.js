@@ -186,7 +186,7 @@ const handlers = {
    *
    * @param {string} filepath - The absolute file path.
    * @param {number} maxSize - Maximum allowed content size to return.
-   * @returns {Promise<ArrayBuffer>} The file content.
+   * @returns {Promise<string|ArrayBuffer>} The file content.
    */
   async readFile(path, maxSize) {
     console.log(`readFile: ${path}`);

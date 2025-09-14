@@ -24,10 +24,6 @@ export default class ImageComponent extends TabComponent {
     const contentContainer = this.container.getElement()[0];
     this.img = document.createElement('img');
 
-    if (this.state.value) {
-      this.setContent(this.state.value);
-    }
-
     contentContainer.appendChild(this.img);
   }
 
@@ -54,17 +50,6 @@ export default class ImageComponent extends TabComponent {
       webp: 'image/webp',
     };
     return mimeTypes[ext];
-  }
-
-  /**
-   * Set the src attribute on the image element.
-   *
-   * @param {string} base64String - Base64 encoded string of the image.
-   */
-  setContent = (base64String) => {
-    if (typeof base64String === 'string') {
-      this.setSrc(`data:${this.getFileMimeType()};base64,` + base64String);
-    }
   }
 
   /**

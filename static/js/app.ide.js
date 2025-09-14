@@ -153,15 +153,11 @@ export default class IDEApp extends App {
     if (!filepath) return;
 
     try {
-      const content = await this.vfs.readFile(filepath, MAX_FILE_SIZE);
-      if (isBase64(content)) {
-        // For base64 content we can directly set it.
-        imageComponent.setContent(content);
-      } else {
-        // For binary content we create a blob URL.
-        const link = await this.vfs.getFileURL(filepath);
-        imageComponent.setSrc(link);
-      }
+      // Ensure the file is within the size limit.
+      await this.vfs.readFile(filepath, MAX_FILE_SIZE);
+
+      const link = await this.vfs.getFileURL(filepath);
+      imageComponent.setSrc(link);
     } catch (err) {
       if (err instanceof FileTooLargeError) {
         imageComponent.exceededFileSize();
