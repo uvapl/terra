@@ -915,13 +915,13 @@ class FileTreeManager {
       item.file((file) => {
         const reader = new FileReader();
         reader.onload = (e) => {
-          const content = e.target.result;
+          const buffer = e.target.result;
           const destPath = [targetNodePath, path, file.name].filter((s) => s).join('/');
-          Terra.app.vfs.createFile(destPath, content).then(() => {
+          Terra.app.vfs.createFile(destPath, buffer).then(() => {
             this.createFileTree();
           });
         };
-        reader.readAsText(file);
+        reader.readAsArrayBuffer(file);
       });
     } else if (item.isDirectory) {
       const dirReader = item.createReader();

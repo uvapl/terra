@@ -218,7 +218,7 @@ const handlers = {
    *
    * @param {string} path - The name of the file. Leave empty to
    * create a new Untitled file in the root directory.
-   * @param {string} content - The initial content of the file.
+   * @param {string|ArrayBuffer} content - The initial content of the file.
    * @param {boolean} isUserInvoked - Whether user invoked the action.
    * @returns {Promise<string>} The generated name for the new file.
    */
@@ -592,12 +592,16 @@ async function resetTreeState() {
 }
 
 function incrementString(str) {
-  const match = /\((\d+)\)$/.exec(str);
+  const parts = str.split('.');
+  const ext = parts.length > 1 ? `.${parts.pop()}` : '';
+  let name = parts.join('.');
+
+  const match = /\((\d+)\)$/.exec(name);
   if (match) {
     const num = parseInt(match[1]) + 1;
-    return str.replace(/\((\d+)\)$/, `(${num})`);
+    return name.replace(/\((\d+)\)$/, `(${num})`);
   }
-  return `${str} (1)`;
+  return `${name} (1)${ext}`;
 }
 
 function isOPFS() {
@@ -720,22 +724,25 @@ async function findFilesInFolder(folderpath) {
  * Writes data to a file.
  *
  * @param {FileSystemFileHandle} handle - The handle of the file to write.
- * @param {string} content - The content to write to the file.
+ * @param {string|ArrayBuffer} content - The content to write.
  * @returns {Promise<void>} Resolves when the file is successfully written.
  */
 async function writeFile(handle, content) {
+  const data = content instanceof ArrayBuffer
+    ? new Uint8Array(content)
+    : new TextEncoder().encode(content);
+
   if (isOPFS()) {
-    // Use Safari-compatible API.
+    // Safari-compatible API (SyncAccessHandle)
     const accessHandle = await handle.createSyncAccessHandle();
-    const data = new TextEncoder().encode(content);
     accessHandle.truncate(data.byteLength);
     accessHandle.write(data, { at: 0 });
     accessHandle.flush();
     accessHandle.close();
   } else {
-    // Use general FS API.
+    // General FS API
     const writable = await handle.createWritable();
-    await writable.write(content);
+    await writable.write(data);
     await writable.close();
   }
 }

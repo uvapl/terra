@@ -21,6 +21,7 @@
 
 .file-dropzone {
   flex-grow: 1;
+  display: flex;
   padding: var(--file-tree-padding);
 }
 
