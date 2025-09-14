@@ -78,7 +78,8 @@ self.onmessage = async (event) => {
   if (result && result.error) {
     self.postMessage({ id, type: `${type}:error`, error: result.error });
   } else {
-    self.postMessage({ id, type: `${type}:result`, data: result });
+    const transfer = result instanceof ArrayBuffer ? [result] : [];
+    self.postMessage({ id, type: `${type}:result`, data: result }, transfer);
   }
 };
 
