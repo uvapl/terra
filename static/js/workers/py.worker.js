@@ -232,7 +232,7 @@ class API extends BaseAPI {
     let content = null;
 
     if (isImageExtension(filepath)) {
-      content = uint8ToBase64(this.pyodide.FS.readFile(filepath));
+      content = this.pyodide.FS.readFile(filepath).buffer;
     } else {
       content = this.pyodide.FS.readFile(filepath, { encoding: 'utf8' });
     }
