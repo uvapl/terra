@@ -357,17 +357,12 @@ class FileTreeManager {
    * @param {string} path - The absolute folderpath to close all files from.
    */
   closeFilesInFolderRecursively = async (path) => {
-    const subfiles = await Terra.app.vfs.listFilesInFolder(path);
-    for (const fileName of subfiles) {
-      const subfilepath = path ? `${path}/${fileName}` : fileName;
-      Terra.app.closeFile(subfilepath);
-    }
-
-    const subfolders = await Terra.app.vfs.listFoldersInFolder(path);
-    for (const folderName of subfolders) {
-      const subfolderpath = path ? `${path}/${folderName}` : folderName;
-      this.closeFilesInFolderRecursively(subfolderpath);
-    }
+    Terra.app.layout.getTabComponents().forEach((component)  => {
+      const subfilepath = component.getPath();
+      if (subfilepath.startsWith(path)) {
+        Terra.app.closeFile(subfilepath);
+      }
+    });
   }
 
   /**
