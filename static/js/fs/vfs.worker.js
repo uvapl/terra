@@ -315,8 +315,7 @@ const handlers = {
    * and content of the corresponding file.
    */
   async getAllFiles(path) {
-    const root =
-      (await getFolderHandleByPath(path)) || (await getRootFolderHandle());
+    const root = (await getFolderHandleByPath(path)) || (await getRootFolderHandle());
     const files = [];
 
     async function walk(folderHandle, currentPath = '') {
@@ -326,7 +325,10 @@ const handlers = {
 
         if (handle.kind === 'file') {
           const file = await handle.getFile();
-          const content = await file.text();
+          const content =  isImageExtension(path)
+            ? await file.arrayBuffer()
+            : await file.text();
+
           files.push({ path, content });
         } else if (handle.kind === 'directory') {
           await walk(handle, path);
