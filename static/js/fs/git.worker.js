@@ -1,4 +1,4 @@
-import { isImageExtension } from '../helpers/image.js';
+import { isImageExtension, arrayBufferToBase64 } from '../helpers/image.js';
 import { Octokit } from '../vendor/octokit-core-6.1.3.min.js';
 import TaskQueue from '../task-queue.js';
 
@@ -331,7 +331,7 @@ class API {
    * Commit a file to the repository by writing its contents to a file, adding
    * it to the staging area and committing it.
    * @param {string} filepath - The absolute filepath to commit.
-   * @param {string} filecontents - The contents of the file to commit.
+   * @param {string|ArrayBuffer} filecontents - The contents of the file to commit.
    * @param {string} sha - The sha of the file to commit.
    * @async
    */
@@ -339,11 +339,18 @@ class API {
     this._log('Committing', filepath);
     const sha = this.fileShaMap[filepath];
 
+    let content;
+    if (filecontents instanceof ArrayBuffer) {
+      content = arrayBufferToBase64(filecontents);
+    } else {
+      content = btoa(filecontents);
+    }
+
     const response = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
       path: filepath,
       message: `Update ${filepath}`,
       committer: this.committer,
-      content: isImageExtension(filepath) ? filecontents : btoa(filecontents),
+      content,
       branch: this.repoBranch,
       sha,
     });

@@ -13,6 +13,22 @@ export function uint8ToBase64(uint8Array) {
 }
 
 /**
+ * Converts an ArrayBuffer (or Uint8Array) to a base64 string.
+ *
+ * @param {ArrayBuffer|Uint8Array} buffer
+ * @returns {string} Base64-encoded string
+ */
+export function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
  * Check whether a given filename has an image extension.
  *
  * @param {string} filename - The filename to check.
