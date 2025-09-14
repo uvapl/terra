@@ -23,18 +23,18 @@ import debouncer from '../debouncer.js';
 
 const blacklistedPaths = [
   'site-packages', // when user folder has python virtual env
-  '__pycache__', // Python cache directory
-  '.mypy_cache', // Mypy cache directory
+  '__pycache__',   // Python cache directory
+  '.mypy_cache',   // Mypy cache directory
   '.venv',
   'venv',
-  'env', // virtual environment
-  '.DS_Store', // Macos metadata file
+  'env',           // virtual environment
+  '.DS_Store',     // Macos metadata file
   'dist',
-  'build', // compiled assets for various languages
+  'build',         // compiled assets for various languages
   'coverage',
-  '.nyc_output', // code coverage reports
-  '.git', // Git directory
-  'node_modules', // NodeJS projects
+  '.nyc_output',   // code coverage reports
+  '.git',          // Git directory
+  'node_modules',  // NodeJS projects
 ];
 
 /**
