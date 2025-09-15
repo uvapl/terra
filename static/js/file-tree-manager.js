@@ -329,7 +329,7 @@ class FileTreeManager {
       if (node.data.isFile) {
         Terra.app.closeFile(node.key);
       } else if (node.data.isFolder) {
-        await this.closeFilesInFolderRecursively(node.key);
+        await Terra.app.closeFilesFromFolder(node.key);
       }
 
       // Delete from the VFS.
@@ -347,21 +347,6 @@ class FileTreeManager {
       // Reload tree such that the 'No files or folders found' becomes visible
       // when needed.
       await this.createFileTree();
-    });
-  }
-
-  /**
-   * Close all files inside a folder, including nested files in subfolders.
-   *
-   * @async
-   * @param {string} path - The absolute folderpath to close all files from.
-   */
-  closeFilesInFolderRecursively = async (path) => {
-    Terra.app.layout.getTabComponents().forEach((component) => {
-      const subfilepath = component.getPath();
-      if (subfilepath.startsWith(path)) {
-        Terra.app.closeFile(subfilepath);
-      }
     });
   }
 
