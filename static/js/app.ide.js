@@ -274,6 +274,21 @@ export default class IDEApp extends App {
   }
 
   /**
+   * Close all files inside a folder, including nested files in subfolders.
+   *
+   * @param {string} path - The absolute folderpath to close all files from.
+   */
+  async closeFilesFromFolder(path) {
+    this.layout.getTabComponents().forEach((component) => {
+      const subfilepath = component.getPath();
+      console.log(component); console.log(subfilepath);
+      if (subfilepath?.startsWith(path)) {
+        this.closeFile(subfilepath);
+      }
+    });
+  }
+
+  /**
    * Retrieve the file object of the active editor.
    *
    * @async
