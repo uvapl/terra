@@ -232,6 +232,7 @@ export default class EditorComponent extends TabComponent {
     }
 
     if (this.firstTimeLoadingContent) {
+      this.clearUndoStack();
       this.firstTimeLoadingContent = false;
     }
   }
