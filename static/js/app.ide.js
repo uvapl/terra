@@ -281,7 +281,6 @@ export default class IDEApp extends App {
   async closeFilesFromFolder(path) {
     this.layout.getTabComponents().forEach((component) => {
       const subfilepath = component.getPath();
-      console.log(component); console.log(subfilepath);
       if (subfilepath?.startsWith(path)) {
         this.closeFile(subfilepath);
       }
