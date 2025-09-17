@@ -17,23 +17,24 @@
  * operations.
  */
 
+import { isImageExtension } from '../helpers/image.js';
 import { getPartsFromPath, seconds, slugify } from '../helpers/shared.js';
 import debouncer from '../debouncer.js';
 
 const blacklistedPaths = [
   'site-packages', // when user folder has python virtual env
-  '__pycache__', // Python cache directory
-  '.mypy_cache', // Mypy cache directory
+  '__pycache__',   // Python cache directory
+  '.mypy_cache',   // Mypy cache directory
   '.venv',
   'venv',
-  'env', // virtual environment
-  '.DS_Store', // Macos metadata file
+  'env',           // virtual environment
+  '.DS_Store',     // Macos metadata file
   'dist',
-  'build', // compiled assets for various languages
+  'build',         // compiled assets for various languages
   'coverage',
-  '.nyc_output', // code coverage reports
-  '.git', // Git directory
-  'node_modules', // NodeJS projects
+  '.nyc_output',   // code coverage reports
+  '.git',          // Git directory
+  'node_modules',  // NodeJS projects
 ];
 
 /**
@@ -77,7 +78,10 @@ self.onmessage = async (event) => {
   if (result && result.error) {
     self.postMessage({ id, type: `${type}:error`, error: result.error });
   } else {
-    self.postMessage({ id, type: `${type}:result`, data: result });
+    // Transfer an ArrayBuffer instead of copying it.
+    const transfer = result instanceof ArrayBuffer ? [result] : [];
+
+    self.postMessage({ id, type: `${type}:result`, data: result }, transfer);
   }
 };
 
@@ -185,7 +189,7 @@ const handlers = {
    *
    * @param {string} filepath - The absolute file path.
    * @param {number} maxSize - Maximum allowed content size to return.
-   * @returns {Promise<string>} The file content.
+   * @returns {Promise<string|ArrayBuffer>} The file content.
    */
   async readFile(path, maxSize) {
     console.log(`readFile: ${path}`);
@@ -200,7 +204,8 @@ const handlers = {
     if (maxSize && size > maxSize) {
       return { error: 'FileTooLarge' };
     }
-    return await file.text();
+
+    return isImageExtension(path) ? await file.arrayBuffer() : await file.text();
   },
 
   async getFileURL(path) {
@@ -218,7 +223,7 @@ const handlers = {
    *
    * @param {string} path - The name of the file. Leave empty to
    * create a new Untitled file in the root directory.
-   * @param {string} content - The initial content of the file.
+   * @param {string|ArrayBuffer} content - The initial content of the file.
    * @param {boolean} isUserInvoked - Whether user invoked the action.
    * @returns {Promise<string>} The generated name for the new file.
    */
@@ -227,7 +232,6 @@ const handlers = {
     let name = path ? parts.pop() : 'Untitled';
     const parentPath = parts.join('/');
 
-    // getFolderHandleByPath handles root path, too
     const folder = await getFolderHandleByPath(parentPath);
 
     while (await handlers.pathExists(`${parentPath}/${name}`)) {
@@ -313,8 +317,7 @@ const handlers = {
    * and content of the corresponding file.
    */
   async getAllFiles(path) {
-    const root =
-      (await getFolderHandleByPath(path)) || (await getRootFolderHandle());
+    const root = (await getFolderHandleByPath(path)) || (await getRootFolderHandle());
     const files = [];
 
     async function walk(folderHandle, currentPath = '') {
@@ -324,7 +327,10 @@ const handlers = {
 
         if (handle.kind === 'file') {
           const file = await handle.getFile();
-          const content = await file.text();
+          const content =  isImageExtension(path)
+            ? await file.arrayBuffer()
+            : await file.text();
+
           files.push({ path, content });
         } else if (handle.kind === 'directory') {
           await walk(handle, path);
@@ -592,12 +598,16 @@ async function resetTreeState() {
 }
 
 function incrementString(str) {
-  const match = /\((\d+)\)$/.exec(str);
+  const parts = str.split('.');
+  const ext = parts.length > 1 ? `.${parts.pop()}` : '';
+  let name = parts.join('.');
+
+  const match = /\((\d+)\)$/.exec(name);
   if (match) {
     const num = parseInt(match[1]) + 1;
-    return str.replace(/\((\d+)\)$/, `(${num})`);
+    return name.replace(/\((\d+)\)$/, `(${num})`);
   }
-  return `${str} (1)`;
+  return `${name} (1)${ext}`;
 }
 
 function isOPFS() {
@@ -720,22 +730,25 @@ async function findFilesInFolder(folderpath) {
  * Writes data to a file.
  *
  * @param {FileSystemFileHandle} handle - The handle of the file to write.
- * @param {string} content - The content to write to the file.
+ * @param {string|ArrayBuffer} content - The content to write.
  * @returns {Promise<void>} Resolves when the file is successfully written.
  */
 async function writeFile(handle, content) {
+  const data = content instanceof ArrayBuffer
+    ? new Uint8Array(content)
+    : new TextEncoder().encode(content);
+
   if (isOPFS()) {
-    // Use Safari-compatible API.
+    // Safari-compatible API (SyncAccessHandle)
     const accessHandle = await handle.createSyncAccessHandle();
-    const data = new TextEncoder().encode(content);
     accessHandle.truncate(data.byteLength);
     accessHandle.write(data, { at: 0 });
     accessHandle.flush();
     accessHandle.close();
   } else {
-    // Use general FS API.
+    // General FS API
     const writable = await handle.createWritable();
-    await writable.write(content);
+    await writable.write({ type: "write", data });
     await writable.close();
   }
 }

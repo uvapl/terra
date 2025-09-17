@@ -2,9 +2,10 @@ import { createModal, hideModal, showModal } from '../modal.js';
 import Terra from '../terra.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
-import { seconds, slugify } from '../helpers/shared.js';
+import { isBase64, seconds, slugify } from '../helpers/shared.js';
 import { GITHUB_URL_PATTERN } from '../ide/constants.js';
 import debouncer from '../debouncer.js';
+import { isImageExtension } from '../helpers/image.js';
 
 /**
  * GitFS worker class that handles all Git operations.
@@ -344,7 +345,11 @@ export default class GitFS {
 
     const files = repoContents.filter((file) => file.type === 'blob');
     for (const file of files) {
-      await this.vfs.createFile(file.path, file.content, false);
+      const content = isImageExtension(file.path)
+        ? file.content
+        : (isBase64(file.content) ? atob(file.content) : file.content);
+
+      await this.vfs.createFile(file.path, content, false);
     }
 
     // Trigger a vfsChanged event, such that all editors reload their content.
