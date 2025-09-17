@@ -41,4 +41,4 @@ export const AUTOSAVE_START_OFFSET = 60 * 1000;
 export const MODAL_ANIM_DURATION = 300;
 
 // The maximum file size in bytes allowed for files.
-export const MAX_FILE_SIZE = 1024 * 1024; // 1MB
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
