@@ -365,6 +365,21 @@ export default class App {
   }
 
   /**
+   * Called when running a program has finished in the language worker.
+   */
+  onRunEnded() {
+    // Print inverted `%` to terminal if last line of output was not terminated by a `\n`.
+    this.termForgotNewlinePercent();
+
+    // Set focus to the active editor.
+    this.getActiveEditor().focus();
+  }
+
+  /***** Terminal Management ********************************************/
+
+  lastWriteNotTerminated = false;
+
+  /**
    * Clear the terminal's write buffer.
    */
   termClearWriteBuffer() {
@@ -377,6 +392,7 @@ export default class App {
    * @param {string} msg - The message to write.
    */
   termWrite(msg) {
+    this.lastWriteNotTerminated = !msg.endsWith("\n");
     this.layout.term.write(msg);
   }
 
@@ -415,11 +431,24 @@ export default class App {
   }
 
   /**
+   * Print inverted `%` to terminal if last line of output was not
+   * terminated by a `\n`.
+   */
+  termForgotNewlinePercent() {
+    if (this.lastWriteNotTerminated) {
+      this.lastWriteNotTerminated = false;
+      Terra.app.termWriteln("\x1b[7m%\x1b[0m");
+    }
+  }
+
+  /**
    * Clear the terminal's content.
    */
   termClear() {
     this.layout.term.clear();
   }
+
+  /***********************************************************************/
 
   /**
    * Get all tab components from the layout.
