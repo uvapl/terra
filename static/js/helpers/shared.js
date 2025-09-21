@@ -318,3 +318,14 @@ export function isBase64(text) {
     return false;
   }
 }
+
+/**
+ * Check whether a given filename has an image extension.
+ *
+ * @param {string} filename - The filename to check.
+ * @returns {boolean} True if the filename has an image extension, false otherwise.
+ */
+export function isImageExtension(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext);
+}

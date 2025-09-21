@@ -1,5 +1,4 @@
-import { getPartsFromPath } from '../helpers/shared.js';
-import { isImageExtension, uint8ToBase64 } from '../helpers/image.js';
+import { getPartsFromPath, isImageExtension } from '../helpers/shared.js';
 import BaseAPI from './base-api.js';
 import { loadPyodide } from '../vendor/pyodide-0.25.0.min.js';
 

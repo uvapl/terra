@@ -2,10 +2,9 @@ import { createModal, hideModal, showModal } from '../modal.js';
 import Terra from '../terra.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
-import { isBase64, seconds, slugify } from '../helpers/shared.js';
+import { isBase64, seconds, slugify, isImageExtension } from '../helpers/shared.js';
 import { GITHUB_URL_PATTERN } from '../ide/constants.js';
 import debouncer from '../debouncer.js';
-import { isImageExtension } from '../helpers/image.js';
 
 /**
  * GitFS worker class that handles all Git operations.

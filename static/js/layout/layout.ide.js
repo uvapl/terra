@@ -1,8 +1,11 @@
 import Layout from './layout.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
-import { isValidFilename, getFileExtension } from '../helpers/shared.js';
-import { isImageExtension } from '../helpers/image.js';
+import {
+  isValidFilename,
+  getFileExtension,
+  isImageExtension
+} from '../helpers/shared.js';
 import { BASE_FONT_SIZE, MAX_FILE_SIZE } from '../constants.js';
 import { createModal, hideModal, showModal } from '../modal.js';
 import Terra from '../terra.js';

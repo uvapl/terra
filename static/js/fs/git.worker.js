@@ -1,4 +1,4 @@
-import { isImageExtension, arrayBufferToBase64 } from '../helpers/image.js';
+import { isImageExtension } from '../helpers/shared.js';
 import { Octokit } from '../vendor/octokit-core-6.1.3.min.js';
 import TaskQueue from '../task-queue.js';
 
@@ -342,7 +342,7 @@ class API {
     const sha = this.fileShaMap[filepath];
 
     const content = filecontents instanceof ArrayBuffer
-      ? arrayBufferToBase64(filecontents)
+      ? this.arrayBufferToBase64(filecontents)
       : btoa(filecontents);
 
     const response = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
@@ -393,7 +393,7 @@ class API {
       branch: this.repoBranch,
       committer: this.committer,
       content: newContent instanceof ArrayBuffer
-        ? arrayBufferToBase64(newContent)
+        ? this.arrayBufferToBase64(newContent)
         : btoa(newContent),
     });
 
@@ -455,6 +455,23 @@ class API {
 
     this.moveFolderSuccessCallback(updatedFiles);
   }
+
+  /**
+   * Converts an ArrayBuffer (or Uint8Array) to a base64 string.
+   *
+   * @param {ArrayBuffer|Uint8Array} buffer
+   * @returns {string} Base64-encoded string
+   */
+  arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
 }
 
 // =============================================================================
