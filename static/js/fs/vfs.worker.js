@@ -17,24 +17,28 @@
  * operations.
  */
 
-import { isImageExtension } from '../helpers/image.js';
-import { getPartsFromPath, seconds, slugify } from '../helpers/shared.js';
+import {
+  getPartsFromPath,
+  seconds,
+  slugify,
+  isImageExtension
+} from '../helpers/shared.js';
 import debouncer from '../debouncer.js';
 
 const blacklistedPaths = [
   'site-packages', // when user folder has python virtual env
-  '__pycache__',   // Python cache directory
-  '.mypy_cache',   // Mypy cache directory
+  '__pycache__', // Python cache directory
+  '.mypy_cache', // Mypy cache directory
   '.venv',
   'venv',
-  'env',           // virtual environment
-  '.DS_Store',     // Macos metadata file
+  'env', // virtual environment
+  '.DS_Store', // Macos metadata file
   'dist',
-  'build',         // compiled assets for various languages
+  'build',  // compiled assets for various languages
   'coverage',
-  '.nyc_output',   // code coverage reports
-  '.git',          // Git directory
-  'node_modules',  // NodeJS projects
+  '.nyc_output', // code coverage reports
+  '.git',  // Git directory
+  'node_modules', // NodeJS projects
 ];
 
 /**
@@ -739,14 +743,14 @@ async function writeFile(handle, content) {
     : new TextEncoder().encode(content);
 
   if (isOPFS()) {
-    // Safari-compatible API (SyncAccessHandle)
+    // Use Safari-compatible API.
     const accessHandle = await handle.createSyncAccessHandle();
     accessHandle.truncate(data.byteLength);
     accessHandle.write(data, { at: 0 });
     accessHandle.flush();
     accessHandle.close();
   } else {
-    // General FS API
+    // Use general FS API.
     const writable = await handle.createWritable();
     await writable.write({ type: "write", data });
     await writable.close();

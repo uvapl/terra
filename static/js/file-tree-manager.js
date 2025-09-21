@@ -48,10 +48,34 @@ class FileTreeManager {
 
       const files = e.originalEvent.dataTransfer.items;
       for (var i = 0; i < files.length; i++) {
-        const item = files[i].webkitGetAsEntry();
-        this._createFileSystemEntryInVFS(item);
+        const item = this.getDataTransferFileEntry(files[i]);
+        if (!item) continue;
+        this._createFileSystemEntryInVFS(item).then(() => {
+          this.createFileTree();
+        });
       }
     });
+  }
+
+  /**
+   * Get the FileSystemEntry from a DataTransferItem.
+   *
+   * Note: webkitGetAsEntry() is also implemented in non-Webkit browsers; it may
+   * be renamed to getAsEntry() in the future, so we should look for both.
+   * @see https://developer.mozilla.org/en-US/docs/Web/API/DataTransferItem/webkitGetAsEntry
+   *
+   * @param {DataTransferItem} file - The file to get the entry from.
+   * @returns {FileSystemEntry|null} [TODO:description]
+   */
+  getDataTransferFileEntry = (file) => {
+    if (file.webkitGetAsEntry)  {
+      return file.webkitGetAsEntry();
+    } else if (file.getAsEntry) {
+      return file.getAsEntry();
+    }
+
+    // Dropped file isn't a file or it's not in read or read/write mode.
+    return null;
   }
 
   /**
@@ -909,29 +933,34 @@ class FileTreeManager {
    * @param {FileSystemFileEntry} item - The file or folder entry.
    * @param {string} [path] - The path of the entry.
    * @param {string} [targetNodePath] - The path of the node it was dropped onto.
+   * @return {Promise<void>} Resolves when the file or folder has been created.
    */
   _createFileSystemEntryInVFS = (item, path = '', targetNodePath = null) => {
-    if (item.isFile) {
-      item.file((file) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const buffer = e.target.result;
-          const destPath = [targetNodePath, path, file.name].filter((s) => s).join('/');
-          Terra.app.vfs.createFile(destPath, buffer).then(() => {
-            this.createFileTree();
-          });
-        };
-        reader.readAsArrayBuffer(file);
-      });
-    } else if (item.isDirectory) {
-      const dirReader = item.createReader();
-      dirReader.readEntries((entries) => {
-        for (const entry of entries) {
-          const subpath = path ? `${path}/${item.name}` : item.name;
-          this._createFileSystemEntryInVFS(entry, subpath, targetNodePath);
-        }
-      });
-    }
+    return new Promise((resolve) => {
+      if (item.isFile) {
+        item.file((file) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const buffer = e.target.result;
+            const destPath = [targetNodePath, path, file.name].filter((s) => s).join('/');
+            Terra.app.vfs.createFile(destPath, buffer).then(() => {
+              console.log('created file', destPath);
+              resolve();
+            });
+          };
+          reader.readAsArrayBuffer(file);
+        });
+      } else if (item.isDirectory) {
+        const dirReader = item.createReader();
+        dirReader.readEntries(async (entries) => {
+          for (const entry of entries) {
+            const subpath = path ? `${path}/${item.name}` : item.name;
+            await this._createFileSystemEntryInVFS(entry, subpath, targetNodePath);
+          }
+          resolve();
+        });
+      }
+    });
   }
 
   /**
@@ -949,8 +978,11 @@ class FileTreeManager {
 
     if (data.files.length > 0) { // user dropped one or more filesystem file/folder
       for (var i = 0; i < data.files.length; i++) {
-        const item = data.dataTransfer.items[i].webkitGetAsEntry();
-        this._createFileSystemEntryInVFS(item, '', parentPath);
+        const item = this.getDataTransferFileEntry(data.dataTransfer.items[i]);
+        if (!item) continue
+        this._createFileSystemEntryInVFS(item, '', parentPath).then(() =>  {
+          this.createFileTree();
+        });
       }
     } else if (sourceNode) { // user moved a node in the file tree
       // If the dropped node became a root node, unset parentId.

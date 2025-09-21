@@ -127,7 +127,7 @@ export default class VirtualFileSystem extends EventTarget {
    */
   downloadFile = async (path) => {
     const content = await this.readFile(path);
-    const { name, ext } = getPartsFromPath(path);
+    const { name } = getPartsFromPath(path);
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     saveAs(blob, name);
   };
