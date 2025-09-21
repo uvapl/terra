@@ -65,7 +65,7 @@ class FileTreeManager {
    * @see https://developer.mozilla.org/en-US/docs/Web/API/DataTransferItem/webkitGetAsEntry
    *
    * @param {DataTransferItem} file - The file to get the entry from.
-   * @returns {FileSystemEntry|null} [TODO:description]
+    * @returns {FileSystemEntry|null} The file entry or null if not available.
    */
   getDataTransferFileEntry = (file) => {
     if (file.webkitGetAsEntry)  {
