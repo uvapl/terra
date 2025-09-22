@@ -232,14 +232,13 @@ export default class LangWorker {
     // Only disable the button again if the current tab has a worker,
     // because users can still run code through the contextmenu in the
     // file-tree in the IDE app.
-    const editorComponent = Terra.app.getActiveEditor();
-    let disableRunBtn = false;
-    if (editorComponent && !this.constructor.hasWorker(getFileExtension(editorComponent.getFilename()))) {
-      disableRunBtn = true;
-    }
+    const activeEditor = Terra.app.getActiveEditor();
+    let disableRunBtn =
+      !activeEditor ||
+      !this.constructor.hasWorker(getFileExtension(activeEditor.getFilename()));
 
-    // Focus the active editor again.
-    editorComponent.focus();
+    // Callback to main app.
+    Terra.app.onRunEnded();
 
     // Change the stop-code button back to a run-code button.
     const $button = $('#run-code');
