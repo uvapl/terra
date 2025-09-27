@@ -37,11 +37,10 @@ export default class IDEApp extends App {
   async postSetupLayout() {
     if (!LFS.available()) {
       // Disable open-folder if the FileSystemAPI is not supported.
-      $('#menu-item--open-folder').remove();
-      $('#menu-item--close-folder').remove();
+      $('#menu-item--open-folder').addClass('disabled');
     } else if (LFS.hasProjectLoaded()) {
       // Enable close-folder menu item.
-      $('#menu-item--close-folder').removeClass('disabled');
+      $('#menu-item--close-project').removeClass('disabled');
       fileTreeManager.setTitle(await LFS.getBaseFolderName());
     }
 
@@ -472,7 +471,7 @@ export default class IDEApp extends App {
 
     await this.vfs.connect(null, 'ide');
     LFS.close();
-    $('#menu-item--close-folder').addClass('disabled');
+    $('#menu-item--close-project').addClass('disabled');
   }
 
   // ***** FS helpers *****

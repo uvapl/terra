@@ -137,8 +137,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   constructor(additionalLayoutConfig, options = {}) {
     let layoutConfig = localStorageManager.getLocalStorageItem('layout');
 
-    const layoutConfigVersion =
-      localStorageManager.getLocalStorageItem('layoutVersion');
+    const layoutConfigVersion = localStorageManager.getLocalStorageItem('layout-version');
     const layoutConfigVersionNumber = parseInt(layoutConfigVersion, 10);
 
     if (
@@ -148,10 +147,8 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       layoutConfigVersionNumber < LAYOUT_CONFIG_VERSION
     ) {
       // Load default config.
-      layoutConfig =
-        mergeObjects(DEFAULT_LAYOUT_CONFIG, additionalLayoutConfig);
-      localStorageManager.setLocalStorageItem('layoutVersion',
-        LAYOUT_CONFIG_VERSION)
+      layoutConfig = mergeObjects(DEFAULT_LAYOUT_CONFIG, additionalLayoutConfig);
+      localStorageManager.setLocalStorageItem('layout-version', LAYOUT_CONFIG_VERSION)
     } else {
       // Load previous config from user's storage.
       layoutConfig = JSON.parse(layoutConfig);
@@ -459,8 +456,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
         this.activeTab = param.container.getComponent();
       });
     }
-
-    setTimeout(() => {console.log('onStackCreated: initialised')}, 0);
   }
 
   /**

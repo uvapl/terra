@@ -1,14 +1,13 @@
 ////////////////////////////////////////////////////////////////////////////////
 // This file contains the logic for the menubar at the top of the IDE app.
 ////////////////////////////////////////////////////////////////////////////////
-import { MODAL_ANIM_DURATION } from '../constants.js';
 import { isMac } from '../helpers/shared.js';
 import { createModal, hideModal, showModal } from '../modal.js';
-import pluginManager from '../plugin-manager.js';
 import Terra from '../terra.js';
 import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
 import { GITHUB_URL_PATTERN } from './constants.js';
+import * as LFS from '../fs/lfs.js';
 
 $(document).ready(() => {
   $('.menubar [data-keystroke]').each((_, element) => setMenubarKeystrokeIcons(element));
@@ -152,7 +151,7 @@ function registerMenubarEventListeners() {
 
   $('#menu-item--comment').click(Menubar.toggleComment);
 
-  $('#menu-item--close-folder').click(Menubar.closeLFSFolder);
+  $('#menu-item--close-project').click(Menubar.closeLFSFolder);
   $('#menu-item--open-folder').click(Menubar.openLFSFolder);
   Mousetrap.bind(['ctrl+shift+o'], Menubar.openLFSFolder);
 
@@ -198,16 +197,25 @@ Menubar.openNewFile = () => {
 };
 
 Menubar.openLFSFolder = () => {
+  if (!LFS.available()) return;
+
   Terra.app.openLFSFolder().then(() => {
     fileTreeManager.removeInfoMsg();
-    $('#menu-item--close-folder').removeClass('disabled');
+    $('#menu-item--close-project').removeClass('disabled');
   });
 };
 
 Menubar.closeLFSFolder = (event) => {
-  if ($('#menu-item--close-folder').hasClass('disabled')) return;
+  if ($('#menu-item--close-project').hasClass('disabled')) return;
 
+  // Close the connected Git(Hub) repo, if any.
+  localStorageManager.removeLocalStorageItem('git-repo');
+  Terra.app.closeGitFS();
+
+  // Close the LFS folder, if any.
   Terra.app.closeLFSFolder();
+
+  $('#menu-item--close-project').addClass('disabled');
   closeActiveMenuBarMenu(event);
 };
 
@@ -280,10 +288,19 @@ Menubar.runTab = () => {
   Terra.app.getActiveEditor().editor.execCommand('run');
 };
 
-Menubar.addCredentials = () => {
+Menubar.connectRepo = () => {
+  if ($('#menu-item--connect-repo').hasClass('disabled')) return;
+
   const accessToken = localStorageManager.getLocalStorageItem('git-access-token', '');
-  const $modal = createModal({
-    title: 'Add GitHub credentials',
+
+  // When the current repo link exists, the user was already connected and they
+  // want to connect to another repository.
+  const currentRepoLink = localStorageManager.getLocalStorageItem('git-repo', '');
+
+  const hasEmptyFields = !accessToken || !currentRepoLink;
+
+  const $connectModal = createModal({
+    title: 'Connect repository',
     body: `
       <div class="form-wrapper-full-width">
         <label>Personal access token:</label>
@@ -298,64 +315,15 @@ Menubar.addCredentials = () => {
         In order to clone private repositories or push and pull contents from any repository, your GitHub personal access token is required.
         Credentials will be stored locally in your browser and will not be shared with anyone.
       </p>
-    `,
-    footer: `
-      <button type="button" class="button cancel-btn">Cancel</button>
-      <button type="button" class="button primary-btn confirm-btn">Save</button>
-    `,
-    attrs: {
-      id: 'ide-git-creds-modal',
-      class: 'modal-width-small',
-    }
-  });
 
-  showModal($modal);
-
-  $modal.find('.cancel-btn').click(() => hideModal($modal));
-  $modal.find('.confirm-btn').click(() => {
-    const accessToken = $modal.find('.git-access-token').val();
-    if (accessToken) {
-      $('#menu-item--connect-repo').removeClass('disabled');
-      localStorageManager.setLocalStorageItem('git-access-token', accessToken);
-    } else {
-      localStorageManager.removeLocalStorageItem('git-access-token');
-
-      // No credentials set, disable connect repo button.
-      $('#menu-item--connect-repo').addClass('disabled');
-    }
-
-    hideModal($modal);
-  });
-};
-
-Menubar.connectRepo = () => {
-  if (!localStorageManager.getLocalStorageItem('git-access-token')) return;
-
-  // When the current repo link exists, the user was already connected and they
-  // want to connect to another repository.
-  const currentRepoLink = localStorageManager.getLocalStorageItem('git-repo', '');
-
-  const localFilesNotice = currentRepoLink
-    ? '<p class="text-small">Leave empty to disconnect from the repository.</p>'
-    : `
-      <p class="text-small">
-        ❗️ Local files will be permanently discarded when connecting a new repository.
-        If you want to keep your local files, please download them manually before continuing.
-      </p>
-    `;
-
-  const $connectModal = createModal({
-    title: 'Connect repository',
-    body: `
-      <p>Only GitHub repostory links are supported. Leave empty to disconnect from the repository.</p>
       <div class="form-wrapper-full-width">
+        <label>Repository HTTPS URL</label>
         <input class="text-input full-width-input repo-link" value="${currentRepoLink}" placeholder="https://github.com/{owner}/{repo}"></textarea>
-        ${localFilesNotice}
       </div>
     `,
     footer: `
       <button type="button" class="button cancel-btn">Cancel</button>
-      <button type="button" class="button primary-btn confirm-btn">Connect</button>
+      <button type="button" class="button primary-btn connect-btn" ${hasEmptyFields ? 'disabled' : ''}>Connect</button>
     `,
     attrs: {
       id: 'ide-connect-repo-modal',
@@ -367,27 +335,29 @@ Menubar.connectRepo = () => {
     $('#ide-connect-repo-modal .repo-link').focus();
   });
 
-  // Change the connect to a disconnect button when the repo link is removed.
-  if (currentRepoLink) {
-    $connectModal.find('.repo-link').on('keyup', (event) => {
-      const repoLink = event.target.value;
-      if (!repoLink) {
-        $connectModal.find('.primary-btn').removeClass('primary-btn').addClass('danger-btn').text('Disconnect');
-      } else {
-        $connectModal.find('.danger-btn').addClass('primary-btn').removeClass('danger-btn').text('Connect');
-      }
-    });
-  }
+  // Disable the connect button when any of the text fields are empty.
+  $connectModal.find('.text-input').on('keyup', () => {
+    const hasEmptyFields = $connectModal.find('.text-input').toArray().some(input => !$(input).val().trim());
+    const $connectBtn = $connectModal.find('.connect-btn');
+
+    if (hasEmptyFields) {
+      $connectBtn.attr('disabled', 'disabled');
+    } else {
+      $connectBtn.removeAttr('disabled');
+    }
+  });
 
   $connectModal.find('.cancel-btn').click(() => hideModal($connectModal));
-  $connectModal.find('.confirm-btn').click(async () => {
-    const newRepoLink = $connectModal.find('.repo-link').val().trim();
-
+  $connectModal.find('.connect-btn').click(() => {
     // For now, we only allow GitHub-HTTPS repo links.
+    const newRepoLink = $connectModal.find('.repo-link').val().trim();
     if (newRepoLink && !GITHUB_URL_PATTERN.test(newRepoLink)) {
       alert('Invalid GitHub repository');
       return;
     }
+
+    const newAccessToken = $connectModal.find('.git-access-token').val();
+    localStorageManager.setLocalStorageItem('git-access-token', newAccessToken);
 
     hideModal($connectModal);
 
@@ -395,15 +365,9 @@ Menubar.connectRepo = () => {
     // default branch for the new repo.
     localStorageManager.removeLocalStorageItem('git-branch');
 
-    if (newRepoLink) {
-      console.log('Connecting to repository:', newRepoLink);
-      localStorageManager.setLocalStorageItem('git-repo', newRepoLink);
-      Terra.app.openGitFS();
-    } else {
-      console.log('Disconnecting from repository.');
-      localStorageManager.removeLocalStorageItem('git-repo');
-      Terra.app.closeGitFS();
-    }
+    console.log('Connecting to repository:', newRepoLink);
+    localStorageManager.setLocalStorageItem('git-repo', newRepoLink);
+    Terra.app.openGitFS();
   });
 };
 
