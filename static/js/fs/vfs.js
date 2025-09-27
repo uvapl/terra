@@ -67,7 +67,7 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {string} name
    * @param {array} params
    */
-  _send(name, params) {
+  _send(name, params = []) {
     const id = `vfs-${this._nextId++}`;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
