@@ -67,11 +67,12 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {string} name
    * @param {array} params
    */
-  _send(name, params) {
+  _send(name, params = []) {
     const id = `vfs-${this._nextId++}`;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
-      this.worker.postMessage({ id, type: name, data: params });
+      const transfer = params.filter((p) => p instanceof ArrayBuffer);
+      this.worker.postMessage({ id, type: name, data: params }, transfer);
     });
   }
 
@@ -128,8 +129,8 @@ export default class VirtualFileSystem extends EventTarget {
   downloadFile = async (path) => {
     const content = await this.readFile(path);
     const { name } = getPartsFromPath(path);
-    const fileBlob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    saveAs(fileBlob, name);
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    saveAs(blob, name);
   };
 
   /**
