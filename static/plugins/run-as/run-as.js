@@ -92,8 +92,8 @@ export default class RunAsPlugin extends TerraPlugin {
     const editorComponent = Terra.app.layout.getActiveEditor();
     if (!editorComponent || editorComponent.proglang !== 'c') return;
 
-    const activeTabName = editorComponent.getFilename();
-    const defaultTarget = activeTabName.replace(/\.c$/, '');
+    const activeTabName = editorComponent.getPath();
+    const defaultTarget = editorComponent.getFilename().replace(/\.c$/, '');
 
     const currentArgs = (this.getState('args') || '').replace(/"/g, '&quot;');
     const currentCompileSrcFiles = this.getState('compileSrcFilenames') || '';

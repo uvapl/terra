@@ -192,8 +192,8 @@ export default class IDEApp extends App {
     const state = runAsPlugin.getState();
 
     const editorComponent = this.layout.getActiveEditor();
-    const activeTabName = editorComponent.getFilename();
-    const defaultTarget = activeTabName.replace(/\.c$/, '');
+    const activeTabName = editorComponent.getPath();
+    const defaultTarget = editorComponent.getFilename().replace(/\.c$/, '');
 
     // This regex matches quoted strings (single or double quotes) or unquoted
     // words separated by whitespace and is used to split a string of arguments
