@@ -4,7 +4,7 @@ import localStorageManager from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
 import { isBase64, seconds, slugify, isImageExtension } from '../helpers/shared.js';
 import { GITHUB_URL_PATTERN } from '../ide/constants.js';
-import debouncer from '../debouncer.js';
+import debounce from '../debouncer.js';
 
 /**
  * GitFS worker class that handles all Git operations.
@@ -75,7 +75,7 @@ export default class GitFS {
     const { file } = event.detail;
 
     // Only commit changes after 2 seconds of inactivity.
-    debouncer.debounce(
+    debounce(
       `commit-${slugify(file.path)}`,
       seconds(2),
       () => this.commit(file.path, file.content)

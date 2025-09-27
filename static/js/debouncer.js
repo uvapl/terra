@@ -1,27 +1,23 @@
-class Debouncer {
-  /**
-   * @type {object<string, number>}
-   */
-  timeoutHandlers = {};
+/**
+ * @type {object<string, number>}
+ */
+const timeoutHandlers = {};
 
-  /**
-   * Debounce a callback based on an ID.
-   *
-   * @param {string} id - Some unique identifier (e.g., uuidv4).
-   * @param {number} timeout - The amount of time in ms to wait.
-   * @param {function} callback - Callback function to invoke.
-   */
-  debounce(id, timeout, callback) {
-    if (typeof this.timeoutHandlers[id] !== 'undefined') {
-      clearTimeout(this.timeoutHandlers[id]);
-    }
-
-    this.timeoutHandlers[id] = setTimeout(() => {
-      callback();
-      clearTimeout(this.timeoutHandlers[id]);
-      delete this.timeoutHandlers[id];
-    }, timeout);
+/**
+ * Debounce a callback based on an ID.
+ *
+ * @param {string} id - Some unique identifier (e.g., uuidv4).
+ * @param {number} timeout - The amount of time in ms to wait.
+ * @param {function} callback - Callback function to invoke.
+ */
+export default function debounce(id, timeout, callback) {
+  if (typeof timeoutHandlers[id] !== 'undefined') {
+    clearTimeout(timeoutHandlers[id]);
   }
-}
 
-export default new Debouncer();
+  timeoutHandlers[id] = setTimeout(() => {
+    callback();
+    clearTimeout(timeoutHandlers[id]);
+    delete timeoutHandlers[id];
+  }, timeout);
+}
