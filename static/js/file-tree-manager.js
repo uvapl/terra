@@ -944,7 +944,6 @@ class FileTreeManager {
             const buffer = e.target.result;
             const destPath = [targetNodePath, path, file.name].filter((s) => s).join('/');
             Terra.app.vfs.createFile(destPath, buffer).then(() => {
-              console.log('created file', destPath);
               resolve();
             });
           };
