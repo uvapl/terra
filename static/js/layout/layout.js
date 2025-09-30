@@ -459,8 +459,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
         this.activeTab = param.container.getComponent();
       });
     }
-
-    setTimeout(() => {console.log('onStackCreated: initialised')}, 0);
   }
 
   /**
