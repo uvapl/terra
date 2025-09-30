@@ -1,5 +1,4 @@
-import { getPartsFromPath } from '../helpers/shared.js';
-import { isImageExtension, uint8ToBase64 } from '../helpers/image.js';
+import { getPartsFromPath, isImageExtension } from '../helpers/shared.js';
 import BaseAPI from './base-api.js';
 import { loadPyodide } from '../vendor/pyodide-0.25.0.min.js';
 
@@ -110,7 +109,11 @@ class API extends BaseAPI {
       // Put each file in the virtual file system. Only do this when the file
       // content is not empty, otherwise pyodide throws an error.
       if (file.content) {
-        this.pyodide.FS.writeFile(file.path, file.content, { encoding: 'utf8' });
+        if (file.content instanceof ArrayBuffer) {
+          this.pyodide.FS.writeFile(file.path, new Uint8Array(file.content));
+        } else {
+          this.pyodide.FS.writeFile(file.path, file.content, { encoding: 'utf8' });
+        }
 
         // Keep track of when the file was created.
         const stat = this.pyodide.FS.stat(file.path);
@@ -232,7 +235,7 @@ class API extends BaseAPI {
     let content = null;
 
     if (isImageExtension(filepath)) {
-      content = uint8ToBase64(this.pyodide.FS.readFile(filepath));
+      content = this.pyodide.FS.readFile(filepath).buffer;
     } else {
       content = this.pyodide.FS.readFile(filepath, { encoding: 'utf8' });
     }

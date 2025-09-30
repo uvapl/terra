@@ -1,4 +1,4 @@
-import { isImageExtension } from '../helpers/image.js';
+import { isImageExtension } from '../helpers/shared.js';
 import { Octokit } from '../vendor/octokit-core-6.1.3.min.js';
 import TaskQueue from '../task-queue.js';
 
@@ -301,20 +301,22 @@ class API {
         repoContents.data.tree.map(async (fileOrFolder) => {
           if (fileOrFolder.type === 'blob') {
             try {
-              const res = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
-                branch: this.repoBranch,
-                path: fileOrFolder.path,
-              });
+              if (isImageExtension(fileOrFolder.path)) {
+                // Octokit returns images as base64, but we want to have them as
+                // an ArrayBuffer, thus we fetch them directly from the raw URL.
+                const rawUrl = `https://raw.githubusercontent.com/${this.repoOwner}/${this.repoName}/${this.repoBranch}/${fileOrFolder.path}`;
+                const resp = await fetch(rawUrl);
+                fileOrFolder.content = await resp.arrayBuffer();
+              } else {
+                const res = await this._request('GET', '/repos/{owner}/{repo}/contents/{path}', {
+                  branch: this.repoBranch,
+                  path: fileOrFolder.path,
+                });
+
+                fileOrFolder.content = atob(res.data.content);
+              }
 
               this.fileShaMap[fileOrFolder.path] = fileOrFolder.sha;
-
-              const content = atob(res.data.content);
-              if (isImageExtension(fileOrFolder.path)) {
-                // Use the base64 string to create a blob URL later.
-                fileOrFolder.content = res.data.content.replace(/\n/g, "");
-              } else if (content) {
-                fileOrFolder.content = content;
-              }
             } catch {
               this._log('Possibly empty file:', fileOrFolder.path)
             }
@@ -331,7 +333,7 @@ class API {
    * Commit a file to the repository by writing its contents to a file, adding
    * it to the staging area and committing it.
    * @param {string} filepath - The absolute filepath to commit.
-   * @param {string} filecontents - The contents of the file to commit.
+   * @param {string|ArrayBuffer} filecontents - The contents of the file to commit.
    * @param {string} sha - The sha of the file to commit.
    * @async
    */
@@ -339,11 +341,15 @@ class API {
     this._log('Committing', filepath);
     const sha = this.fileShaMap[filepath];
 
+    const content = filecontents instanceof ArrayBuffer
+      ? this.arrayBufferToBase64(filecontents)
+      : btoa(filecontents);
+
     const response = await this._request('PUT', '/repos/{owner}/{repo}/contents/{path}', {
       path: filepath,
       message: `Update ${filepath}`,
       committer: this.committer,
-      content: isImageExtension(filepath) ? filecontents : btoa(filecontents),
+      content,
       branch: this.repoBranch,
       sha,
     });
@@ -377,7 +383,7 @@ class API {
    *
    * @param {string} oldPath - The absolute filepath of the file to move.
    * @param {string} newPath - The absolute filepath to the new file.
-   * @param {string} newContent - The new content of the file.
+   * @param {string|ArrayBuffer} newContent - The new content of the file.
    */
   async moveFile(oldPath, newPath, newContent) {
     // Create the new file with the new content.
@@ -386,7 +392,9 @@ class API {
       message: `Rename ${oldPath} to ${newPath}`,
       branch: this.repoBranch,
       committer: this.committer,
-      content: isImageExtension(newPath) ? newContent : btoa(newContent),
+      content: newContent instanceof ArrayBuffer
+        ? this.arrayBufferToBase64(newContent)
+        : btoa(newContent),
     });
 
     // Delete the old file.
@@ -447,6 +455,23 @@ class API {
 
     this.moveFolderSuccessCallback(updatedFiles);
   }
+
+  /**
+   * Converts an ArrayBuffer (or Uint8Array) to a base64 string.
+   *
+   * @param {ArrayBuffer|Uint8Array} buffer
+   * @returns {string} Base64-encoded string
+   */
+  arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
 }
 
 // =============================================================================
