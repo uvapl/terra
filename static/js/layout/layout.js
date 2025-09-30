@@ -176,6 +176,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       }
     });
 
+    this.on('initialised', () => this.onInitialised(options));
     this.on('stackCreated', (stack) => this.onStackCreated(stack, options));
     this.on('tabCreated', (tab) => this.onTabCreated(tab));
 
@@ -186,6 +187,27 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     $(window).on('resize', () => {
       this.updateSize(window.innerWidth, window.innerHeight);
     });
+  }
+
+  /**
+   * Executed after the layout has been initialised.
+   *
+   * @param {object} options - Options passed to the layout.
+   */
+  onInitialised(options) {
+    this.emitToAllComponents('afterFirstRender');
+    this.setTheme(localStorageManager.getLocalStorageItem('theme') || 'light');
+    this.renderButtons();
+    this.showTermStartupMessage();
+    pluginManager.triggerEvent('onLayoutLoaded');
+
+    if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
+      this.emitToTabComponents('setCustomAutocompleter', options.autocomplete);
+    }
+
+    if (this.vertical) {
+      this.emitToAllComponents('verticalLayout');
+    }
   }
 
   /**
@@ -437,27 +459,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
         this.activeTab = param.container.getComponent();
       });
     }
-
-    if (this.initialised) return;
-    this.initialised = true;
-
-    // Do a set-timeout trick to make sure the components are registered
-    // through the registerComponent() function, prior to calling this part.
-    setTimeout(() => {
-      this.emitToAllComponents('afterFirstRender');
-      this.setTheme(localStorageManager.getLocalStorageItem('theme') || 'light');
-      this.renderButtons();
-      this.showTermStartupMessage();
-      pluginManager.triggerEvent('onLayoutLoaded');
-
-      if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
-        this.emitToTabComponents('setCustomAutocompleter', options.autocomplete);
-      }
-
-      if (this.vertical) {
-        this.emitToAllComponents('verticalLayout');
-      }
-    }, 0);
   }
 
   /**

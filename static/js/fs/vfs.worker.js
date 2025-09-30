@@ -23,7 +23,7 @@ import {
   slugify,
   isImageExtension
 } from '../helpers/shared.js';
-import debouncer from '../debouncer.js';
+import debounce from '../debouncer.js';
 
 const blacklistedPaths = [
   'site-packages', // when user folder has python virtual env
@@ -271,7 +271,7 @@ const handlers = {
     const handle = await getFileHandleByPath(path);
     if (!handle) return;
 
-    debouncer.debounce(
+    debounce(
       `file-update-${slugify(path)}`,
       seconds(0.2),
       () => writeFile(handle, content)
