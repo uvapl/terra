@@ -192,7 +192,7 @@ export default class IDEApp extends App {
     const state = runAsPlugin.getState();
 
     const editorComponent = this.layout.getActiveEditor();
-    const activeTabName = editorComponent.getPath();
+    const activeTabPath = editorComponent.getPath();
     const defaultTarget = editorComponent.getFilename().replace(/\.c$/, '');
 
     // This regex matches quoted strings (single or double quotes) or unquoted
@@ -201,7 +201,7 @@ export default class IDEApp extends App {
     const parseArgsRegex = /("[^"]*"|'[^']*'|\S+)/g;
 
     return {
-      compileSrcFilenames: (state.compileSrcFilenames || activeTabName).split(' '),
+      compileSrcFilenames: (state.compileSrcFilenames || activeTabPath).split(' '),
       compileTarget: state.compileTarget || defaultTarget,
       args: state.args ? state.args.match(parseArgsRegex) : [],
     }

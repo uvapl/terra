@@ -92,7 +92,7 @@ export default class RunAsPlugin extends TerraPlugin {
     const editorComponent = Terra.app.layout.getActiveEditor();
     if (!editorComponent || editorComponent.proglang !== 'c') return;
 
-    const activeTabName = editorComponent.getPath();
+    const activeTabPath = editorComponent.getPath();
     const defaultTarget = editorComponent.getFilename().replace(/\.c$/, '');
 
     const currentArgs = (this.getState('args') || '').replace(/"/g, '&quot;');
@@ -110,7 +110,7 @@ export default class RunAsPlugin extends TerraPlugin {
 
         <div class="form-wrapper-full-width">
           <label>Source files</label>
-          <input type="text" id="compile-src-files-input" class="text-input full-width-input" placeholder="${activeTabName}" value="${currentCompileSrcFiles}" />
+          <input type="text" id="compile-src-files-input" class="text-input full-width-input" placeholder="${activeTabPath}" value="${currentCompileSrcFiles}" />
           <p class="text-small">Specify a list of source files to compile, separated by spaces. Leave empty to compile and run the current file.</p>
         </div>
 
@@ -140,8 +140,8 @@ export default class RunAsPlugin extends TerraPlugin {
     this.validateInputFields($modal);
 
     // Update the preview when the user types in any the input fields.
-    this.updateCmdPreview($modal, activeTabName, defaultTarget);
-    $modal.find('input').keyup(() => this.updateCmdPreview($modal, activeTabName, defaultTarget))
+    this.updateCmdPreview($modal, activeTabPath, defaultTarget);
+    $modal.find('input').keyup(() => this.updateCmdPreview($modal, activeTabPath, defaultTarget))
 
     $modal.find('.cancel-btn').click(() => hideModal($modal));
     $modal.find('.run-btn').click(() => {
