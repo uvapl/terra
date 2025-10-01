@@ -57,11 +57,12 @@ export function renderGitRepoBranches(branches) {
  * @param {DOMElement} element - One list-item from the menubar.
  */
 function setMenubarKeystrokeIcons(element) {
+  // NOTE: Keys with an underscore use the format of {Mac_key}_{Windows_key}.
   const keystroke = $(element).data('keystroke')
     .replace('CTRL_META', isMac() ? '\u2318' : 'Ctrl')
-    .replace('ALT_OPTION', isMac() ? '\u2325' : 'Alt')
-    .replace('CTRL', isMac() ? '\u2303' : 'Ctrl')
-    .replace('SHIFT', '\u21E7')
+    .replace('ALT_OPTION', isMac() ? '\u2325' : 'Alt') // Option key on Mac, Alt key on Windows/Linux
+    .replace('CTRL_ALT', isMac() ? '\u2303' : 'Alt') // Control key on Mac, Alt key on Windows/Linux
+    .replace('SHIFT', isMac() ? '\u21E7' : 'Shift')
     .replace('ENTER', '\u23CE')
     .replace('UP', '\u2191')
     .replace('DOWN', '\u2193')
@@ -135,10 +136,10 @@ function registerMenubarEventListeners() {
   // All submenu item event listeners.
   // =================================
   $('#menu-item--new-file').click(() => fileTreeManager.createFile());
-  Mousetrap.bind(['ctrl+t'], () => fileTreeManager.createFile());
+  Mousetrap.bind([isMac() ? 'ctrl+n' : 'alt+n'], () => fileTreeManager.createFile());
 
   $('#menu-item--new-folder').click(() => fileTreeManager.createFolder());
-  Mousetrap.bind(['ctrl+shift+t'], () => fileTreeManager.createFolder());
+  Mousetrap.bind([isMac() ? 'ctrl+shift+n' : 'alt+shift+n'], () => fileTreeManager.createFolder());
 
   $('#menu-item--close-file').click(() => Terra.app.closeFile());
   Mousetrap.bind(['ctrl+w'], () => Terra.app.closeFile());
