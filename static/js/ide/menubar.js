@@ -294,6 +294,12 @@ Menubar.connectRepo = () => {
 
   const hasEmptyFields = !accessToken || !currentRepoLink;
 
+  let connectRepoHistory = localStorageManager
+    .getLocalStorageItem('connect-repo-history', '')
+    .split(',')
+    .filter((url) => url.trim() !== '');
+  const connectRepoHistoryHtml = connectRepoHistory.map((url) => `<option value="${url}"></option>`);
+
   const $connectModal = createModal({
     title: 'Connect GitHub repository',
     body: `
@@ -313,7 +319,10 @@ Menubar.connectRepo = () => {
 
       <div class="form-wrapper-full-width">
         <label>Repository HTTPS URL</label>
-        <input class="text-input full-width-input repo-link" value="${currentRepoLink}" placeholder="https://github.com/{owner}/{repo}"></textarea>
+        <input class="text-input full-width-input repo-link" list="connect-repo-hist" value="${currentRepoLink}" placeholder="https://github.com/{owner}/{repo}"></textarea>
+        <datalist id="connect-repo-hist">
+          ${connectRepoHistoryHtml}
+        </datalist>
       </div>
     `,
     footer: `
@@ -331,7 +340,8 @@ Menubar.connectRepo = () => {
   });
 
   // Disable the connect button when any of the text fields are empty.
-  $connectModal.find('.text-input').on('keyup', () => {
+  // The 'input' event listener is needed if a user clicks on a datalist item.
+  $connectModal.find('.text-input').on('keyup input', () => {
     const hasEmptyFields = $connectModal.find('.text-input').toArray().some(input => !$(input).val().trim());
     const $connectBtn = $connectModal.find('.connect-btn');
 
@@ -353,15 +363,23 @@ Menubar.connectRepo = () => {
     }
 
     const newAccessToken = $connectModal.find('.git-access-token').val();
-    localStorageManager.setLocalStorageItem('git-access-token', newAccessToken);
 
     hideModal($connectModal);
+    console.log('Connecting to repository:', newRepoLink);
+
+    // Update connect repo history by prepending the new repo link.
+    if (connectRepoHistory.includes(newRepoLink)) {
+      connectRepoHistory.splice(connectRepoHistory.indexOf(newRepoLink), 1);
+    }
+    connectRepoHistory.unshift(newRepoLink);
+    connectRepoHistory = connectRepoHistory.slice(0, 10); // Only last 10 entries.
+    localStorageManager.setLocalStorageItem('connect-repo-history', connectRepoHistory.join(','));
 
     // Remove previously selected branch such that the clone will use the
     // default branch for the new repo.
     localStorageManager.removeLocalStorageItem('git-branch');
 
-    console.log('Connecting to repository:', newRepoLink);
+    localStorageManager.setLocalStorageItem('git-access-token', newAccessToken);
     localStorageManager.setLocalStorageItem('git-repo', newRepoLink);
     Terra.app.openGitFS();
   });
