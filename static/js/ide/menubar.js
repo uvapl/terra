@@ -12,12 +12,6 @@ import * as LFS from '../fs/lfs.js';
 $(document).ready(() => {
   $('.menubar [data-keystroke]').each((_, element) => setMenubarKeystrokeIcons(element));
   registerMenubarEventListeners();
-
-  // Disable the connect repo button if no credentials are set yet.
-  const gitToken = localStorageManager.getLocalStorageItem('git-access-token');
-  if (!gitToken) {
-    $('#menu-item--connect-repo').addClass('disabled');
-  }
 });
 
 // ===========================================================================
@@ -300,7 +294,7 @@ Menubar.connectRepo = () => {
   const hasEmptyFields = !accessToken || !currentRepoLink;
 
   const $connectModal = createModal({
-    title: 'Connect repository',
+    title: 'Connect GitHub repository',
     body: `
       <div class="form-wrapper-full-width">
         <label>Personal access token:</label>
@@ -340,7 +334,8 @@ Menubar.connectRepo = () => {
     const hasEmptyFields = $connectModal.find('.text-input').toArray().some(input => !$(input).val().trim());
     const $connectBtn = $connectModal.find('.connect-btn');
 
-    if (hasEmptyFields) {
+    const newRepoLink = $connectModal.find('.repo-link').val().trim();
+    if (hasEmptyFields || !GITHUB_URL_PATTERN.test(newRepoLink)) {
       $connectBtn.attr('disabled', 'disabled');
     } else {
       $connectBtn.removeAttr('disabled');
