@@ -53,7 +53,7 @@ export function createModal(modalOptions = {}) {
 
   $modal.off('keydown').on('keydown', (e) => {
     if (e.key === 'Enter') {
-      $modal.find('.modal-footer .confirm-btn').click();
+      $modal.find('.modal-footer .primary-btn').click();
     }
   });
 

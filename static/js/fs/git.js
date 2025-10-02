@@ -236,6 +236,7 @@ export default class GitFS {
       // Ready callback from the worker instance.
       case 'ready':
         this.isReady = true;
+        $('#menu-item--close-project').removeClass('disabled');
         break;
 
       // Triggered for primary and secondary rate limit.
