@@ -148,7 +148,7 @@
 }
 
 .lm_header .lm_tabdropdown_list .lm_tab:hover {
-  background: var(--tab-menu--tab-bg-color);
+  background: var(--tab-bg-color);
 }
 
 .lm_header .lm_tabdropdown_list .lm_tab + .lm_tab {
@@ -158,19 +158,6 @@
 
 .lm_header .lm_tabdropdown_list .lm_tab .lm_title {
   width: auto;
-}
-
-/* dark mode overrides */
-.dark-mode .lm_tab.lm_active {
-  background-color: var(--dark-mode-active-tab-bg-color);
-  color: var(--dark-mode-active-tab-fg-color);
-}
-
-/* cursor line */
-.dark-mode .ace_gutter-active-line,
-.dark-mode .ace_marker-layer .ace_active-line {
-  background-color: #383c44;
-  border: 0;
 }
 
 /* editor in read-only mode */
@@ -193,4 +180,52 @@
 
 .ace_text-input[readonly] ~ .ace_scroller .ace_cursor {
   display: none !important;
+}
+
+/* ========================================================================== */
+/* Dark Mode                                                                  */
+/* ========================================================================== */
+.dark-mode .lm_tab {
+  background-color: var(--dark-mode-tab-bg-color);
+  color: var(--dark-mode-tab-fg-color);
+}
+
+.dark-mode .lm_tab.lm_active {
+  background-color: var(--dark-mode-active-tab-bg-color);
+  color: var(--dark-mode-active-tab-fg-color);
+  border-color: var(--dark-mode-border-color-active);
+}
+
+.dark-mode .lm_goldenlayout {
+  background-color: var(--dark-mode-bg);
+}
+
+.dark-mode .lm_content,
+.dark-mode .lm_tab {
+  border-color: var(--dark-mode-border-color);
+}
+
+.dark-mode .ace_gutter-active-line,
+.dark-mode .ace_marker-layer .ace_active-line {
+  background-color: var(--dark-mode-editor-cursor-active-line-bg);
+  border: 0;
+}
+
+
+.dark-mode .lm_header .lm_tabdropdown_list {
+  background-color: var(--dark-mode-bg);
+  border: 1px solid var(--dark-mode-border-color);
+}
+
+.dark-mode .lm_header .lm_tabdropdown_list .lm_tab + .lm_tab {
+  border-top: 1px solid var(--dark-mode-border-color);
+}
+
+.dark-mode .lm_header .lm_tabdropdown_list .lm_tab:hover {
+  background: var(--dark-mode-active-tab-bg-color);
+  color: var(--dark-mode-active-tab-fg-color);
+}
+
+.dark-mode .lm_header .lm_controls .lm_tabdropdown:before {
+  color: var(--dark-mode-fg);
 }

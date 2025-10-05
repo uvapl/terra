@@ -57,7 +57,7 @@
 
 .menubar li:not(.disabled):hover,
 .menubar li:not(.disabled):focus {
-  background: var(--tab-menu--tab-bg-color);
+  background: var(--tab-bg-color);
   color: var(--color-black);
   cursor: pointer;
 }
@@ -68,7 +68,7 @@
 }
 
 .menubar > li.open {
-  background: var(--tab-menu--tab-bg-color);
+  background: var(--tab-bg-color);
   color: var(--color-black);
 }
 
@@ -129,7 +129,7 @@
   right: 8px;
   width: 10px;
   height: 10px;
-  background: url('../../../img/icons/arrow-head-right.png') no-repeat center center;
+  background: url('../../../img/icons/arrow-head-right-white.png') no-repeat center center;
   background-size: contain;
   top: 50%;
   transform: translateY(-50%);
@@ -141,5 +141,49 @@
 }
 
 .menubar .separator {
-  border-bottom: 1px solid var(--tab-menu--tab-bg-color);
+  border-bottom: 1px solid var(--tab-bg-color);
 }
+
+/* ========================================================================== */
+/* Dark Mode                                                                  */
+/* ========================================================================== */
+.dark-mode .navbar {
+  border-bottom: 1px solid var(--dark-mode-border-color);
+}
+
+.dark-mode .page-title {
+  color: var(--dark-mode-fg);
+}
+
+.dark-mode .menubar ul {
+  background: var(--dark-mode-overlay-bg-color);
+  border-color: var(--dark-mode-border-color);
+}
+
+.dark-mode .menubar li {
+  color: var(--dark-mode-overlay-fg-color);
+}
+
+.dark-mode .menubar li.disabled {
+  color: var(--dark-mode-overlay-disabled-fg-color);
+}
+
+.dark-mode .menubar li:not(.disabled):hover,
+.dark-mode .menubar li:not(.disabled):focus {
+  background: var(--dark-mode-active-tab-bg-color);
+  color: var(--dark-mode-active-tab-fg-color);
+}
+
+.dark-mode .menubar > li.open {
+  background: var(--dark-mode-active-tab-bg-color);
+  color: var(--dark-mode-active-tab-fg-color);
+}
+
+.dark-mode .menubar > li.open ul {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.7));
+}
+
+.dark-mode .menubar .separator {
+  border-bottom: 1px solid var(--dark-mode-border-color);
+}
+

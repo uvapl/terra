@@ -575,11 +575,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @returns {string}
    */
   getClearTermButtonHtml() {
-    return `
-      <button id="clear-term" class="button clear-term-btn" title="Clear terminal">
-        <img src="static/img/icons/trash-bin.png" alt="trash bin" />
-      </button>
-    `;
+    return `<button id="clear-term" class="button clear-term-btn" title="Clear terminal"></button>`;
   }
 
   /**
