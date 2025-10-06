@@ -62,3 +62,13 @@ textarea {
   display: block;
   margin-bottom: 4px;
 }
+
+/* ========================================================================== */
+/* Dark Mode                                                                  */
+/* ========================================================================== */
+.dark-mode .text-input,
+.dark-mode .select {
+  background-color: var(--dark-mode-bg);
+  color: var(--dark-mode-fg);
+  border-color: var(--dark-mode-border-color);
+}

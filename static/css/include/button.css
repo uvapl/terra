@@ -58,14 +58,56 @@
   background: var(--color-error-hover);
 }
 
-.clear-term-btn img {
-  pointer-events: none;
+.clear-term-btn:before {
+  content: '';
+  background-image: url('./../../img/icons/trash-bin.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
   width: 15px;
   height: 16px;
+  display: block;
   opacity: 0.65;
 }
 
-.clear-term-btn:hover img,
-.clear-term-btn:focus img {
+.clear-term-btn:hover:before,
+.clear-term-btn:focus:before {
   opacity: 1;
+}
+
+/* ========================================================================== */
+/* Dark Mode                                                                  */
+/* ========================================================================== */
+.dark-mode .button {
+  color: var(--dark-mode-fg);
+  background: none;
+  border-color: var(--dark-mode-border-color);
+}
+
+.dark-mode .button:active {
+  background: var(--dark-mode-active-tab-bg-color);
+}
+
+.dark-mode .primary-btn {
+  color: #3b8dc4;
+  border-color: #3b8dc4;
+}
+
+.primary-btn:not([disabled]):active {
+  background: #1a374b;
+}
+
+.dark-mode .button[disabled] {
+  /* background: #31343c; */
+  color: #66686d;
+  border-color: #66686d;
+}
+
+.dark-mode .button:not(.primary-btn):not([disabled]):hover {
+  color: var(--color-white);
+  border-color: var(--dark-mode-border-color-active);
+}
+
+.dark-mode .clear-term-btn:before {
+  background-image: url('./../../img/icons/trash-bin-white.png');
 }

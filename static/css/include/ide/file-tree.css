@@ -22,6 +22,9 @@
 .file-dropzone {
   flex-grow: 1;
   display: flex;
+}
+
+.file-dropzone.drag-over {
   padding: var(--file-tree-padding);
 }
 
@@ -128,7 +131,7 @@
 }
 
 .fancytree-node:not(.fancytree-drop-accept):not(.fancytree-drop-reject):not(.fancytree-statusnode-nodata):hover {
-  background-color: var(--tab-menu--tab-bg-color);
+  background-color: var(--tab-bg-color);
   cursor: pointer;
 }
 
@@ -209,7 +212,7 @@
 
 .context-menu-item:hover {
   color: var(--color-black);
-  background-color: var(--tab-menu--tab-bg-color);
+  background-color: var(--tab-bg-color);
   cursor: pointer;
   outline: 0;
 }
@@ -262,7 +265,8 @@
   width: var(--file-tree-width);
   padding: var(--file-tree-padding);
   border-top: 1px solid var(--border-color);
-  background-color: #ffffeb;
+  background-color: #fffdbe;
+  color: var(--color-black);
 }
 
 .local-storage-warning .warning-icon {
@@ -308,4 +312,69 @@
 .file-tree-bottom-msg p {
   margin: 0;
   font-size: 12px;
+}
+
+/* ========================================================================== */
+/* Dark Mode                                                                  */
+/* ========================================================================== */
+.dark-mode .file-tree-container .title {
+  color: #6b7280;
+}
+
+.dark-mode .fancytree-node:not(.fancytree-drop-accept):not(.fancytree-drop-reject):not(.fancytree-statusnode-nodata):hover {
+  background-color: var(--dark-mode-bg-lighter);
+}
+
+.dark-mode .file-tree-file-icon {
+  background-image: url('../../../img/icons/file-white.png');
+}
+
+.dark-mode .file-tree-folder-icon {
+  background-image: url('../../../img/icons/folder-white.png');
+}
+
+.dark-mode .fancytree-expanded > .fancytree-expander {
+  background-image: url('../../../img/icons/arrow-head-down-white.png');
+}
+
+.dark-mode .fancytree-node:not(.fancytree-expanded) > .fancytree-expander {
+  background-image: url('../../../img/icons/arrow-head-right-white.png');
+}
+
+.dark-mode .drop-area-indicator[aria-expanded="true"]::before,
+.dark-mode .file-tree.drop-area-indicator::before {
+  background: var(--dark-mode-fg);
+}
+
+.dark-mode .file-tree-container .add-file-btn {
+  background-image: url('../../../img/icons/file-white.png');
+}
+
+.dark-mode .file-tree-container .add-folder-btn {
+  background-image: url('../../../img/icons/folder-white.png');
+}
+
+.dark-mode .local-storage-warning {
+  border-top: 1px solid var(--dark-mode-border-color);
+}
+
+.dark-mode .file-dropzone.drag-over:before {
+  border-color: var(--dark-mode-fg);
+  color: var(--dark-mode-fg);
+}
+
+.dark-mode .context-menu-list {
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
+  background-color: var(--dark-mode-overlay-bg-color);
+  border-color: var(--dark-mode-border-color);
+}
+
+.dark-mode .context-menu-item {
+  background-color: var(--dark-mode-overlay-bg-color);
+  color: var(--dark-mode-overlay-fg-color);
+}
+
+.dark-mode .context-menu-item:hover {
+  color: var(--dark-mode-active-tab-fg-color);
+  background-color: var(--dark-mode-active-tab-bg-color);
 }

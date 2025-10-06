@@ -98,3 +98,16 @@
 .modal-width-medium .modal-content {
   width: 550px;
 }
+
+/* ========================================================================== */
+/* Dark Mode                                                                  */
+/* ========================================================================== */
+.dark-mode .modal-content {
+  background: var(--dark-mode-bg);
+  color: var(--dark-mode-fg);
+}
+
+.dark-mode .modal-header,
+.dark-mode .modal-footer {
+  border-color: var(--dark-mode-border-color);
+}

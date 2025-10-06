@@ -13,12 +13,14 @@
   --active-tab-bg-color: #fff;
   --border-color: #c6c6c6;
   --border-radius: 4px;
-  --tab-menu--tab-bg-color: #ddd;
-  --dark-mode-active-tab-fg-color: #dcdfe4;
-  --dark-mode-active-tab-bg-color: #282c34;
+  --scrollbar-bg-color: #fff;
+  --scrollbar-thumb-color: #c6c6c6;
+}
 
 * {
   box-sizing: border-box;
+  scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-bg-color);
+  scrollbar-width: thin;
 }
 
 html,
@@ -114,3 +116,12 @@ body {
   -webkit-backdrop-filter: blur(1px) grayscale(40%);
   backdrop-filter: blur(1px) grayscale(40%);
 }
+
+/* ========================================================================== */
+/* Dark Mode                                                                  */
+/* ========================================================================== */
+.dark-mode {
+  background-color: var(--dark-mode-bg);
+  color: var(--dark-mode-fg);
+}
+
