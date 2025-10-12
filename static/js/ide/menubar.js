@@ -62,6 +62,7 @@ function setMenubarKeystrokeIcons(element) {
     .replace('CTRL_META', isMac() ? '\u2318' : 'Ctrl')
     .replace('ALT_OPTION', isMac() ? '\u2325' : 'Alt') // Option key on Mac, Alt key on Windows/Linux
     .replace('CTRL_ALT', isMac() ? '\u2303' : 'Alt') // Control key on Mac, Alt key on Windows/Linux
+    .replace('CTRL', isMac() ? '\u2303' : 'Ctrl')
     .replace('SHIFT', isMac() ? '\u21E7' : 'Shift')
     .replace('ENTER', '\u23CE')
     .replace('UP', '\u2191')
