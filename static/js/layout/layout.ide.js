@@ -9,7 +9,7 @@ import {
 import { BASE_FONT_SIZE, MAX_FILE_SIZE } from '../constants.js';
 import { createModal, hideModal, showModal } from '../modal.js';
 import Terra from '../terra.js';
-import tooltipManager from '../tooltip-manager.js';
+import { createTooltip, destroyTooltip } from '../tooltip-manager.js';
 
 export default class IDELayout extends Layout {
   /**
@@ -240,7 +240,7 @@ export default class IDELayout extends Layout {
     $modal.find('.text-input').focus().select();
 
     $modal.find('.cancel-btn').click(() => {
-      tooltipManager.destroyTooltip('saveFile');
+      destroyTooltip('saveFile');
       hideModal($modal);
     });
 
@@ -263,7 +263,7 @@ export default class IDELayout extends Layout {
 
       if (errorMsg) {
         const anchor = $modal.find('input').parent()[0];
-        tooltipManager.createTooltip('saveFile', anchor, errorMsg, {
+        createTooltip('saveFile', anchor, errorMsg, {
           placement: 'top',
           theme: 'error',
         });
@@ -272,7 +272,7 @@ export default class IDELayout extends Layout {
       }
 
       // Remove the tooltip if it exists.
-      tooltipManager.destroyTooltip('saveFile');
+      destroyTooltip('saveFile');
 
       // Create a new file in the VFS and then refresh the file tree.
       await Terra.app.vfs.createFile(

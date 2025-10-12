@@ -4,7 +4,7 @@ import { createModal, hideModal, showModal } from './modal.js'
 import Terra from './terra.js'
 import LangWorker from './lang-worker.js';
 import EditorComponent from './layout/editor.component.js';
-import tooltipManager from './tooltip-manager.js';
+import { createTooltip, destroyTooltip } from './tooltip-manager.js';
 
 class FileTreeManager {
   /**
@@ -683,13 +683,13 @@ class FileTreeManager {
     if (!newName) {
       // If no name has been filled in, return false.
       // In this case, the old file name will be kept.
-      tooltipManager.destroyTooltip('renameNode');
+      destroyTooltip('renameNode');
       return false;
     }
 
     if (oldName === newName) {
       // Nothing changes, return true to close the edit.
-      tooltipManager.destroyTooltip('renameNode');
+      destroyTooltip('renameNode');
       return true;
     }
 
@@ -705,7 +705,7 @@ class FileTreeManager {
     }
 
     if (errorMsg) {
-      tooltipManager.createTooltip('renameNode', sourceNode.span, errorMsg, {
+      createTooltip('renameNode', sourceNode.span, errorMsg, {
         placement: 'right',
         theme: 'error',
       });
@@ -734,7 +734,7 @@ class FileTreeManager {
     });
 
     // Destroy the leftover tooltip if it exists.
-    tooltipManager.destroyTooltip('renameNode');
+    destroyTooltip('renameNode');
 
     return true;
   }
@@ -855,7 +855,7 @@ class FileTreeManager {
         )
       );
 
-      tooltipManager.destroyTooltip('dndDuplicate');
+      destroyTooltip('dndDuplicate');
 
       if (containsDuplicate) {
         // Create new tooltip.
@@ -864,7 +864,7 @@ class FileTreeManager {
           : targetNode.span;
 
         const msg = `There already exists a "${sourceNode.title}" file or folder`;
-        tooltipManager.createTooltip('dndDuplicate', anchor, msg, {
+        createTooltip('dndDuplicate', anchor, msg, {
           placement: 'right',
           theme: 'error',
         });
@@ -902,7 +902,7 @@ class FileTreeManager {
     // Remove the visual drag area indicator.
     $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
 
-    tooltipManager.destroyTooltip('dndDuplicate');
+    destroyTooltip('dndDuplicate');
     this.sortFileTree()
     Terra.v.blockFSPolling = false;
   }
