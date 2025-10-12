@@ -61,10 +61,17 @@ export default class EditorComponent extends TabComponent {
     // Remove default sublime Ctrl+Enter command.
     this.editor.commands.removeCommand('addLineAfter');
 
-    // Remove default Ctrl+N and Ctrl+Shift+N commands since
-    // we want them to be handled by Terra globally.
-    this.editor.commands.removeCommand('golinedown');
-    this.editor.commands.removeCommand('selectdown');
+    // Remove default Ctrl+N and Ctrl+Shift+N keybindings since we want them to
+    // be handled by Terra globally.
+    //
+    // NOTE: We only remove the keybinding, because we want to keep the original
+    // command functionality for the other keybind.
+    for (const cmd of ['golinedown', 'selectdown']) {
+      this.editor.commands.commands[cmd].bindKey.mac = this.editor.commands.commands[cmd].bindKey.mac
+        .split('|')
+        .filter((cmd) => !['Ctrl-N', 'Ctrl-Shift-N'].includes(cmd))
+        .join('|');
+    }
 
     this.editor.commands.addCommand({
       name: 'new-file',
