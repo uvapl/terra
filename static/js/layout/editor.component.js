@@ -1,6 +1,6 @@
 import { BASE_FONT_SIZE } from '../constants.js';
 import { getFileExtension, seconds } from '../helpers/shared.js';
-import pluginManager from '../plugin-manager.js';
+import { triggerPluginEvent } from '../plugin-manager.js';
 import { getLocalStorageItem } from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
 import Terra from '../terra.js';
@@ -552,13 +552,13 @@ export default class EditorComponent extends TabComponent {
       // This excludes the first time the content is loaded when the tab opened.
       if (!this.firstTimeLoadingContent) {
         this.onEditorChange();
-        pluginManager.triggerEvent('onEditorChange', this);
+        triggerPluginEvent('onEditorChange', this);
       }
     });
 
     this.editor.on('focus', () => {
       this.onEditorFocus();
-      pluginManager.triggerEvent('onEditorFocus', this);
+      triggerPluginEvent('onEditorFocus', this);
     });
   }
 
@@ -570,28 +570,28 @@ export default class EditorComponent extends TabComponent {
     this.container.on('afterFirstRender', this.onContainerAfterFirstRender);
 
     this.container.on('onTabDragStop', ({ event, tab }) => {
-      pluginManager.triggerEvent('onTabDragStop', event, tab);
+      triggerPluginEvent('onTabDragStop', event, tab);
     });
 
     this.container.on('show', () => {
       this.onShow();
       this.dispatchEvent(new Event('show'));
-      pluginManager.triggerEvent('onEditorShow', this);
+      triggerPluginEvent('onEditorShow', this);
     });
 
     this.container.on('hide', () => {
       this.onHide();
-      pluginManager.triggerEvent('onEditorHide', this);
+      triggerPluginEvent('onEditorHide', this);
     });
 
     this.container.on('lock', () => {
       this.lock();
-      pluginManager.triggerEvent('onEditorLock', this);
+      triggerPluginEvent('onEditorLock', this);
     });
 
     this.container.on('unlock', () => {
       this.unlock();
-      pluginManager.triggerEvent('onEditorUnlock', this);
+      triggerPluginEvent('onEditorUnlock', this);
     });
 
     this.container.on('setCustomAutocompleter', (completions) => {
@@ -600,27 +600,27 @@ export default class EditorComponent extends TabComponent {
 
     this.container.on('themeChanged', (theme) => {
       this.setTheme(theme);
-      pluginManager.triggerEvent('setEditorTheme', theme, this);
+      triggerPluginEvent('setEditorTheme', theme, this);
     });
 
     this.container.on('fontSizeChanged', (fontSize) => {
       this.setFontSize(fontSize);
-      pluginManager.triggerEvent('setEditorFontSize', fontSize, this);
+      triggerPluginEvent('setEditorFontSize', fontSize, this);
     });
 
     this.container.on('resize', () => {
       this.onContainerResize();
-      pluginManager.triggerEvent('onEditorContainerResize', this);
+      triggerPluginEvent('onEditorContainerResize', this);
     });
 
     this.container.on('destroy', () => {
       this.onDestroy();
-      pluginManager.triggerEvent('onEditorDestroy', this);
+      triggerPluginEvent('onEditorDestroy', this);
     });
 
     this.container.on('vfsChanged', () => {
       this.dispatchEvent(new Event('vfsChanged'));
-      pluginManager.triggerEvent('onEditorContentChanged', this);
+      triggerPluginEvent('onEditorContentChanged', this);
     });
   }
 }

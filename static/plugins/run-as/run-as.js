@@ -1,7 +1,6 @@
 import { TerraPlugin } from '../../js/plugin-manager.js';
 import { createModal, hideModal, showModal } from '../../js/modal.js';
 import Terra from '../../js/terra.js';
-import { isMac } from '../../js/helpers/shared.js';
 
 export default class RunAsPlugin extends TerraPlugin {
   name = 'run-as';

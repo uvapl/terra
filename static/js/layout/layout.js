@@ -9,7 +9,7 @@ import {
 import ImageComponent from './image.component.js';
 import EditorComponent from './editor.component.js';
 import TerminalComponent from './term.component.js';
-import pluginManager from '../plugin-manager.js';
+import { triggerPluginEvent } from '../plugin-manager.js';
 import {
   setLocalStorageItem,
   getLocalStorageItem
@@ -199,7 +199,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     this.setTheme(getLocalStorageItem('theme') || 'light');
     this.renderButtons();
     this.showTermStartupMessage();
-    pluginManager.triggerEvent('onLayoutLoaded');
+    triggerPluginEvent('onLayoutLoaded');
 
     if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
       this.emitToTabComponents('setCustomAutocompleter', options.autocomplete);
