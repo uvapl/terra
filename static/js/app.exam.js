@@ -19,7 +19,7 @@ import {
 import LangWorker from './lang-worker.js';
 import ExamLayout from './layout/layout.exam.js';
 import {
-  isDefaultPrefix,
+  isDefaultLocalStoragePrefix,
   setLocalStorageItem,
   getLocalStorageItem,
   removeLocalStorageItem,
@@ -202,7 +202,7 @@ export default class ExamApp extends App {
 
         // This should only update the local storage prefix if it's
         // not the default prefix.
-        if (isDefaultPrefix()) {
+        if (isDefaultLocalStoragePrefix()) {
           const currentStorageKey = getLocalStorageItem('last-used');
 
           if (currentStorageKey) {

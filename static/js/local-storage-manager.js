@@ -18,7 +18,7 @@ let localStoragePrefix = defaultLocalStoragePrefix;
  *
  * @returns {bool} True if the current prefix is the default prefix.
  */
-export function isDefaultPrefix() {
+export function isDefaultLocalStoragePrefix() {
   return localStoragePrefix === defaultLocalStoragePrefix;
 }
 
