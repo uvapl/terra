@@ -4,7 +4,10 @@ import {
   isObject,
 } from './helpers/shared.js';
 import Terra from './terra.js';
-import localStorageManager from './local-storage-manager.js';
+import {
+  setLocalStorageItem,
+  getLocalStorageItem,
+} from './local-storage-manager.js';
 
 // Base plugin class that all plugins should extend.
 export class TerraPlugin {
@@ -130,7 +133,7 @@ export class TerraPlugin {
   loadFromLocalStorage() {
     const storageKey = slugify(this.storageKey);
     const defaultValue = isObject(this.defaultState) ? JSON.stringify(this.defaultState) : null;
-    const state = localStorageManager.getLocalStorageItem(storageKey, defaultValue);
+    const state = getLocalStorageItem(storageKey, defaultValue);
 
     if (state) {
       return JSON.parse(state);
@@ -194,7 +197,7 @@ export class TerraPlugin {
    */
   saveState() {
     const storageKey = slugify(this.storageKey);
-    localStorageManager.setLocalStorageItem(storageKey, JSON.stringify(this.state));
+    setLocalStorageItem(storageKey, JSON.stringify(this.state));
   }
 
   // EVENT LISTENERS THAT CAN BE IMPLEMENTED FOR EACH PLUGIN.

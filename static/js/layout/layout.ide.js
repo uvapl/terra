@@ -1,5 +1,5 @@
 import Layout from './layout.js';
-import localStorageManager from '../local-storage-manager.js';
+import { setLocalStorageItem } from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
 import {
   isValidFilename,
@@ -157,7 +157,7 @@ export default class IDELayout extends Layout {
     }
 
     const state = JSON.stringify(config);
-    localStorageManager.setLocalStorageItem('layout', state);
+    setLocalStorageItem('layout', state);
   }
 
   _removeEditorValue(config) {

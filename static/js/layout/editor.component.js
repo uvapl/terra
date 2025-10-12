@@ -1,7 +1,7 @@
 import { BASE_FONT_SIZE } from '../constants.js';
 import { getFileExtension, seconds } from '../helpers/shared.js';
 import pluginManager from '../plugin-manager.js';
-import localStorageManager from '../local-storage-manager.js';
+import { getLocalStorageItem } from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
 import Terra from '../terra.js';
 import TabComponent from './tab.component.js';
@@ -50,7 +50,7 @@ export default class EditorComponent extends TabComponent {
     this.initEditor();
     this.bindEditorEvents();
 
-    this.setTheme(localStorageManager.getLocalStorageItem('theme') || 'light');
+    this.setTheme(getLocalStorageItem('theme') || 'light');
     this.setFontSize(this.state.fontSize || BASE_FONT_SIZE);
 
     // Set the proglang, or use 'text' as the filetype if there's no file ext.

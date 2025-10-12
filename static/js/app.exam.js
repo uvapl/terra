@@ -18,7 +18,13 @@ import {
 } from './helpers/shared.js';
 import LangWorker from './lang-worker.js';
 import ExamLayout from './layout/layout.exam.js';
-import localStorageManager from './local-storage-manager.js';
+import {
+  isDefaultPrefix,
+  setLocalStorageItem,
+  getLocalStorageItem,
+  removeLocalStorageItem,
+  updateLocalStoragePrefix
+} from './local-storage-manager.js';
 import Terra from './terra.js';
 
 export default class ExamApp extends App {
@@ -56,7 +62,7 @@ export default class ExamApp extends App {
         Terra.app.langWorker = new LangWorker(proglang);
 
         // Get the font-size stored in local storage or use fallback value.
-        const fontSize = localStorageManager.getLocalStorageItem('font-size', BASE_FONT_SIZE);
+        const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
 
         // Create the content objects that represent each tab in the editor.
         const content = this.generateConfigContent(this.config.tabs, fontSize);
@@ -122,7 +128,7 @@ export default class ExamApp extends App {
     // Register the auto-save after a certain auto-save offset time to prevent
     // the server receives many requests at once. This helps to spread them out
     // over a minute of time.
-    const forceAutoSave = localStorageManager.getLocalStorageItem('editor-content-changed', false);
+    const forceAutoSave = getLocalStorageItem('editor-content-changed', false);
     const startTimeout = getRandNumBetween(0, AUTOSAVE_START_OFFSET);
     setTimeout(() => {
       Terra.app.registerAutoSave(this.config.postback, this.config.code, forceAutoSave);
@@ -143,7 +149,7 @@ export default class ExamApp extends App {
     // Catch ctrl/cmd+w (aka page reloading) to prevent the user from closing the tab.
     $(window).on('beforeunload', (e) => {
       if (this.editorContentChanged) {
-        localStorageManager.setLocalStorageItem('editor-content-changed', true);
+        setLocalStorageItem('editor-content-changed', true);
       }
 
       const message = 'Are you sure you want to leave this page?';
@@ -177,9 +183,9 @@ export default class ExamApp extends App {
           config.configUrl = queryParams.url;
 
           const currentStorageKey = slugify(config.configUrl);
-          localStorageManager.setLocalStorageItem('last-used', currentStorageKey);
-          localStorageManager.updateLocalStoragePrefix(currentStorageKey);
-          localStorageManager.setLocalStorageItem('config', JSON.stringify(config));
+          setLocalStorageItem('last-used', currentStorageKey);
+          updateLocalStoragePrefix(currentStorageKey);
+          setLocalStorageItem('config', JSON.stringify(config));
 
           // Remove query params from the URL.
           history.replaceState({}, null, window.location.origin + window.location.pathname);
@@ -196,15 +202,15 @@ export default class ExamApp extends App {
 
         // This should only update the local storage prefix if it's
         // not the default prefix.
-        if (localStorageManager.isDefaultPrefix()) {
-          const currentStorageKey = localStorageManager.getLocalStorageItem('last-used');
+        if (isDefaultPrefix()) {
+          const currentStorageKey = getLocalStorageItem('last-used');
 
           if (currentStorageKey) {
-            localStorageManager.updateLocalStoragePrefix(currentStorageKey);
+            updateLocalStoragePrefix(currentStorageKey);
           }
         }
 
-        const localConfig = JSON.parse(localStorageManager.getLocalStorageItem('config'));
+        const localConfig = JSON.parse(getLocalStorageItem('config'));
 
         // Check immediately if the server is reachable by retrieving the
         // config again. If it is reachable, use the localConfig as the actual
@@ -215,7 +221,7 @@ export default class ExamApp extends App {
           // While we fallback on localstorage, we still need to check whether
           // the exam is locked, so we have to update the `locked` property.
           localConfig.locked = newConfig.locked;
-          localStorageManager.setLocalStorageItem('config', JSON.stringify(localConfig));
+          setLocalStorageItem('config', JSON.stringify(localConfig));
 
           config = localConfig;
           this.notify('Connected to server', { fadeOutAfterMs: seconds(10) });
@@ -406,7 +412,7 @@ export default class ExamApp extends App {
 
           // The response is successful at this point, thus reset flag.
           this.editorContentChanged = false;
-          localStorageManager.removeLocalStorageItem('editor-content-changed');
+          removeLocalStorageItem('editor-content-changed');
 
           // Update the last saved timestamp in the UI.
           this.updateLastSaved();

@@ -1,5 +1,8 @@
 import idbManager from '../idb.js';
-import localStorageManager from '../local-storage-manager.js';
+import {
+  setLocalStorageItem,
+  getLocalStorageItem,
+} from '../local-storage-manager.js';
 
 /**
  * Check whether LFS is available in the browser.
@@ -18,7 +21,7 @@ export function available() {
  */
 export function hasProjectLoaded() {
   return (
-    available() && localStorageManager.getLocalStorageItem('use-lfs', false)
+    available() && getLocalStorageItem('use-lfs', false)
   );
 }
 
@@ -37,7 +40,7 @@ export async function choose() {
     return;
   }
   await _verifyLFSHandlePermission(rootFolderHandle, true);
-  localStorageManager.setLocalStorageItem('use-lfs', true);
+  setLocalStorageItem('use-lfs', true);
   await idbManager.saveHandle('lfs', 'root', rootFolderHandle);
   return rootFolderHandle;
 }
@@ -77,7 +80,7 @@ export async function getBaseFolderName() {
  * @returns {Promise<void>}
  */
 export async function close() {
-  localStorageManager.setLocalStorageItem('use-lfs', false);
+  setLocalStorageItem('use-lfs', false);
   await idbManager.clearStores();
 }
 

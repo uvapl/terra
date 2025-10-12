@@ -4,7 +4,7 @@ import { MAX_FILE_SIZE } from './constants.js';
 import { getFileExtension, getRepoInfo, isBase64 } from './helpers/shared.js';
 import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
-import localStorageManager from './local-storage-manager.js';
+import { getLocalStorageItem } from './local-storage-manager.js';
 import fileTreeManager from './file-tree-manager.js';
 import pluginManager from './plugin-manager.js';
 import GitFS from './fs/git.js';
@@ -345,7 +345,7 @@ export default class IDEApp extends App {
    * @returns {boolean} True if configured and should be able to connect.
    */
   isGitConfigured() {
-    return localStorageManager.getLocalStorageItem('git-repo');
+    return getLocalStorageItem('git-repo');
   }
 
   /**
@@ -366,8 +366,8 @@ export default class IDEApp extends App {
   async startGitFS() {
     await this.vfs.connect(null, 'ide-git');
 
-    const accessToken = localStorageManager.getLocalStorageItem('git-access-token');
-    const repoLink = localStorageManager.getLocalStorageItem('git-repo');
+    const accessToken = getLocalStorageItem('git-access-token');
+    const repoLink = getLocalStorageItem('git-repo');
     const repoInfo = getRepoInfo(repoLink);
     if (repoInfo) {
       fileTreeManager.setTitle(`${repoInfo.user}/${repoInfo.repo}`)

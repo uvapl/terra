@@ -1,6 +1,9 @@
 import { createModal, hideModal, showModal } from '../modal.js';
 import Terra from '../terra.js';
-import localStorageManager from '../local-storage-manager.js';
+import {
+  setLocalStorageItem,
+  getLocalStorageItem,
+} from '../local-storage-manager.js';
 import fileTreeManager from '../file-tree-manager.js';
 import { isBase64, seconds, slugify, isImageExtension } from '../helpers/shared.js';
 import { GITHUB_URL_PATTERN } from '../ide/constants.js';
@@ -117,7 +120,7 @@ export default class GitFS {
       data: {
         accessToken: accessToken,
         repoLink: this._repoLink,
-        branch: localStorageManager.getLocalStorageItem('git-branch'),
+        branch: getLocalStorageItem('git-branch'),
       },
     });
   }
@@ -131,8 +134,8 @@ export default class GitFS {
     console.log('Terminating existing GitFS worker')
 
     if (clear) {
-      localStorageManager.setLocalStorageItem('git-repo', '');
-      localStorageManager.setLocalStorageItem('git-branch', '');
+      setLocalStorageItem('git-repo', '');
+      setLocalStorageItem('git-branch', '');
     }
 
     $('#menu-item--branch')
@@ -303,7 +306,7 @@ export default class GitFS {
         if (errMsg.toLowerCase().includes('bad credentials')) {
           errMsg = 'Personal access token was not accepted. Could it be expired?';
         } else if (errMsg.toLowerCase().includes('not found')) {
-          const gitRepo = localStorageManager.getLocalStorageItem('git-repo');
+          const gitRepo = getLocalStorageItem('git-repo');
           const match = GITHUB_URL_PATTERN.exec(gitRepo);
           if (match && match.length === 3) {
             errMsg = `Repository ${match[1]}/${match[2]} was not found on GitHub.`;

@@ -8,7 +8,10 @@ import {
 } from './helpers/shared.js';
 import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
-import localStorageManager from './local-storage-manager.js';
+import {
+  getLocalStorageItem,
+  updateLocalStoragePrefix
+} from './local-storage-manager.js';
 import EmbedLayout from './layout/layout.embed.js';
 
 export default class EmbedApp extends App {
@@ -35,7 +38,7 @@ export default class EmbedApp extends App {
 
     // Update local storage key.
     const currentStorageKey = slugify(window.location.href);
-    localStorageManager.updateLocalStoragePrefix(currentStorageKey);
+    updateLocalStoragePrefix(currentStorageKey);
 
     // Since embed's are temporary session, clear the VFS before making a new
     // temporary file.
@@ -55,7 +58,7 @@ export default class EmbedApp extends App {
     Terra.app.langWorker = new LangWorker(proglang);
 
     // Get the font-size stored in local storage or use fallback value.
-    const fontSize = localStorageManager.getLocalStorageItem('font-size', BASE_FONT_SIZE);
+    const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
 
     // Create the content objects that represent each tab in the editor.
     const content = this.generateConfigContent(tabs, fontSize);
