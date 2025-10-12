@@ -9,7 +9,7 @@ import {
   getLocalStorageItem,
   removeLocalStorageItem,
 } from '../local-storage-manager.js';
-import fileTreeManager from '../file-tree-manager.js';
+import * as fileTreeManager from '../file-tree-manager.js';
 import { GITHUB_URL_PATTERN } from './constants.js';
 import * as LFS from '../fs/lfs.js';
 

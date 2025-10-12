@@ -1,6 +1,6 @@
 import Layout from './layout.js';
 import { setLocalStorageItem } from '../local-storage-manager.js';
-import fileTreeManager from '../file-tree-manager.js';
+import * as fileTreeManager from '../file-tree-manager.js';
 import {
   isValidFilename,
   getFileExtension,

@@ -5,7 +5,7 @@ import { getFileExtension, getRepoInfo, isBase64 } from './helpers/shared.js';
 import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
 import { getLocalStorageItem } from './local-storage-manager.js';
-import fileTreeManager from './file-tree-manager.js';
+import * as fileTreeManager from './file-tree-manager.js';
 import { triggerPluginEvent } from './plugin-manager.js';
 import GitFS from './fs/git.js';
 import { FileNotFoundError, FileTooLargeError } from './fs/vfs.js';

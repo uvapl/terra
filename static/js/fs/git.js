@@ -4,7 +4,7 @@ import {
   setLocalStorageItem,
   getLocalStorageItem,
 } from '../local-storage-manager.js';
-import fileTreeManager from '../file-tree-manager.js';
+import * as fileTreeManager from '../file-tree-manager.js';
 import { isBase64, seconds, slugify, isImageExtension } from '../helpers/shared.js';
 import { GITHUB_URL_PATTERN } from '../ide/constants.js';
 import debounce from '../debouncer.js';
