@@ -84,7 +84,7 @@
 
 .menubar > li.open > ul {
   display: block;
-  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.3));
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.3);
   left: 0;
   top: 100%;
 }
@@ -186,4 +186,3 @@
 .dark-mode .menubar .separator {
   border-bottom: 1px solid var(--dark-mode-border-color);
 }
-
