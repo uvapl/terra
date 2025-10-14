@@ -642,7 +642,12 @@ class API extends BaseAPI {
       const input = `${basename}.cc`;
       const obj = `${basename}.o`;
       this.memfs.addFile(input, file.content);
-      await this.compile({ input, content: file.content, obj });
+      try {
+        await this.compile({ input, content: file.content, obj });
+      }
+      finally {
+        this.runUserCodeCallback();
+      }
       objectFiles.push(obj);
     }
 
