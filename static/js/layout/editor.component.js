@@ -1,7 +1,8 @@
 import { BASE_FONT_SIZE } from '../constants.js';
-import { eventTargetMixin, getFileExtension, seconds } from '../helpers/shared.js';
+import { getFileExtension, seconds } from '../helpers/shared.js';
 import pluginManager from '../plugin-manager.js';
 import localStorageManager from '../local-storage-manager.js';
+import fileTreeManager from '../file-tree-manager.js';
 import Terra from '../terra.js';
 import TabComponent from './tab.component.js';
 
@@ -59,6 +60,27 @@ export default class EditorComponent extends TabComponent {
 
     // Remove default sublime Ctrl+Enter command.
     this.editor.commands.removeCommand('addLineAfter');
+
+    // Remove default Ctrl+N and Ctrl+Shift+N commands since
+    // we want them to be handled by Terra globally.
+    this.editor.commands.removeCommand('golinedown');
+    this.editor.commands.removeCommand('selectdown');
+
+    this.editor.commands.addCommand({
+      name: 'new-file',
+      bindKey: {win: 'Ctrl-N', mac: 'Ctrl-N'},
+      exec: () => {
+        fileTreeManager.createFile();
+      }
+    });
+
+    this.editor.commands.addCommand({
+      name: 'new-folder',
+      bindKey: {win: 'Ctrl-Shift-N', mac: 'Ctrl-Shift-N'},
+      exec: () => {
+        fileTreeManager.createFolder();
+      }
+    });
   }
 
   /**
