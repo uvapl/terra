@@ -4,8 +4,12 @@
 import { isMac } from '../helpers/shared.js';
 import { createModal, hideModal, showModal } from '../modal.js';
 import Terra from '../terra.js';
-import localStorageManager from '../local-storage-manager.js';
-import fileTreeManager from '../file-tree-manager.js';
+import {
+  setLocalStorageItem,
+  getLocalStorageItem,
+  removeLocalStorageItem,
+} from '../local-storage-manager.js';
+import * as fileTreeManager from '../file-tree-manager.js';
 import { GITHUB_URL_PATTERN } from './constants.js';
 import * as LFS from '../fs/lfs.js';
 
@@ -38,7 +42,7 @@ export function renderGitRepoBranches(branches) {
     if ($element.hasClass('active')) return;
 
     const newBranch = $element.data('val');
-    localStorageManager.setLocalStorageItem('git-branch', newBranch);
+    setLocalStorageItem('git-branch', newBranch);
     $element.addClass('active').siblings().removeClass('active');
 
     Terra.app.gitfs.setRepoBranch(newBranch);
@@ -205,7 +209,7 @@ Menubar.closeLFSFolder = (event) => {
   if ($('#menu-item--close-project').hasClass('disabled')) return;
 
   // Close the connected Git(Hub) repo, if any.
-  localStorageManager.removeLocalStorageItem('git-repo');
+  removeLocalStorageItem('git-repo');
   Terra.app.closeGitFS();
 
   // Close the LFS folder, if any.
@@ -287,16 +291,15 @@ Menubar.runTab = () => {
 Menubar.connectRepo = () => {
   if ($('#menu-item--connect-repo').hasClass('disabled')) return;
 
-  const accessToken = localStorageManager.getLocalStorageItem('git-access-token', '');
+  const accessToken = getLocalStorageItem('git-access-token', '');
 
   // When the current repo link exists, the user was already connected and they
   // want to connect to another repository.
-  const currentRepoLink = localStorageManager.getLocalStorageItem('git-repo', '');
+  const currentRepoLink = getLocalStorageItem('git-repo', '');
 
   const hasEmptyFields = !accessToken || !currentRepoLink;
 
-  let connectRepoHistory = localStorageManager
-    .getLocalStorageItem('connect-repo-history', '')
+  let connectRepoHistory = getLocalStorageItem('connect-repo-history', '')
     .split(',')
     .filter((url) => url.trim() !== '');
   const connectRepoHistoryHtml = connectRepoHistory.map((url) => `<option value="${url}"></option>`);
@@ -374,14 +377,14 @@ Menubar.connectRepo = () => {
     }
     connectRepoHistory.unshift(newRepoLink);
     connectRepoHistory = connectRepoHistory.slice(0, 10); // Only last 10 entries.
-    localStorageManager.setLocalStorageItem('connect-repo-history', connectRepoHistory.join(','));
+    setLocalStorageItem('connect-repo-history', connectRepoHistory.join(','));
 
     // Remove previously selected branch such that the clone will use the
     // default branch for the new repo.
-    localStorageManager.removeLocalStorageItem('git-branch');
+    removeLocalStorageItem('git-branch');
 
-    localStorageManager.setLocalStorageItem('git-access-token', newAccessToken);
-    localStorageManager.setLocalStorageItem('git-repo', newRepoLink);
+    setLocalStorageItem('git-access-token', newAccessToken);
+    setLocalStorageItem('git-repo', newRepoLink);
     Terra.app.openGitFS();
   });
 };

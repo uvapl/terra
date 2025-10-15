@@ -1,12 +1,12 @@
 import App from './app.js';
 import IDELayout from './layout/layout.ide.js';
 import { MAX_FILE_SIZE } from './constants.js';
-import { getFileExtension, getRepoInfo, isBase64 } from './helpers/shared.js';
+import { getFileExtension, getRepoInfo } from './helpers/shared.js';
 import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
-import localStorageManager from './local-storage-manager.js';
-import fileTreeManager from './file-tree-manager.js';
-import pluginManager from './plugin-manager.js';
+import { getLocalStorageItem } from './local-storage-manager.js';
+import * as fileTreeManager from './file-tree-manager.js';
+import { triggerPluginEvent, getPlugin } from './plugin-manager.js';
 import GitFS from './fs/git.js';
 import { FileNotFoundError, FileTooLargeError } from './fs/vfs.js';
 import * as LFS from './fs/lfs.js';
@@ -187,7 +187,7 @@ export default class IDEApp extends App {
    * compile target, and file arguments.
    */
   getRunAsConfig() {
-    const runAsPlugin = pluginManager.getPlugin('run-as');
+    const runAsPlugin = getPlugin('run-as');
     const state = runAsPlugin.getState();
 
     const editorComponent = this.layout.getActiveEditor();
@@ -345,7 +345,7 @@ export default class IDEApp extends App {
    * @returns {boolean} True if configured and should be able to connect.
    */
   isGitConfigured() {
-    return localStorageManager.getLocalStorageItem('git-repo');
+    return getLocalStorageItem('git-repo');
   }
 
   /**
@@ -366,8 +366,8 @@ export default class IDEApp extends App {
   async startGitFS() {
     await this.vfs.connect(null, 'ide-git');
 
-    const accessToken = localStorageManager.getLocalStorageItem('git-access-token');
-    const repoLink = localStorageManager.getLocalStorageItem('git-repo');
+    const accessToken = getLocalStorageItem('git-access-token');
+    const repoLink = getLocalStorageItem('git-repo');
     const repoInfo = getRepoInfo(repoLink);
     if (repoInfo) {
       fileTreeManager.setTitle(`${repoInfo.user}/${repoInfo.repo}`)
@@ -397,7 +397,7 @@ export default class IDEApp extends App {
 
       console.log('Creating gitfs worker');
       fileTreeManager.setInfoMsg('Cloning repository...');
-      pluginManager.triggerEvent('onStorageChange', 'git');
+      triggerPluginEvent('onStorageChange', 'git');
     }
   }
 
@@ -460,7 +460,7 @@ export default class IDEApp extends App {
 
     await this.vfs.connect(rootFolderHandle);
 
-    pluginManager.triggerEvent('onStorageChange', 'lfs');
+    triggerPluginEvent('onStorageChange', 'lfs');
 
     // Render the LFS contents.
     await fileTreeManager.createFileTree();
@@ -519,6 +519,6 @@ export default class IDEApp extends App {
     await fileTreeManager.createFileTree(); // show empty file tree
     fileTreeManager.showLocalStorageWarning();
     fileTreeManager.setTitle('local storage');
-    pluginManager.triggerEvent('onStorageChange', 'local');
+    triggerPluginEvent('onStorageChange', 'local');
   }
 }

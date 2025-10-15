@@ -1,5 +1,8 @@
-import idbManager from '../idb.js';
-import localStorageManager from '../local-storage-manager.js';
+import * as idb from '../idb.js';
+import {
+  setLocalStorageItem,
+  getLocalStorageItem,
+} from '../local-storage-manager.js';
 
 /**
  * Check whether LFS is available in the browser.
@@ -18,7 +21,7 @@ export function available() {
  */
 export function hasProjectLoaded() {
   return (
-    available() && localStorageManager.getLocalStorageItem('use-lfs', false)
+    available() && getLocalStorageItem('use-lfs', false)
   );
 }
 
@@ -37,8 +40,8 @@ export async function choose() {
     return;
   }
   await _verifyLFSHandlePermission(rootFolderHandle, true);
-  localStorageManager.setLocalStorageItem('use-lfs', true);
-  await idbManager.saveHandle('lfs', 'root', rootFolderHandle);
+  setLocalStorageItem('use-lfs', true);
+  await idb.saveHandle('lfs', 'root', rootFolderHandle);
   return rootFolderHandle;
 }
 
@@ -52,7 +55,7 @@ export async function choose() {
  * @returns {Promise<FileSystemDirectoryHandle>} The root folder handle if permission is granted.
  */
 export async function reopen() {
-  const rootFolderHandle = await idbManager.getHandle('lfs', 'root');
+  const rootFolderHandle = await idb.getHandle('lfs', 'root');
   if (await _verifyLFSHandlePermission(rootFolderHandle)) {
     return rootFolderHandle;
   } else {
@@ -66,7 +69,7 @@ export async function reopen() {
  * @returns {Promise<string>} The name of the root folder handle.
  */
 export async function getBaseFolderName() {
-  const rootFolderHandle = await idbManager.getHandle('lfs', 'root');
+  const rootFolderHandle = await idb.getHandle('lfs', 'root');
   return rootFolderHandle.name;
 }
 
@@ -77,8 +80,8 @@ export async function getBaseFolderName() {
  * @returns {Promise<void>}
  */
 export async function close() {
-  localStorageManager.setLocalStorageItem('use-lfs', false);
-  await idbManager.clearStores();
+  setLocalStorageItem('use-lfs', false);
+  await idb.clearStores();
 }
 
 /**

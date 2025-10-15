@@ -1,6 +1,6 @@
 import { getFileExtension } from './helpers/shared.js';
 import Terra from './terra.js';
-import fileTreeManager from './file-tree-manager.js';
+import * as fileTreeManager from './file-tree-manager.js';
 
 
 /**

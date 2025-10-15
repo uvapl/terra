@@ -1,7 +1,6 @@
-import { TerraPlugin } from '../../js/plugin-manager.js';
+import { getPlugin, TerraPlugin } from '../../js/plugin-manager.js';
 import { seconds, getPartsFromPath } from '../../js/helpers/shared.js';
 import { createModal, hideModal, showModal } from '../../js/modal.js';
-import pluginManager from '../../js/plugin-manager.js';
 import Terra from '../../js/terra.js';
 
 const BASE_URL = 'https://checkz.proglab.nl'
@@ -33,7 +32,7 @@ export default class Check50Plugin extends TerraPlugin {
 
   onPluginRegistered = (plugin) => {
     if (plugin.name === 'rightSidebar') {
-      this.rightSidebarPlugin = pluginManager.getPlugin('rightSidebar');
+      this.rightSidebarPlugin = getPlugin('rightSidebar');
     }
   }
 

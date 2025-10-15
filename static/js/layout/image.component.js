@@ -1,6 +1,6 @@
 import { getFileExtension } from '../helpers/shared.js';
 import TabComponent from './tab.component.js';
-import pluginManager from '../plugin-manager.js';
+import { triggerPluginEvent } from '../plugin-manager.js';
 
 /**
  * Image component for GoldenLayout.
@@ -109,17 +109,17 @@ export default class ImageComponent extends TabComponent {
   bindContainerEvents = () => {
     this.container.on('show', () => {
       this.onShow();
-      pluginManager.triggerEvent('onImageShow', this);
+      triggerPluginEvent('onImageShow', this);
     });
 
     this.container.on('hide', () => {
       this.onHide();
-      pluginManager.triggerEvent('onImageHide', this);
+      triggerPluginEvent('onImageHide', this);
     });
 
     this.container.on('destroy', () => {
       this.onDestroy();
-      pluginManager.triggerEvent('onImageDestroy', this);
+      triggerPluginEvent('onImageDestroy', this);
     });
 
     this.container.on('vfsChanged', () => {

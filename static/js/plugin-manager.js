@@ -4,7 +4,16 @@ import {
   isObject,
 } from './helpers/shared.js';
 import Terra from './terra.js';
-import localStorageManager from './local-storage-manager.js';
+import {
+  setLocalStorageItem,
+  getLocalStorageItem,
+} from './local-storage-manager.js';
+
+/**
+ * Contains a reference to all loaded plugins.
+ * @type {object}
+ */
+const plugins = {};
 
 // Base plugin class that all plugins should extend.
 export class TerraPlugin {
@@ -130,7 +139,7 @@ export class TerraPlugin {
   loadFromLocalStorage() {
     const storageKey = slugify(this.storageKey);
     const defaultValue = isObject(this.defaultState) ? JSON.stringify(this.defaultState) : null;
-    const state = localStorageManager.getLocalStorageItem(storageKey, defaultValue);
+    const state = getLocalStorageItem(storageKey, defaultValue);
 
     if (state) {
       return JSON.parse(state);
@@ -194,7 +203,7 @@ export class TerraPlugin {
    */
   saveState() {
     const storageKey = slugify(this.storageKey);
-    localStorageManager.setLocalStorageItem(storageKey, JSON.stringify(this.state));
+    setLocalStorageItem(storageKey, JSON.stringify(this.state));
   }
 
   // EVENT LISTENERS THAT CAN BE IMPLEMENTED FOR EACH PLUGIN.
@@ -220,121 +229,110 @@ export class TerraPlugin {
   // onPluginRegistered = (plugin) => { }
 }
 
-class TerraPluginManager {
-  /**
-   * Contains a reference to all loaded plugins.
-   * @type {object}
-   */
-  plugins = {};
-
-
-  /**
-   * Register a plugin.
-   *
-   * @param {object} plugin - A valid plugin object.
-   */
-  register = (plugin) => {
-    if (plugin instanceof TerraPlugin) {
-      this.plugins[plugin.name] = plugin;
-    } else {
-      throw new Error("Plugin must be an instance of the TerraPlugin class.");
-    }
-
-    if (Array.isArray(plugin.css)) {
-      this.loadCSS(plugin.css);
-    }
-
-    this.triggerEvent('onPluginRegistered', plugin);
+/**
+ * Register a plugin.
+ *
+ * @param {object} plugin - A valid plugin object.
+ */
+function register(plugin) {
+  if (plugin instanceof TerraPlugin) {
+    plugins[plugin.name] = plugin;
+  } else {
+    throw new Error("Plugin must be an instance of the TerraPlugin class.");
   }
 
-  /**
-   * Load a given CSS path.
-   *
-   * @param {string} path - The CSS path to load.
-   */
-  loadCSS = (path) => {
-    for (const cssPath of path) {
-      $('head').append(`<link rel="stylesheet" type="text/css" href="${cssPath}">`);
-    }
+  if (Array.isArray(plugin.css)) {
+    loadCSS(plugin.css);
   }
 
-  /**
-   * Load a single plugin by name residing in the `static/plugins` directory.
-   *
-   * @param {string} pluginName - The name of the plugin to load.
-   * @returns {Promise} Resolves when the plugin is loaded.
-   */
-  loadPlugin = (pluginName) => {
-    return new Promise((resolve, reject) => {
-      import(`../plugins/${pluginName}/${pluginName}.js`)
-        .then((mod) => {
-          const plugin = new mod.default();
-          this.register(plugin);
-          resolve();
-        })
-        .catch(reject);
-    })
-  }
+  triggerPluginEvent('onPluginRegistered', plugin);
+}
 
-  /**
-   * Load multiple plugins names residing in the `static/plugins` directory.
-   *
-   * @param {array} pluginNames - List names of the plugins to load.
-   * @returns {Promise} Resolves when all plugins are loaded.
-   */
-  loadPlugins = (pluginNames) => {
-    return Promise.all(pluginNames.map((pluginName) => this.loadPlugin(pluginName)));
-  }
-
-  /**
-   * Custom behavior for the storage change event. This is necessary because
-   * we need to keep track automatically of the current storage name and
-   * previous storage name that are required as arguments for the event.
-   *
-   * @param {string} pluginName - The name of the plugin to trigger the event for.
-   * @param {string} storageName - The new storage name.
-   */
-  triggerStorageChange = (pluginName, storageName) => {
-    Terra.v.prevStorageName = Terra.v.storageName;
-    Terra.v.storageName = storageName;
-    this.plugins[pluginName]['onStorageChange'](
-      Terra.v.storageName,
-      Terra.v.prevStorageName
-    );
-  }
-
-  /**
-   * Trigger an event on all loaded plugins.
-   *
-   * @param {string} eventName - The name of the event.
-   * @param {array} ...args - The arguments to pass to the event handler.
-   */
-  triggerEvent = (eventName, ...args) => {
-    Object.keys(this.plugins).forEach((pluginName) => {
-      if (typeof this.plugins[pluginName][eventName] === 'function') {
-        if (eventName === 'onStorageChange') {
-          this.triggerStorageChange(pluginName, ...args);
-        } else {
-          this.plugins[pluginName][eventName](...args);
-        }
-      }
-    });
-  }
-
-
-  /**
-   * Get a plugin by name.
-   *
-   * @param {string} name - The name of the plugin to retrieve.
-   * @throws {Error} - When the plugin does not exist.
-   */
-  getPlugin = (name) => {
-    if (!this.plugins.hasOwnProperty(name)) {
-      throw new Error(`Plugin with name "${name}" does not exist.`);
-    }
-
-    return this.plugins[name];
+/**
+ * Load a given CSS path.
+ *
+ * @param {string} path - The CSS path to load.
+ */
+function loadCSS(path) {
+  for (const cssPath of path) {
+    $('head').append(`<link rel="stylesheet" type="text/css" href="${cssPath}">`);
   }
 }
 
-export default new TerraPluginManager();
+/**
+ * Load a single plugin by name residing in the `static/plugins` directory.
+ *
+ * @param {string} pluginName - The name of the plugin to load.
+ * @returns {Promise} Resolves when the plugin is loaded.
+ */
+function loadPlugin(pluginName) {
+  return new Promise((resolve, reject) => {
+    import(`../plugins/${pluginName}/${pluginName}.js`)
+      .then((mod) => {
+        const plugin = new mod.default();
+        register(plugin);
+        resolve();
+      })
+      .catch(reject);
+  })
+}
+
+/**
+ * Load multiple plugins names residing in the `static/plugins` directory.
+ *
+ * @param {array} pluginNames - List names of the plugins to load.
+ * @returns {Promise} Resolves when all plugins are loaded.
+ */
+export function loadPlugins(pluginNames) {
+  return Promise.all(pluginNames.map((pluginName) => loadPlugin(pluginName)));
+}
+
+/**
+ * Custom behavior for the storage change event. This is necessary because
+ * we need to keep track automatically of the current storage name and
+ * previous storage name that are required as arguments for the event.
+ *
+ * @param {string} pluginName - The name of the plugin to trigger the event for.
+ * @param {string} storageName - The new storage name.
+ */
+function triggerStorageChange(pluginName, storageName) {
+  Terra.v.prevStorageName = Terra.v.storageName;
+  Terra.v.storageName = storageName;
+  plugins[pluginName]['onStorageChange'](
+    Terra.v.storageName,
+    Terra.v.prevStorageName
+  );
+}
+
+/**
+ * Trigger an event on all loaded plugins.
+ *
+ * @param {string} eventName - The name of the event.
+ * @param {array} ...args - The arguments to pass to the event handler.
+ */
+export function triggerPluginEvent(eventName, ...args) {
+  Object.keys(plugins).forEach((pluginName) => {
+    if (typeof plugins[pluginName][eventName] === 'function') {
+      if (eventName === 'onStorageChange') {
+        triggerStorageChange(pluginName, ...args);
+      } else {
+        plugins[pluginName][eventName](...args);
+      }
+    }
+  });
+}
+
+
+/**
+ * Get a plugin by name.
+ *
+ * @param {string} name - The name of the plugin to retrieve.
+ * @throws {Error} - When the plugin does not exist.
+ */
+export function getPlugin(name) {
+  if (!plugins.hasOwnProperty(name)) {
+    throw new Error(`Plugin with name "${name}" does not exist.`);
+  }
+
+  return plugins[name];
+}

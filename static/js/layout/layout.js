@@ -9,8 +9,11 @@ import {
 import ImageComponent from './image.component.js';
 import EditorComponent from './editor.component.js';
 import TerminalComponent from './term.component.js';
-import pluginManager from '../plugin-manager.js';
-import localStorageManager from '../local-storage-manager.js';
+import { triggerPluginEvent } from '../plugin-manager.js';
+import {
+  setLocalStorageItem,
+  getLocalStorageItem
+} from '../local-storage-manager.js';
 import Terra from '../terra.js';
 
 /**
@@ -135,9 +138,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   activeTab = null;
 
   constructor(additionalLayoutConfig, options = {}) {
-    let layoutConfig = localStorageManager.getLocalStorageItem('layout');
+    let layoutConfig = getLocalStorageItem('layout');
 
-    const layoutConfigVersion = localStorageManager.getLocalStorageItem('layout-version');
+    const layoutConfigVersion = getLocalStorageItem('layout-version');
     const layoutConfigVersionNumber = parseInt(layoutConfigVersion, 10);
 
     if (
@@ -148,7 +151,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     ) {
       // Load default config.
       layoutConfig = mergeObjects(DEFAULT_LAYOUT_CONFIG, additionalLayoutConfig);
-      localStorageManager.setLocalStorageItem('layout-version', LAYOUT_CONFIG_VERSION)
+      setLocalStorageItem('layout-version', LAYOUT_CONFIG_VERSION)
     } else {
       // Load previous config from user's storage.
       layoutConfig = JSON.parse(layoutConfig);
@@ -193,10 +196,10 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    */
   onInitialised(options) {
     this.emitToAllComponents('afterFirstRender');
-    this.setTheme(localStorageManager.getLocalStorageItem('theme') || 'light');
+    this.setTheme(getLocalStorageItem('theme') || 'light');
     this.renderButtons();
     this.showTermStartupMessage();
-    pluginManager.triggerEvent('onLayoutLoaded');
+    triggerPluginEvent('onLayoutLoaded');
 
     if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
       this.emitToTabComponents('setCustomAutocompleter', options.autocomplete);
@@ -486,11 +489,11 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   addActiveStates() {
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');
-    const currentFontSize = localStorageManager.getLocalStorageItem('font-size', BASE_FONT_SIZE);
+    const currentFontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
     $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
 
     // Add active state to theme dropdown.
-    const currentTheme = localStorageManager.getLocalStorageItem('theme') || 'light';
+    const currentTheme = getLocalStorageItem('theme') || 'light';
     const $editorThemeMenu = $('#editor-theme-menu');
     $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
   }
@@ -535,7 +538,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   onStateChanged() {
     const config = this.toConfig();
     const state = JSON.stringify(config);
-    localStorageManager.setLocalStorageItem('layout', state);
+    setLocalStorageItem('layout', state);
   }
 
   /**
@@ -556,7 +559,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     }
 
     this.emitToAllComponents('themeChanged', theme);
-    localStorageManager.setLocalStorageItem('theme', theme);
+    setLocalStorageItem('theme', theme);
   }
 
   /**
@@ -633,7 +636,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       const $element = $(event.target);
       const newFontSize = parseInt($element.data('val'));
       this.emitToAllComponents('fontSizeChanged', newFontSize);
-      localStorageManager.setLocalStorageItem('font-size', newFontSize);
+      setLocalStorageItem('font-size', newFontSize);
       $element.addClass('active').siblings().removeClass('active');
     });
 
