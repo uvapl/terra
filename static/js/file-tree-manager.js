@@ -481,7 +481,7 @@ function _createContextMenuItems($trigger, event) {
         name: 'Run',
         callback: () => {
           Terra.v.userClickedContextMenuItem = true;
-          Terra.app.runCode({ fileId: node.key });
+          Terra.app.runCode({ filepath: node.key });
           Terra.v.blockFSPolling = false;
         }
       };
