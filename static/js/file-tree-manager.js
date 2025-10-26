@@ -48,8 +48,8 @@ export function setupFileDrop() {
   $dropzone.on('dragleave', (e) => {
     if (!isLocalFileSystemDrag(e)) return;
 
-    $dropzone.removeClass('drag-over');
     $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
+    $dropzone.removeClass('drag-over');
   });
 
   $dropzone.on('drop', (e) => {
@@ -57,6 +57,7 @@ export function setupFileDrop() {
 
     e.preventDefault();
     e.stopPropagation();
+
     $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
     $dropzone.removeClass('drag-over');
 
@@ -617,7 +618,6 @@ export function createFileTree(forceRecreate = false, persistState = true) {
         autoExpandMS: 400,
         dragStart: _dragStartCallback,
         dragEnter: _dragEnterCallback,
-        dragLeave: _dragLeaveCallback,
         dragDrop: _dragStopCallback,
         dragEnd: _dragEndCallback,
       },
@@ -893,14 +893,6 @@ function _dragEnterCallback(targetNode, data) {
 }
 
 /**
- * Callback when the user drags a node away from another node.
- */
-function _dragLeaveCallback() {
-  // Remove the visual drag area indicator.
-  $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
-}
-
-/**
  * Callback when the user starts dragging a node in the file tree.
  */
 function _dragStartCallback(node, data) {
@@ -921,6 +913,7 @@ function _dragEndCallback() {
   // Remove the visual drag area indicator.
   $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
 
+  $('.custom-drag-helper').remove();
   destroyTooltip('dndDuplicate');
   sortFileTree()
   Terra.v.blockFSPolling = false;
