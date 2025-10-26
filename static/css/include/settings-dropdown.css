@@ -1,5 +1,6 @@
 .settings-menu {
   user-select: none;
+  -webkit-user-select: none;
 }
 
 .settings-btn {

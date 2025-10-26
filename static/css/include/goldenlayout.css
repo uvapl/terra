@@ -12,6 +12,7 @@
   font-size: inherit;
   font-family: inherit;
   user-select: none;
+  -webkit-user-select: none;
   border-top-right-radius: var(--border-radius);
   border-top-left-radius: var(--border-radius);
   padding: 2px 10px 5px;
@@ -173,6 +174,7 @@
   align-items: center;
   justify-content: center;
   user-select: none;
+  -webkit-user-select: none;
   background-color: rgba(255, 255, 255, 0.7);
   -webkit-backdrop-filter: blur(1px) grayscale(40%);
   backdrop-filter: blur(1px) grayscale(40%);
