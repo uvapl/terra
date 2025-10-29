@@ -18,23 +18,6 @@
   --file-tree-width: 250px;
   --file-tree-padding: 10px;
   --file-tree-indent: 20px;
-  --dark-mode-color-error: #c65e54;
-  --dark-mode-color-error-hover: #e64a3a;
-  --dark-mode-bg-lighter: #393e4b;
-  --dark-mode-bg: #282c34;
-  --dark-mode-fg: #abb2bf;
-  --dark-mode-tab-fg-color: #7b818a;
-  --dark-mode-tab-bg-color: #282c34;
-  --dark-mode-layout-window-bg: #21242b;
-  --dark-mode-active-tab-fg-color: #dcdfe4;
-  --dark-mode-active-tab-bg-color: #31353e;
-  --dark-mode-border-color: #3a3f4b;
-  --dark-mode-border-color-active: #51576a;
-  --dark-mode-editor-cursor-active-line-bg: #31353e;
-  --dark-mode-editor-print-margin-color: #717784;
-  --dark-mode-overlay-bg-color: #282c34;
-  --dark-mode-overlay-fg-color: #abb2bf;
-  --dark-mode-overlay-disabled-fg-color: #5c6370;
 }
 
 .app-container {
@@ -105,26 +88,4 @@
 
 .code-block .line + .line {
   margin-top: 4px;
-}
-
-/* ========================================================================== */
-/* Dark Mode                                                                  */
-/* ========================================================================== */
-.dark-mode * {
-  scrollbar-color: var(--dark-mode-bg-lighter) var(--dark-mode-bg);
-  scrollbar-width: thin;
-}
-
-.dark-mode .xterm-viewport {
-  /* use !important to overwrite inline style by GoldenLayout */
-  background-color: var(--dark-mode-layout-window-bg) !important;
-}
-
-.dark-mode .terminal {
-  border: 1px solid var(--dark-mode-border-color);
-}
-
-.dark-mode .code-block {
-  background-color: var(--dark-mode-layout-window-bg);
-  border: 1px solid var(--dark-mode-border-color);
 }

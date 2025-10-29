@@ -12,6 +12,7 @@
   font-size: inherit;
   font-family: inherit;
   user-select: none;
+  -webkit-user-select: none;
   border-top-right-radius: var(--border-radius);
   border-top-left-radius: var(--border-radius);
   padding: 2px 10px 5px;
@@ -173,6 +174,7 @@
   align-items: center;
   justify-content: center;
   user-select: none;
+  -webkit-user-select: none;
   background-color: rgba(255, 255, 255, 0.7);
   -webkit-backdrop-filter: blur(1px) grayscale(40%);
   backdrop-filter: blur(1px) grayscale(40%);
@@ -228,4 +230,39 @@
 
 .dark-mode .lm_header .lm_controls .lm_tabdropdown:before {
   color: var(--dark-mode-fg);
+}
+
+.dark-mode .ace_search {
+  background-color: var(--dark-mode-bg);
+  color: var(--dark-mode-fg);
+  border-color: var(--dark-mode-border-color);
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.5);
+}
+
+.dark-mode .ace_search .ace_button {
+  color: unset;
+}
+
+.dark-mode .ace_search .ace_button.checked {
+  border-color: var(--dark-mode-border-color-active);
+  color: var(--color-white);
+}
+
+.dark-mode .ace_search .ace_button:hover {
+  background-color: unset;
+}
+
+.dark-mode .ace_search .ace_button:active {
+  background: var(--dark-mode-active-tab-bg-color);
+}
+
+.dark-mode .ace_search .ace_searchbtn {
+  background: transparent;
+  border-color: var(--dark-mode-border-color);
+  color: unset;
+}
+
+.dark-mode .ace_searchbtn.prev:after,
+.dark-mode .ace_searchbtn.next:after {
+  border-color: var(--dark-mode-fg);
 }

@@ -7,6 +7,7 @@
   min-width: var(--file-tree-width);
   max-width: var(--file-tree-width);
   user-select: none;
+  -webkit-user-select: none;
   display: flex;
   flex-direction: column;
 }
@@ -146,14 +147,6 @@
   max-width: 300px;
 }
 
-.file-tree-file-icon {
-  background-image: url('../../../img/icons/file.png');
-}
-
-.file-tree-folder-icon {
-  background-image: url('../../../img/icons/folder.png');
-}
-
 .file-tree-icon {
   display: block;
   width: 16px;
@@ -165,10 +158,18 @@
   position: relative;
 }
 
-.fancytree-folder.fancytree-has-children > .fancytree-expander {
+.file-tree-file-icon {
+  background-image: url('../../../img/icons/file.png');
+}
+
+.file-tree-folder-icon {
+  display: none;
+}
+
+.fancytree-folder > .fancytree-expander {
   pointer-events: none;
   display: block;
-  width: 12px;
+  width: 16px;
   height: 12px;
   background-repeat: no-repeat;
   background-size: 12px;
@@ -327,10 +328,6 @@
 
 .dark-mode .file-tree-file-icon {
   background-image: url('../../../img/icons/file-white.png');
-}
-
-.dark-mode .file-tree-folder-icon {
-  background-image: url('../../../img/icons/folder-white.png');
 }
 
 .dark-mode .fancytree-expanded > .fancytree-expander {
