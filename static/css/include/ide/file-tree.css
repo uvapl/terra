@@ -249,9 +249,10 @@
 
 /* The item that is dragged under the cursor */
 .custom-drag-helper {
+  position: absolute;
   display: inline-block;
   background-color: var(--color-white);
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
   padding: 5px 10px;
   border-radius: var(--border-radius);
 }
@@ -374,4 +375,9 @@
 .dark-mode .context-menu-item:hover {
   color: var(--dark-mode-active-tab-fg-color);
   background-color: var(--dark-mode-active-tab-bg-color);
+}
+
+.dark-mode .custom-drag-helper {
+  background-color: var(--dark-mode-bg-lighter);
+  border-color: var(--dark-mode-border-color);
 }

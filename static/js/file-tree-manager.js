@@ -25,25 +25,39 @@ setupFileDrop();
 export function setupFileDrop() {
   const $dropzone = $('#file-dropzone');
 
+  // The datatransfer.types will be ['Files'] if the user is dragging a local
+  // filesystem file/folder onto this area.
+  const isLocalFileSystemDrag = (e) =>
+    e.originalEvent.dataTransfer.types.includes('Files');
+
   $dropzone.on('dragover', (e) => {
+    if (!isLocalFileSystemDrag(e)) return;
+
     // This prevents the browser from opening the file.
     e.preventDefault();
     e.stopPropagation();
   });
 
   $dropzone.on('dragenter', (e) => {
+    if (!isLocalFileSystemDrag(e)) return;
+
     $('#file-tree').addClass(DROP_AREA_INDICATOR_CLASS);
     $dropzone.addClass('drag-over');
   });
 
   $dropzone.on('dragleave', (e) => {
-    $dropzone.removeClass('drag-over');
+    if (!isLocalFileSystemDrag(e)) return;
+
     $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
+    $dropzone.removeClass('drag-over');
   });
 
   $dropzone.on('drop', (e) => {
+    if (!isLocalFileSystemDrag(e)) return;
+
     e.preventDefault();
     e.stopPropagation();
+
     $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
     $dropzone.removeClass('drag-over');
 
@@ -69,7 +83,7 @@ export function setupFileDrop() {
  * @returns {FileSystemEntry|null} The file entry or null if not available.
  */
 function getDataTransferFileEntry(file) {
-  if (file.webkitGetAsEntry)  {
+  if (file.webkitGetAsEntry) {
     return file.webkitGetAsEntry();
   } else if (file.getAsEntry) {
     return file.getAsEntry();
@@ -604,7 +618,6 @@ export function createFileTree(forceRecreate = false, persistState = true) {
         autoExpandMS: 400,
         dragStart: _dragStartCallback,
         dragEnter: _dragEnterCallback,
-        dragLeave: _dragLeaveCallback,
         dragDrop: _dragStopCallback,
         dragEnd: _dragEndCallback,
       },
@@ -880,14 +893,6 @@ function _dragEnterCallback(targetNode, data) {
 }
 
 /**
- * Callback when the user drags a node away from another node.
- */
-function _dragLeaveCallback() {
-  // Remove the visual drag area indicator.
-  $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
-}
-
-/**
  * Callback when the user starts dragging a node in the file tree.
  */
 function _dragStartCallback(node, data) {
@@ -908,6 +913,7 @@ function _dragEndCallback() {
   // Remove the visual drag area indicator.
   $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
 
+  $('.custom-drag-helper').remove();
   destroyTooltip('dndDuplicate');
   sortFileTree()
   Terra.v.blockFSPolling = false;
@@ -958,14 +964,14 @@ function _dragStopCallback(targetNode, data) {
   const sourceNode = data.otherNode;
 
   const parentPath = (targetNode.data.isFolder)
-      ? targetNode.key
-      : (targetNode.parent.title.startsWith('root') ? null : targetNode.parent.key);
+    ? targetNode.key
+    : (targetNode.parent.title.startsWith('root') ? null : targetNode.parent.key);
 
   if (data.files.length > 0) { // user dropped one or more filesystem file/folder
     for (var i = 0; i < data.files.length; i++) {
       const item = getDataTransferFileEntry(data.dataTransfer.items[i]);
       if (!item) continue
-      _createFileSystemEntryInVFS(item, '', parentPath).then(() =>  {
+      _createFileSystemEntryInVFS(item, '', parentPath).then(() => {
         createFileTree();
       });
     }

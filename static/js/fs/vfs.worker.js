@@ -722,7 +722,13 @@ async function findFilesInFolder(folderpath) {
   // Gather all subfile handles.
   const subfiles = [];
   for await (let handle of folderHandle.values()) {
-    if (handle.kind === 'file' && !blacklistedPaths.includes(handle.name)) {
+    // Skip blacklisted paths and .crswap (Chrome's crash recovery swap) files.
+    const isValidFile = (
+      !blacklistedPaths.includes(handle.name)
+      && !handle.name.endsWith('.crswap')
+    );
+
+    if (handle.kind === 'file' && isValidFile) {
       subfiles.push(handle);
     }
   }
