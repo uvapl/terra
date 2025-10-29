@@ -218,8 +218,8 @@ export default class App {
 
   /**
    * Runs the code inside the worker by sending all files to the worker along with
-   * the current active tab name. If the `fileId` is set, then solely that file
-   * will be run.
+   * the current active tab name. If the `options.filepath` is set, then solely
+   * that file will be run.
    *
    * @async
    * @param {object} options - Options for running the code.

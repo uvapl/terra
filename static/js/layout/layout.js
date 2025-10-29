@@ -263,17 +263,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   /**
-   * Get all file IDs from the open tabs in the layout.
-   *
-   * @returns {string[]} List of file IDs.
-   */
-  getAllOpenTabFileIds() {
-    return this.getTabComponents().map(
-      (editorComponent) => editorComponent.getState().fileId
-    );
-  }
-
-  /**
    * Invoked when the terminal tab is created for the first time.
    *
    * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
