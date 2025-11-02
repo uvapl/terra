@@ -995,12 +995,13 @@ function _dragStopCallback(targetNode, data) {
     // as a sibling next to the target file.
     if (data.hitMode === 'over' && targetNode.data.isFile) {
       sourceNode.moveTo(targetNode, 'before');
-    } else {
-      /* hardcoding 'over' makes the drag work in all cases? */
-      sourceNode.moveTo(targetNode, 'over');
+    } else if (targetNode.data.isFile) {
+      /* not sure if this is needed */
+      sourceNode.moveTo(targetNode, 'after');
+    } else if (targetNode.data.isFolder) {
+      sourceNode.moveTo(targetNode, 'child');
       targetNode.setExpanded();
     }
-
 
     fn(srcPath, destPath).then(() => {
       // Update the node keys.
