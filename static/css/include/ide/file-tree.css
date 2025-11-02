@@ -136,7 +136,7 @@
   cursor: pointer;
 }
 
-.fancytree-icon {
+.fancytree-icon, .fancytree-title {
   pointer-events: none;
 }
 
@@ -260,6 +260,13 @@
 
 .fancytree-drop-reject {
   color: red;
+}
+
+.fancytree-folder.fancytree-drop-accept,
+.fancytree-folder.fancytree-drop-over,
+.fancytree-folder:has(+ ul > li > .fancytree-drop-accept:not(.fancytree-folder))
+{
+  background-color: sandybrown;
 }
 
 /* The item that is dragged under the cursor */
