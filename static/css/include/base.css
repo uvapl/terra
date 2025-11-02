@@ -45,6 +45,9 @@ html,
 body {
   width: 100%;
   height: 100%;
+
+  /* prevent pull-down/pull-up scroll effects that are unnecessary for a fullscreen app */
+  overscroll-behavior: none;
   overflow: hidden;
 
   /* Prevents the layout from breaking on small screens */
