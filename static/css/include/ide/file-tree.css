@@ -163,18 +163,28 @@
 }
 
 .file-tree-folder-icon {
-  display: none;
+  background-image: url('../../../img/icons/folder.png');
 }
 
 .fancytree-folder > .fancytree-expander {
   pointer-events: none;
   display: block;
-  width: 16px;
+  width: 12px;
   height: 12px;
   background-repeat: no-repeat;
   background-size: 12px;
   background-position: center 50%;
   margin-right: 5px;
+}
+
+/* Indent folder content */
+.fancytree-container > li > ul {
+  padding-left: 40px;
+}
+
+/* Unindent folders so the caret sticks out a little (to the left) */
+.file-tree ul ul .fancytree-folder {
+  margin-left: -17px;
 }
 
 .fancytree-expanded > .fancytree-expander {
@@ -183,6 +193,11 @@
 
 .fancytree-node:not(.fancytree-expanded) > .fancytree-expander {
   background-image: url('../../../img/icons/arrow-head-right.png');
+}
+
+/* Empty folders are always shown with a downward-pointing caret */
+.fancytree-folder:not(.fancytree-has-children) > .fancytree-expander {
+  background-image: url('../../../img/icons/arrow-head-down.png');
 }
 
 .fancytree-node input {
@@ -329,6 +344,10 @@
 
 .dark-mode .file-tree-file-icon {
   background-image: url('../../../img/icons/file-white.png');
+}
+
+.dark-mode .file-tree-folder-icon {
+  background-image: url('../../../img/icons/folder-white.png');
 }
 
 .dark-mode .fancytree-expanded > .fancytree-expander {
