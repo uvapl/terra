@@ -115,12 +115,14 @@
   outline: 0;
   list-style: none;
   margin: 0;
-  padding: 0 var(--file-tree-padding);
+  padding: 0;
+  padding-left: var(--file-tree-first-indent);
 }
 
 .fancytree-container ul {
   list-style: none;
   margin: 0;
+  padding: 0;
   padding-left: var(--file-tree-indent);
 }
 
@@ -140,7 +142,7 @@
   cursor: pointer;
 }
 
-.fancytree-icon, .fancytree-title {
+.fancytree-icon {
   pointer-events: none;
 }
 
@@ -183,11 +185,11 @@
 
 /* Indent folder content */
 .fancytree-container > li > ul {
-  padding-left: 40px;
+  padding-left: var(--file-tree-indent);
 }
 
 /* Unindent folders so the caret sticks out a little (to the left) */
-.file-tree ul ul .fancytree-folder {
+.file-tree ul .fancytree-folder {
   margin-left: -17px;
 }
 
@@ -268,9 +270,7 @@
 }
 
 .fancytree-folder.fancytree-drop-accept,
-.fancytree-folder.fancytree-drop-over,
-.fancytree-folder:has(+ ul > li > .fancytree-drop-accept:not(.fancytree-folder)),
-.fancytree-folder:has(+ ul > li > .fancytree-drop-over:not(.fancytree-folder))
+.fancytree-folder:has(+ ul > li > .fancytree-drop-accept:not(.fancytree-folder))
 {
   background-color: sandybrown;
 }
