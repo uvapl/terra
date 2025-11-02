@@ -616,7 +616,6 @@ export function createFileTree(forceRecreate = false, persistState = true) {
       // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtDnd
       dnd5: {
         preventVoidMoves: true,
-        preventSameParent: true,
         autoExpandMS: 400,
         dragStart: _dragStartCallback,
         dragEnter: _dragEnterCallback,
