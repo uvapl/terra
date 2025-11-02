@@ -616,6 +616,7 @@ export function createFileTree(forceRecreate = false, persistState = true) {
       // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtDnd
       dnd5: {
         preventVoidMoves: true,
+        preventSameParent: true,
         autoExpandMS: 400,
         dragStart: _dragStartCallback,
         dragEnter: _dragEnterCallback,
@@ -996,7 +997,8 @@ function _dragStopCallback(targetNode, data) {
     if (data.hitMode === 'over' && targetNode.data.isFile) {
       sourceNode.moveTo(targetNode, 'before');
     } else {
-      sourceNode.moveTo(targetNode, data.hitMode);
+      /* hardcoding 'over' makes the drag work in all cases? */
+      sourceNode.moveTo(targetNode, 'over');
       targetNode.setExpanded();
     }
 

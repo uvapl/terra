@@ -126,9 +126,13 @@
 
 .fancytree-node {
   display: inline-flex;
-  align-items: center;
   padding: 3px 5px;
   border-radius: var(--border-radius);
+}
+
+.fancytree-folder {
+  /* we don't do this for files because it makes the file container elt too high */
+  align-items: center;
 }
 
 .fancytree-node:not(.fancytree-drop-accept):not(.fancytree-drop-reject):not(.fancytree-statusnode-nodata):hover {
@@ -242,7 +246,8 @@
   position: relative;
 }
 
-.drop-area-indicator[aria-expanded="true"]::before,
+/* disabled indicator */
+/*.drop-area-indicator[aria-expanded="true"]::before,
 .file-tree.drop-area-indicator::before {
   content: '';
   position: absolute;
@@ -256,7 +261,7 @@
 .file-tree.drop-area-indicator::before {
   top: 0;
   left: 5px;
-}
+}*/
 
 .fancytree-drop-reject {
   color: red;
@@ -264,7 +269,8 @@
 
 .fancytree-folder.fancytree-drop-accept,
 .fancytree-folder.fancytree-drop-over,
-.fancytree-folder:has(+ ul > li > .fancytree-drop-accept:not(.fancytree-folder))
+.fancytree-folder:has(+ ul > li > .fancytree-drop-accept:not(.fancytree-folder)),
+.fancytree-folder:has(+ ul > li > .fancytree-drop-over:not(.fancytree-folder))
 {
   background-color: sandybrown;
 }
