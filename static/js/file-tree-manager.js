@@ -621,6 +621,11 @@ export function createFileTree(forceRecreate = false, persistState = true) {
         dragEnter: _dragEnterCallback,
         dragDrop: _dragStopCallback,
         dragEnd: _dragEndCallback,
+        dragOver: function(node, data) {
+          if (data.hitMode === "before" || data.hitMode === "after") {
+            data.hitMode = "over";
+          }
+        },
       },
 
       // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtEdit
@@ -836,6 +841,7 @@ function _onClickNodeCallback(event, data) {
  */
 function _dragEnterCallback(targetNode, data) {
   // Remove all existing visual drag area indicators.
+  $(`.fancytree-drop-accept`).removeClass("fancytree-drop-accept");
   $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
 
   // Add a visual drag area indicator.
