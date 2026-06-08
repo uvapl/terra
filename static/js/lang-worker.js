@@ -107,7 +107,8 @@ export default class LangWorker {
 
     // Disable the button and wait for the worker to remove the disabled prop
     // once it has been loaded.
-    $('#run-code').removeClass('loading').prop('disabled', true);
+    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
+    $('.lm_header .worker-loading-label').show();
 
     Terra.app.termClearWriteBuffer();
 
@@ -134,7 +135,8 @@ export default class LangWorker {
       this.terminate(showTerminateMsg);
     }
 
-    $('#run-code').addClass('loading');
+    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
+    $('.lm_header .worker-loading-label').show();
 
     console.log(`Spawning new ${this.proglang} worker`);
 
@@ -248,6 +250,10 @@ export default class LangWorker {
       .addClass('primary-btn')
       .removeClass('danger-btn');
 
+    if (!disableRunBtn) {
+      $('.lm_header .config-btn').prop('disabled', false);
+    }
+
     if (Terra.v.showStopCodeButtonTimeoutId) {
       clearTimeout(Terra.v.showStopCodeButtonTimeoutId);
       Terra.v.showStopCodeButtonTimeoutId = null;
@@ -307,7 +313,8 @@ export default class LangWorker {
       // everything has been initialised and ready to run some code.
       case 'ready':
         this.isReady = true;
-        $('.lm_header .run-user-code-btn').prop('disabled', false).removeClass('loading');
+        $('.lm_header .worker-loading-label').hide();
+        $('.lm_header .run-user-code-btn').prop('disabled', false);
         $('.lm_header .clear-term-btn').prop('disabled', false);
         $('.lm_header .config-btn').prop('disabled', false);
         break;
@@ -353,7 +360,7 @@ export default class LangWorker {
       // This event will be triggered after a custom config button's command has
       // been executed.
       case 'runButtonCommandCallback':
-        $(event.data.selector).prop('disabled', false);
+        $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', false);
         break;
 
       case 'restartWorker':

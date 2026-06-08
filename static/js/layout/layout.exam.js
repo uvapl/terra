@@ -39,6 +39,7 @@ export default class ExamLayout extends Layout {
     $terminalContainer.find('.lm_controls').append(settingsMenuHtml);
 
     this.renderConfigButtons();
+    $terminalContainer.find('.lm_header').append('<span class="worker-loading-label">Loading</span>');
     this.addActiveStates();
     this.addButtonEventListeners();
   }

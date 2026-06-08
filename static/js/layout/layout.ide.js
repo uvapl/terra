@@ -140,7 +140,8 @@ export default class IDELayout extends Layout {
     const $terminalContainer = $('.terminal-component-container');
     $terminalContainer.find('.lm_header')
       .append(clearTermButtonHtml)
-      .append(runCodeButtonHtml);
+      .append(runCodeButtonHtml)
+      .append('<span class="worker-loading-label">Loading</span>');
 
     this.addButtonEventListeners();
     this.addActiveStates();

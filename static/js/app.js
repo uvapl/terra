@@ -246,7 +246,7 @@ export default class App {
     // Focus the terminal, such that the user can immediately invoke ctrl+c.
     this.layout.term.focus();
 
-    $('#run-code').prop('disabled', true);
+    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
 
     // Run a given file path, or otherwise the active file.
     const filepath = options.filepath || this.layout.getActiveEditor().getPath();
@@ -320,7 +320,7 @@ export default class App {
   async runButtonCommand(selector, cmd) {
     const $button = $(selector);
     if ($button.prop('disabled')) return;
-    $button.prop('disabled', true);
+    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
 
     const activeTabName = this.layout.getActiveEditor().getFilename();
     let files = await this.vfs.getAllFiles();

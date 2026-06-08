@@ -30,8 +30,16 @@
   background: #62c0ff;
 }
 
-/* loading spinner */
-.primary-btn.loading:before {
+/* worker loading label */
+.worker-loading-label {
+  display: none;
+  font-size: 12px;
+  color: #606060;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+.worker-loading-label::before {
   content: '';
   display: inline-block;
   width: 10px;
