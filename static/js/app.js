@@ -322,6 +322,8 @@ export default class App {
     if ($button.prop('disabled')) return;
     $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
 
+    this.layout.term.clear();
+
     const activeTabName = this.layout.getActiveEditor().getFilename();
     let files = await this.vfs.getAllFiles();
     files = files.concat(this.getHiddenFiles());
@@ -352,6 +354,10 @@ export default class App {
         this.langWorker.restart();
       }
     }
+
+    if (!this.langWorker) {
+      $('.lm_header .worker-loading-label').hide();
+    }
   }
 
   /**
@@ -362,6 +368,7 @@ export default class App {
       this.langWorker.terminate();
       this.langWorker = null;
     }
+    $('.lm_header .worker-loading-label').hide();
   }
 
   /**
