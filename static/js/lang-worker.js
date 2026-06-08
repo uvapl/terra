@@ -1,4 +1,4 @@
-import { getFileExtension } from './helpers/shared.js';
+import { getFileExtension, isImageExtension } from './helpers/shared.js';
 import Terra from './terra.js';
 import * as fileTreeManager from './file-tree-manager.js';
 
@@ -294,10 +294,39 @@ export default class LangWorker {
           file.path,
           file.content,
         );
+
+        // Automatically open new image files in a tab.
+        if (isImageExtension(file.path)) {
+          Terra.app.layout.addFileTab(file.path);
+        }
       }
 
       // Recreate the file tree.
       await fileTreeManager.createFileTree();
+    }
+  }
+
+  /**
+   * Called from within the worker when files have been deleted from the
+   * worker's internal filesystem during execution of the program.
+   *
+   * @async
+   * @param {string[]} deletedPaths - List of file paths that were deleted.
+   */
+  async deletedFilesCallback(deletedPaths) {
+    if (!Array.isArray(deletedPaths)) {
+      return;
+    }
+
+    for (const path of deletedPaths) {
+      await Terra.app.vfs.deleteFile(path, false);
+
+      const tabComponent = Terra.app.getTabComponents().find(
+        (component) => component.getPath() === path
+      );
+      if (tabComponent) {
+        tabComponent.close();
+      }
     }
   }
 
@@ -379,6 +408,10 @@ export default class LangWorker {
         // will only triggerer if there are new files created or existing files
         // have been modified during execution time.
         this.newOrModifiedFilesCallback(event.data.newOrModifiedFiles);
+        break;
+
+      case 'deletedFilesCallback':
+        this.deletedFilesCallback(event.data.deletedPaths);
         break;
     }
   }

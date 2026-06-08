@@ -1,6 +1,8 @@
 import Layout from './layout.js';
 
 export default class ExamLayout extends Layout {
+  tabsClosable = false;
+
   /**
    * Create the layout.
    *
@@ -13,6 +15,12 @@ export default class ExamLayout extends Layout {
    */
   constructor(content, fontSize, options = {}) {
     const defaultLayoutConfig = {
+      settings: {
+        showPopoutIcon: false,
+        showMaximiseIcon: false,
+        showCloseIcon: false,
+        reorderEnabled: false,
+      },
       content: [
         {
           content: [

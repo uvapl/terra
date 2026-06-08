@@ -1,8 +1,9 @@
 import { getFileExtension, isObject } from './helpers/shared.js'
 import LangWorker from './lang-worker.js';
 import Terra from './terra.js';
-import VirtualFileSystem from './fs/vfs.js';
+import VirtualFileSystem, { FileNotFoundError, FileTooLargeError } from './fs/vfs.js';
 import Layout from './layout/layout.js';
+import { MAX_FILE_SIZE } from './constants.js';
 
 /**
  * Base class that is extended for each of the apps.
@@ -176,6 +177,25 @@ export default class App {
   onImageVFSChanged(imageComponent) {
     if (!Terra.v.blockFSPolling) {
       this.setImageFileContent(imageComponent);
+    }
+  }
+
+  async setImageFileContent(imageComponent) {
+    const filepath = imageComponent.getPath();
+    if (!filepath) return;
+
+    try {
+      await this.vfs.readFile(filepath, MAX_FILE_SIZE);
+      const link = await this.vfs.getFileURL(filepath);
+      imageComponent.setSrc(link);
+    } catch (err) {
+      if (err instanceof FileTooLargeError) {
+        imageComponent.exceededFileSize();
+      } else if (err instanceof FileNotFoundError) {
+        console.warn('Editor file disappeared:', err.path);
+      } else {
+        console.error('Unexpected error reading file:', err);
+      }
     }
   }
 
@@ -390,7 +410,7 @@ export default class App {
    * Clear the terminal's write buffer.
    */
   termClearWriteBuffer() {
-    this.layout.term.clearTermWriteBuffer();
+    this.layout.term?.clearTermWriteBuffer();
   }
 
   /**
@@ -427,14 +447,14 @@ export default class App {
    * longer wait for user input and will not process any further input.
    */
   termDisposeUserInput() {
-    this.layout.term.disposeUserInput();
+    this.layout.term?.disposeUserInput();
   }
 
   /**
    * Hide the cursor of the terminal.
    */
   termHideTermCursor() {
-    this.layout.term.hideTermCursor();
+    this.layout.term?.hideTermCursor();
   }
 
   /**
