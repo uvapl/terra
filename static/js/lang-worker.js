@@ -356,6 +356,10 @@ export default class LangWorker {
         $(event.data.selector).prop('disabled', false);
         break;
 
+      case 'restartWorker':
+        this.restart(false);
+        break;
+
       case 'runUserCodeCallback':
         // Run user code callback invoked from the worker instance. This event
         // will be triggered after excecuting the user's code.

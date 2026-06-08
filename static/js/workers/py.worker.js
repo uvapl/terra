@@ -13,6 +13,7 @@ class API extends BaseAPI {
     this.sharedMem = options.sharedMem;
     this.newOrModifiedFilesCallback = options.newOrModifiedFilesCallback;
     this.runButtonCommandCallback = options.runButtonCommandCallback;
+    this.restartCallback = options.restartCallback;
 
     this.initPyodide();
   }
@@ -338,6 +339,7 @@ class API extends BaseAPI {
       }
 
       this.runUserCodeCallback();
+      this.restartCallback();
     }
   }
 
@@ -366,6 +368,7 @@ class API extends BaseAPI {
       }
     } finally {
       this.runButtonCommandCallback(selector);
+      this.restartCallback();
     }
   }
 
@@ -452,21 +455,6 @@ class API extends BaseAPI {
       // Use matplotlib's Agg backend for static images.
       this.pyodide.runPython("import matplotlib; matplotlib.use('Agg')");
 
-      // Unload all modules that would be imported from the Terra editor.
-      this.pyodide.runPython(`
-        import importlib, sys, types
-
-        # allow python to pick up new files in FS etc
-        importlib.invalidate_caches()
-
-        # reload local modules
-        for name, mod in list(sys.modules.items()):
-            if isinstance(mod, types.ModuleType):
-                file = getattr(mod, "__file__", "")
-                if file and file.startswith("/home/pyodide/"):
-                    importlib.reload(mod)
-      `);
-
       // Most of the output will end up in the raw stdout handler defined
       // earlier, but some output will still end up in the console, which
       // generally happens solely for config buttons.
@@ -528,6 +516,10 @@ const onAnyMessage = async event => {
 
         runButtonCommandCallback(selector) {
           port.postMessage({ id: 'runButtonCommandCallback', selector });
+        },
+
+        restartCallback() {
+          port.postMessage({ id: 'restartWorker' });
         }
       });
       break;
