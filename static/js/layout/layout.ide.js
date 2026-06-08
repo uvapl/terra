@@ -4,7 +4,6 @@ import * as fileTreeManager from '../file-tree-manager.js';
 import {
   isValidFilename,
   getFileExtension,
-  isImageExtension
 } from '../helpers/shared.js';
 import { BASE_FONT_SIZE, MAX_FILE_SIZE } from '../constants.js';
 import { createModal, hideModal, showModal } from '../modal.js';
@@ -314,43 +313,6 @@ export default class IDELayout extends Layout {
       tabComponents[0].getFilename() === 'Untitled' &&
       !tabComponents[0].getPath() &&
       tabComponents[0].getContent() === ''
-    );
-  }
-
-  /**
-   * Open a file in the editor, or switch to the tab if it's already open.
-   *
-   * N.B. This function assumes that another editor tab is already present.
-   *
-   * @param {string} filepath - The path of the file to open.
-   */
-  addFileTab(filepath) {
-    let tabComponents = this.getTabComponents();
-
-    // Switch to the selected file if that is already open.
-    const tabComponent = tabComponents.find(
-      (component) => component.getPath() === filepath
-    );
-    if (tabComponent) {
-      tabComponent.setActive();
-      return;
-    }
-
-    // An empty Untitled tab will be removed before adding the new tab.
-    if (this.onlyHasEmptyUntitled()) {
-      this.resetLayout = true;
-      tabComponents[0].close();
-      this.resetLayout = false;
-    }
-
-    // Add new tab.
-    const filename = filepath.split('/').pop();
-    this.editorStack.addChild(
-      this._createEditorTab({
-        title: filename,
-        componentState: { path: filepath },
-        componentName: isImageExtension(filename) ? 'image' : 'editor',
-      })
     );
   }
 

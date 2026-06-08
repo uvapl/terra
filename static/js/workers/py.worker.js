@@ -12,6 +12,7 @@ class API extends BaseAPI {
     this.hostRead = options.hostRead;
     this.sharedMem = options.sharedMem;
     this.newOrModifiedFilesCallback = options.newOrModifiedFilesCallback;
+    this.deletedFilesCallback = options.deletedFilesCallback;
     this.runButtonCommandCallback = options.runButtonCommandCallback;
     this.restartCallback = options.restartCallback;
 
@@ -245,6 +246,18 @@ class API extends BaseAPI {
   }
 
   /**
+   * Finds files that were deleted when running Python code.
+   *
+   * @param {*} files
+   * @returns list of deleted files
+   */
+  checkForDeletedFiles(files) {
+    return files
+      .filter((f) => !this.fileExists(f.path))
+      .map((f) => f.path);
+  }
+
+  /**
    * Check if new files have been created in the virtual filesystem, based on
    * the files that were passed to the runUserCode function.
    */
@@ -331,11 +344,16 @@ class API extends BaseAPI {
       this.pyodide.FS.chdir(HOME_DIR);
 
       const newFiles = this.checkForNewFiles(vfsFiles);
+      const deletedPaths = this.checkForDeletedFiles(vfsFiles);
 
       this.deleteFilesFromVirtualFS(vfsFiles);
 
       if (newFiles.length > 0) {
         this.newOrModifiedFilesCallback(newFiles);
+      }
+
+      if (deletedPaths.length > 0) {
+        this.deletedFilesCallback(deletedPaths);
       }
 
       this.runUserCodeCallback();
@@ -507,6 +525,13 @@ const onAnyMessage = async event => {
           port.postMessage({
             id: 'newOrModifiedFilesCallback',
             newOrModifiedFiles
+          });
+        },
+
+        deletedFilesCallback(deletedPaths) {
+          port.postMessage({
+            id: 'deletedFilesCallback',
+            deletedPaths
           });
         },
 

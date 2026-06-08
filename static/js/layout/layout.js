@@ -1,6 +1,7 @@
 import { BASE_FONT_SIZE } from '../constants.js';
 import {
   isMac,
+  isImageExtension,
   isObject,
   mergeObjects,
   eventTargetMixin,
@@ -67,6 +68,12 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @type {boolean}
    */
   initialised = false;
+
+  /**
+   * Whether tabs created via addFileTab() can be closed by the user.
+   * @type {boolean}
+   */
+  tabsClosable = true;
 
   /**
    * Only for the Exam app we will have only one programming language,
@@ -696,5 +703,43 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
         .removeClass('primary-btn')
         .addClass('danger-btn');
     }, seconds(1));
+  }
+
+  /**
+   * Open a file in the editor, or switch to the tab if it's already open.
+   *
+   * N.B. This function assumes that another editor tab is already present.
+   *
+   * @param {string} filepath - The path of the file to open.
+   */
+  addFileTab(filepath) {
+    let tabComponents = this.getTabComponents();
+
+    // Switch to the selected file if that is already open.
+    const tabComponent = tabComponents.find(
+      (component) => component.getPath() === filepath
+    );
+    if (tabComponent) {
+      tabComponent.setActive();
+      return;
+    }
+
+    // An empty Untitled tab will be removed before adding the new tab.
+    if (this.onlyHasEmptyUntitled?.()) {
+      this.resetLayout = true;
+      tabComponents[0].close();
+      this.resetLayout = false;
+    }
+
+    // Add new tab.
+    const filename = filepath.split('/').pop();
+    this.editorStack.addChild(
+      this._createEditorTab({
+        title: filename,
+        componentState: { path: filepath },
+        componentName: isImageExtension(filename) ? 'image' : 'editor',
+        isClosable: this.tabsClosable,
+      })
+    );
   }
 }

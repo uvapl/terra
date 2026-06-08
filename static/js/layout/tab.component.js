@@ -92,7 +92,8 @@ export default class TabComponent extends EventTarget {
    * Close the current editor, which will completely destroy the editor.
    */
   close = () => {
-    this.container.close();
+    const contentItem = this.container.parent;
+    contentItem.parent.removeChild(contentItem);
   }
 
   setActive = () => {

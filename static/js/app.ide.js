@@ -143,32 +143,6 @@ export default class IDEApp extends App {
   }
 
   /**
-   * Reload the file content.
-   *
-   * @param {ImageComponent} imageComponent - The image component instance.
-   */
-  async setImageFileContent(imageComponent) {
-    const filepath = imageComponent.getPath();
-    if (!filepath) return;
-
-    try {
-      // Ensure the file is within the size limit.
-      await this.vfs.readFile(filepath, MAX_FILE_SIZE);
-
-      const link = await this.vfs.getFileURL(filepath);
-      imageComponent.setSrc(link);
-    } catch (err) {
-      if (err instanceof FileTooLargeError) {
-        imageComponent.exceededFileSize();
-      } else if (err instanceof FileNotFoundError) {
-        console.warn('Editor file disappeared:', err.path);
-      } else {
-        console.error('Unexpected error reading file:', err);
-      }
-    }
-  }
-
-  /**
    * Create the layout object with the given content objects and font-size.
    *
    * @param {boolean} [forceDefaultLayout=false] Whether to force the default layout.
