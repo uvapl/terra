@@ -175,6 +175,22 @@ function registerMenubarEventListeners() {
   Mousetrap.bind(['ctrl+f', 'meta+f'], Menubar.search);
 
   $('#menu-item--replace').click(Menubar.replace);
+  Mousetrap.bind([isMac() ? 'command+option+f' : 'ctrl+alt+f'], Menubar.replace);
+
+  $('#menu-item--increase-font-size').click(Menubar.increaseFontSize);
+  Mousetrap.bind(['ctrl+='], Menubar.increaseFontSize);
+
+  $('#menu-item--decrease-font-size').click(Menubar.decreaseFontSize);
+  Mousetrap.bind(['ctrl+-'], Menubar.decreaseFontSize);
+
+  $('#menu-item--default-font-size').click(Menubar.defaultFontSize);
+  Mousetrap.bind(['ctrl+0'], Menubar.defaultFontSize);
+
+  $('#menu-item--demo-font-size').click(Menubar.demoFontSize);
+  Mousetrap.bind(['ctrl+9'], Menubar.demoFontSize);
+
+  $('#menu-item--duplicate-line').click(Menubar.duplicateLine);
+  $('#menu-item--select-all').click(Menubar.selectAll);
 
   $('#menu-item--run-tab').click(Menubar.runTab);
 
@@ -282,6 +298,19 @@ Menubar.search = () => {
 
 Menubar.replace = () => {
   Terra.app.getActiveEditor().editor.execCommand('replace');
+};
+
+Menubar.increaseFontSize = () => Terra.app.layout.changeFontSize(Terra.app.layout.getCurrentFontSize() + 1);
+Menubar.decreaseFontSize = () => Terra.app.layout.changeFontSize(Terra.app.layout.getCurrentFontSize() - 1);
+Menubar.defaultFontSize = () => Terra.app.layout.changeFontSize(16);
+Menubar.demoFontSize = () => Terra.app.layout.changeFontSize(24);
+
+Menubar.duplicateLine = () => {
+  Terra.app.getActiveEditor().editor.execCommand('duplicateSelection');
+};
+
+Menubar.selectAll = () => {
+  Terra.app.getActiveEditor().editor.execCommand('selectall');
 };
 
 Menubar.runTab = () => {

@@ -93,6 +93,30 @@ export default class IDELayout extends Layout {
         bindKey: 'Ctrl+Shift+T',
         exec: () => fileTreeManager.createFolder(),
       },
+      {
+        name: 'increaseFontSize',
+        bindKey: { win: 'Ctrl+=', mac: 'Ctrl+=' },
+        exec: () => this.changeFontSize(this.getCurrentFontSize() + 1),
+        readOnly: true,
+      },
+      {
+        name: 'decreaseFontSize',
+        bindKey: { win: 'Ctrl+-', mac: 'Ctrl+-' },
+        exec: () => this.changeFontSize(this.getCurrentFontSize() - 1),
+        readOnly: true,
+      },
+      {
+        name: 'defaultFontSize',
+        bindKey: { win: 'Ctrl+0', mac: 'Ctrl+0' },
+        exec: () => this.changeFontSize(16),
+        readOnly: true,
+      },
+      {
+        name: 'demoFontSize',
+        bindKey: { win: 'Ctrl+9', mac: 'Ctrl+9' },
+        exec: () => this.changeFontSize(24),
+        readOnly: true,
+      },
     ]);
 
     editorComponent.onCommandExec((event) => this._validateFileSizeLimit(event, editorComponent));

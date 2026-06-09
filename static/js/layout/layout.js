@@ -624,6 +624,19 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     console.info('renderButtons() is not implemented');
   }
 
+  getCurrentFontSize() {
+    return parseInt(getLocalStorageItem('font-size', BASE_FONT_SIZE));
+  }
+
+  changeFontSize(newSize) {
+    newSize = Math.max(8, Math.min(72, newSize));
+    this.emitToAllComponents('fontSizeChanged', newSize);
+    setLocalStorageItem('font-size', newSize);
+    const $items = $('#font-size-menu').find('li[data-val]');
+    $items.removeClass('active');
+    $items.filter(`[data-val="${newSize}"]`).addClass('active');
+  }
+
   /**
    * Add event listeners to the buttons and dropdowns in the layout.
    */
@@ -632,12 +645,8 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     $('#clear-term').click(() => this.onClearTermButtonClick());
 
     // Update font-size for all components on change.
-    $('#font-size-menu').find('li').click((event) => {
-      const $element = $(event.target);
-      const newFontSize = parseInt($element.data('val'));
-      this.emitToAllComponents('fontSizeChanged', newFontSize);
-      setLocalStorageItem('font-size', newFontSize);
-      $element.addClass('active').siblings().removeClass('active');
+    $('#font-size-menu').find('li[data-val]').click((event) => {
+      this.changeFontSize(parseInt($(event.target).data('val')));
     });
 
     // Update theme on change.
