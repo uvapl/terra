@@ -399,7 +399,7 @@ export default class App {
    * @param {string} msg - The message to write.
    */
   termWrite(msg) {
-    this.lastWriteNotTerminated = !msg.endsWith("\n");
+    this.lastWriteNotTerminated = typeof msg !== "string" || !msg.endsWith("\n");
     this.layout.term.write(msg);
   }
 
