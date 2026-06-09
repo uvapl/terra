@@ -134,6 +134,18 @@ export default class TerminalComponent {
       Terra.app.handleControlC(event);
     } else if (event.key === 'k' && (isMac() ? event.metaKey : event.ctrlKey)) {
       this.clear();
+    } else if (event.key === '=' && event.ctrlKey) {
+      Terra.app.layout.changeFontSize(Terra.app.layout.getCurrentFontSize() + 1);
+      return false;
+    } else if (event.key === '-' && event.ctrlKey) {
+      Terra.app.layout.changeFontSize(Terra.app.layout.getCurrentFontSize() - 1);
+      return false;
+    } else if (event.key === '0' && event.ctrlKey) {
+      Terra.app.layout.changeFontSize(16);
+      return false;
+    } else if (event.key === '9' && event.ctrlKey) {
+      Terra.app.layout.changeFontSize(24);
+      return false;
     }
   }
 
