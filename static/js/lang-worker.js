@@ -110,9 +110,10 @@ export default class LangWorker {
     $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
     $('.lm_header .worker-loading-label').show();
 
-    Terra.app.termClearWriteBuffer();
-
+    // Stop button has been clicked, so we clear the
+    // output buffer and show a kill message.
     if (showTerminateMsg) {
+      Terra.app.termClearWriteBuffer();
       Terra.app.termWriteln('\x1b[1;31mProcess terminated\x1b[0m');
     }
 
@@ -359,6 +360,8 @@ export default class LangWorker {
             Terra.app.termWrite(event.data.data);
           }
         } catch (e) {
+          console.log("Caught write error on the terminal - clearing buffer;")
+          console.log(e)
           Terra.app.termClearWriteBuffer();
         }
         break;
