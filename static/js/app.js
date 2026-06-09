@@ -251,17 +251,10 @@ export default class App {
   async runCode(options = {}) {
     if (options.clearTerm) this.layout.term.clear();
 
-    if (this.langWorker) {
-      if (!this.langWorker.isReady) {
-        // Worker API is busy, wait for it to be done.
-        return;
-      } else if (this.langWorker.isRunningCode) {
-        // Terminate worker in cases of infinite loops.
-        return this.langWorker.restart(true);
-      }
+    if (this.langWorker?.isRunningCode) {
+      // Terminate worker in cases of infinite loops.
+      return this.langWorker.restart(true);
     }
-
-    // When reaching this part, we actually run the code in the active editor.
 
     // Focus the terminal, such that the user can immediately invoke ctrl+c.
     this.layout.term.focus();
@@ -279,7 +272,7 @@ export default class App {
     const proglang = getFileExtension(filepath);
     this.createLangWorker(proglang);
 
-    // Build args send to the worker's runUserCode function.
+    // Build args to send to the worker's runUserCode function.
     const runUserCodeArgs = [filepath, files];
 
     const runAsConfig = this.getRunAsConfig();
@@ -287,19 +280,17 @@ export default class App {
       runUserCodeArgs.push(runAsConfig);
     }
 
-    // Wait for the worker to be ready before running the code.
-    if (this.langWorker && !this.langWorker.isReady) {
-      const runFileIntervalId = setInterval(() => {
-        if (this.langWorker && this.langWorker.isReady) {
-          this.langWorker.runUserCode(...runUserCodeArgs);
-          this.layout.checkForStopCodeButton();
-          clearInterval(runFileIntervalId);
-        }
-      }, 200);
-    } else if (this.langWorker) {
-      // If the worker is ready, run the code immediately.
+    const run = () => {
       this.langWorker.runUserCode(...runUserCodeArgs);
       this.layout.checkForStopCodeButton();
+    };
+
+    if (this.langWorker && !this.langWorker.isReady) {
+      // Worker is still loading — queue the command to run once it's ready.
+      this.langWorker.pendingCommand = run;
+      $('.lm_header .worker-loading-label').show();
+    } else if (this.langWorker) {
+      run();
     }
   }
 
@@ -348,8 +339,14 @@ export default class App {
     let files = await this.vfs.getAllFiles();
     files = files.concat(this.getHiddenFiles());
 
-    if (this.langWorker && this.langWorker.isReady) {
-      this.langWorker.runButtonCommand(selector, activeTabName, cmd, files);
+    const run = () => this.langWorker.runButtonCommand(selector, activeTabName, cmd, files);
+
+    if (this.langWorker && !this.langWorker.isReady) {
+      // Worker is still loading — queue the command to run once it's ready.
+      this.langWorker.pendingCommand = run;
+      $('.lm_header .worker-loading-label').show();
+    } else if (this.langWorker?.isReady) {
+      run();
     }
   }
 

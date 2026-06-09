@@ -50,6 +50,13 @@ export default class LangWorker {
    */
   worker = null;
 
+  /**
+   * A command to execute immediately once the worker signals ready.
+   * Set when a button is clicked while the worker is still (re)loading.
+   * @type {Function|null}
+   */
+  pendingCommand = null;
+
   constructor(proglang) {
     this.proglang = proglang;
     this._createWorker();
@@ -107,9 +114,6 @@ export default class LangWorker {
 
     // Disable the button and wait for the worker to remove the disabled prop
     // once it has been loaded.
-    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
-    $('.lm_header .worker-loading-label').show();
-
     // Stop button has been clicked, so we clear the
     // output buffer and show a kill message.
     if (showTerminateMsg) {
@@ -135,9 +139,6 @@ export default class LangWorker {
     if (this.worker) {
       this.terminate(showTerminateMsg);
     }
-
-    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
-    $('.lm_header .worker-loading-label').show();
 
     console.log(`Spawning new ${this.proglang} worker`);
 
@@ -344,9 +345,15 @@ export default class LangWorker {
       case 'ready':
         this.isReady = true;
         $('.lm_header .worker-loading-label').hide();
-        $('.lm_header .run-user-code-btn').prop('disabled', false);
-        $('.lm_header .clear-term-btn').prop('disabled', false);
-        $('.lm_header .config-btn').prop('disabled', false);
+        if (this.pendingCommand) {
+          const cmd = this.pendingCommand;
+          this.pendingCommand = null;
+          cmd();
+        } else {
+          $('.lm_header .run-user-code-btn').prop('disabled', false);
+          $('.lm_header .clear-term-btn').prop('disabled', false);
+          $('.lm_header .config-btn').prop('disabled', false);
+        }
         break;
 
       // Write callback from the worker instance. When the worker wants to write

@@ -208,9 +208,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     this.showTermStartupMessage();
     triggerPluginEvent('onLayoutLoaded');
 
-    const workerLoading = Terra.app.langWorker && !Terra.app.langWorker.isReady;
-    const $label = $(`<span class="worker-loading-label" style="${workerLoading ? '' : 'display:none'}">Loading</span>`);
-    $('.terminal-component-container .lm_header').append($label);
+    $('.terminal-component-container .lm_header').append('<span class="worker-loading-label" style="display:none">Loading</span>');
 
     if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
       this.emitToTabComponents('setCustomAutocompleter', options.autocomplete);
