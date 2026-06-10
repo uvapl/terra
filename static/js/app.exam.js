@@ -25,6 +25,7 @@ import {
   removeLocalStorageItem,
   updateLocalStoragePrefix
 } from './local-storage-manager.js';
+import { notify, notifyError } from './notifications.js';
 import Terra from './terra.js';
 
 export default class ExamApp extends App {
@@ -89,13 +90,16 @@ export default class ExamApp extends App {
         });
 
         // Make layout instance available at all times.
+        /**
+         * @type {ExamLayout}
+         */
         this.layout = layout;
 
         resolve();
       })
       .catch((err) => {
         // Remove the right navbar when the application failed to initialise.
-        $('.navbar-right').remove();
+        ExamLayout.removeNavbar();
       });
     });
   }
@@ -118,12 +122,7 @@ export default class ExamApp extends App {
   postSetupLayout() {
     this.editorContentChanged = false;
 
-    if (this.config.course_name && this.config.exam_name) {
-      $('.page-title').html(`
-        <span class="course-name">${this.config.course_name}</span>
-        <span class="exam-name">${this.config.exam_name}</span>
-      `);
-    }
+    this.layout.setPageTitle(this.config.course_name, this.config.exam_name);
 
     // Register the auto-save after a certain auto-save offset time to prevent
     // the server receives many requests at once. This helps to spread them out
@@ -136,10 +135,7 @@ export default class ExamApp extends App {
 
     // Make the right navbar visible and add the click event listener to the
     // submit button.
-    $('.navbar-right')
-      .removeClass('hidden')
-      .find('#submit-btn')
-      .click(Terra.app.showSubmitExamModal);
+    this.layout.showNavbar(this.onSubmitButtonClicked);
 
     // Immediately lock everything if this exam is locked.
     if (this.config.locked === true) {
@@ -190,10 +186,10 @@ export default class ExamApp extends App {
           // Remove query params from the URL.
           history.replaceState({}, null, window.location.origin + window.location.pathname);
 
-          this.notify('Connected to server', { fadeOutAfterMs: seconds(10) });
+          notify('Connected to server', { fadeOutAfterMs: seconds(10) });
         } catch (err) {
           console.error('Failed to fetch config:', err);
-          this.notifyError('Could not connect to server');
+          notifyError('Could not connect to server');
           return;
         }
       } else {
@@ -224,11 +220,11 @@ export default class ExamApp extends App {
           setLocalStorageItem('config', JSON.stringify(localConfig));
 
           config = localConfig;
-          this.notify('Connected to server', { fadeOutAfterMs: seconds(10) });
+          notify('Connected to server', { fadeOutAfterMs: seconds(10) });
         } catch (err) {
           console.error('Failed to connect to server:');
           console.error(err);
-          this.notifyError('Failed to connect to server');
+          notifyError('Failed to connect to server');
         }
       }
 
@@ -267,78 +263,13 @@ export default class ExamApp extends App {
    * Lock the entire app, which gets triggered once the exam is over.
    */
   lock() {
-    this.notify('Your code is now locked and cannot be edited anymore.');
-
-    // Lock all components, making them read-only.
-    this.layout.emitToTabComponents('lock');
+    notify('Your code is now locked and cannot be edited anymore.');
 
     // Disable language worker.
-    Terra.app.langWorker.terminate();
+    this.langWorker.terminate();
 
-    // Use set-timeout to ensure these locks happen after the DOM has been
-    // rendered at least once.
-    setTimeout(() => {
-      // Disable the controls and remove their 'click' event listeners.
-      $('.terminal-component-container .button').prop('disabled', true).off('click');
-
-      // Lock the drag handler between the editor and terminal.
-      $('.lm_splitter').addClass('locked');
-
-      // Show lock screen for both containers.
-      $('.component-container').addClass('locked');
-    });
-
-    // Check if the submit modal is open.
-    const $submitModal = $('#submit-exam-model');
-    if ($submitModal.length > 0) {
-      let lastSubmissionText = '';
-      if (this.prevAutoSaveTime instanceof Date) {
-        lastSubmissionText = `<br/><br/>✅ The last successful submit was at ${formatDate(this.prevAutoSaveTime)}.`;
-      }
-
-      $submitModal.find('.modal-body').html(`❌ The submission was locked since the last submit. ${lastSubmissionText}`);
-    }
-
-    $('#submit-btn').remove();
-  }
-
-  /**
-   * Wrapper to render a notification as an error type.
-   *
-   * @param {string} msg - The message to be displayed.
-   * @param {object} options - Additional options for the notification.
-   */
-  notifyError(msg, options) {
-    this.notify(msg, { ...options, type: 'error' });
-  }
-
-  /**
-   * Render a given message inside the notification container in the UI.
-   *
-   * @param {string} msg - The message to be displayed.
-   * @param {object} options - Additional options for the notification.
-   * @param {string} options.type - The type of notification (e.g. 'error').
-   * @param {number} options.fadeOutAfterMs - The time in milliseconds to fade.
-   */
-  notify(msg, options = {}) {
-    if (window.notifyTimeoutId !== null) {
-      clearTimeout(window.notifyTimeoutId);
-      window.notifyTimeoutId = null;
-    }
-
-    const $msgContainer = $('.msg-container');
-
-    if (options.type === 'error') {
-      $msgContainer.addClass('error');
-    }
-
-    $msgContainer.html(`<span>${msg}</span>`);
-
-    if (options.fadeOutAfterMs) {
-      window.notifyTimeoutId = setTimeout(() => {
-        $('.msg-container span').fadeOut();
-      }, options.fadeOutAfterMs);
-    }
+    // Make the entire UI read-only.
+    this.layout.showLockedState({ prevAutoSaveTime: this.prevAutoSaveTime });
   }
 
   /**
@@ -442,26 +373,12 @@ export default class ExamApp extends App {
         msg += ` (last save at ${formatDate(this.prevAutoSaveTime)})`
       }
 
-      this.notifyError(msg);
+      notifyError(msg);
     } else {
-      Terra.app.notify(`Last save at ${autoSaveTime}`);
+      notify(`Last save at ${autoSaveTime}`);
       this.prevAutoSaveTime = currDate;
 
-      const $modal = $('#submit-exam-model');
-      if ($modal.length > 0) {
-        const evaluationFormLink = this.config.eval_link
-          ? `<br/><br/>🙏 <a href="${this.config.eval_link}" target="_blank">Fill in the evaluation form for the course</a>`
-          : '';
-
-        $modal.find('.modal-body').html(`
-          <p>
-            ✅ Your files have been submitted successfully<br/><br/>
-            🛂 Make sure that you sign off at the desk before leaving
-            ${evaluationFormLink}
-          </p>
-          <p>You can still return to the exam if you would like to make more changes to your code.</p>
-        `);
-      }
+      this.layout.setSubmitModalSuccess({ evalLink: this.config.eval_link });
     }
   }
 
@@ -494,72 +411,10 @@ export default class ExamApp extends App {
   }
 
   /**
-   * Hide the submit exam modal by removing it completely out of the DOM, which
-   * simplifies our code a bit as we can handle a bit less.
+   * Show the submit exam modal and do one final submit of all the contents.
    */
-  hideSubmitExamModal() {
-    let $modal = $('#submit-exam-model');
-
-    if ($modal.length === 0) return;
-
-    $modal.removeClass('show');
-
-    // Use a timeout to wait for the model animation to be completed before
-    // completely removing it from the DOM.
-    setTimeout(() => {
-      $modal.remove();
-    }, 300);
-  }
-
-  /**
-   * Show the modal that does one final submit of all the contents.
-   */
-  showSubmitExamModal() {
-    let lastSaveText = '';
-    if (this.prevAutoSaveTime instanceof Date) {
-      lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${formatDate(this.prevAutoSaveTime)}</span>.<br/>`;
-    }
-
-    const modalHtml = `
-      <div id="submit-exam-model" class="modal" tabindex="-1">
-        <div class="modal-content">
-          <div class="modal-header">
-            <p class="modal-title">You're done!</p>
-          </div>
-          <div class="modal-body">
-            <div class="spinner"></div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="button dismiss-modal-btn">Return to exam</button>
-          </div>
-        </div>
-      </div>
-    `;
-    $('body').append(modalHtml);
-
-    const $modal = $('#submit-exam-model');
-    $modal.find('.dismiss-modal-btn').click(this.hideSubmitExamModal);
-
-    // Use setTimeout trick to add the class after the modal HTML has been
-    // rendered to the DOM to show the fade-in animation.
-    setTimeout(() => $modal.addClass('show'), 10);
-
-    // If for some reason the auto-save POST request takes more than 1 second,
-    // we will show a message to the user.
-    //
-    // interval = 300ms for the opening transition to be completed + 1 second of
-    // time to wait for the POST request. If the submission was successful, then
-    // this timeout will be cleared automatically.
-    const infoMsgTimeoutId = setTimeout(() => {
-      $modal.find('.modal-body').html(`
-        <p>
-          🈲 NOTE: DO NOT CLOSE THIS BROWSER WINDOW<br/><br/>
-          🛄 Trying to submit your final changes to the server.<br/>
-          ${lastSaveText}
-        </p>
-        <p>You can still return to the exam if you would like to make more changes to your code.</p>
-      `);
-    }, 1300);
+  onSubmitButtonClicked() {
+    this.layout.showSubmitExamModal({ prevAutoSaveTime: this.prevAutoSaveTime });
 
     // Wait for the modal to be shown and then execute the code.
     // interval = 300ms for the opening transition to be completed.
@@ -567,7 +422,7 @@ export default class ExamApp extends App {
       await this.loadConfig();
       this.registerAutoSave(this.config.postback, this.config.code, true, () => {
         // Stop all timeouts after the first successful save.
-        clearTimeout(infoMsgTimeoutId);
+        this.layout.cancelSubmitPendingMessage();
         clearTimeout(submitTimeoutId);
       });
 
