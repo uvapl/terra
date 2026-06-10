@@ -29,6 +29,12 @@ import { notify, notifyError } from './notifications.js';
 
 export default class ExamApp extends App {
   /**
+   * Reference to the exam layout instance.
+   * @type {ExamLayout}
+   */
+  layout = null;
+
+  /**
    * Contains a reference to the exam config.
    * @type {object}
    */
@@ -80,7 +86,7 @@ export default class ExamApp extends App {
         }
 
         // Create the layout object.
-        const layout = this.createLayout(content, fontSize, {
+        const layout = new ExamLayout(content, fontSize, {
           proglang,
           hiddenFiles: this.config.hidden_tabs,
           buttonConfig: this.config.buttons,
@@ -89,9 +95,6 @@ export default class ExamApp extends App {
         });
 
         // Make layout instance available at all times.
-        /**
-         * @type {ExamLayout}
-         */
         this.layout = layout;
 
         resolve();
@@ -101,21 +104,6 @@ export default class ExamApp extends App {
         ExamLayout.removeNavbar();
       });
     });
-  }
-
-  /**
-   * Create the layout object with the given content objects and font-size.
-   *
-   * @param {array} content - List of content objects.
-   * @param {number} fontSize - The default font-size to be used.
-   * @param {object} options - Additional options object.
-   * @param {string} options.proglang - The programming language to be used.
-   * @param {object} options.buttonConfig - Object containing buttons with their
-   * commands that will be rendered by the layout.
-   * @returns {ExamLayout} The layout instance.
-   */
-  createLayout(content, fontSize, options = {}) {
-    return new ExamLayout(content, fontSize, options);
   }
 
   postSetupLayout() {
