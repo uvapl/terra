@@ -1,0 +1,8 @@
+{
+  "tabs": {
+    "main.py": "print('hello exam')\n"
+  },
+  "course_name": "Test Course",
+  "exam_name": "Test Exam",
+  "eval_link": "https://example.com/eval"
+}
