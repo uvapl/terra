@@ -26,7 +26,6 @@ import {
   updateLocalStoragePrefix
 } from './local-storage-manager.js';
 import { notify, notifyError } from './notifications.js';
-import Terra from './terra.js';
 
 export default class ExamApp extends App {
   /**
@@ -60,7 +59,7 @@ export default class ExamApp extends App {
         const proglang = getFileExtension(Object.keys(this.config.tabs)[0]);
 
         // Initialise the programming language specific worker API.
-        Terra.app.langWorker = new LangWorker(proglang);
+        this.langWorker = new LangWorker(proglang);
 
         // Get the font-size stored in local storage or use fallback value.
         const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
@@ -69,11 +68,11 @@ export default class ExamApp extends App {
         const content = this.generateConfigContent(this.config.tabs, fontSize);
 
         if (isNewExam) {
-          await Terra.app.vfs.clear();
+          await this.vfs.clear();
 
           // Create the files inside the VFS.
           await Promise.all(
-            content.map((file) => Terra.app.vfs.createFile(
+            content.map((file) => this.vfs.createFile(
               file.title,
               file.componentState.value,
             ))
@@ -130,7 +129,7 @@ export default class ExamApp extends App {
     const forceAutoSave = getLocalStorageItem('editor-content-changed', false);
     const startTimeout = getRandNumBetween(0, AUTOSAVE_START_OFFSET);
     setTimeout(() => {
-      Terra.app.registerAutoSave(this.config.postback, this.config.code, forceAutoSave);
+      this.registerAutoSave(this.config.postback, this.config.code, forceAutoSave);
     }, startTimeout);
 
     // Make the right navbar visible and add the click event listener to the
@@ -139,7 +138,7 @@ export default class ExamApp extends App {
 
     // Immediately lock everything if this exam is locked.
     if (this.config.locked === true) {
-      Terra.app.lock();
+      this.lock();
     }
 
     // Catch ctrl/cmd+w (aka page reloading) to prevent the user from closing the tab.
@@ -332,7 +331,7 @@ export default class ExamApp extends App {
           // that the user the submission has been closed.
           if (res.status === 423) {
             clearInterval(this.autoSaveIntervalId);
-            Terra.app.lock();
+            this.lock();
             return;
           }
 
@@ -401,7 +400,7 @@ export default class ExamApp extends App {
       this.layout.getEditorComponents().map(async (editorComponent) => {
         const filename = editorComponent.getFilename();
         const filepath = editorComponent.getPath();
-        const content = await Terra.app.vfs.readFile(filepath);
+        const content = await this.vfs.readFile(filepath);
         const blob = new Blob([content], { type: 'text/plain' });
         formData.append(`files[${filename}]`, blob, filename);
       })
