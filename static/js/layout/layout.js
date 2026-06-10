@@ -482,7 +482,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
         }
 
         $('.terminal-component-container .lm_header')
-          .append(`<button id="${id}" class="button config-btn ${id}-btn" disabled>${name}</button>`);
+          .append(`<button id="${id}" class="button config-btn ${id}-btn">${name}</button>`);
 
         $(selector).click(() => Terra.app.runButtonCommand(selector, cmd));
       });
@@ -575,7 +575,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    */
   getRunCodeButtonHtml() {
     const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
-    return `<button id="run-code" class="button primary-btn run-user-code-btn" disabled>Run (${runCodeShortcut})</button>`;
+    return `<button id="run-code" class="button primary-btn run-user-code-btn">Run (${runCodeShortcut})</button>`;
   };
 
   /**
