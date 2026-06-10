@@ -197,6 +197,14 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   /**
+   * Re-apply the current window size to the layout by firing the window
+   * resize event, which also lets other resize listeners recalculate.
+   */
+  refresh() {
+    $(window).trigger('resize');
+  }
+
+  /**
    * Executed after the layout has been initialised.
    *
    * @param {object} options - Options passed to the layout.
