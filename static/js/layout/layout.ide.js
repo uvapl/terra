@@ -1,13 +1,8 @@
 import Layout from './layout.js';
 import { setLocalStorageItem } from '../local-storage-manager.js';
 import * as fileTreeManager from '../file-tree-manager.js';
-import {
-  isValidFilename,
-  getFileExtension,
-} from '../helpers/shared.js';
 import { BASE_FONT_SIZE, MAX_FILE_SIZE } from '../constants.js';
 import { createModal, hideModal, showModal } from '../modal.js';
-import Terra from '../terra.js';
 import { createTooltip, destroyTooltip } from '../tooltip-manager.js';
 
 export default class IDELayout extends Layout {
@@ -66,6 +61,25 @@ export default class IDELayout extends Layout {
     super(defaultLayoutConfig, { forceDefaultLayout });
   }
 
+  /**
+   * Enable or disable the project-related items in the menubar.
+   *
+   * @param {object} state - The desired menu state.
+   * @param {boolean} [state.openFolderEnabled] - Whether the "Open Folder"
+   * menu item is enabled. Leave undefined to keep the current state.
+   * @param {boolean} [state.closeProjectEnabled] - Whether the "Close Project"
+   * menu item is enabled. Leave undefined to keep the current state.
+   */
+  setProjectMenuState({ openFolderEnabled, closeProjectEnabled } = {}) {
+    if (typeof openFolderEnabled === 'boolean') {
+      $('#menu-item--open-folder').toggleClass('disabled', !openFolderEnabled);
+    }
+
+    if (typeof closeProjectEnabled === 'boolean') {
+      $('#menu-item--close-project').toggleClass('disabled', !closeProjectEnabled);
+    }
+  }
+
   registerEditorCommands(editorComponent) {
     super.registerEditorCommands(editorComponent);
 
@@ -73,14 +87,12 @@ export default class IDELayout extends Layout {
       {
         name: 'save',
         bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
-        exec: () => {
-          Terra.app.saveFile();
-        }
+        exec: () => this.dispatchEvent(new CustomEvent('saveFile')),
       },
       {
         name: 'closeFile',
         bindKey: 'Ctrl+W',
-        exec: () => Terra.app.closeFile(),
+        exec: () => this.dispatchEvent(new CustomEvent('closeFile')),
         readOnly: true,
       },
       {
@@ -170,14 +182,9 @@ export default class IDELayout extends Layout {
   };
 
   onStateChanged() {
-    let config = this.toConfig();
-
-    // Exclude the content from all editors for the IDE when LFS is enabled,
-    // because for LFS we use lazy loading, i.e. only load the content when
-    // opening the file.
-    if (Terra.app.hasLFSProjectLoaded) {
-      config = this._removeEditorValue(config);
-    }
+    // Exclude the content from all editors for the IDE, because the content
+    // is reloaded from the VFS when the layout is restored.
+    const config = this._removeEditorValue(this.toConfig());
 
     const state = JSON.stringify(config);
     setLocalStorageItem('layout', state);
@@ -187,7 +194,11 @@ export default class IDELayout extends Layout {
     if (config.content) {
       config.content.forEach((item) => {
         if (item.type === 'component') {
-          item.componentState.value = '';
+          // Keep the value of pathless (Untitled) tabs, because those cannot
+          // be reloaded from the VFS.
+          if (item.componentState.path) {
+            item.componentState.value = '';
+          }
         } else {
           this._removeEditorValue(item);
         }
@@ -197,36 +208,34 @@ export default class IDELayout extends Layout {
   }
 
   /**
-   * Creates the HTML recursively for the folder options in the save file modal.
+   * Creates the HTML for the folder options in the save file modal.
    *
-   * @async
-   * @param {string} [parentPath] - The absolute parent folder path where
-   * subfolders will be fetched from.
-   * @param {string} [html] - The HTML string to append to.
-   * @param {string} [indent] - The visual indent indicator.
-   * @returns {Promise<string>} The HTML string with the folder options.
+   * @param {array<object>} folders - List of folder objects, each containing
+   * an absolute `path` and a `depth` indicating how deeply it is nested.
+   * @returns {string} The HTML string with the folder options.
    */
-  async createFolderOptionsHtml(parentPath = '', html = '', indent = '--') {
-    const subfolders = await Terra.app.vfs.listFoldersInFolder(parentPath);
-
-    for (const folderName of subfolders) {
-      const subfolderpath = parentPath ? `${parentPath}/${folderName}` : folderName;
-      html += `<option value="${subfolderpath}">${indent} ${folderName}</option>`;
-      html += await this.createFolderOptionsHtml(subfolderpath, '', indent + '--');
-    }
-
-    return html;
+  _createFolderOptionsHtml(folders) {
+    return folders.map(({ path, depth }) => {
+      const indent = '--'.repeat(depth + 1);
+      const folderName = path.split('/').pop();
+      return `<option value="${path}">${indent} ${folderName}</option>`;
+    }).join('');
   }
 
   /**
    * Prompt the user with a modal for a filename and in which folder to save it.
    * This function gets triggered on each 'save' keystroke, i.e. <cmd/ctrl + s>.
    *
-   * @async
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {object} options - The save modal options.
+   * @param {string} options.filename - The filename to prefill in the input.
+   * @param {array<object>} options.folders - List of `{ path, depth }` folder
+   * objects to choose from, in rendering order.
+   * @param {function} options.onSave - Async callback that performs the actual
+   * save. Called with `(filename, parentPath)` and should resolve to an error
+   * message string when the save failed, or null on success.
    */
-  async promptSaveFile(editorComponent) {
-    const folderOptions = await this.createFolderOptionsHtml();
+  showSaveFileModal({ filename, folders, onSave }) {
+    const folderOptions = this._createFolderOptionsHtml(folders);
 
     const $modal = createModal({
       title: 'Save file',
@@ -235,7 +244,7 @@ export default class IDELayout extends Layout {
         <div class="form-wrapper">
           <label>Enter a filename:</label>
           <div class="right-container">
-            <input class="text-input" placeholder="Enter a filename" value="${editorComponent.getFilename()}" maxlength="30" />
+            <input class="text-input" placeholder="Enter a filename" value="${filename}" maxlength="30" />
           </div>
         </div>
         <div class="form-wrapper">
@@ -268,21 +277,14 @@ export default class IDELayout extends Layout {
     });
 
     $modal.find('.primary-btn').click(async () => {
-      const filename = $modal.find('.text-input').val();
+      const newFilename = $modal.find('.text-input').val();
 
       let parentPath = $modal.find('.select').val();
       if (parentPath === 'root') {
         parentPath = '';
       }
 
-      const filepath = parentPath ? `${parentPath}/${filename}` : filename;
-
-      let errorMsg;
-      if (!isValidFilename(filename)) {
-        errorMsg = 'Name can\'t contain \\ / : * ? " < > |';
-      } else if ((await Terra.app.vfs.pathExists(filepath))) {
-        errorMsg = `There already exists a "${filename}" file or folder`;
-      }
+      const errorMsg = await onSave(newFilename, parentPath);
 
       if (errorMsg) {
         const anchor = $modal.find('input').parent()[0];
@@ -297,30 +299,7 @@ export default class IDELayout extends Layout {
       // Remove the tooltip if it exists.
       destroyTooltip('saveFile');
 
-      // Create a new file in the VFS and then refresh the file tree.
-      await Terra.app.vfs.createFile(
-        filepath,
-        editorComponent.getContent(),
-      );
-      await fileTreeManager.createFileTree();
-
-      // Change the Untitled tab to the new filename.
-      editorComponent.setPath(filepath);
-
-      // Update the container state.
-      editorComponent.extendState({ path: filepath });
-
-      // For some reason no layout update is triggered, so we trigger an update.
-      this.emit('stateChanged');
-
       hideModal($modal);
-
-      const proglang = getFileExtension(filename);
-
-      // Set correct syntax highlighting.
-      editorComponent.setProgLang(proglang)
-
-      Terra.app.createLangWorker(proglang);
     });
   }
 

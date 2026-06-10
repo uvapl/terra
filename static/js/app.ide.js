@@ -1,7 +1,7 @@
 import App from './app.js';
 import IDELayout from './layout/layout.ide.js';
 import { MAX_FILE_SIZE } from './constants.js';
-import { getFileExtension, getRepoInfo } from './helpers/shared.js';
+import { getFileExtension, getRepoInfo, isValidFilename } from './helpers/shared.js';
 import Terra from './terra.js';
 import LangWorker from './lang-worker.js';
 import { getLocalStorageItem } from './local-storage-manager.js';
@@ -37,10 +37,10 @@ export default class IDEApp extends App {
   async postSetupLayout() {
     if (!LFS.available()) {
       // Disable open-folder if the FileSystemAPI is not supported.
-      $('#menu-item--open-folder').addClass('disabled');
+      this.layout.setProjectMenuState({ openFolderEnabled: false });
     } else if (LFS.hasProjectLoaded()) {
       // Enable close-folder menu item.
-      $('#menu-item--close-project').removeClass('disabled');
+      this.layout.setProjectMenuState({ closeProjectEnabled: true });
       fileTreeManager.setTitle(await LFS.getBaseFolderName());
     }
 
@@ -59,14 +59,14 @@ export default class IDEApp extends App {
 
     this.startLFSChangeListener();
 
-    $(window).resize();
+    this.layout.refresh();
   }
 
   /**
    * Reset the layout to its initial state.
    */
   resetLayout() {
-    const oldContentConfig = Terra.app.layout.getTabComponents().map((component) => ({
+    const oldContentConfig = this.layout.getTabComponents().map((component) => ({
       title: component.getFilename(),
       componentName: component.getComponentName(),
       componentState: {
@@ -82,8 +82,8 @@ export default class IDEApp extends App {
       setTimeout(() => {
         const editorComponent = this.layout.getActiveEditor();
         const proglang = getFileExtension(editorComponent.getFilename());
-        if (Terra.app.langWorker && LangWorker.hasWorker(proglang)) {
-          Terra.app.langWorker.restart();
+        if (this.langWorker && LangWorker.hasWorker(proglang)) {
+          this.langWorker.restart();
         }
       }, 10);
     });
@@ -150,7 +150,15 @@ export default class IDEApp extends App {
    * @returns {Layout} The layout instance.
    */
   createLayout(forceDefaultLayout = false, contentConfig = []) {
-    return new IDELayout(forceDefaultLayout, contentConfig);
+    const layout = new IDELayout(forceDefaultLayout, contentConfig);
+
+    // Attach listeners here rather than in registerLayoutEvents(), because
+    // resetLayout() replaces the layout instance and the new instance needs
+    // these listeners too.
+    layout.addEventListener('saveFile', () => this.saveFile());
+    layout.addEventListener('closeFile', () => this.closeFile());
+
+    return layout;
   }
 
   /**
@@ -202,7 +210,78 @@ export default class IDEApp extends App {
     if (existingFilepath && (await this.vfs.pathExists(existingFilepath)))
       return;
 
-    this.layout.promptSaveFile(editorComponent);
+    this.layout.showSaveFileModal({
+      filename: editorComponent.getFilename(),
+      folders: await this.getFolderList(),
+      onSave: (filename, parentPath) =>
+        this.saveFileAs(editorComponent, filename, parentPath),
+    });
+  }
+
+  /**
+   * List all folders in the VFS recursively, in depth-first order.
+   *
+   * @async
+   * @param {string} [parentPath] - The absolute parent folder path where
+   * subfolders will be fetched from.
+   * @param {number} [depth] - The current nesting depth.
+   * @returns {Promise<array<object>>} List of `{ path, depth }` folder objects.
+   */
+  async getFolderList(parentPath = '', depth = 0) {
+    const folders = [];
+
+    const subfolders = await this.vfs.listFoldersInFolder(parentPath);
+    for (const folderName of subfolders) {
+      const subfolderpath = parentPath ? `${parentPath}/${folderName}` : folderName;
+      folders.push({ path: subfolderpath, depth });
+      folders.push(...(await this.getFolderList(subfolderpath, depth + 1)));
+    }
+
+    return folders;
+  }
+
+  /**
+   * Save the contents of an editor as a new file in the VFS, refresh the file
+   * tree and point the editor tab at the new file.
+   *
+   * @async
+   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {string} filename - The filename for the new file.
+   * @param {string} parentPath - The absolute folder path to save the file in,
+   * or an empty string for the root folder.
+   * @returns {Promise<string|null>} An error message when the save failed, or
+   * null on success.
+   */
+  async saveFileAs(editorComponent, filename, parentPath) {
+    const filepath = parentPath ? `${parentPath}/${filename}` : filename;
+
+    if (!isValidFilename(filename)) {
+      return 'Name can\'t contain \\ / : * ? " < > |';
+    } else if ((await this.vfs.pathExists(filepath))) {
+      return `There already exists a "${filename}" file or folder`;
+    }
+
+    // Create a new file in the VFS and then refresh the file tree.
+    await this.vfs.createFile(filepath, editorComponent.getContent());
+    await fileTreeManager.createFileTree();
+
+    // Change the Untitled tab to the new filename.
+    editorComponent.setPath(filepath);
+
+    // Update the container state.
+    editorComponent.extendState({ path: filepath });
+
+    // For some reason no layout update is triggered, so we trigger an update.
+    this.layout.emit('stateChanged');
+
+    const proglang = getFileExtension(filename);
+
+    // Set correct syntax highlighting.
+    editorComponent.setProgLang(proglang);
+
+    this.createLangWorker(proglang);
+
+    return null;
   }
 
   /**
@@ -361,7 +440,7 @@ export default class IDEApp extends App {
     }
 
     if (accessToken && repoLink) {
-      Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
+      this.layout.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
 
       const gitfs = new GitFS(this.vfs, repoLink);
       this.gitfs = gitfs;
@@ -459,7 +538,7 @@ export default class IDEApp extends App {
 
     await this.vfs.connect(null, 'ide');
     LFS.close();
-    $('#menu-item--close-project').addClass('disabled');
+    this.layout.setProjectMenuState({ closeProjectEnabled: false });
   }
 
   // ***** FS helpers *****
