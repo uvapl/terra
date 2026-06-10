@@ -78,6 +78,12 @@ export default class IDEApp extends App {
     this.layout.resetLayout = true;
     this.layout.destroy();
     this.layout = this.createLayout(true, oldContentConfig);
+
+    // Re-attach the base-class listeners (runCode, editor events) to the new
+    // layout instance. Note that postSetupLayout is intentionally not re-bound
+    // to 'initialised', as its side effects should only happen at app init.
+    this.registerLayoutEvents();
+
     this.layout.on('initialised', () => {
       setTimeout(() => {
         const editorComponent = this.layout.getActiveEditor();

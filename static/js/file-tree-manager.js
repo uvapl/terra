@@ -5,6 +5,7 @@ import Terra from './terra.js'
 import LangWorker from './lang-worker.js';
 import EditorComponent from './layout/editor.component.js';
 import { createTooltip, destroyTooltip } from './tooltip-manager.js';
+import * as LFS from './fs/lfs.js';
 
 /**
  * Reference to the FancyTree instance.
@@ -466,7 +467,7 @@ function _createContextMenuItems($trigger, event) {
       },
     };
 
-    if (!Terra.app.hasLFSProjectLoaded) {
+    if (!LFS.hasProjectLoaded()) {
       menu.downloadFolder = {
         name: 'Download',
         callback: () => {
@@ -479,7 +480,7 @@ function _createContextMenuItems($trigger, event) {
   }
 
   if (isFile) {
-    if (!Terra.app.hasLFSProjectLoaded) {
+    if (!LFS.hasProjectLoaded()) {
       menu.downloadFile = {
         name: 'Download',
         callback: () => {

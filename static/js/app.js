@@ -65,6 +65,11 @@ export default class App {
     // Await the setupLayout because some apps might need to do async work.
     await this.setupLayout();
 
+    // We register the postSetupLayout as a callback, which will be called when
+    // the subsequent init() function has finished. This is only done once: a
+    // replacement layout (e.g. after a reset) must not re-run postSetupLayout.
+    this.layout.on('initialised', this.postSetupLayout);
+
     this.registerLayoutEvents();
     this.layout.init();
   }
@@ -85,13 +90,11 @@ export default class App {
   }
 
   /**
-   * Add event listeners to the layout instance.
+   * Add event listeners to the layout instance. This must be called again
+   * whenever the layout instance is replaced (e.g. after a layout reset),
+   * because the listeners are attached to the instance itself.
    */
   registerLayoutEvents() {
-    // We register the postSetupLayout as a callback, which will be called when
-    // the subsequent init() function has finished.
-    this.layout.on('initialised', this.postSetupLayout);
-
     this.layout.addEventListener('runCode', this.onRunCode);
 
     // Listen for editor events being emitted.
