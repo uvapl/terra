@@ -223,7 +223,7 @@ export function destroyTree() {
  * @param {string|null} [path] - The path for the new file. Leave null to
  * create a new file in the root folder.
  */
-async function createFile(path = null) {
+export async function createFile(path = null) {
   // Create the new file in the filesystem.
   const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
 
