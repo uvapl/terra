@@ -5,25 +5,26 @@ import {
   AUTOSAVE_START_OFFSET,
 } from './constants.js';
 import {
+  getConfigUrlParams,
+  fetchConfig,
+  isValidConfig,
+  examSlug,
+  selectConfigStorage,
+  saveConfig,
+  loadStoredConfig,
+} from './app.exam.config.js';
+import {
   formatDate,
   getFileExtension,
   getRandNumBetween,
-  isObject,
-  isValidUrl,
-  slugify,
-  makeUrl,
-  objectHasKeys,
-  parseQueryParams,
   seconds,
 } from './helpers/shared.js';
 import LangWorker from './lang-worker.js';
 import ExamLayout from './layout/layout.exam.js';
 import {
-  isDefaultLocalStoragePrefix,
   setLocalStorageItem,
   getLocalStorageItem,
   removeLocalStorageItem,
-  updateLocalStoragePrefix
 } from './local-storage-manager.js';
 import { notify, notifyError } from './notifications.js';
 
@@ -50,81 +51,84 @@ export default class ExamApp extends App {
     this.editorContentChanged = true;
   }
 
-  setupLayout() {
-    return new Promise((resolve, reject) => {
-      this.loadConfig().then(async (isNewExam) => {
-        // Files for a specific exam are hosted in a subdirectory of the VFS.
-        const slug = slugify(this.config.configUrl);
-        await this.vfs.setBaseFolder(`exam-${slug}`);
+  async setupLayout() {
+    let isNewExam;
+    try {
+      isNewExam = await this.loadConfig();
+    } catch (err) {
+      // Remove the right navbar when the application failed to initialise.
+      ExamLayout.removeNavbar();
+      throw err;
+    }
 
-        if (!this.config.tabs) {
-          this.config.tabs = {};
-        }
+    // Files for a specific exam are hosted in a subdirectory of the VFS.
+    const slug = examSlug(this.config.configUrl);
+    await this.vfs.setBaseFolder(`exam-${slug}`);
 
-        // Get the programming language based on tabs filename.
-        const proglang = getFileExtension(Object.keys(this.config.tabs)[0]);
+    if (!this.config.tabs) {
+      this.config.tabs = {};
+    }
 
-        // Initialise the programming language specific worker API.
-        this.langWorker = new LangWorker(proglang);
+    // Get the programming language based on tabs filename.
+    const proglang = getFileExtension(Object.keys(this.config.tabs)[0]);
 
-        // Get the font-size stored in local storage or use fallback value.
-        const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
+    // Initialise the programming language specific worker API.
+    this.langWorker = new LangWorker(proglang);
 
-        // Create the content objects that represent each tab in the editor.
-        const content = this.generateConfigContent(this.config.tabs, fontSize);
+    // Get the font-size stored in local storage or use fallback value.
+    const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
 
-        if (isNewExam) {
-          await this.vfs.clear();
+    // Create the content objects that represent each tab in the editor.
+    const content = this.generateConfigContent(this.config.tabs, fontSize);
 
-          // Create the files inside the VFS.
-          await Promise.all(
-            content.map((file) => this.vfs.createFile(
-              file.title,
-              file.componentState.value,
-            ))
-          )
-        }
+    // Load the exam files.
+    if (isNewExam) {
+      await this.vfs.clear();
 
-        // Create the layout object.
-        const layout = new ExamLayout(content, fontSize, {
-          proglang,
-          hiddenFiles: this.config.hidden_tabs,
-          buttonConfig: this.config.buttons,
-          autocomplete: this.config.autocomplete,
-          forceDefaultLayout: isNewExam,
-        });
+      await Promise.all(
+        content.map((file) => this.vfs.createFile(
+          file.title,
+          file.componentState.value,
+        ))
+      )
+    }
 
-        // Make layout instance available at all times.
-        this.layout = layout;
-
-        resolve();
-      })
-      .catch((err) => {
-        // Remove the right navbar when the application failed to initialise.
-        ExamLayout.removeNavbar();
-      });
+    // Initialize the layout.
+    this.layout = new ExamLayout(content, fontSize, {
+      proglang,
+      hiddenFiles: this.config.hidden_tabs,
+      buttonConfig: this.config.buttons,
+      autocomplete: this.config.autocomplete,
+      forceDefaultLayout: isNewExam,
     });
   }
 
   postSetupLayout() {
-    this.editorContentChanged = false;
+    // The previous session may have ended with changes the server never
+    // received; in that case start with the changed flag raised so the
+    // content is saved again.
+    this.editorContentChanged = getLocalStorageItem('editor-content-changed', false);
 
     this.layout.setPageTitle(this.config.course_name, this.config.exam_name);
 
     // Register the auto-save after a certain auto-save offset time to prevent
     // the server receives many requests at once. This helps to spread them out
     // over a minute of time.
-    const forceAutoSave = getLocalStorageItem('editor-content-changed', false);
     const startTimeout = getRandNumBetween(0, AUTOSAVE_START_OFFSET);
     setTimeout(() => {
-      this.registerAutoSave(this.config.postback, this.config.code, forceAutoSave);
+      this.registerAutoSave();
+
+      // Push content the previous session never managed to save.
+      if (this.editorContentChanged) {
+        this.runAutoSave(this.config.postback, this.config.code);
+      }
     }, startTimeout);
 
     // Make the right navbar visible and add the click event listener to the
     // submit button.
     this.layout.showNavbar(this.onSubmitButtonClicked);
 
-    // Immediately lock everything if this exam is locked.
+    // Immediately lock everything if this exam is configured as being locked.
     if (this.config.locked === true) {
       this.lock();
     }
@@ -147,112 +151,93 @@ export default class ExamApp extends App {
    * if there are no query params, the app can also boot from
    * a recent configuration in localStorage.
    *
-   * @returns {Promise<object|string>} The configuration for the app once
-   * resolved, or an error when rejected.
+   * Sets `this.config` on success.
+   *
+   * @async
+   * @returns {Promise<boolean>} Whether this is a new exam, or an error
+   * when rejected.
    */
-  loadConfig() {
-    return new Promise(async (resolve, reject) => {
-      let isNewExam = false;
-      let config;
+  async loadConfig() {
+    const queryParams = getConfigUrlParams();
+    const { config, isNewExam } = queryParams
+      ? await this.loadConfigFromUrl(queryParams)
+      : await this.loadConfigFromStorage();
 
-      // First, check if there are query params given. If so, validate them.
-      // Next, get the config data and when fetched succesfully, save it into
-      // local storage and remove the query params from the URL.
-      const queryParams = parseQueryParams();
-      if (this.validateQueryParams(queryParams)) {
-        try {
-          isNewExam = true;
+    if (!isValidConfig(config)) {
+      throw new Error('Invalid config file');
+    }
 
-          config = await this.getConfig(makeUrl(queryParams.url, { code: queryParams.code }));
-          config.code = queryParams.code;
-          config.configUrl = queryParams.url;
-
-          const currentStorageKey = slugify(config.configUrl);
-          setLocalStorageItem('last-used', currentStorageKey);
-          updateLocalStoragePrefix(currentStorageKey);
-          setLocalStorageItem('config', JSON.stringify(config));
-
-          // Remove query params from the URL.
-          history.replaceState({}, null, window.location.origin + window.location.pathname);
-
-          notify('Connected to server', { fadeOutAfterMs: seconds(10) });
-        } catch (err) {
-          console.error('Failed to fetch config:', err);
-          notifyError('Could not connect to server');
-          return;
-        }
-      } else {
-        console.log('Trying to loading previous exam config from localStorage...')
-
-        // This should only update the local storage prefix if it's
-        // not the default prefix.
-        if (isDefaultLocalStoragePrefix()) {
-          const currentStorageKey = getLocalStorageItem('last-used');
-
-          if (currentStorageKey) {
-            updateLocalStoragePrefix(currentStorageKey);
-          }
-        }
-
-        const localConfig = JSON.parse(getLocalStorageItem('config'));
-
-        // On a first visit (or after clearing storage) there is no stored
-        // config, so there is nothing to fall back on.
-        if (!localConfig) {
-          notifyError('No configuration present.');
-          reject('No configuration present');
-          return;
-        }
-
-        // Check immediately if the server is reachable by retrieving the
-        // config again. If it is reachable, use the localConfig as the actual
-        // config, otherwise notify the user that we failed to connect.
-        try {
-          const newConfig = await this.getConfig(makeUrl(localConfig.configUrl, { code: localConfig.code }))
-
-          // While we fallback on localstorage, we still need to check whether
-          // the exam is locked, so we have to update the `locked` property.
-          localConfig.locked = newConfig.locked;
-          setLocalStorageItem('config', JSON.stringify(localConfig));
-
-          config = localConfig;
-          notify('Connected to server', { fadeOutAfterMs: seconds(10) });
-        } catch (err) {
-          console.error('Failed to connect to server:');
-          console.error(err);
-          notifyError('Failed to connect to server');
-        }
-      }
-
-      if (!this.isValidConfig(config)) {
-        reject('Invalid config file');
-      } else {
-        this.config = config;
-        resolve(isNewExam);
-      }
-    });
+    this.config = config;
+    return isNewExam;
   }
 
   /**
-   * Get the config from a given URL.
+   * Fetch a fresh config from the exam server pointed to by the URL query
+   * params, persist it into local storage and remove the query params from
+   * the URL.
    *
    * @async
-   * @param {string} url - The URL that returns a JSON config.
-   * @returns {Promise<object>} The JSON config object.
+   * @param {object} queryParams - The validated `{ url, code }` query params.
+   * @returns {Promise<object>} An `{ config, isNewExam }` object.
    */
-  async getConfig(url) {
-    return new Promise((resolve, reject) => {
-      fetch(url)
-        .then((response) => response.json())
-        .then((configData) => {
-          if (!this.isValidConfig(configData)) {
-            reject();
-          } else {
-            resolve(configData)
-          }
-        })
-        .catch((err) => reject(err));
-    });
+  async loadConfigFromUrl(queryParams) {
+    try {
+      const config = await fetchConfig(queryParams.url, queryParams.code);
+      config.code = queryParams.code;
+      config.configUrl = queryParams.url;
+
+      selectConfigStorage(config.configUrl);
+      saveConfig(config);
+
+      // Remove query params from the URL.
+      history.replaceState({}, null, window.location.origin + window.location.pathname);
+
+      notify('Connected to server', { fadeOutAfterMs: seconds(10) });
+      return { config, isNewExam: true };
+    } catch (err) {
+      console.error('Failed to fetch config:', err);
+      notifyError('Could not connect to server');
+      throw err;
+    }
+  }
+
+  /**
+   * Boot from the most recently used config in local storage, verifying that
+   * the exam server is still reachable and refreshing the `locked` status.
+   *
+   * @async
+   * @returns {Promise<object>} An `{ config, isNewExam }` object.
+   */
+  async loadConfigFromStorage() {
+    console.log('Trying to loading previous exam config from localStorage...')
+
+    const config = loadStoredConfig();
+
+    // On a first visit (or after clearing storage) there is no stored
+    // config, so there is nothing to fall back on.
+    if (!config) {
+      notifyError('No configuration present.');
+      throw new Error('No configuration present');
+    }
+
+    // Check immediately if the server is reachable by retrieving the
+    // config again. If it is reachable, use the stored config as the actual
+    // config, otherwise notify the user that we failed to connect.
+    try {
+      const newConfig = await fetchConfig(config.configUrl, config.code);
+
+      // While we fallback on localstorage, we still need to check whether
+      // the exam is locked, so we have to update the `locked` property.
+      config.locked = newConfig.locked;
+      saveConfig(config);
+
+      notify('Connected to server', { fadeOutAfterMs: seconds(10) });
+      return { config, isNewExam: false };
+    } catch (err) {
+      console.error('Failed to connect to server:', err);
+      notifyError('Could not connect to server');
+      throw err;
+    }
   }
 
   /**
@@ -269,91 +254,63 @@ export default class ExamApp extends App {
   }
 
   /**
-   * Validate whether the given config object is valid.
-   *
-   * @param {object} config - The config object to validate.
-   * @returns {boolean} True when the given object is a valid config object.
+   * Register auto-save by calling the auto-save every X seconds, but only
+   * when there are changes the server has not successfully received yet.
+   * The postback URL and code are read from the config at save time, so a
+   * config refresh (e.g. on submit) is picked up automatically.
    */
-  isValidConfig(config) {
-    return isObject(config) && objectHasKeys(config, ['tabs', 'postback']);
-  }
-
-  /**
-   * Validate the query parameters for this application.
-   *
-   * @param {object} queryParams - The query parameters object.
-   * @returns {boolean} True when the query params passes all validation checks.
-   */
-  validateQueryParams(queryParams) {
-    if (!isObject(queryParams) || !objectHasKeys(queryParams, ['url', 'code'])) {
-      return false;
-    }
-
-    // At this point, we know we have a 'url' and 'code' param.
-    const configUrl = window.decodeURI(queryParams.url);
-    if (!isValidUrl(configUrl)) {
-      console.error('Invalid config URL');
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
-   * Register auto-save by calling the auto-save every X seconds.
-   *
-   * @param {string} url - The endpoint where the files will be submitted to.
-   * @param {string} uuid - Unique user ID that the POST request needs for
-   * verification purposes.
-   * @param {boolean} [force] - Whether to trigger the auto-save immediately.
-   * @param {function} [saveCallback] - Callback when the save has been done.
-   */
-  registerAutoSave(url, uuid, force, saveCallback) {
+  registerAutoSave() {
     if (this.autoSaveIntervalId) {
       clearInterval(this.autoSaveIntervalId);
     }
 
-    const run = async () => {
-      // Explicitly use a try-catch to make sure this auto-save never stops.
-      try {
-        if (this.editorContentChanged || force) {
-          // Save the editor content.
-          const res = await this.doAutoSave(url, uuid);
-
-          if (typeof saveCallback === 'function') {
-            saveCallback();
-          }
-
-          // Check if the response returns a "423 Locked" status, indicating
-          // that the user the submission has been closed.
-          if (res.status === 423) {
-            clearInterval(this.autoSaveIntervalId);
-            this.lock();
-            return;
-          }
-
-          // If the response was not OK, throw an error.
-          if (!res.ok) {
-            throw new Error(`[${res.status} ${res.statusText}] ${res.url}`);
-          }
-
-          // The response is successful at this point, thus reset flag.
-          this.editorContentChanged = false;
-          removeLocalStorageItem('editor-content-changed');
-
-          // Update the last saved timestamp in the UI.
-          this.updateLastSaved();
-
-        }
-      } catch (err) {
-        console.error('Auto-save failed:', err);
-        this.updateLastSaved(true);
+    this.autoSaveIntervalId = setInterval(() => {
+      if (this.editorContentChanged) {
+        this.runAutoSave(this.config.postback, this.config.code);
       }
-    };
+    }, AUTOSAVE_INTERVAL);
+  }
 
-    this.autoSaveIntervalId = setInterval(run, AUTOSAVE_INTERVAL);
+  /**
+   * Save the editor content and handle the server response. Saves
+   * unconditionally: whether a save is needed is up to the caller. On
+   * failure the changed flag is left raised, so the auto-save interval
+   * will retry.
+   *
+   * @async
+   * @param {string} url - The endpoint where the files will be submitted to.
+   * @param {string} uuid - Unique user ID that the POST request needs for
+   * verification purposes.
+   */
+  async runAutoSave(url, uuid) {
+    // Explicitly use a try-catch to make sure this auto-save never stops.
+    try {
+      // Save the editor content.
+      const res = await this.doAutoSave(url, uuid);
 
-    if (force) run();
+      // Check if the response returns a "423 Locked" status, indicating
+      // that the user the submission has been closed.
+      if (res.status === 423) {
+        clearInterval(this.autoSaveIntervalId);
+        this.lock();
+        return;
+      }
+
+      // If the response was not OK, throw an error.
+      if (!res.ok) {
+        throw new Error(`[${res.status} ${res.statusText}] ${res.url}`);
+      }
+
+      // The response is successful at this point, thus reset flag.
+      this.editorContentChanged = false;
+      removeLocalStorageItem('editor-content-changed');
+
+      // Update the last saved timestamp in the UI.
+      this.updateLastSaved();
+    } catch (err) {
+      console.error('Auto-save failed:', err);
+      this.updateLastSaved(true);
+    }
   }
 
   /**
@@ -414,14 +371,20 @@ export default class ExamApp extends App {
 
     // Wait for the modal to be shown and then execute the code.
     // interval = 300ms for the opening transition to be completed.
-    const submitTimeoutId = setTimeout(async () => {
-      await this.loadConfig();
-      this.registerAutoSave(this.config.postback, this.config.code, true, () => {
-        // Stop all timeouts after the first successful save.
-        this.layout.cancelSubmitPendingMessage();
-        clearTimeout(submitTimeoutId);
-      });
+    setTimeout(async () => {
+      try {
+        await this.loadConfig();
+      } catch (err) {
+        console.error('Failed to reload config on submit:', err);
+        return;
+      }
 
+      // The submit must end in a confirmed save, even when nothing changed
+      // since the last auto-save. Raise the changed flag so a failed save
+      // below is retried by the auto-save interval, and a successful save
+      // renders the success message in the submit modal.
+      this.editorContentChanged = true;
+      this.runAutoSave(this.config.postback, this.config.code);
     }, 300);
   }
 
