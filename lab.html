@@ -1,0 +1,58 @@
+<!DOCTYPE>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+  <link rel="stylesheet" href="static/css/vendor/goldenlayout/1.5.9/goldenlayout-base.css" />
+  <link rel="stylesheet" href="static/css/vendor/goldenlayout/1.5.9/goldenlayout-light-theme.css" />
+  <link rel="stylesheet" href="static/css/vendor/xterm-5.4.0.min.css" />
+  <link rel="stylesheet" href="static/css/main.lab.css" />
+  <title>Proglab Lab</title>
+</head>
+
+<body class="terra-lab">
+
+  <div class="app-container">
+    <nav class="navbar">
+      <div class="navbar-left">
+        <h1 class="page-title">Proglab Lab</h1>
+      </div>
+      <div class="msg-container"></div>
+      <div class="navbar-right"></div>
+    </nav>
+    <div class="layout-outer-container">
+      <div class="readme-container">
+        <div class="readme-content" id="readme"></div>
+      </div>
+      <div id="layout" class="layout-container"></div>
+      <div class="lab-landing-form hidden">
+        <form id="lab-url-form">
+          <h2>Open a lab</h2>
+          <p>Paste the URL of a lab to get started. This can be the address where
+            a lab is deployed, or a GitHub directory URL:</p>
+          <p><code>https://minprog.github.io/objects/queue/lab/</code><br/>
+            <code>https://github.com/cs50/labs/tree/2023/x/mario/less</code></p>
+          <input type="text" id="lab-url-input" name="url" placeholder="https://your-site.example/lab/" autocomplete="off" spellcheck="false" />
+          <button type="submit" class="button primary-btn">Open lab</button>
+          <p class="form-error error hidden"></p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load third party libraries -->
+  <script src="static/js/vendor/jquery/jquery-3.7.1.min.js"></script>
+  <script src="static/js/vendor/ace/1.39.0/ace.js"></script>
+  <script src="static/js/vendor/ace/1.39.0/ext-language_tools.js"></script>
+  <script src="static/js/vendor/goldenlayout-1.5.9.min.js"></script>
+  <script src="static/js/vendor/xterm/5.4.0/xterm.min.js"></script>
+  <script src="static/js/vendor/xterm/5.4.0/xterm.fit.min.js"></script>
+
+  <!-- Load custom scripts -->
+  <script src="static/js/main.lab.js" type="module"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,32 @@
+@import 'include/base.css';
+@import 'include/form.css';
+@import 'include/spinner.css';
+@import 'include/button.css';
+@import 'include/modal.css';
+@import 'include/navbar.css';
+@import 'include/settings-dropdown.css';
+@import 'include/goldenlayout.css';
+@import 'include/term.css';
+@import 'include/editor.css';
+@import 'include/ide/image-component.css';
+@import 'include/lab/readme.css';
+
+/* Lab Overrides */
+
+:root {
+  --readme-width: 40%;
+  --readme-min-width: 320px;
+}
+
+.layout-container {
+  width: calc(100% - var(--readme-width)) !important;
+}
+
+.layout-outer-container {
+  overflow: hidden;
+}
+
+.lm_goldenlayout,
+.lm_goldenlayout > div {
+  max-width: 100%;
+}
