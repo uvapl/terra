@@ -143,7 +143,9 @@ export default class ExamApp extends App {
   }
 
   /**
-   * Load the config through query params with a fallback on the local storage.
+   * Load the exam configuration from query params. However,
+   * if there are no query params, the app can also boot from
+   * a recent configuration in localStorage.
    *
    * @returns {Promise<object|string>} The configuration for the app once
    * resolved, or an error when rejected.
@@ -180,8 +182,7 @@ export default class ExamApp extends App {
           return;
         }
       } else {
-        console.log('fallback local storage')
-        // Fallback on local storage.
+        console.log('Trying to loading previous exam config from localStorage...')
 
         // This should only update the local storage prefix if it's
         // not the default prefix.
@@ -194,6 +195,14 @@ export default class ExamApp extends App {
         }
 
         const localConfig = JSON.parse(getLocalStorageItem('config'));
+
+        // On a first visit (or after clearing storage) there is no stored
+        // config, so there is nothing to fall back on.
+        if (!localConfig) {
+          notifyError('No configuration present.');
+          reject('No configuration present');
+          return;
+        }
 
         // Check immediately if the server is reachable by retrieving the
         // config again. If it is reachable, use the localConfig as the actual
