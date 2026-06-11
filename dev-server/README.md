@@ -57,7 +57,7 @@ Notes:
 - To start over from a clean slate, clear the site's localStorage (the app
   keys are prefixed with `terra-`).
 
-### Typical scenarios
+### Typical scenarios (exam)
 
 | Scenario | How |
 |---|---|
@@ -66,3 +66,41 @@ Notes:
 | Locked exam on load | `curl localhost:8001/lock`, then reload the exam page |
 | Lock during the exam (423 path) | `curl localhost:8001/lock`, then edit some code and wait for the next auto-save |
 | Server unreachable | Stop exam-stub.py, reload the exam page |
+
+## Testing lab mode
+
+Lab mode needs no stub server: the lab's own host is the backend, so testing
+requires an internet connection. With serve.rb running, open:
+
+```
+http://localhost:8000/lab.html#https://minprog.github.io/objects/queue/lab/
+http://localhost:8000/lab.html#https://github.com/cs50/labs/tree/2023/x/mario/less
+```
+
+The lab URL identifies a directory containing a `.cs50.yml` (or `.cs50.yaml`)
+lab50 config and a `README.md`. Two URL forms are accepted:
+
+- **Statically deployed labs** (preferred): any URL is taken to be the lab
+  directory itself and files are fetched straight from it. The host must
+  serve CORS headers (`Access-Control-Allow-Origin`); GitHub Pages does.
+- **GitHub repository URLs** (`github.com/org/repo/tree/branch/subdir`):
+  resolved to raw.githubusercontent.com. Branch names may contain slashes;
+  the branch/subdir split is resolved through the GitHub API, with a raw-file
+  probe as fallback when the API is rate-limited (60 unauthenticated
+  requests/hour per IP).
+
+The lab URL goes after a `#` (preferred — it stays in the address bar, so the
+link remains shareable) or in a `?url=` query param (stripped after load).
+
+Notes:
+
+- On a successful load the app stores the config in localStorage and strips
+  the query params. Reloading without params reopens the last-used lab.
+- Labs are persistent: downloaded files live in a per-lab VFS folder and are
+  never overwritten by re-downloads, so student edits survive reloads. The
+  README scroll progress ({% next %} pagination) is also remembered.
+- Opening lab.html without params and without a stored lab shows a form to
+  paste a lab URL into.
+- To start over from a clean slate, clear the site's localStorage (lab keys
+  are prefixed with `terra-lab-`).
+

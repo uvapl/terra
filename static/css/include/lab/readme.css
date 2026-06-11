@@ -1,0 +1,262 @@
+/* ==========================================================================
+ *  Lab README sidebar styling.
+ * ========================================================================== */
+
+.readme-container {
+  min-width: var(--readme-min-width);
+  width: var(--readme-width);
+  max-width: var(--readme-width);
+  overflow-y: auto;
+  border-right: 1px solid var(--border-color);
+  background-color: var(--color-white);
+}
+
+.readme-content {
+  padding: 10px 25px 40px;
+  line-height: 1.55;
+}
+
+.readme-content h1,
+.readme-content h2,
+.readme-content h3 {
+  line-height: 1.25;
+}
+
+.readme-content pre {
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: var(--border-radius);
+  padding: 10px;
+  overflow-x: auto;
+}
+
+.readme-content code {
+  font-family: monospace;
+  background-color: #f5f5f5;
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.readme-content pre code {
+  background: none;
+  padding: 0;
+}
+
+.readme-content img {
+  max-width: 100%;
+}
+
+.readme-content blockquote {
+  margin-left: 0;
+  padding-left: 15px;
+  border-left: 4px solid var(--border-color);
+  color: #555;
+}
+
+.readme-content table {
+  border-collapse: collapse;
+}
+
+.readme-content th,
+.readme-content td {
+  border: 1px solid var(--border-color);
+  padding: 4px 10px;
+}
+
+/* Spoilers ({% spoiler %}) */
+
+.readme-content details.spoiler {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 8px 12px;
+  margin: 10px 0;
+}
+
+.readme-content details.spoiler summary {
+  cursor: pointer;
+  user-select: none;
+  font-weight: bold;
+}
+
+/* Videos ({% video URL %}): a thumbnail that links out to YouTube, since
+ * iframes cannot be embedded under the COEP headers the app requires. */
+
+.readme-content .video-link {
+  position: relative;
+  display: block;
+  margin: 10px 0;
+}
+
+.readme-content .video-link img {
+  display: block;
+  width: 100%;
+  border-radius: var(--border-radius);
+}
+
+.readme-content .video-link:after {
+  content: '▶';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 64px;
+  line-height: 64px;
+  text-align: center;
+  font-size: 26px;
+  text-indent: 4px;
+  color: var(--color-white);
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.readme-content .video-link:hover:after {
+  background-color: rgba(200, 0, 0, 0.85);
+}
+
+/* Pagination ({% next %}) */
+
+.readme-page.hidden-page {
+  display: none;
+}
+
+/* Separate unfolded pages with extra space and a centered ornament sitting
+ * on a horizontal rule. */
+.readme-page + .readme-page {
+  position: relative;
+  margin-top: 60px;
+  padding-top: 45px;
+  border-top: 1px solid var(--border-color);
+}
+
+.readme-page + .readme-page:before {
+  content: '\2042'; /* asterism: ⁂ */
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0 16px;
+  background-color: var(--color-white);
+  color: #999;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.readme-next-btn {
+  display: block;
+  margin: 35px auto;
+  padding: 10px 32px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #1a374b;
+  background: #62c0ff;
+  border: 0;
+  border-radius: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: filter 0.15s, box-shadow 0.15s;
+}
+
+.readme-next-btn:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.readme-next-btn:active {
+  background: #5dabdf;
+  box-shadow: none;
+}
+
+/* Landing form (shown when no lab is configured) */
+
+.lab-landing-form {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background-color: var(--color-white);
+  padding-top: 10vh;
+}
+
+.lab-landing-form form {
+  max-width: 600px;
+  padding: 0 20px;
+}
+
+.lab-landing-form input[type="text"] {
+  display: block;
+  width: 100%;
+  font-size: 14px;
+  font-family: monospace;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+}
+
+/* ========================================================================== */
+/* Dark Mode                                                                  */
+/* ========================================================================== */
+
+.dark-mode .readme-container {
+  background-color: var(--dark-mode-bg);
+  border-right-color: var(--dark-mode-border-color);
+  color: var(--dark-mode-fg);
+}
+
+.dark-mode .readme-content a {
+  color: #61afef;
+}
+
+.dark-mode .readme-content a:visited {
+  color: #61afef;
+}
+
+.dark-mode .readme-content pre,
+.dark-mode .readme-content code {
+  background-color: var(--dark-mode-layout-window-bg);
+  border-color: var(--dark-mode-border-color);
+}
+
+.dark-mode .readme-content blockquote {
+  color: var(--dark-mode-tab-fg-color);
+  border-left-color: var(--dark-mode-border-color);
+}
+
+.dark-mode .readme-content details.spoiler,
+.dark-mode .readme-content th,
+.dark-mode .readme-content td {
+  border-color: var(--dark-mode-border-color);
+}
+
+.dark-mode .readme-page + .readme-page {
+  border-top-color: var(--dark-mode-border-color);
+}
+
+.dark-mode .readme-page + .readme-page:before {
+  background-color: var(--dark-mode-bg);
+  color: var(--dark-mode-tab-fg-color);
+}
+
+.dark-mode .readme-next-btn {
+  color: var(--dark-mode-bg);
+  background: #3b8dc4;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.dark-mode .readme-next-btn:active {
+  background: #1a374b;
+  color: var(--dark-mode-fg);
+}
+
+.dark-mode .lab-landing-form {
+  background-color: var(--dark-mode-bg);
+}
+
+.dark-mode .lab-landing-form input[type="text"] {
+  background-color: var(--dark-mode-layout-window-bg);
+  border-color: var(--dark-mode-border-color);
+  color: var(--dark-mode-fg);
+}
