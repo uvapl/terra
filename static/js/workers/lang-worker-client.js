@@ -16,16 +16,10 @@ const supportedLangs = ['c', 'py'];
  */
 export default class LangWorkerClient {
   /**
-   * The current programming language that is being used.
+   * The programming language the active worker runs, or null when idle.
    * @type {string}
    */
-  _proglang = null;
-
-  /**
-   * The previous programming language that was used.
-   * @type {string}
-   */
-  _prevProglang = null;
+  proglang = null;
 
   /**
    * Contains a shared memory object when enabled.
@@ -105,20 +99,19 @@ export default class LangWorkerClient {
   load(proglang) {
     // Unsupported language: make sure no worker keeps running.
     if (!this.supports(proglang)) {
-      if (this.worker) {
-        this.terminate();
-      }
+      this.terminate();
       return;
     }
 
+    // Switching languages: tear down the current worker first, while
+    // this.proglang still names it (so terminate() logs the right one).
+    if (this.worker && this.proglang !== proglang) {
+      this.terminate();
+    }
+
     if (!this.worker) {
-      // No worker yet: spawn one.
       this.proglang = proglang;
       this._createWorker();
-    } else if (this.proglang !== proglang) {
-      // Worker running for a different language: restart with the new one.
-      this.proglang = proglang;
-      this.restart();
     }
   }
 
@@ -139,15 +132,6 @@ export default class LangWorkerClient {
     }
   }
 
-  set proglang(newLang) {
-    this._prevProglang = this.proglang;
-    this._proglang = newLang;
-  }
-
-  get proglang() {
-    return this._proglang;
-  }
-
   /**
    * Terminate the existing worker process and delegate the terminal/UI cleanup
    * (cursor, user input, terminate message) to the app.
@@ -161,7 +145,7 @@ export default class LangWorkerClient {
       return;
     }
 
-    console.log(`Terminating existing ${this._prevProglang || this.proglang} worker`);
+    console.log(`Terminating existing ${this.proglang} worker`);
 
     this.isRunningCode = false;
     this.isReady = false;
@@ -172,21 +156,15 @@ export default class LangWorkerClient {
   }
 
   /**
-   * Creates a new worker process and terminates the existing worker if needed.
-   *
-   * @param {boolean} [showTerminateMsg] - Print a message in the terminal
-   * indicating the current worker process has been terminated.
+   * Spawn a new worker process for the current proglang. Callers are responsible
+   * for terminating any existing worker first (see load() and restart()).
    */
-  _createWorker(showTerminateMsg) {
+  _createWorker() {
     this.isReady = false;
-
-    if (this.worker) {
-      this.terminate(showTerminateMsg);
-    }
 
     console.log(`Spawning new ${this.proglang} worker`);
 
-    this.worker = new Worker(this.getWorkerPath(this._proglang), { type: 'module' });
+    this.worker = new Worker(this.getWorkerPath(this.proglang), { type: 'module' });
     const channel = new MessageChannel();
     this.port = channel.port1;
     this.port.onmessage = this.onmessage.bind(this);
@@ -267,7 +245,8 @@ export default class LangWorkerClient {
    * indicating the current worker process has been terminated.
    */
   restart(showTerminateMsg) {
-    this._createWorker(showTerminateMsg);
+    this.terminate(showTerminateMsg);
+    this._createWorker();
   }
 
   /**
