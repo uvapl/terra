@@ -274,8 +274,8 @@ export default class App {
     if (options.clearTerm) this.layout.term.clear();
 
     if (this.langWorkerClient.isRunningCode) {
-      // Terminate worker in cases of infinite loops.
-      return this.langWorkerClient.restart(true);
+      // Act as stop button: abort the running program (e.g. an infinite loop).
+      return this.stopRunningProgramManually();
     }
 
     // Focus the terminal, such that the user can immediately invoke ctrl+c.
@@ -318,7 +318,7 @@ export default class App {
 
   handleControlC(event) {
     if (event.key === 'c' && event.ctrlKey && this.langWorkerClient.isRunningCode) {
-      this.langWorkerClient.restart(true);
+      this.stopRunningProgramManually();
     }
   }
 
@@ -402,7 +402,6 @@ export default class App {
       onRequestStdin: this.termWaitForInput,
       onRunButtonCommandDone: this.onWorkerRunButtonCommandDone,
       onRunEnded: this.onRunEnded,
-      onTerminate: this.onWorkerTerminate,
       onNewOrModifiedFiles: this.onWorkerNewOrModifiedFiles,
       onDeletedFiles: this.onWorkerDeletedFiles,
     };
@@ -479,23 +478,14 @@ export default class App {
   }
 
   /**
-   * Worker handler: the worker has been terminated. Clean up the terminal and,
-   * optionally, print a termination message.
-   *
-   * @param {boolean} [showTerminateMsg] - Print a process-terminated message.
+   * Stop the program the user is currently running: restart the worker so the
+   * next run starts fresh, then clear any pending output and print a termination
+   * notice. The restart triggers onRunEnded, which resets the UI and terminal.
    */
-  onWorkerTerminate(showTerminateMsg) {
-    // Stop button has been clicked, so we clear the output buffer and show a
-    // kill message.
-    if (showTerminateMsg) {
-      this.termClearWriteBuffer();
-      this.termWriteln('\x1b[1;31mProcess terminated\x1b[0m');
-    }
-
-    // Dispose any active user input.
-    this.termDisposeUserInput();
-
-    this.termHideTermCursor();
+  stopRunningProgramManually() {
+    this.langWorkerClient.restart();
+    this.termClearWriteBuffer();
+    this.termWriteln('\x1b[1;31mProcess terminated\x1b[0m');
   }
 
   /**
@@ -570,8 +560,9 @@ export default class App {
   }
 
   /**
-   * Worker handler: the user's code has finished running or was terminated.
-   * Reset the run/stop button and terminal state.
+   * Worker handler: the user's code has finished running or was aborted. Reset
+   * the run/stop button and clean up the terminal. Safe on normal completion
+   * too: there is nothing pending to dispose and the cursor is already hidden.
    */
   onRunEnded() {
     // Only disable the button again if the current tab has a worker, because
@@ -584,6 +575,10 @@ export default class App {
 
     // Print inverted `%` to terminal if last line of output was not terminated by a `\n`.
     this.termForgotNewlinePercent();
+
+    // Dispose any pending stdin prompt left by an aborted run and hide the cursor.
+    this.termDisposeUserInput();
+    this.termHideTermCursor();
 
     // Set focus to the active editor.
     this.getActiveEditor().focus();

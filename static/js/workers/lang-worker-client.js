@@ -64,7 +64,7 @@ export default class LangWorkerClient {
    *
    * @param {object} handlers - App-side reaction callbacks. Required keys:
    * onReady, onWrite, onWriteError, onRequestStdin, onRunButtonCommandDone,
-   * onRunEnded, onTerminate, onNewOrModifiedFiles, onDeletedFiles.
+   * onRunEnded, onNewOrModifiedFiles, onDeletedFiles.
    */
   constructor(handlers) {
     this.handlers = handlers;
@@ -133,13 +133,12 @@ export default class LangWorkerClient {
   }
 
   /**
-   * Terminate the existing worker process and delegate the terminal/UI cleanup
-   * (cursor, user input, terminate message) to the app.
-   *
-   * @param {boolean} [showTerminateMsg] - Print a message in the terminal
-   * indicating the current worker process has been terminated.
+   * Terminate the active worker process. Safe to call when idle. If a program
+   * was running when killed, the run-ended handler is invoked so the app can
+   * reset its UI and clean up the terminal; a clean post-run restart (where the
+   * run already reported completion) stays silent.
    */
-  terminate(showTerminateMsg) {
+  terminate() {
     // Safe to call when idle: nothing to tear down without an active worker.
     if (!this.worker) {
       return;
@@ -147,12 +146,18 @@ export default class LangWorkerClient {
 
     console.log(`Terminating existing ${this.proglang} worker`);
 
+    const wasRunning = this.isRunningCode;
     this.isRunningCode = false;
     this.isReady = false;
     this.worker.terminate();
     this.worker = null;
-    this.handlers.onRunEnded();
-    this.handlers.onTerminate(showTerminateMsg);
+
+    // Only when we abort a still-running program: a normal run already reported
+    // its end via the 'runUserCodeCallback' message, so the Pyodide post-run
+    // self-restart must not fire it again.
+    if (wasRunning) {
+      this.handlers.onRunEnded();
+    }
   }
 
   /**
@@ -237,15 +242,12 @@ export default class LangWorkerClient {
   }
 
   /**
-   * Terminate the code that is being run by the user. Useful when e.g. an
-   * infinite loop is detected. This process terminates the existing worker and
-   * create a complete new instance.
-   *
-   * @param {boolean} [showTerminateMsg] - Print a message in the terminal
-   * indicating the current worker process has been terminated.
+   * Tear down the existing worker and spawn a fresh instance for the same
+   * language. Used to abort a running program (e.g. an infinite loop) and for
+   * the Pyodide post-run reset.
    */
-  restart(showTerminateMsg) {
-    this.terminate(showTerminateMsg);
+  restart() {
+    this.terminate();
     this._createWorker();
   }
 
@@ -321,7 +323,7 @@ export default class LangWorkerClient {
         break;
 
       case 'restartWorker':
-        this.restart(false);
+        this.restart();
         break;
 
       case 'runUserCodeCallback':
