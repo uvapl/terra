@@ -10,7 +10,6 @@ import {
   loadStoredConfig,
 } from './app.lab.config.js';
 import { getFileExtension } from './helpers/shared.js';
-import LangWorker from './lang-worker.js';
 import LabLayout from './layout/layout.lab.js';
 import { loadReadme } from './app.lab.readme.js';
 import { getLocalStorageItem } from './local-storage-manager.js';
@@ -84,9 +83,6 @@ export default class LabApp extends App {
 
     // Get the programming language based on the first filename.
     const proglang = getFileExtension(config.files[0]);
-
-    // Initialise the programming language specific worker API.
-    this.langWorker = new LangWorker(proglang);
 
     // Get the font-size stored in local storage or use fallback value.
     const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);

@@ -3,7 +3,6 @@ import IDELayout from './layout/layout.ide.js';
 import { MAX_FILE_SIZE } from './constants.js';
 import { getFileExtension, getRepoInfo, isValidFilename } from './helpers/shared.js';
 import Terra from './terra.js';
-import LangWorker from './lang-worker.js';
 import { getLocalStorageItem } from './local-storage-manager.js';
 import * as fileTreeManager from './file-tree-manager.js';
 import { triggerPluginEvent, getPlugin } from './plugin-manager.js';
@@ -88,8 +87,8 @@ export default class IDEApp extends App {
       setTimeout(() => {
         const editorComponent = this.layout.getActiveEditor();
         const proglang = getFileExtension(editorComponent.getFilename());
-        if (this.langWorker && LangWorker.hasWorker(proglang)) {
-          this.langWorker.restart();
+        if (this.langWorkerClient.hasActiveWorker() && this.langWorkerClient.supports(proglang)) {
+          this.langWorkerClient.restart();
         }
       }, 10);
     });

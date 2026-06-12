@@ -1,6 +1,7 @@
-import { getFileExtension, isObject } from './helpers/shared.js'
-import LangWorker from './lang-worker.js';
+import { getFileExtension, isImageExtension, isObject } from './helpers/shared.js'
+import LangWorkerClient from './workers/lang-worker-client.js';
 import Terra from './terra.js';
+import * as fileTreeManager from './file-tree-manager.js';
 import VirtualFileSystem, { FileNotFoundError, FileTooLargeError } from './fs/vfs.js';
 import Layout from './layout/layout.js';
 import { MAX_FILE_SIZE } from './constants.js';
@@ -16,10 +17,10 @@ export default class App {
   layout = null;
 
   /**
-   * Reference to the current programming language worker.
-   * @type {LangWorker}
+   * Reference to the current language worker client.
+   * @type {LangWorkerClient}
    */
-  langWorker = null;
+  langWorkerClient = null;
 
   /**
    * Reference to the Virtual File System (VFS) instance.
@@ -31,6 +32,10 @@ export default class App {
     this._bindThis();
 
     this.vfs = new VirtualFileSystem();
+
+    // The language worker client persists for the lifetime of the app; it only
+    // spawns a worker thread on demand once a supported language is loaded.
+    this.langWorkerClient = new LangWorkerClient(this.getLangWorkerHandlers());
   }
 
   /**
@@ -116,6 +121,17 @@ export default class App {
         }
       });
     });
+
+    // Once the layout (and thus its run button) has rendered, spawn the worker
+    // for the initially active tab's language and set the run button to match.
+    // The editor 'show' events fire before the run button exists, so this has to
+    // be (re)applied here rather than relying on those events alone.
+    this.layout.on('initialised', () => {
+      const activeEditor = this.getActiveEditor();
+      const filename = activeEditor ? activeEditor.getFilename() : null;
+      this.createLangWorker(getFileExtension(filename));
+      this.updateRunButtonState(filename);
+    });
   }
 
   /**
@@ -155,6 +171,8 @@ export default class App {
       this.createLangWorker(editorComponent.proglang);
     }
 
+    this.updateRunButtonState(editorComponent.getFilename());
+
     await this.setEditorFileContent(editorComponent);
   }
 
@@ -174,6 +192,7 @@ export default class App {
 
   onImageShow(imageComponent) {
     this.terminateLangWorker();
+    this.updateRunButtonState(null);
     this.setImageFileContent(imageComponent);
   }
 
@@ -254,9 +273,9 @@ export default class App {
   async runCode(options = {}) {
     if (options.clearTerm) this.layout.term.clear();
 
-    if (this.langWorker?.isRunningCode) {
-      // Terminate worker in cases of infinite loops.
-      return this.langWorker.restart(true);
+    if (this.langWorkerClient.isRunningCode) {
+      // Act as stop button: abort the running program (e.g. an infinite loop).
+      return this.stopRunningProgramManually();
     }
 
     // Focus the terminal, such that the user can immediately invoke ctrl+c.
@@ -284,22 +303,22 @@ export default class App {
     }
 
     const run = () => {
-      this.langWorker.runUserCode(...runUserCodeArgs);
+      this.langWorkerClient.runUserCode(...runUserCodeArgs);
       this.layout.checkForStopCodeButton();
     };
 
-    if (this.langWorker && !this.langWorker.isReady) {
+    if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
       // Worker is still loading — queue the command to run once it's ready.
-      this.langWorker.pendingCommand = run;
+      this.langWorkerClient.pendingCommand = run;
       $('.lm_header .worker-loading-label').show();
-    } else if (this.langWorker) {
+    } else if (this.langWorkerClient.hasActiveWorker()) {
       run();
     }
   }
 
   handleControlC(event) {
-    if (event.key === 'c' && event.ctrlKey && this.langWorker && this.langWorker.isRunningCode) {
-      this.langWorker.restart(true);
+    if (event.key === 'c' && event.ctrlKey && this.langWorkerClient.isRunningCode) {
+      this.stopRunningProgramManually();
     }
   }
 
@@ -342,64 +361,229 @@ export default class App {
     let files = await this.vfs.getAllFiles();
     files = files.concat(this.getHiddenFiles());
 
-    const run = () => this.langWorker.runButtonCommand(selector, activeTabName, cmd, files);
+    const run = () => this.langWorkerClient.runButtonCommand(selector, activeTabName, cmd, files);
 
-    if (this.langWorker && !this.langWorker.isReady) {
+    if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
       // Worker is still loading — queue the command to run once it's ready.
-      this.langWorker.pendingCommand = run;
+      this.langWorkerClient.pendingCommand = run;
       $('.lm_header .worker-loading-label').show();
-    } else if (this.langWorker?.isReady) {
+    } else if (this.langWorkerClient.isReady) {
       run();
     }
   }
 
   /**
-   * Create a new worker instance if none exists already. The existing instance
-   * will be terminated and restarted if necessary.
+   * Create a new language worker client if none exists already. The existing
+   * client will be terminated and restarted if necessary. This is the single
+   * place where a client is constructed, so its handlers are always wired.
    *
    * @param {string} proglang - The proglang to spawn the related worker for.
    */
   createLangWorker(proglang) {
-    // Situation 1: no worker, thus spawn a new one.
-    if (!this.langWorker && LangWorker.hasWorker(proglang)) {
-      this.langWorker = new LangWorker(proglang);
-    } else if (this.langWorker && this.langWorker.proglang !== proglang) {
-      this.langWorker.proglang = proglang;
+    this.langWorkerClient.load(proglang);
 
-      // Situation 2: existing worker but new proglang is invalid.
-      if (!LangWorker.hasWorker(proglang)) {
-        this.terminateLangWorker();
-      } else {
-        // Situation 3: existing worker and new proglang is valid.
-        this.langWorker.restart();
-      }
-    }
-
-    if (!this.langWorker) {
+    if (!this.langWorkerClient.hasActiveWorker()) {
       $('.lm_header .worker-loading-label').hide();
     }
+  }
+
+  /**
+   * Build the app-side reaction callbacks handed to a language worker client.
+   * The client is pure transport and delegates every DOM/VFS/terminal reaction
+   * to these handlers. All methods are already bound to `this` via _bindThis().
+   *
+   * @returns {object} The handlers object.
+   */
+  getLangWorkerHandlers() {
+    return {
+      onReady: this.onWorkerReady,
+      onWrite: this.onWorkerWrite,
+      onWriteError: this.onWorkerWriteError,
+      onRequestStdin: this.termWaitForInput,
+      onRunButtonCommandDone: this.onWorkerRunButtonCommandDone,
+      onRunEnded: this.onRunEnded,
+      onNewOrModifiedFiles: this.onWorkerNewOrModifiedFiles,
+      onDeletedFiles: this.onWorkerDeletedFiles,
+    };
   }
 
   /**
   * Terminate the current language worker if it exists.
    */
   terminateLangWorker() {
-    if (this.langWorker) {
-      this.langWorker.terminate();
-      this.langWorker = null;
+    if (this.langWorkerClient.hasActiveWorker()) {
+      this.langWorkerClient.terminate();
     }
     $('.lm_header .worker-loading-label').hide();
   }
 
   /**
-   * Called when running a program has finished in the language worker.
+   * Enable the run button only when the given file's language has a worker;
+   * disable it otherwise (e.g. plain text, an image, or an Untitled file).
+   * Called whenever the active tab changes.
+   *
+   * @param {string|null} filename - The active tab's filename, or null when the
+   * active tab is not a runnable editor (e.g. an image).
+   */
+  updateRunButtonState(filename) {
+    const canRun = this.langWorkerClient.supports(getFileExtension(filename));
+    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', !canRun);
+  }
+
+  /**
+   * Worker handler: the worker has finished initialising and is ready to run.
+   * Re-enable the worker UI buttons unless a queued command is about to run.
+   *
+   * @param {boolean} hasPendingCommand - Whether a queued command will run now.
+   */
+  onWorkerReady(hasPendingCommand) {
+    $('.lm_header .worker-loading-label').hide();
+
+    if (!hasPendingCommand) {
+      $('.lm_header .run-user-code-btn').prop('disabled', false);
+      $('.lm_header .clear-term-btn').prop('disabled', false);
+      $('.lm_header .config-btn').prop('disabled', false);
+    }
+  }
+
+  /**
+   * Worker handler: write a message produced by the worker to the terminal.
+   *
+   * @param {string} text - The message to write.
+   */
+  onWorkerWrite(text) {
+    try {
+      this.termWrite(text);
+    } catch (e) {
+      console.log("Caught write error on the terminal - clearing buffer;")
+      console.log(e)
+      this.termClearWriteBuffer();
+    }
+  }
+
+  /**
+   * Worker handler: write an error message produced by the worker in red.
+   *
+   * @param {string} text - The error message to write.
+   */
+  onWorkerWriteError(text) {
+    this.termWrite(`\x1b[1;31m${text}\x1b[0m`);
+  }
+
+  /**
+   * Worker handler: a custom config button's command has finished executing.
+   */
+  onWorkerRunButtonCommandDone() {
+    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', false);
+  }
+
+  /**
+   * Stop the program the user is currently running: restart the worker so the
+   * next run starts fresh, then clear any pending output and print a termination
+   * notice. The restart triggers onRunEnded, which resets the UI and terminal.
+   */
+  stopRunningProgramManually() {
+    this.langWorkerClient.restart();
+    this.termClearWriteBuffer();
+    this.termWriteln('\x1b[1;31mProcess terminated\x1b[0m');
+  }
+
+  /**
+   * Worker handler: files were created or modified in the worker's internal
+   * filesystem during execution. Reflect the changes in the VFS, open tabs and
+   * the file tree.
+   *
+   * @async
+   * @param {array} newOrModifiedFiles - List of file objects.
+   */
+  async onWorkerNewOrModifiedFiles(newOrModifiedFiles) {
+    if (!Array.isArray(newOrModifiedFiles)) {
+      return;
+    }
+
+    for (const file of newOrModifiedFiles) {
+      // Check if the file already exists in the VFS.
+      if ((await this.vfs.pathExists(file.path))) {
+        // If the file already exists, update its content.
+        await this.vfs.updateFile(file.path, file.content);
+
+        // Check if there's an open tab for this file.
+        const tabComponent = this.getTabComponents().find((component) => {
+          const path = component.getPath();
+          return path == file.path;
+        });
+
+        // If so, update its content.
+        if (tabComponent) {
+          tabComponent.setContent(file.content);
+        }
+      } else {
+        // Otherwise, create a new file in the VFS.
+        await this.vfs.createFile(
+          file.path,
+          file.content,
+        );
+
+        // Automatically open new image files in a tab.
+        if (isImageExtension(file.path)) {
+          this.layout.addFileTab(file.path);
+        }
+      }
+
+      // Recreate the file tree.
+      await fileTreeManager.createFileTree();
+    }
+  }
+
+  /**
+   * Worker handler: files were deleted from the worker's internal filesystem
+   * during execution. Remove them from the VFS and close any open tabs.
+   *
+   * @async
+   * @param {string[]} deletedPaths - List of file paths that were deleted.
+   */
+  async onWorkerDeletedFiles(deletedPaths) {
+    if (!Array.isArray(deletedPaths)) {
+      return;
+    }
+
+    for (const path of deletedPaths) {
+      await this.vfs.deleteFile(path, false);
+
+      const tabComponent = this.getTabComponents().find(
+        (component) => component.getPath() === path
+      );
+      if (tabComponent) {
+        tabComponent.close();
+      }
+    }
+  }
+
+  /**
+   * Worker handler: the user's code has finished running or was aborted. Reset
+   * the run/stop button and clean up the terminal. Safe on normal completion
+   * too: there is nothing pending to dispose and the cursor is already hidden.
    */
   onRunEnded() {
+    // Only disable the button again if the current tab has a worker, because
+    // users can still run code through the contextmenu in the file-tree in the
+    // IDE app.
+    const activeEditor = this.getActiveEditor();
+    const disableRunBtn =
+      !activeEditor ||
+      !this.langWorkerClient.supports(getFileExtension(activeEditor.getFilename()));
+
     // Print inverted `%` to terminal if last line of output was not terminated by a `\n`.
     this.termForgotNewlinePercent();
 
+    // Dispose any pending stdin prompt left by an aborted run and hide the cursor.
+    this.termDisposeUserInput();
+    this.termHideTermCursor();
+
     // Set focus to the active editor.
     this.getActiveEditor().focus();
+
+    this.layout.onRunEnded({ disableRunBtn });
   }
 
   /***** Terminal Management ********************************************/

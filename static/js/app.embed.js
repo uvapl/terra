@@ -7,7 +7,6 @@ import {
   removeIndent,
 } from './helpers/shared.js';
 import Terra from './terra.js';
-import LangWorker from './lang-worker.js';
 import {
   getLocalStorageItem,
   updateLocalStoragePrefix
@@ -53,9 +52,6 @@ export default class EmbedApp extends App {
 
     // Get the programming language based on the filename.
     const proglang = getFileExtension(queryParams.filename);
-
-    // Initialise the programming language specific worker API.
-    Terra.app.langWorker = new LangWorker(proglang);
 
     // Get the font-size stored in local storage or use fallback value.
     const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
