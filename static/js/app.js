@@ -122,12 +122,15 @@ export default class App {
       });
     });
 
-    // Set the initial run-button state once the layout (and thus its run button)
-    // has been rendered. The editor 'show' events fire before the button exists,
-    // so the active tab's runnability must be re-applied here.
+    // Once the layout (and thus its run button) has rendered, spawn the worker
+    // for the initially active tab's language and set the run button to match.
+    // The editor 'show' events fire before the run button exists, so this has to
+    // be (re)applied here rather than relying on those events alone.
     this.layout.on('initialised', () => {
       const activeEditor = this.getActiveEditor();
-      this.updateRunButtonState(activeEditor ? activeEditor.getFilename() : null);
+      const filename = activeEditor ? activeEditor.getFilename() : null;
+      this.createLangWorker(getFileExtension(filename));
+      this.updateRunButtonState(filename);
     });
   }
 

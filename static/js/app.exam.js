@@ -71,9 +71,6 @@ export default class ExamApp extends App {
     // Get the programming language based on tabs filename.
     const proglang = getFileExtension(Object.keys(this.config.tabs)[0]);
 
-    // Initialise the programming language specific worker client.
-    this.createLangWorker(proglang);
-
     // Get the font-size stored in local storage or use fallback value.
     const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
 
