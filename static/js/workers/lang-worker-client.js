@@ -1,8 +1,3 @@
-import { getFileExtension, isImageExtension } from './helpers/shared.js';
-import Terra from './terra.js';
-import * as fileTreeManager from './file-tree-manager.js';
-
-
 /**
  * List of supported programming languages that have a corresponding worker.
  * @type {string[]}
@@ -11,9 +6,15 @@ const supportedLangs = ['c', 'py'];
 
 
 /**
- * Bridge class between the main app and the currently loaded language worker.
+ * Main-thread client that fronts a language worker.
+ *
+ * This class is a pure transport layer: it owns the `Worker` instance and its
+ * shared memory, posts commands to it, routes incoming messages, and manages the
+ * worker lifecycle (spawn/terminate/restart). It has no knowledge of the DOM, the
+ * app, or the VFS — all UI and app-side reactions are delegated to the handlers
+ * object passed to the constructor.
  */
-export default class LangWorker {
+export default class LangWorkerClient {
   /**
    * The current programming language that is being used.
    * @type {string}
@@ -57,19 +58,68 @@ export default class LangWorker {
    */
   pendingCommand = null;
 
-  constructor(proglang) {
-    this.proglang = proglang;
-    this._createWorker();
+  /**
+   * App-side reaction callbacks. See App.getLangWorkerHandlers() for the shape.
+   * @type {object}
+   */
+  handlers = null;
+
+  /**
+   * The client is created once and persists for the lifetime of the app. It does
+   * not spawn a worker until load() is called for a supported language.
+   *
+   * @param {object} handlers - App-side reaction callbacks. Required keys:
+   * onReady, onWrite, onWriteError, onRequestStdin, onRunButtonCommandDone,
+   * onRunEnded, onTerminate, onNewOrModifiedFiles, onDeletedFiles.
+   */
+  constructor(handlers) {
+    this.handlers = handlers;
   }
 
   /**
    * Check whether a given proglang has a corresponding worker implementation.
    *
    * @param {string} proglang - The proglang to check for.
-   * @returns {boolean} True if proglang is valid, false otherwise.
+   * @returns {boolean} True if proglang is supported, false otherwise.
    */
-  static hasWorker(proglang) {
+  supports(proglang) {
     return supportedLangs.some((lang) => proglang === lang);
+  }
+
+  /**
+   * Whether a worker thread is currently running.
+   *
+   * @returns {boolean} True if a worker is active, false otherwise.
+   */
+  hasActiveWorker() {
+    return !!this.worker;
+  }
+
+  /**
+   * Spawn, switch, or tear down the worker thread for a given language. This is
+   * the single entry point the app uses to keep the worker in sync with the
+   * active programming language.
+   *
+   * @param {string} proglang - The programming language to load a worker for.
+   */
+  load(proglang) {
+    // Unsupported language: make sure no worker keeps running.
+    if (!this.supports(proglang)) {
+      if (this.worker) {
+        this.terminate();
+      }
+      return;
+    }
+
+    if (!this.worker) {
+      // No worker yet: spawn one.
+      this.proglang = proglang;
+      this._createWorker();
+    } else if (this.proglang !== proglang) {
+      // Worker running for a different language: restart with the new one.
+      this.proglang = proglang;
+      this.restart();
+    }
   }
 
   /**
@@ -99,32 +149,26 @@ export default class LangWorker {
   }
 
   /**
-   * Terminate the existing worker process, hides term cursor and disposes any
-   * active user input that is active.
+   * Terminate the existing worker process and delegate the terminal/UI cleanup
+   * (cursor, user input, terminate message) to the app.
    *
    * @param {boolean} [showTerminateMsg] - Print a message in the terminal
    * indicating the current worker process has been terminated.
    */
   terminate(showTerminateMsg) {
+    // Safe to call when idle: nothing to tear down without an active worker.
+    if (!this.worker) {
+      return;
+    }
+
     console.log(`Terminating existing ${this._prevProglang || this.proglang} worker`);
 
     this.isRunningCode = false;
+    this.isReady = false;
     this.worker.terminate();
-    this.runUserCodeCallback();
-
-    // Disable the button and wait for the worker to remove the disabled prop
-    // once it has been loaded.
-    // Stop button has been clicked, so we clear the
-    // output buffer and show a kill message.
-    if (showTerminateMsg) {
-      Terra.app.termClearWriteBuffer();
-      Terra.app.termWriteln('\x1b[1;31mProcess terminated\x1b[0m');
-    }
-
-    // Dispose any active user input.
-    Terra.app.termDisposeUserInput();
-
-    Terra.app.termHideTermCursor();
+    this.worker = null;
+    this.handlers.onRunEnded();
+    this.handlers.onTerminate(showTerminateMsg);
   }
 
   /**
@@ -227,179 +271,74 @@ export default class LangWorker {
   }
 
   /**
-   * Callback function for when the user code has finished running or has been
-   * terminated by the user.
+   * Provide the user's stdin input to the worker by writing it into shared
+   * memory and notifying the (blocked) worker thread.
+   *
+   * @param {string} value - The user's input.
    */
-  runUserCodeCallback() {
-    this.isRunningCode = false;
-
-    // Only disable the button again if the current tab has a worker,
-    // because users can still run code through the contextmenu in the
-    // file-tree in the IDE app.
-    const activeEditor = Terra.app.getActiveEditor();
-    let disableRunBtn =
-      !activeEditor ||
-      !this.constructor.hasWorker(getFileExtension(activeEditor.getFilename()));
-
-    // Callback to main app.
-    Terra.app.onRunEnded();
-
-    // Change the stop-code button back to a run-code button.
-    const $button = $('#run-code');
-    const newText = $button.text().replace('Stop', 'Run');
-    $button.text(newText)
-      .prop('disabled', disableRunBtn)
-      .addClass('primary-btn')
-      .removeClass('danger-btn');
-
-    if (!disableRunBtn) {
-      $('.lm_header .config-btn').prop('disabled', false);
+  provideStdin(value) {
+    const view = new Uint8Array(this.sharedMem.buffer);
+    for (let i = 0; i < value.length; i++) {
+      // To the shared memory.
+      view[i] = value.charCodeAt(i);
     }
 
-    if (Terra.v.showStopCodeButtonTimeoutId) {
-      clearTimeout(Terra.v.showStopCodeButtonTimeoutId);
-      Terra.v.showStopCodeButtonTimeoutId = null;
-    }
+    // Set the last byte to the null terminator.
+    view[value.length] = 0;
+
+    Atomics.notify(new Int32Array(this.sharedMem.buffer), 0);
   }
 
   /**
-   * Called from within the worker when files have been added or modified in the
-   * worker's internal filesystem during execution of the program.
+   * Message event handler for the worker. Updates client state and delegates
+   * every app/UI reaction to the handlers object.
    *
-   * @async
-   * @param {array} newOrModifiedFiles - List of file objects.
-   */
-  async newOrModifiedFilesCallback(newOrModifiedFiles) {
-    if (!Array.isArray(newOrModifiedFiles)) {
-      return;
-    }
-
-    for (const file of newOrModifiedFiles) {
-      // Check if the file already exists in the VFS.
-      if ((await Terra.app.vfs.pathExists(file.path))) {
-        // If the file already exists, update its content.
-        await Terra.app.vfs.updateFile(file.path, file.content);
-
-        // Check if there's an open tab for this file.
-        const tabComponent = Terra.app.getTabComponents().find((component) => {
-          const path = component.getPath();
-          return path == file.path;
-        });
-
-        // If so, update its content.
-        if (tabComponent) {
-          tabComponent.setContent(file.content);
-        }
-      } else {
-        // Otherwise, create a new file in the VFS.
-        await Terra.app.vfs.createFile(
-          file.path,
-          file.content,
-        );
-
-        // Automatically open new image files in a tab.
-        if (isImageExtension(file.path)) {
-          Terra.app.layout.addFileTab(file.path);
-        }
-      }
-
-      // Recreate the file tree.
-      await fileTreeManager.createFileTree();
-    }
-  }
-
-  /**
-   * Called from within the worker when files have been deleted from the
-   * worker's internal filesystem during execution of the program.
-   *
-   * @async
-   * @param {string[]} deletedPaths - List of file paths that were deleted.
-   */
-  async deletedFilesCallback(deletedPaths) {
-    if (!Array.isArray(deletedPaths)) {
-      return;
-    }
-
-    for (const path of deletedPaths) {
-      await Terra.app.vfs.deleteFile(path, false);
-
-      const tabComponent = Terra.app.getTabComponents().find(
-        (component) => component.getPath() === path
-      );
-      if (tabComponent) {
-        tabComponent.close();
-      }
-    }
-  }
-
-  /**
-   * Message event handler for the worker.
-   *
-   * @param {object} event - Event object coming from the UI.
+   * @param {object} event - Event object coming from the worker.
    */
   onmessage(event) {
     switch (event.data.id) {
 
       // Ready callback from the worker instance. This will be run after
       // everything has been initialised and ready to run some code.
-      case 'ready':
+      case 'ready': {
         this.isReady = true;
-        $('.lm_header .worker-loading-label').hide();
-        if (this.pendingCommand) {
+        const hasPendingCommand = !!this.pendingCommand;
+        this.handlers.onReady(hasPendingCommand);
+        if (hasPendingCommand) {
           const cmd = this.pendingCommand;
           this.pendingCommand = null;
           cmd();
-        } else {
-          $('.lm_header .run-user-code-btn').prop('disabled', false);
-          $('.lm_header .clear-term-btn').prop('disabled', false);
-          $('.lm_header .config-btn').prop('disabled', false);
         }
         break;
+      }
 
       // Write callback from the worker instance. When the worker wants to write
       // code the terminal, this event will be triggered.
       case 'write':
-        try {
-          // Only write when the worker is ready. This prevents infinite loops
-          // with print statements to continue printing after the worker has
-          // terminated when the user has pressed the stop button.
-          if (this.isReady) {
-            Terra.app.termWrite(event.data.data);
-          }
-        } catch (e) {
-          console.log("Caught write error on the terminal - clearing buffer;")
-          console.log(e)
-          Terra.app.termClearWriteBuffer();
+        // Only write when the worker is ready. This prevents infinite loops
+        // with print statements to continue printing after the worker has
+        // terminated when the user has pressed the stop button.
+        if (this.isReady) {
+          this.handlers.onWrite(event.data.data);
         }
         break;
 
       case 'write-error':
-        Terra.app.termWrite(`\x1b[1;31m${event.data.data}\x1b[0m`);
+        this.handlers.onWriteError(event.data.data);
         break;
 
       // Stdin callback from the worker instance. When the worker requests user
       // input, this event will be triggered. The user input will be requested
       // and sent back to the worker through the usage of shared memory.
       case 'readStdin':
-        Terra.app.termWaitForInput().then((value) => {
-          const view = new Uint8Array(this.sharedMem.buffer);
-          for (let i = 0; i < value.length; i++) {
-            // To the shared memory.
-            view[i] = value.charCodeAt(i);
-          }
-
-          // Set the last byte to the null terminator.
-          view[value.length] = 0;
-
-          Atomics.notify(new Int32Array(this.sharedMem.buffer), 0);
-        });
+        this.handlers.onRequestStdin().then((value) => this.provideStdin(value));
         break;
 
       // Run custom config button callback from the worker instance.
       // This event will be triggered after a custom config button's command has
       // been executed.
       case 'runButtonCommandCallback':
-        $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', false);
+        this.handlers.onRunButtonCommandDone();
         break;
 
       case 'restartWorker':
@@ -409,7 +348,8 @@ export default class LangWorker {
       case 'runUserCodeCallback':
         // Run user code callback invoked from the worker instance. This event
         // will be triggered after excecuting the user's code.
-        this.runUserCodeCallback();
+        this.isRunningCode = false;
+        this.handlers.onRunEnded();
         break;
 
       case 'newOrModifiedFilesCallback':
@@ -417,11 +357,11 @@ export default class LangWorker {
         // event will be triggered just before the run-user-code callback and
         // will only triggerer if there are new files created or existing files
         // have been modified during execution time.
-        this.newOrModifiedFilesCallback(event.data.newOrModifiedFiles);
+        this.handlers.onNewOrModifiedFiles(event.data.newOrModifiedFiles);
         break;
 
       case 'deletedFilesCallback':
-        this.deletedFilesCallback(event.data.deletedPaths);
+        this.handlers.onDeletedFiles(event.data.deletedPaths);
         break;
     }
   }

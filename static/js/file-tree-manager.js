@@ -2,7 +2,6 @@ import { DROP_AREA_INDICATOR_CLASS } from './ide/constants.js';
 import { getFileExtension, getPartsFromPath, isValidFilename } from './helpers/shared.js'
 import { createModal, hideModal, showModal } from './modal.js'
 import Terra from './terra.js'
-import LangWorker from './lang-worker.js';
 import EditorComponent from './layout/editor.component.js';
 import { createTooltip, destroyTooltip } from './tooltip-manager.js';
 import * as LFS from './fs/lfs.js';
@@ -491,7 +490,7 @@ function _createContextMenuItems($trigger, event) {
       };
     }
 
-    if (LangWorker.hasWorker(getFileExtension(node.title))) {
+    if (Terra.app.langWorkerClient.supports(getFileExtension(node.title))) {
       menu.run = {
         name: 'Run',
         callback: () => {

@@ -19,7 +19,6 @@ import {
   getRandNumBetween,
   seconds,
 } from './helpers/shared.js';
-import LangWorker from './lang-worker.js';
 import ExamLayout from './layout/layout.exam.js';
 import {
   setLocalStorageItem,
@@ -72,8 +71,8 @@ export default class ExamApp extends App {
     // Get the programming language based on tabs filename.
     const proglang = getFileExtension(Object.keys(this.config.tabs)[0]);
 
-    // Initialise the programming language specific worker API.
-    this.langWorker = new LangWorker(proglang);
+    // Initialise the programming language specific worker client.
+    this.createLangWorker(proglang);
 
     // Get the font-size stored in local storage or use fallback value.
     const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
@@ -247,7 +246,7 @@ export default class ExamApp extends App {
     notify('Your code is now locked and cannot be edited anymore.');
 
     // Disable language worker.
-    this.langWorker.terminate();
+    this.terminateLangWorker();
 
     // Make the entire UI read-only.
     this.layout.showLockedState({ prevAutoSaveTime: this.prevAutoSaveTime });

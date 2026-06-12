@@ -470,13 +470,18 @@ class API extends BaseAPI {
     globals.set('__name__', '__main__');
 
     try {
+      const rendered_code = code.join('\n')
+
       // Use matplotlib's Agg backend for static images.
-      this.pyodide.runPython("import matplotlib; matplotlib.use('Agg')");
+      if (rendered_code.includes("matplotlib")) {
+        console.log("Preloading matplotlib")
+        this.pyodide.runPython("import matplotlib; matplotlib.use('Agg')");
+      }
 
       // Most of the output will end up in the raw stdout handler defined
       // earlier, but some output will still end up in the console, which
       // generally happens solely for config buttons.
-      const result = this.pyodide.runPython(code.join('\n'), { globals, locals: globals });
+      const result = this.pyodide.runPython(rendered_code, { globals, locals: globals });
       if (result) {
         this.hostWrite(result);
       }

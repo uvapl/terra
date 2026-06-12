@@ -216,7 +216,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     this.showTermStartupMessage();
     triggerPluginEvent('onLayoutLoaded');
 
-    $('.terminal-component-container .lm_header').append('<span class="worker-loading-label" style="display:none">Loading</span>');
+    $('.terminal-component-container .lm_header').append('<span class="worker-loading-label" style="display:none">Waiting for runtime to fully load, just a sec...</span>');
 
     if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
       this.emitToTabComponents('setCustomAutocompleter', options.autocomplete);
@@ -575,7 +575,10 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    */
   getRunCodeButtonHtml() {
     const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
-    return `<button id="run-code" class="button primary-btn run-user-code-btn">Run (${runCodeShortcut})</button>`;
+    // Rendered disabled by default; enabled once a supported language's worker
+    // is ready (or when switching to a runnable tab). Prevents the button from
+    // being clickable for a non-runnable initial tab such as an Untitled file.
+    return `<button id="run-code" class="button primary-btn run-user-code-btn" disabled>Run (${runCodeShortcut})</button>`;
   };
 
   /**
@@ -706,18 +709,39 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   /**
-   * Change the run-code button to a stop-code button if after 1 second the code
-   * has not finished running (potentially infinite loop scenario).
+   * Change the run-code button to a stop-code button if the code
+   * does not finish immediately (potentially infinite loop scenario).
    */
   checkForStopCodeButton() {
-    Terra.v.showStopCodeButtonTimeoutId = setTimeout(() => {
+    this.showStopCodeButtonTimeoutId = setTimeout(() => {
       const $button = $('#run-code');
       const newText = $button.text().replace('Run', 'Stop');
       $button.text(newText)
         .prop('disabled', false)
         .removeClass('primary-btn')
         .addClass('danger-btn');
-    }, seconds(1));
+    }, seconds(0.2));
+  }
+
+  /**
+   * Change the stop-code button back to a run-code button.
+   */
+  onRunEnded({ disableRunBtn }) {
+    const $button = $('#run-code');
+    const newText = $button.text().replace('Stop', 'Run');
+    $button.text(newText)
+      .prop('disabled', disableRunBtn)
+      .addClass('primary-btn')
+      .removeClass('danger-btn');
+
+    if (!disableRunBtn) {
+      $('.lm_header .config-btn').prop('disabled', false);
+    }
+
+    if (this.showStopCodeButtonTimeoutId) {
+      clearTimeout(this.showStopCodeButtonTimeoutId);
+      this.showStopCodeButtonTimeoutId = null;
+    }
   }
 
   /**
