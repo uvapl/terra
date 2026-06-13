@@ -59,7 +59,7 @@ export default class ShellPlugin extends TerraPlugin {
   externalRun = false;
 
   onLayoutLoaded = () => {
-    this.term = Terra.app.layout.term;
+    this.term = Terra.app.term;
 
     // The terminal may not be instantiated yet at this point; retry shortly.
     if (!this.term) {
@@ -70,6 +70,17 @@ export default class ShellPlugin extends TerraPlugin {
     this.printBanner();
     this.term.acquireInput('shell', { onKey: this.handleKey, onPaste: this.handlePaste });
     this.renderPrompt();
+  }
+
+  /**
+   * The terminal was cleared by the user (ctrl-k, trash button, menu). Render a
+   * fresh prompt, but only when the shell currently owns input — not while a
+   * program is running.
+   */
+  onTerminalCleared = () => {
+    if (this.term?.inputOwner === 'shell') {
+      this.renderPrompt();
+    }
   }
 
   /***** Run lifecycle (program launches) *******************************/

@@ -1,6 +1,4 @@
 import { BASE_FONT_SIZE } from '../constants.js';
-import { isMac } from '../helpers/shared.js';
-import Terra from '../terra.js';
 
 /**
  * Terminal component for GoldenLayout.
@@ -73,9 +71,20 @@ export default class TerminalComponent {
     '\r',     // Enter
   ]
 
-  constructor(container, state) {
+  /**
+   * Injected handler for terminal-level key shortcuts (ctrl-c, ctrl-k, font
+   * size). The component only wires it to xterm; the behaviour lives in the
+   * app. Receives the KeyboardEvent and returns false to stop xterm from
+   * processing the key. Defaults to a no-op.
+   * @type {function}
+   */
+  onKeyEvent = () => {};
+
+  constructor(container, state, { onKeyEvent } = {}) {
     this.container = container;
     this.state = state;
+
+    if (onKeyEvent) this.onKeyEvent = onKeyEvent;
 
     this.init();
   }
@@ -86,12 +95,30 @@ export default class TerminalComponent {
   }
 
   /**
+   * Tracks whether the last write() did not end in a newline, so a run can
+   * print the inverted `%` marker (see printForgotNewline).
+   * @type {boolean}
+   */
+  lastWriteNotTerminated = false;
+
+  /**
    * Write a message to the terminal.
+   *
+   * If writing throws, the write buffer has likely 'exploded' (e.g. an infinite
+   * loop printing to the terminal); clear it to stop most of the flood.
    *
    * @param {string} msg - The message to write.
    */
   write = (msg) => {
-    this.term.write(msg);
+    this.lastWriteNotTerminated = typeof msg !== 'string' || !msg.endsWith('\n');
+
+    try {
+      this.term.write(msg);
+    } catch (e) {
+      console.log('Caught write error on the terminal - clearing buffer;');
+      console.log(e);
+      this.clearTermWriteBuffer();
+    }
   }
 
   /**
@@ -101,6 +128,18 @@ export default class TerminalComponent {
    */
   writeln = (msg) => {
     this.term.writeln(msg);
+  }
+
+  /**
+   * Print an inverted `%` when the last write did not end in a newline (zsh
+   * style), so trailing output without a final newline stays visible. Called
+   * at the end of a run.
+   */
+  printForgotNewline = () => {
+    if (this.lastWriteNotTerminated) {
+      this.lastWriteNotTerminated = false;
+      this.writeln('\x1b[7m%\x1b[0m');
+    }
   }
 
   /**
@@ -148,7 +187,9 @@ export default class TerminalComponent {
     this.term.open(this.container.getElement()[0]);
     this.fitAddon.fit();
 
-    this.term._core._customKeyEventHandler = this.globalKeyEventHandler;
+    // Attach the key handler here (xterm wiring), but let the injected handler
+    // decide what the terminal-level shortcuts (ctrl-c, ctrl-k, font size) do.
+    this.term._core._customKeyEventHandler = (event) => this.onKeyEvent(event);
 
     // A single, persistent input pipeline: every keystroke and paste is routed
     // to whoever currently owns input (see acquireInput/releaseInput). When
@@ -168,26 +209,6 @@ export default class TerminalComponent {
 
     this.setFontSize(fontSize);
     this.hideTermCursor();
-  }
-
-  globalKeyEventHandler = (event) => {
-    if (event.key === 'c' && event.ctrlKey) {
-      Terra.app.handleControlC(event);
-    } else if (event.key === 'k' && (isMac() ? event.metaKey : event.ctrlKey)) {
-      this.clear();
-    } else if (event.key === '=' && event.ctrlKey) {
-      Terra.app.layout.changeFontSize(Terra.app.layout.getCurrentFontSize() + 1);
-      return false;
-    } else if (event.key === '-' && event.ctrlKey) {
-      Terra.app.layout.changeFontSize(Terra.app.layout.getCurrentFontSize() - 1);
-      return false;
-    } else if (event.key === '0' && event.ctrlKey) {
-      Terra.app.layout.changeFontSize(16);
-      return false;
-    } else if (event.key === '9' && event.ctrlKey) {
-      Terra.app.layout.changeFontSize(24);
-      return false;
-    }
   }
 
   /**
@@ -256,7 +277,7 @@ export default class TerminalComponent {
     this.inputHandler = onKey || null;
     this.inputPasteHandler = onPaste || null;
     this.showTermCursor();
-    this.term.focus();
+    // this.term.focus();
   }
 
   /**

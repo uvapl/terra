@@ -1,4 +1,4 @@
-import { getFileExtension, isImageExtension, isObject } from './helpers/shared.js'
+import { getFileExtension, isImageExtension, isMac, isObject } from './helpers/shared.js'
 import LangWorkerClient from './workers/lang-worker-client.js';
 import Terra from './terra.js';
 import * as fileTreeManager from './file-tree-manager.js';
@@ -35,6 +35,16 @@ export default class App {
    * @type {?function}
    */
   _runEndResolver = null;
+
+  /**
+   * The terminal component, or null when it does not (yet) exist. The layout
+   * owns the terminal's lifecycle; this is a convenience accessor so the rest
+   * of the app does not reach through the layout on every use.
+   * @type {?TerminalComponent}
+   */
+  get term() {
+    return this.layout?.term ?? null;
+  }
 
   constructor() {
     this._bindThis();
@@ -110,15 +120,19 @@ export default class App {
   registerLayoutEvents() {
     this.layout.addEventListener('runCode', this.onRunCode);
 
+    // Provide the terminal-level key handler to the layout, which injects it
+    // into the terminal component (so the component does not reach the app).
+    this.layout.onTerminalKey = this.handleTerminalKeyEvent;
+
     // Listen for editor events being emitted.
     const editorEvents = [
-      'onEditorStartEditing',
-      'onEditorStopEditing',
-      'onEditorChange',
-      'onEditorShow',
-      'onEditorVFSChanged',
-      'onImageShow',
-      'onImageVFSChanged',
+      'onEditorEditingStarted',
+      'onEditorEditingStopped',
+      'onEditorTextChanged',
+      'onEditorSwitchedTo',
+      'onEditorReloadRequested',
+      'onImageSwitchedTo',
+      'onImageReloadRequested',
     ];
 
     editorEvents.forEach((eventName) => {
@@ -155,13 +169,13 @@ export default class App {
   /**
    * Callback function for when the content has changed of an editor.
    *
-   * This is default functionality and super.onEditorChange() must be
+   * This is default functionality and super.onEditorTextChanged() must be
    * called first in child classes before any additional functionality.
    *
    * @async
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  async onEditorChange(editorComponent) {
+  async onEditorTextChanged(editorComponent) {
     const path = editorComponent.getPath();
     await this.vfs.updateFile(path, editorComponent.getContent());
   }
@@ -169,12 +183,12 @@ export default class App {
   /**
    * Callback function when an editor instance becomes visible/active.
    *
-   * This is default functionality and super.onEditorShow() must be
+   * This is default functionality and super.onEditorSwitchedTo() must be
    * called first in child classes before any additional functionality.
    *
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  async onEditorShow(editorComponent) {
+  async onEditorSwitchedTo(editorComponent) {
     if (editorComponent.ready) {
       this.createLangWorker(editorComponent.proglang);
     }
@@ -192,19 +206,19 @@ export default class App {
    *
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  async onEditorVFSChanged(editorComponent) {
+  async onEditorReloadRequested(editorComponent) {
     if (!Terra.v.blockFSPolling) {
       await this.setEditorFileContent(editorComponent, true);
     }
   }
 
-  onImageShow(imageComponent) {
+  onImageSwitchedTo(imageComponent) {
     this.terminateLangWorker();
     this.updateRunButtonState(null);
     this.setImageFileContent(imageComponent);
   }
 
-  onImageVFSChanged(imageComponent) {
+  onImageReloadRequested(imageComponent) {
     if (!Terra.v.blockFSPolling) {
       this.setImageFileContent(imageComponent);
     }
@@ -279,7 +293,7 @@ export default class App {
    * @param {boolean} options.runAs - Whether the runAs config should be used.
    */
   async runCode(options = {}) {
-    if (options.clearTerm) this.layout.term.clear();
+    if (options.clearTerm) this.term.clear();
 
     if (this.langWorkerClient.isRunningCode) {
       // Act as stop button: abort the running program (e.g. an infinite loop).
@@ -308,7 +322,7 @@ export default class App {
     triggerPluginEvent('onRunStart');
 
     // Focus the terminal, such that the user can immediately invoke ctrl+c.
-    this.layout.term.focus();
+    this.term.focus();
 
     $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
 
@@ -386,6 +400,45 @@ export default class App {
   }
 
   /**
+   * Handle the terminal-level keyboard shortcuts. Attached to xterm by the
+   * terminal component, but the behaviour lives here because it is app/layout
+   * concern: ctrl-c stops a running program, ctrl-k clears the terminal, and
+   * ctrl with =/-/0/9 adjusts the font size.
+   *
+   * @param {KeyboardEvent} event - The keyboard event from xterm.
+   * @returns {boolean|undefined} false to stop xterm from processing the key.
+   */
+  handleTerminalKeyEvent(event) {
+    if (event.key === 'c' && event.ctrlKey) {
+      this.handleControlC(event);
+    } else if (event.key === 'k' && (isMac() ? event.metaKey : event.ctrlKey)) {
+      this.clearTerminal();
+    } else if (event.key === '=' && event.ctrlKey) {
+      this.layout.changeFontSize(this.layout.getCurrentFontSize() + 1);
+      return false;
+    } else if (event.key === '-' && event.ctrlKey) {
+      this.layout.changeFontSize(this.layout.getCurrentFontSize() - 1);
+      return false;
+    } else if (event.key === '0' && event.ctrlKey) {
+      this.layout.changeFontSize(16);
+      return false;
+    } else if (event.key === '9' && event.ctrlKey) {
+      this.layout.changeFontSize(24);
+      return false;
+    }
+  }
+
+  /**
+   * Clear the terminal at the user's request (ctrl-k, the trash button, the
+   * menu item) and notify plugins, so e.g. the shell can render a fresh prompt.
+   * Pre-run clears use term.clear() directly and deliberately do not notify.
+   */
+  clearTerminal() {
+    this.term?.clear();
+    triggerPluginEvent('onTerminalCleared');
+  }
+
+  /**
    * Get the config object for the run-as button.
    * This is executed just before the user runs the code from an editor.
    * By default this returns null if not implemented in child classes.
@@ -418,7 +471,7 @@ export default class App {
     if ($button.prop('disabled')) return;
     $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
 
-    this.layout.term.clear();
+    this.term.clear();
 
     const activeTabName = this.layout.getActiveEditor().getFilename();
     let files = await this.vfs.getAllFiles();
@@ -462,7 +515,7 @@ export default class App {
       onReady: this.onWorkerReady,
       onWrite: this.onWorkerWrite,
       onWriteError: this.onWorkerWriteError,
-      onRequestStdin: this.termWaitForInput,
+      onRequestStdin: () => this.term.waitForInput(),
       onRunButtonCommandDone: this.onWorkerRunButtonCommandDone,
       onRunEnded: this.onRunEnded,
       onNewOrModifiedFiles: this.onWorkerNewOrModifiedFiles,
@@ -515,13 +568,7 @@ export default class App {
    * @param {string} text - The message to write.
    */
   onWorkerWrite(text) {
-    try {
-      this.termWrite(text);
-    } catch (e) {
-      console.log("Caught write error on the terminal - clearing buffer;")
-      console.log(e)
-      this.termClearWriteBuffer();
-    }
+    this.term?.write(text);
   }
 
   /**
@@ -530,7 +577,7 @@ export default class App {
    * @param {string} text - The error message to write.
    */
   onWorkerWriteError(text) {
-    this.termWrite(`\x1b[1;31m${text}\x1b[0m`);
+    this.term?.write(`\x1b[1;31m${text}\x1b[0m`);
   }
 
   /**
@@ -547,8 +594,8 @@ export default class App {
    */
   stopRunningProgramManually() {
     this.langWorkerClient.restart();
-    this.termClearWriteBuffer();
-    this.termWriteln('\x1b[1;31mProcess terminated\x1b[0m');
+    this.term?.clearTermWriteBuffer();
+    this.term?.writeln('\x1b[1;31mProcess terminated\x1b[0m');
   }
 
   /**
@@ -637,11 +684,11 @@ export default class App {
       !this.langWorkerClient.supports(getFileExtension(activeEditor.getFilename()));
 
     // Print inverted `%` to terminal if last line of output was not terminated by a `\n`.
-    this.termForgotNewlinePercent();
+    this.term?.printForgotNewline();
 
     // Dispose any pending stdin prompt left by an aborted run and hide the cursor.
-    this.termDisposeUserInput();
-    this.termHideTermCursor();
+    this.term?.disposeUserInput();
+    this.term?.hideTermCursor();
 
     // Set focus to the active editor.
     this.getActiveEditor().focus();
@@ -660,81 +707,6 @@ export default class App {
     // (e.g. the shell, to restore its prompt and cursor).
     triggerPluginEvent('onRunEnded');
   }
-
-  /***** Terminal Management ********************************************/
-
-  lastWriteNotTerminated = false;
-
-  /**
-   * Clear the terminal's write buffer.
-   */
-  termClearWriteBuffer() {
-    this.layout.term?.clearTermWriteBuffer();
-  }
-
-  /**
-   * Write a message to the terminal without newline character.
-   *
-   * @param {string} msg - The message to write.
-   */
-  termWrite(msg) {
-    this.lastWriteNotTerminated = typeof msg !== "string" || !msg.endsWith("\n");
-    this.layout.term.write(msg);
-  }
-
-  /**
-   * Write a message to the terminal with newline character.
-   *
-   * @param {string} msg - The message to write.
-   */
-  termWriteln(msg) {
-    this.layout.term.writeln(msg);
-  }
-
-  /**
-   * Enable the terminal input for the user and wait until they press ENTER and
-   * process the typed input.
-   *
-   * @returns {Promise<string>} The user's input.
-   */
-  termWaitForInput() {
-    return this.layout.term.waitForInput()
-  }
-
-  /**
-   * Dispose the terminal user input, which means that the terminal will no
-   * longer wait for user input and will not process any further input.
-   */
-  termDisposeUserInput() {
-    this.layout.term?.disposeUserInput();
-  }
-
-  /**
-   * Hide the cursor of the terminal.
-   */
-  termHideTermCursor() {
-    this.layout.term?.hideTermCursor();
-  }
-
-  /**
-   * Print inverted `%` to terminal if last line of output was not
-   * terminated by a `\n`.
-   */
-  termForgotNewlinePercent() {
-    if (this.lastWriteNotTerminated) {
-      this.lastWriteNotTerminated = false;
-      Terra.app.termWriteln("\x1b[7m%\x1b[0m");
-    }
-  }
-
-  /**
-   * Clear the terminal's content.
-   */
-  termClear() {
-    this.layout.term.clear();
-  }
-
-  /***********************************************************************/
 
   /**
    * Get all tab components from the layout.
