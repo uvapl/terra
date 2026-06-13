@@ -1,5 +1,5 @@
 import { BASE_FONT_SIZE } from '../constants.js';
-import { isMac, isObject } from '../helpers/shared.js';
+import { isMac } from '../helpers/shared.js';
 import Terra from '../terra.js';
 
 /**
@@ -32,6 +32,38 @@ export default class TerminalComponent {
    * @type {Terminal}
    */
   term = null;
+
+  /**
+   * Identifies who currently owns keyboard input on the terminal. One of
+   * `null` (nobody — keystrokes are dropped, the default e.g. in the exam),
+   * `'shell'` (the shell plugin's input loop) or `'program'` (a running
+   * program reading stdin via waitForInput). Only the owner receives keys.
+   * @type {string|null}
+   */
+  inputOwner = null;
+
+  /**
+   * Per-keystroke handler for the current input owner, or null when there is
+   * no owner. Receives xterm.js onKey events.
+   * @type {?function}
+   */
+  inputHandler = null;
+
+  /**
+   * Paste handler for the current input owner, called with the cleaned
+   * (blacklist-stripped) pasted text, or null when there is no owner.
+   * @type {?function}
+   */
+  inputPasteHandler = null;
+
+  /**
+   * Saved input owners, so that releasing input restores the previous owner
+   * rather than dropping to nobody. This lets a program transiently take over
+   * input (e.g. for stdin) while the shell is active and hand it back when the
+   * run ends. Each entry is { owner, onKey, onPaste }.
+   * @type {array}
+   */
+  inputStack = [];
 
   // Disable some special characters when input is enabled.
   // For all input sequences, see http://xtermjs.org/docs/api/vtfeatures/#c0
@@ -118,6 +150,15 @@ export default class TerminalComponent {
 
     this.term._core._customKeyEventHandler = this.globalKeyEventHandler;
 
+    // A single, persistent input pipeline: every keystroke and paste is routed
+    // to whoever currently owns input (see acquireInput/releaseInput). When
+    // there is no owner the events are dropped, which is the default behaviour
+    // for environments without a shell (e.g. the exam).
+    this.term.onKey((e) => {
+      if (this.inputHandler) this.inputHandler(e);
+    });
+    this.term.textarea.addEventListener('paste', this._handlePaste);
+
     // Trigger a single resize after the terminal has rendered to make sure it
     // fits the whole parent width and doesn't leave any gaps near the edges.
     setTimeout(() => {
@@ -193,17 +234,60 @@ export default class TerminalComponent {
   }
 
   /**
-   * Disposes the user input when active. This is actived once user input is
-   * requested through the `waitForInput` function in order to remove the onKey
-   * event listener that is binded by the `waitForInput` function.
+   * Acquire keyboard input for a given owner. Any subsequent keystroke or
+   * paste is routed to the supplied handlers until the same owner releases it.
+   * The cursor is shown and the terminal focused so the user can start typing.
+   *
+   * @param {string} owner - One of 'shell' or 'program'.
+   * @param {object} handlers
+   * @param {function} handlers.onKey - Called with each xterm.js onKey event.
+   * @param {function} [handlers.onPaste] - Called with cleaned pasted text.
+   */
+  acquireInput = (owner, { onKey, onPaste } = {}) => {
+    // Remember the current owner so releasing restores it (e.g. a program
+    // taking over input while the shell is active hands back to the shell).
+    this.inputStack.push({
+      owner: this.inputOwner,
+      onKey: this.inputHandler,
+      onPaste: this.inputPasteHandler,
+    });
+
+    this.inputOwner = owner;
+    this.inputHandler = onKey || null;
+    this.inputPasteHandler = onPaste || null;
+    this.showTermCursor();
+    this.term.focus();
+  }
+
+  /**
+   * Release keyboard input held by the given owner, restoring the previous
+   * owner. No-op when a different owner currently holds input, so a stale
+   * release cannot steal it.
+   *
+   * @param {string} owner - The owner that previously acquired input.
+   */
+  releaseInput = (owner) => {
+    if (this.inputOwner !== owner) return;
+
+    const prev = this.inputStack.pop() || { owner: null, onKey: null, onPaste: null };
+    this.inputOwner = prev.owner;
+    this.inputHandler = prev.onKey;
+    this.inputPasteHandler = prev.onPaste;
+
+    if (this.inputOwner) {
+      this.showTermCursor();
+    } else {
+      this.hideTermCursor();
+    }
+  }
+
+  /**
+   * Disposes the program's stdin input. Kept for the run lifecycle in app.js,
+   * which calls this when a run ends or is aborted; it simply releases input
+   * held by the running program.
    */
   disposeUserInput = () => {
-    if (isObject(this.userInputDisposable) && typeof this.userInputDisposable.dispose === 'function') {
-      this.userInputDisposable.dispose();
-      this.userInputDisposable = null;
-    }
-
-    this.term.textarea.removeEventListener('paste', this.handleUserPaste);
+    this.releaseInput('program');
   }
 
   /**
@@ -220,7 +304,16 @@ export default class TerminalComponent {
     this.term.write('\x1b[?25h');
   }
 
-  handleUserPaste = (event) => {
+  /**
+   * Persistent paste handler. Cleans the pasted text (stripping newlines and
+   * blacklisted control characters) and forwards it to the current input
+   * owner's paste handler, if any.
+   *
+   * @param {ClipboardEvent} event
+   */
+  _handlePaste = (event) => {
+    if (!this.inputPasteHandler) return;
+
     // Get the pasted text from the clipboard.
     const clipboardData = event.clipboardData || window.clipboardData;
     let pastedData = clipboardData.getData('Text').replace(/[\r\n]/g, '');
@@ -229,29 +322,22 @@ export default class TerminalComponent {
     const blacklistedCharsPattern = new RegExp(`[${this.blacklistedKeys.join('')}]`, 'g');
     pastedData = pastedData.replace(blacklistedCharsPattern, '');
 
-    this.term.write(pastedData);
-    this.userInput += pastedData;
+    this.inputPasteHandler(pastedData);
   }
 
-
   /**
-   * Enable stdin in the terminal and record the user's keystrokes. Once the
-   * user presses ENTER, the promise is resolved with the user's input.
+   * Enable stdin for a running program and record the user's keystrokes. Once
+   * the user presses ENTER, the promise is resolved with the user's input.
+   * This is the 'program' input owner expressed through acquireInput.
    *
    * @returns {Promise<string>} The user's input.
    */
   waitForInput = () => {
     return new Promise((resolve) => {
-      // Immediately focus the terminal when user input is requested.
-      this.showTermCursor();
-      this.term.focus();
-
       // Keep track of the value that is typed by the user.
       this.userInput = '';
 
-      this.term.textarea.addEventListener('paste', this.handleUserPaste);
-
-      this.userInputDisposable = this.term.onKey(e => {
+      const onKey = (e) => {
         // Only append allowed characters.
         if (!this.blacklistedKeys.includes(e.key)) {
           this.term.write(e.key);
@@ -268,16 +354,22 @@ export default class TerminalComponent {
 
         // If the user presses enter, resolve the promise.
         if (e.key === '\r') {
-          this.disposeUserInput();
+          this.releaseInput('program');
 
           // Trigger a real enter in the terminal.
           this.term.write('\n');
           this.userInput += '\n';
 
-          this.hideTermCursor();
           resolve(this.userInput);
         }
-      });
+      };
+
+      const onPaste = (text) => {
+        this.term.write(text);
+        this.userInput += text;
+      };
+
+      this.acquireInput('program', { onKey, onPaste });
     });
   }
 

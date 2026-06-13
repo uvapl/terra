@@ -645,8 +645,12 @@ class API extends BaseAPI {
       try {
         await this.compile({ input, content: file.content, obj });
       }
-      finally {
+      catch (err) {
+        // Signal run-end only when compilation fails (which aborts the run).
+        // On success the run continues to link/run, which reports the single
+        // run-end itself; firing here too would end the run prematurely.
         this.runUserCodeCallback();
+        throw err;
       }
       objectFiles.push(obj);
     }

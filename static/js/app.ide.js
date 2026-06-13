@@ -57,6 +57,7 @@ export default class IDEApp extends App {
     }
 
     this.startLFSChangeListener();
+    this.startFSStructureListener();
 
     this.layout.refresh();
   }
@@ -566,6 +567,30 @@ export default class IDEApp extends App {
         fileTreeManager.createFileTree(),
       );
     });
+  }
+
+  /**
+   * Rebuild the file tree when the VFS structure changes (a file or folder is
+   * created or deleted), regardless of the active storage backend. This makes
+   * the tree reflect changes made outside the file-tree UI — e.g. files and
+   * folders created by the shell via touch, mkdir, or output redirection.
+   *
+   * Content-only changes (fileContentChanged, e.g. autosave) are intentionally
+   * ignored, as they do not alter the tree structure.
+   */
+  async startFSStructureListener() {
+    const rebuild = async () => {
+      // Skip while the user is mid-action (e.g. renaming a tree item).
+      if (Terra.v.blockFSPolling) return;
+
+      await fileTreeManager.runFuncWithPersistedState(() =>
+        fileTreeManager.createFileTree(),
+      );
+    };
+
+    this.vfs.addEventListener('fileCreated', rebuild);
+    this.vfs.addEventListener('folderCreated', rebuild);
+    this.vfs.addEventListener('fileDeleted', rebuild);
   }
 
   /**

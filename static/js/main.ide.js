@@ -8,6 +8,7 @@ const plugins = [
   'check50',
   'run-as',
   'right-sidebar',
+  'shell',
   // 'editor-unlink-killer',
 ];
 

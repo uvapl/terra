@@ -4,6 +4,7 @@ import Terra from './terra.js';
 import * as fileTreeManager from './file-tree-manager.js';
 import VirtualFileSystem, { FileNotFoundError, FileTooLargeError } from './fs/vfs.js';
 import Layout from './layout/layout.js';
+import { triggerPluginEvent } from './plugin-manager.js';
 import { MAX_FILE_SIZE } from './constants.js';
 
 /**
@@ -27,6 +28,13 @@ export default class App {
    * @type {VirtualFileSystem}
    */
   vfs = null;
+
+  /**
+   * Resolver for the promise returned by the most recent runFile() call, or
+   * null when no shell-initiated run is in flight. Resolved by onRunEnded.
+   * @type {?function}
+   */
+  _runEndResolver = null;
 
   constructor() {
     this._bindThis();
@@ -278,13 +286,32 @@ export default class App {
       return this.stopRunningProgramManually();
     }
 
+    // Run a given file path, or otherwise the active file.
+    const filepath = options.filepath || this.layout.getActiveEditor().getPath();
+    await this._startRun({ filepath, runAs: options.runAs });
+  }
+
+  /**
+   * Start running a single file in the language worker. Shared by runCode (the
+   * run button) and runFile (the shell). Collects all files, spawns the worker
+   * for the file's language if needed, and either runs immediately or queues
+   * the command until the worker is ready.
+   *
+   * @async
+   * @param {object} options
+   * @param {string} options.filepath - The file to run.
+   * @param {boolean} [options.runAs] - Whether the runAs config should be used.
+   */
+  async _startRun({ filepath, runAs = false }) {
+    // Notify plugins that a run is starting (e.g. the shell, to yield the
+    // terminal and start program output on a fresh line).
+    triggerPluginEvent('onRunStart');
+
     // Focus the terminal, such that the user can immediately invoke ctrl+c.
     this.layout.term.focus();
 
     $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
 
-    // Run a given file path, or otherwise the active file.
-    const filepath = options.filepath || this.layout.getActiveEditor().getPath();
     let files = await this.vfs.getAllFiles();
 
     // Append hidden files if present.
@@ -297,9 +324,14 @@ export default class App {
     // Build args to send to the worker's runUserCode function.
     const runUserCodeArgs = [filepath, files];
 
-    const runAsConfig = this.getRunAsConfig();
-    if (options.runAs && runAsConfig) {
-      runUserCodeArgs.push(runAsConfig);
+    // Only resolve the runAs config when actually running "as", because
+    // getRunAsConfig() reads the active editor's path and throws when there is
+    // no runnable active tab (e.g. when the shell launches a program).
+    if (runAs) {
+      const runAsConfig = this.getRunAsConfig();
+      if (runAsConfig) {
+        runUserCodeArgs.push(runAsConfig);
+      }
     }
 
     const run = () => {
@@ -314,6 +346,37 @@ export default class App {
     } else if (this.langWorkerClient.hasActiveWorker()) {
       run();
     }
+  }
+
+  /**
+   * Run a single file and resolve once the run has ended (whether it completed
+   * normally or was aborted). This is the stable entry point the shell uses to
+   * launch a program: the shell yields terminal input, awaits this, then takes
+   * input back. It deliberately goes through the app rather than reaching into
+   * the language worker client.
+   *
+   * @param {string} filepath - The (VFS-absolute) file to run.
+   * @returns {Promise<void>} Resolves when the run has ended.
+   */
+  runFile(filepath) {
+    return new Promise((resolve, reject) => {
+      if (!this.langWorkerClient.supports(getFileExtension(filepath))) {
+        reject(new Error(`cannot run '${filepath}': unsupported file type`));
+        return;
+      }
+
+      if (this.langWorkerClient.isRunningCode) {
+        reject(new Error('a program is already running'));
+        return;
+      }
+
+      // onRunEnded resolves this once the worker reports the run has finished.
+      this._runEndResolver = resolve;
+      this._startRun({ filepath }).catch((err) => {
+        this._runEndResolver = null;
+        reject(err);
+      });
+    });
   }
 
   handleControlC(event) {
@@ -584,6 +647,18 @@ export default class App {
     this.getActiveEditor().focus();
 
     this.layout.onRunEnded({ disableRunBtn });
+
+    // If a run was started through runFile (e.g. by the shell), resolve its
+    // promise now so the caller can resume.
+    if (this._runEndResolver) {
+      const resolve = this._runEndResolver;
+      this._runEndResolver = null;
+      resolve();
+    }
+
+    // Notify plugins that the run has ended, after the terminal cleanup above
+    // (e.g. the shell, to restore its prompt and cursor).
+    triggerPluginEvent('onRunEnded');
   }
 
   /***** Terminal Management ********************************************/
