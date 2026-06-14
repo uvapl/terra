@@ -109,7 +109,7 @@ export default class ImageComponent extends TabComponent {
   bindContainerEvents = () => {
     this.container.on('show', () => {
       this.onShow();
-      triggerPluginEvent('onImageShow', this);
+      triggerPluginEvent('onImageSwitchedTo', this);
     });
 
     this.container.on('hide', () => {

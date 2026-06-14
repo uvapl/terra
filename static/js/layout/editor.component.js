@@ -552,7 +552,7 @@ export default class EditorComponent extends TabComponent {
       // This excludes the first time the content is loaded when the tab opened.
       if (!this.firstTimeLoadingContent) {
         this.onEditorChange();
-        triggerPluginEvent('onEditorChange', this);
+        triggerPluginEvent('onEditorTextChanged', this);
       }
     });
 
@@ -576,7 +576,7 @@ export default class EditorComponent extends TabComponent {
     this.container.on('show', () => {
       this.onShow();
       this.dispatchEvent(new Event('show'));
-      triggerPluginEvent('onEditorShow', this);
+      triggerPluginEvent('onEditorSwitchedTo', this);
     });
 
     this.container.on('hide', () => {

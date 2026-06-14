@@ -110,6 +110,13 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   term = null;
 
   /**
+   * Handler for terminal-level key shortcuts, provided by the app and injected
+   * into the terminal component. Null until the app sets it.
+   * @type {?function}
+   */
+  onTerminalKey = null;
+
+  /**
    * Default terminal startup message.
    * Each element in the array is written on a separate line.
    * @type {array}
@@ -189,7 +196,16 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
     this.registerComponent('image', ImageComponent);
     this.registerComponent('editor', EditorComponent);
-    this.registerComponent('terminal', TerminalComponent);
+
+    // Inject the terminal key handler (set by the app) so the component never
+    // reaches out to the app itself. A plain function is used (not an arrow) so
+    // GoldenLayout can `new` it; returning an object makes `new` yield it.
+    const layout = this;
+    this.registerComponent('terminal', function (container, state) {
+      return new TerminalComponent(container, state, {
+        onKeyEvent: (event) => layout.onTerminalKey?.(event),
+      });
+    });
 
     $(window).on('resize', () => {
       this.updateSize(window.innerWidth, window.innerHeight);
@@ -309,8 +325,8 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     // key = local editor event name
     // value = external event name that the app will listen to
     const events = {
-      'show': 'onImageShow',
-      'vfsChanged': 'onImageVFSChanged',
+      'show': 'onImageSwitchedTo',
+      'vfsChanged': 'onImageReloadRequested',
     }
 
     for (const [internalEventName, externalEventName] of Object.entries(events)) {
@@ -338,11 +354,11 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     // key = local editor event name
     // value = external event name that the app will listen to
     const events = {
-      'startEditing': 'onEditorStartEditing',
-      'stopEditing': 'onEditorStopEditing',
-      'change': 'onEditorChange',
-      'show': 'onEditorShow',
-      'vfsChanged': 'onEditorVFSChanged',
+      'startEditing': 'onEditorEditingStarted',
+      'stopEditing': 'onEditorEditingStopped',
+      'change': 'onEditorTextChanged',
+      'show': 'onEditorSwitchedTo',
+      'vfsChanged': 'onEditorReloadRequested',
     }
 
     for (const [internalEventName, externalEventName] of Object.entries(events)) {
@@ -715,7 +731,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * Callback when the user clicks the clear-term button.
    */
   onClearTermButtonClick() {
-    this.term.clear();
+    Terra.app.clearTerminal();
   }
 
   /**

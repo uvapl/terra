@@ -229,9 +229,9 @@ export class TerraPlugin {
   // EVENT LISTENERS THAT CAN BE IMPLEMENTED FOR EACH PLUGIN.
   // ========================================================
   // onLayoutLoaded = () => { }
-  // onEditorChange = (editorComponent) => { }
+  // onEditorTextChanged = (editorComponent) => { }
   // onEditorFocus = (editorComponent) => { }
-  // onEditorShow = (editorComponent) => { }
+  // onEditorSwitchedTo = (editorComponent) => { }
   // onEditorHide = (editorComponent) => { }
   // onEditorLoad = (editorComponent) => { }
   // onEditorLock = (editorComponent) => { }
@@ -241,7 +241,7 @@ export class TerraPlugin {
   // onEditorContainerResize = (editorComponent) => { }
   // onEditorDestroy = (editorComponent) => { }
   // onEditorContentChanged (editorComponent) => { }
-  // onImageShow = (imageComponent) => { }
+  // onImageSwitchedTo = (imageComponent) => { }
   // onImageHide = (imageComponent) => { }
   // onImageDestroy = (imageComponent) => { }
   // onImageHide = (imageComponent) => { }

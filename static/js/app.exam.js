@@ -46,7 +46,7 @@ export default class ExamApp extends App {
    */
   editorContentChanged = false;
 
-  onEditorStartEditing(editorComponent) {
+  onEditorEditingStarted(editorComponent) {
     this.editorContentChanged = true;
   }
 
