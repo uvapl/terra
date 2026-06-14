@@ -82,7 +82,17 @@ export class TerraPlugin {
    */
   createTermButtonLeft(buttonConfig) {
     const buttonHtml = this.createTermButtonHtml(buttonConfig);
-    $('.terminal-component-container .lm_header').append(buttonHtml);
+    const $toolbar = $('.navbar-toolbar');
+    if ($toolbar.length) {
+      // The navbar toolbar lives in the page chrome and survives a layout
+      // reset, but onLayoutLoaded re-fires on every init. Remove any existing
+      // button with this id first so a reset replaces it instead of appending
+      // a duplicate.
+      $(`#${buttonConfig.id}`).remove();
+      $toolbar.append(buttonHtml);
+    } else {
+      $('.terminal-component-container .lm_header').append(buttonHtml);
+    }
 
     const $button = $(`#${buttonConfig.id}`);
     $button.click(buttonConfig.onClick);
@@ -100,7 +110,17 @@ export class TerraPlugin {
    */
   createTermButtonRight(buttonConfig) {
     const buttonHtml = this.createTermButtonHtml(buttonConfig);
-    $('.terminal-component-container .lm_header > .lm_controls').prepend(buttonHtml);
+    const $toolbar = $('.navbar-toolbar');
+    if ($toolbar.length) {
+      // In the navbar toolbar, position is handled by CSS `order`, so a plain
+      // append keeps the markup simple. The toolbar survives a layout reset
+      // while onLayoutLoaded re-fires, so drop any existing button with this id
+      // first to replace it rather than append a duplicate.
+      $(`#${buttonConfig.id}`).remove();
+      $toolbar.append(buttonHtml);
+    } else {
+      $('.terminal-component-container .lm_header > .lm_controls').prepend(buttonHtml);
+    }
 
     const $button = $(`#${buttonConfig.id}`);
     $button.click(buttonConfig.onClick);

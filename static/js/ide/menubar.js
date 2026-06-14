@@ -201,9 +201,31 @@ function registerMenubarEventListeners() {
 
   $('#menu-item--kill-process').click(Menubar.killTermProcess);
   $('#menu-item--clear-term').click(() => Terra.app.clearTerminal());
+  $('#menu-item--toggle-focus').click(() => Terra.app.toggleEditorTerminalFocus());
 
   // Prevent the default browser save dialog when pressing ctrl+s or cmd+s.
   Mousetrap.bind(['ctrl+s', 'meta+s'], (event) => event.preventDefault());
+
+  // Clear the terminal with cmd+k (mac) / ctrl+k regardless of what is focused.
+  // We can't use Mousetrap here because it ignores key events originating from
+  // text inputs, and both the editor and terminal are textarea-based. A
+  // capture-phase listener fires before the editor or terminal consumes the key.
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'k' && (isMac() ? event.metaKey : event.ctrlKey)) {
+      event.preventDefault();
+      Terra.app.clearTerminal();
+    }
+  }, true);
+
+  // Toggle focus between the active editor and the terminal with ctrl+`,
+  // regardless of what is focused. Same capture-phase approach as cmd+k above,
+  // so it fires before the editor or terminal consumes the key.
+  document.addEventListener('keydown', (event) => {
+    if (event.key === '`' && event.ctrlKey) {
+      event.preventDefault();
+      Terra.app.toggleEditorTerminalFocus();
+    }
+  }, true);
 }
 
 const Menubar = {};

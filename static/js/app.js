@@ -324,7 +324,7 @@ export default class App {
     // Focus the terminal, such that the user can immediately invoke ctrl+c.
     this.term.focus();
 
-    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
+    $('.run-user-code-btn, .config-btn').prop('disabled', true);
 
     let files = await this.vfs.getAllFiles();
 
@@ -356,7 +356,7 @@ export default class App {
     if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
       // Worker is still loading — queue the command to run once it's ready.
       this.langWorkerClient.pendingCommand = run;
-      $('.lm_header .worker-loading-label').show();
+      $('.worker-loading-label').show();
     } else if (this.langWorkerClient.hasActiveWorker()) {
       run();
     }
@@ -402,8 +402,9 @@ export default class App {
   /**
    * Handle the terminal-level keyboard shortcuts. Attached to xterm by the
    * terminal component, but the behaviour lives here because it is app/layout
-   * concern: ctrl-c stops a running program, ctrl-k clears the terminal, and
-   * ctrl with =/-/0/9 adjusts the font size.
+   * concern: ctrl-c stops a running program and ctrl with =/-/0/9 adjusts the
+   * font size. Clearing the terminal (cmd/ctrl-k) is handled globally in the
+   * menubar so it works regardless of focus.
    *
    * @param {KeyboardEvent} event - The keyboard event from xterm.
    * @returns {boolean|undefined} false to stop xterm from processing the key.
@@ -411,8 +412,6 @@ export default class App {
   handleTerminalKeyEvent(event) {
     if (event.key === 'c' && event.ctrlKey) {
       this.handleControlC(event);
-    } else if (event.key === 'k' && (isMac() ? event.metaKey : event.ctrlKey)) {
-      this.clearTerminal();
     } else if (event.key === '=' && event.ctrlKey) {
       this.layout.changeFontSize(this.layout.getCurrentFontSize() + 1);
       return false;
@@ -436,6 +435,21 @@ export default class App {
   clearTerminal() {
     this.term?.clear();
     triggerPluginEvent('onTerminalCleared');
+  }
+
+  /**
+   * Toggle keyboard focus between the active editor and the terminal (ctrl-`,
+   * the menu item). If the terminal currently holds focus, move to the editor,
+   * otherwise move to the terminal.
+   */
+  toggleEditorTerminalFocus() {
+    const termTextarea = this.term?.term?.textarea;
+    const terminalFocused = termTextarea && document.activeElement === termTextarea;
+    if (terminalFocused) {
+      this.getActiveEditor()?.focus();
+    } else {
+      this.term?.focus();
+    }
   }
 
   /**
@@ -469,7 +483,7 @@ export default class App {
   async runButtonCommand(selector, cmd) {
     const $button = $(selector);
     if ($button.prop('disabled')) return;
-    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
+    $('.run-user-code-btn, .config-btn').prop('disabled', true);
 
     this.term.clear();
 
@@ -482,7 +496,7 @@ export default class App {
     if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
       // Worker is still loading — queue the command to run once it's ready.
       this.langWorkerClient.pendingCommand = run;
-      $('.lm_header .worker-loading-label').show();
+      $('.worker-loading-label').show();
     } else if (this.langWorkerClient.isReady) {
       run();
     }
@@ -499,7 +513,7 @@ export default class App {
     this.langWorkerClient.load(proglang);
 
     if (!this.langWorkerClient.hasActiveWorker()) {
-      $('.lm_header .worker-loading-label').hide();
+      $('.worker-loading-label').hide();
     }
   }
 
@@ -530,7 +544,7 @@ export default class App {
     if (this.langWorkerClient.hasActiveWorker()) {
       this.langWorkerClient.terminate();
     }
-    $('.lm_header .worker-loading-label').hide();
+    $('.worker-loading-label').hide();
   }
 
   /**
@@ -543,7 +557,7 @@ export default class App {
    */
   updateRunButtonState(filename) {
     const canRun = this.langWorkerClient.supports(getFileExtension(filename));
-    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', !canRun);
+    $('.run-user-code-btn, .config-btn').prop('disabled', !canRun);
   }
 
   /**
@@ -553,12 +567,12 @@ export default class App {
    * @param {boolean} hasPendingCommand - Whether a queued command will run now.
    */
   onWorkerReady(hasPendingCommand) {
-    $('.lm_header .worker-loading-label').hide();
+    $('.worker-loading-label').hide();
 
     if (!hasPendingCommand) {
-      $('.lm_header .run-user-code-btn').prop('disabled', false);
-      $('.lm_header .clear-term-btn').prop('disabled', false);
-      $('.lm_header .config-btn').prop('disabled', false);
+      $('.run-user-code-btn').prop('disabled', false);
+      $('.clear-term-btn').prop('disabled', false);
+      $('.config-btn').prop('disabled', false);
     }
   }
 
@@ -584,7 +598,7 @@ export default class App {
    * Worker handler: a custom config button's command has finished executing.
    */
   onWorkerRunButtonCommandDone() {
-    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', false);
+    $('.run-user-code-btn, .config-btn').prop('disabled', false);
   }
 
   /**

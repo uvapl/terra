@@ -10,7 +10,8 @@
   color: var(--color-black);
   user-select: none;
   -webkit-user-select: none;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: none;
+  height: 2.5rem;
 }
 
 .navbar-right ul {
@@ -33,7 +34,11 @@
   margin: 0;
   font-weight: bold;
   font-size: 18px;
-  color: #5F5F5F;
+  /* Logo colors from the Terra IDE mark: mountain green -> earth brown. */
+  background: linear-gradient(to right, #4E7C4E, #8A6D4B);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* ========================================================================== */
@@ -42,12 +47,13 @@
 .navbar-left {
   display: flex;
   align-items: center;
+  gap: 1rem;
   height: 100%;
 }
 
 .menubar {
   list-style: none;
-  margin: 0 0 0 20px;
+  margin: 0;
   padding: 0;
   display: flex;
   color: var(--tab-fg-color);

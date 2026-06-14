@@ -295,7 +295,7 @@
   width: var(--file-tree-width);
   padding: var(--file-tree-padding);
   border-top: 1px solid var(--border-color);
-  background-color: #fffdbe;
+  background-color: #ffb7b3;
   color: var(--color-black);
 }
 

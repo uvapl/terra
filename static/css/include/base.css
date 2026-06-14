@@ -10,8 +10,8 @@
   --tab-fg-color: #737373;
   --tab-bg-color: #e1e1e1;
   --active-tab-fg-color: #000;
-  --active-tab-bg-color: #fff;
-  --border-color: #c6c6c6;
+  --active-tab-bg-color: #f7f6f6;
+  --border-color:transparent;
   --border-radius: 4px;
   --scrollbar-bg-color: #fff;
   --scrollbar-thumb-color: #c6c6c6;
