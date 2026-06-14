@@ -27,7 +27,7 @@ export default class RunAsPlugin extends TerraPlugin {
     });
   }
 
-  onImageShow = (imageComponent) => {
+  onImageSwitchedTo = (imageComponent) => {
     this.disableButton();
   }
 

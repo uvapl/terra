@@ -348,10 +348,10 @@ const handlers = {
 
   /**
    * Create a new folder.
-   * TODO `isUserInvoked` is unused.
    *
    * @param {object} path - The path where the new folder will be created.
    * Leave empty to create a new Untitled folder in the root directory.
+   * @param {boolean} isUserInvoked - Whether the action was user-invoked.
    * @returns {Promise<FileSystemDirectoryHandle>} The new folder handle.
    */
   async createFolder(path, isUserInvoked = true) {
@@ -372,6 +372,14 @@ const handlers = {
     const newHandle = await parentFolderHandle.getDirectoryHandle(name, {
       create: true,
     });
+
+    if (isUserInvoked) {
+      const folderpath = parentPath ? `${parentPath}/${name}` : name;
+      self.postMessage({
+        type: 'folderCreated',
+        data: { folder: { path: folderpath } },
+      });
+    }
 
     return { name };
   },
