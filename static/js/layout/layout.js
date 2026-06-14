@@ -216,7 +216,13 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     this.showTermStartupMessage();
     triggerPluginEvent('onLayoutLoaded');
 
-    $('.terminal-component-container .lm_header').append('<span class="worker-loading-label" style="display:none">Waiting for runtime to fully load, just a sec...</span>');
+    // The button container may live in the persistent page chrome (the IDE
+    // navbar toolbar), which survives a layout reset. Only inject the loading
+    // label once to avoid duplicating it on every re-init.
+    const $buttonContainer = $(this.buttonContainerSelector);
+    if (!$buttonContainer.find('.worker-loading-label').length) {
+      $buttonContainer.append('<span class="worker-loading-label" style="display:none">Waiting for runtime to fully load, just a sec...</span>');
+    }
 
     if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
       this.emitToTabComponents('setCustomAutocompleter', options.autocomplete);
@@ -462,9 +468,26 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       // This partially duplicates what happens in onEditorFocus, but
       // it's needed to be able to close image tabs, which do not get focus.
       this.editorStack.on('activeContentItemChanged', (param) => {
-        this.activeTab = param.container.getComponent();
+        if (typeof param.container.getComponent === 'function') {
+          this.activeTab = param.container.getComponent();
+        }
       });
     }
+  }
+
+  /**
+   * Selector for the container that holds the run/clear/plugin action buttons.
+   *
+   * Defaults to the terminal component header. When a navbar toolbar is present
+   * (the IDE), the buttons live there instead so they read as a single mini
+   * toolbar aligned to the right of the navbar.
+   *
+   * @returns {string}
+   */
+  get buttonContainerSelector() {
+    return $('.navbar-toolbar').length
+      ? '.navbar-toolbar'
+      : '.terminal-component-container .lm_header';
   }
 
   /**
@@ -481,7 +504,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
           cmd = cmd.split('\n');
         }
 
-        $('.terminal-component-container .lm_header')
+        $(this.buttonContainerSelector)
           .append(`<button id="${id}" class="button config-btn ${id}-btn">${name}</button>`);
 
         $(selector).click(() => Terra.app.runButtonCommand(selector, cmd));
@@ -650,24 +673,29 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * Add event listeners to the buttons and dropdowns in the layout.
    */
   addButtonEventListeners() {
-    $('#run-code').click(() => this.onRunCodeButtonClick());
-    $('#clear-term').click(() => this.onClearTermButtonClick());
+    // Several of these elements live in the persistent page chrome (the IDE
+    // navbar/toolbar and settings menu) and survive a layout reset, while the
+    // handlers close over `this` (the layout instance, recreated on reset).
+    // Namespaced off-then-on rebinds the handlers to the current instance
+    // instead of stacking a new handler on top of the old (destroyed) one.
+    $('#run-code').off('click.layout').on('click.layout', () => this.onRunCodeButtonClick());
+    $('#clear-term').off('click.layout').on('click.layout', () => this.onClearTermButtonClick());
 
     // Update font-size for all components on change.
-    $('#font-size-menu').find('li[data-val]').click((event) => {
+    $('#font-size-menu').find('li[data-val]').off('click.layout').on('click.layout', (event) => {
       this.changeFontSize(parseInt($(event.target).data('val')));
     });
 
     // Update theme on change.
-    $('#editor-theme-menu').find('li').click((event) => {
+    $('#editor-theme-menu').find('li').off('click.layout').on('click.layout', (event) => {
       const $element = $(event.target);
       this.setTheme($element.data('val'));
       $element.addClass('active').siblings().removeClass('active');
     });
 
     // Add event listeners for setttings menu.
-    $('.settings-menu').click((event) => $(event.target).toggleClass('open'));
-    $(document).click((event) => {
+    $('.settings-menu').off('click.layout').on('click.layout', (event) => $(event.target).toggleClass('open'));
+    $(document).off('click.settingsMenu').on('click.settingsMenu', (event) => {
       if (!$(event.target).is($('.settings-menu.open'))) {
         $('.settings-menu').removeClass('open');
       }
@@ -735,7 +763,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       .removeClass('danger-btn');
 
     if (!disableRunBtn) {
-      $('.lm_header .config-btn').prop('disabled', false);
+      $('.config-btn').prop('disabled', false);
     }
 
     if (this.showStopCodeButtonTimeoutId) {

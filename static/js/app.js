@@ -281,7 +281,7 @@ export default class App {
     // Focus the terminal, such that the user can immediately invoke ctrl+c.
     this.layout.term.focus();
 
-    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
+    $('.run-user-code-btn, .config-btn').prop('disabled', true);
 
     // Run a given file path, or otherwise the active file.
     const filepath = options.filepath || this.layout.getActiveEditor().getPath();
@@ -310,7 +310,7 @@ export default class App {
     if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
       // Worker is still loading — queue the command to run once it's ready.
       this.langWorkerClient.pendingCommand = run;
-      $('.lm_header .worker-loading-label').show();
+      $('.worker-loading-label').show();
     } else if (this.langWorkerClient.hasActiveWorker()) {
       run();
     }
@@ -353,7 +353,7 @@ export default class App {
   async runButtonCommand(selector, cmd) {
     const $button = $(selector);
     if ($button.prop('disabled')) return;
-    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', true);
+    $('.run-user-code-btn, .config-btn').prop('disabled', true);
 
     this.layout.term.clear();
 
@@ -366,7 +366,7 @@ export default class App {
     if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
       // Worker is still loading — queue the command to run once it's ready.
       this.langWorkerClient.pendingCommand = run;
-      $('.lm_header .worker-loading-label').show();
+      $('.worker-loading-label').show();
     } else if (this.langWorkerClient.isReady) {
       run();
     }
@@ -383,7 +383,7 @@ export default class App {
     this.langWorkerClient.load(proglang);
 
     if (!this.langWorkerClient.hasActiveWorker()) {
-      $('.lm_header .worker-loading-label').hide();
+      $('.worker-loading-label').hide();
     }
   }
 
@@ -414,7 +414,7 @@ export default class App {
     if (this.langWorkerClient.hasActiveWorker()) {
       this.langWorkerClient.terminate();
     }
-    $('.lm_header .worker-loading-label').hide();
+    $('.worker-loading-label').hide();
   }
 
   /**
@@ -427,7 +427,7 @@ export default class App {
    */
   updateRunButtonState(filename) {
     const canRun = this.langWorkerClient.supports(getFileExtension(filename));
-    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', !canRun);
+    $('.run-user-code-btn, .config-btn').prop('disabled', !canRun);
   }
 
   /**
@@ -437,12 +437,12 @@ export default class App {
    * @param {boolean} hasPendingCommand - Whether a queued command will run now.
    */
   onWorkerReady(hasPendingCommand) {
-    $('.lm_header .worker-loading-label').hide();
+    $('.worker-loading-label').hide();
 
     if (!hasPendingCommand) {
-      $('.lm_header .run-user-code-btn').prop('disabled', false);
-      $('.lm_header .clear-term-btn').prop('disabled', false);
-      $('.lm_header .config-btn').prop('disabled', false);
+      $('.run-user-code-btn').prop('disabled', false);
+      $('.clear-term-btn').prop('disabled', false);
+      $('.config-btn').prop('disabled', false);
     }
   }
 
@@ -474,7 +474,7 @@ export default class App {
    * Worker handler: a custom config button's command has finished executing.
    */
   onWorkerRunButtonCommandDone() {
-    $('.lm_header .run-user-code-btn, .lm_header .config-btn').prop('disabled', false);
+    $('.run-user-code-btn, .config-btn').prop('disabled', false);
   }
 
   /**

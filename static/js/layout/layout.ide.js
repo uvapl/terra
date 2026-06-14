@@ -51,7 +51,7 @@ export default class IDELayout extends Layout {
               componentName: 'terminal',
               componentState: { fontSize: BASE_FONT_SIZE },
               isClosable: false,
-              reorderEnabled: false,
+              reorderEnabled: true,
             }
           ]
         }
@@ -168,15 +168,19 @@ export default class IDELayout extends Layout {
   }
 
   renderButtons() {
-    const runCodeButtonHtml = this.getRunCodeButtonHtml();
-    const clearTermButtonHtml = this.getClearTermButtonHtml();
+    // The navbar toolbar lives in the page chrome, outside the GoldenLayout
+    // container, so it survives a layout reset/destroy. Inject the run-code
+    // button HTML only once; appending unconditionally would stack a duplicate
+    // button on every re-init. CSS `order` controls its final position relative
+    // to the plugin buttons injected afterwards.
+    if (!$('#run-code').length) {
+      $(this.buttonContainerSelector).append(this.getRunCodeButtonHtml());
+    }
 
-    // Add run-code and clear-term to the DOM.
-    const $terminalContainer = $('.terminal-component-container');
-    $terminalContainer.find('.lm_header')
-      .append(clearTermButtonHtml)
-      .append(runCodeButtonHtml);
-
+    // Event handlers close over `this` (the layout instance, recreated on
+    // reset), so they are (re)bound on every init to point at the current
+    // instance. addButtonEventListeners is idempotent (off-then-on), so this
+    // does not stack handlers on the persistent buttons.
     this.addButtonEventListeners();
     this.addActiveStates();
   };

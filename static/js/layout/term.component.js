@@ -132,8 +132,6 @@ export default class TerminalComponent {
   globalKeyEventHandler = (event) => {
     if (event.key === 'c' && event.ctrlKey) {
       Terra.app.handleControlC(event);
-    } else if (event.key === 'k' && (isMac() ? event.metaKey : event.ctrlKey)) {
-      this.clear();
     } else if (event.key === '=' && event.ctrlKey) {
       Terra.app.layout.changeFontSize(Terra.app.layout.getCurrentFontSize() + 1);
       return false;

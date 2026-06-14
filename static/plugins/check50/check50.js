@@ -38,7 +38,7 @@ export default class Check50Plugin extends TerraPlugin {
 
   onLayoutLoaded = () => {
     this.$button = this.createTermButtonRight({
-      text: 'Run Check50',
+      text: 'Check50',
       id: 'run-check50-btn',
       class: 'primary-btn',
       onClick: this.onButtonClick,
