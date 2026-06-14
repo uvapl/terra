@@ -402,8 +402,9 @@ export default class App {
   /**
    * Handle the terminal-level keyboard shortcuts. Attached to xterm by the
    * terminal component, but the behaviour lives here because it is app/layout
-   * concern: ctrl-c stops a running program, ctrl-k clears the terminal, and
-   * ctrl with =/-/0/9 adjusts the font size.
+   * concern: ctrl-c stops a running program and ctrl with =/-/0/9 adjusts the
+   * font size. Clearing the terminal (cmd/ctrl-k) is handled globally in the
+   * menubar so it works regardless of focus.
    *
    * @param {KeyboardEvent} event - The keyboard event from xterm.
    * @returns {boolean|undefined} false to stop xterm from processing the key.
@@ -411,8 +412,6 @@ export default class App {
   handleTerminalKeyEvent(event) {
     if (event.key === 'c' && event.ctrlKey) {
       this.handleControlC(event);
-    } else if (event.key === 'k' && (isMac() ? event.metaKey : event.ctrlKey)) {
-      this.clearTerminal();
     } else if (event.key === '=' && event.ctrlKey) {
       this.layout.changeFontSize(this.layout.getCurrentFontSize() + 1);
       return false;
@@ -436,6 +435,21 @@ export default class App {
   clearTerminal() {
     this.term?.clear();
     triggerPluginEvent('onTerminalCleared');
+  }
+
+  /**
+   * Toggle keyboard focus between the active editor and the terminal (ctrl-`,
+   * the menu item). If the terminal currently holds focus, move to the editor,
+   * otherwise move to the terminal.
+   */
+  toggleEditorTerminalFocus() {
+    const termTextarea = this.term?.term?.textarea;
+    const terminalFocused = termTextarea && document.activeElement === termTextarea;
+    if (terminalFocused) {
+      this.getActiveEditor()?.focus();
+    } else {
+      this.term?.focus();
+    }
   }
 
   /**
