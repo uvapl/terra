@@ -3,10 +3,6 @@
   height: 100%;
 }
 
-.component-container .lm_header {
-  padding-left: 2px;
-}
-
 /* The docText popup menu when selecting a suggestion */
 .ace_doc-tooltip {
   background: #fff;
