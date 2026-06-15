@@ -182,10 +182,6 @@ export default class App extends BaseApp {
    */
   createLangWorker(proglang) {
     this.langWorkerClient.load(proglang);
-
-    if (!this.langWorkerClient.hasActiveWorker()) {
-      $('.worker-loading-label').hide();
-    }
   }
 
   /**
@@ -195,7 +191,6 @@ export default class App extends BaseApp {
     if (this.langWorkerClient.hasActiveWorker()) {
       this.langWorkerClient.terminate();
     }
-    $('.worker-loading-label').hide();
   }
 
   // ─────────────────────────── Worker handlers ───────────────────────────
@@ -218,8 +213,6 @@ export default class App extends BaseApp {
        * @param {boolean} hasPendingCommand - Whether a queued command will run.
        */
       onReady: (hasPendingCommand) => {
-        $('.worker-loading-label').hide();
-
         if (!hasPendingCommand) {
           $('.run-user-code-btn').prop('disabled', false);
           $('.clear-term-btn').prop('disabled', false);
@@ -447,7 +440,7 @@ export default class App extends BaseApp {
     if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
       // Worker is still loading — queue the command to run once it's ready.
       this.langWorkerClient.pendingCommand = run;
-      $('.worker-loading-label').show();
+      this.term?.writeln('\x1b[2mWaiting for runtime to fully load, just a sec...\x1b[0m');
     } else if (this.langWorkerClient.hasActiveWorker()) {
       run();
     }
@@ -507,7 +500,7 @@ export default class App extends BaseApp {
     if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
       // Worker is still loading — queue the command to run once it's ready.
       this.langWorkerClient.pendingCommand = run;
-      $('.worker-loading-label').show();
+      this.term?.writeln('\x1b[2mWaiting for runtime to fully load, just a sec...\x1b[0m');
     } else if (this.langWorkerClient.isReady) {
       run();
     }

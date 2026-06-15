@@ -1,6 +1,5 @@
 import { BASE_FONT_SIZE } from '../constants.js';
 import {
-  isMac,
   isImageExtension,
   isObject,
   mergeObjects,
@@ -232,14 +231,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     this.renderButtons();
     this.showTermStartupMessage();
     triggerPluginEvent('onLayoutLoaded');
-
-    // The button container may live in the persistent page chrome (the IDE
-    // navbar toolbar), which survives a layout reset. Only inject the loading
-    // label once to avoid duplicating it on every re-init.
-    const $buttonContainer = $(this.buttonContainerSelector);
-    if (!$buttonContainer.find('.worker-loading-label').length) {
-      $buttonContainer.append('<span class="worker-loading-label" style="display:none">Waiting for runtime to fully load, just a sec...</span>');
-    }
 
     if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
       this.emitToTabComponents('setCustomAutocompleter', options.autocomplete);
@@ -613,11 +604,10 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @returns {string}
    */
   getRunCodeButtonHtml() {
-    const runCodeShortcut = isMac() ? '&#8984;+Enter' : 'Ctrl+Enter';
     // Rendered disabled by default; enabled once a supported language's worker
     // is ready (or when switching to a runnable tab). Prevents the button from
     // being clickable for a non-runnable initial tab such as an Untitled file.
-    return `<button id="run-code" class="button primary-btn run-user-code-btn" disabled>Run (${runCodeShortcut})</button>`;
+    return `<button id="run-code" class="button primary-btn run-user-code-btn" disabled>Run</button>`;
   };
 
   /**
