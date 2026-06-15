@@ -1,34 +1,19 @@
-import { getFileExtension, isImageExtension, isMac, isObject } from './helpers/shared.js'
-import LangWorkerClient from './workers/lang-worker-client.js';
+import { getFileExtension, isImageExtension } from './helpers/shared.js'
 import Terra from './terra.js';
 import * as fileTreeManager from './file-tree-manager.js';
-import VirtualFileSystem, { FileNotFoundError, FileTooLargeError } from './fs/vfs.js';
-import Layout from './layout/layout.js';
+import { FileNotFoundError, FileTooLargeError } from './fs/vfs.js';
+import BaseApp from './app.base.js';
 import { triggerPluginEvent } from './plugin-manager.js';
 import { MAX_FILE_SIZE } from './constants.js';
+import { KeymapScope, matchKeyBinding } from './keymap.js';
 
 /**
  * Base class that is extended for each of the apps.
+ *
+ * Composition and wiring live in BaseApp; this class holds the handlers
+ * (grouped below by the source that fires them) and the basic app methods.
  */
-export default class App {
-  /**
-   * Reference to the GoldenLayout instance.
-   * @type {Layout}
-   */
-  layout = null;
-
-  /**
-   * Reference to the current language worker client.
-   * @type {LangWorkerClient}
-   */
-  langWorkerClient = null;
-
-  /**
-   * Reference to the Virtual File System (VFS) instance.
-   * @type {VirtualFileSystem}
-   */
-  vfs = null;
-
+export default class App extends BaseApp {
   /**
    * Resolver for the promise returned by the most recent runFile() call, or
    * null when no shell-initiated run is in flight. Resolved by onRunEnded.
@@ -36,135 +21,7 @@ export default class App {
    */
   _runEndResolver = null;
 
-  /**
-   * The terminal component, or null when it does not (yet) exist. The layout
-   * owns the terminal's lifecycle; this is a convenience accessor so the rest
-   * of the app does not reach through the layout on every use.
-   * @type {?TerminalComponent}
-   */
-  get term() {
-    return this.layout?.term ?? null;
-  }
-
-  constructor() {
-    this._bindThis();
-
-    this.vfs = new VirtualFileSystem();
-
-    // The language worker client persists for the lifetime of the app; it only
-    // spawns a worker thread on demand once a supported language is loaded.
-    this.langWorkerClient = new LangWorkerClient(this.getLangWorkerHandlers());
-  }
-
-  /**
-   * Bind all functions to the current instance of the class.
-   */
-  _bindThis() {
-    const functionNames = [];
-
-    let proto = Object.getPrototypeOf(this);
-    while (proto && proto !== Object.prototype) {
-      Object.getOwnPropertyNames(proto).forEach((fn) => {
-        if (functionNames.indexOf(fn) === -1 && typeof this[fn] === 'function' && fn !== 'constructor') {
-          functionNames.push(fn);
-        }
-      });
-
-      // Move up the prototype chain
-      proto = Object.getPrototypeOf(proto);
-    }
-
-    functionNames.forEach((fn) => {
-      this[fn] = this[fn].bind(this);
-    });
-  }
-
-  /**
-   * The initialisation function that is called when the app is loaded. This is
-   * explicitely invoked inside the main.<app-type>.js files rather than the
-   * constructor to ensure that the app is properly loaded before it is used.
-   */
-  async init() {
-    // Await the setupLayout because some apps might need to do async work.
-    await this.setupLayout();
-
-    // We register the postSetupLayout as a callback, which will be called when
-    // the subsequent init() function has finished. This is only done once: a
-    // replacement layout (e.g. after a reset) must not re-run postSetupLayout.
-    this.layout.on('initialised', this.postSetupLayout);
-
-    this.registerLayoutEvents();
-    this.layout.init();
-  }
-
-  /**
-   * Child classes that extend this class are expected to implement this.
-   * This function can be async.
-   */
-  async setupLayout() {
-    console.info('setupLayout() not implemented');
-  }
-
-  /**
-   * Child classes that extend this class are expected to implement this.
-   */
-  postSetupLayout() {
-    console.info('postSetupLayout() not implemented');
-  }
-
-  /**
-   * Add event listeners to the layout instance. This must be called again
-   * whenever the layout instance is replaced (e.g. after a layout reset),
-   * because the listeners are attached to the instance itself.
-   */
-  registerLayoutEvents() {
-    this.layout.addEventListener('runCode', this.onRunCode);
-
-    // Provide the terminal-level key handler to the layout, which injects it
-    // into the terminal component (so the component does not reach the app).
-    this.layout.onTerminalKey = this.handleTerminalKeyEvent;
-
-    // Listen for editor events being emitted.
-    const editorEvents = [
-      'onEditorEditingStarted',
-      'onEditorEditingStopped',
-      'onEditorTextChanged',
-      'onEditorSwitchedTo',
-      'onEditorReloadRequested',
-      'onImageSwitchedTo',
-      'onImageReloadRequested',
-    ];
-
-    editorEvents.forEach((eventName) => {
-      this.layout.addEventListener(eventName, async (event) => {
-        const { tabComponent } = event.detail;
-        if (typeof this[eventName] === 'function') {
-          this[eventName](tabComponent);
-        }
-      });
-    });
-
-    // Once the layout (and thus its run button) has rendered, spawn the worker
-    // for the initially active tab's language and set the run button to match.
-    // The editor 'show' events fire before the run button exists, so this has to
-    // be (re)applied here rather than relying on those events alone.
-    this.layout.on('initialised', () => {
-      const activeEditor = this.getActiveEditor();
-      const filename = activeEditor ? activeEditor.getFilename() : null;
-      this.createLangWorker(getFileExtension(filename));
-      this.updateRunButtonState(filename);
-    });
-  }
-
-  /**
-   * Callback when the user clicks on the run-code button in the UI.
-   *
-   * @param {Event} event - The event object.
-   */
-  onRunCode(event) {
-    const { clearTerm } = event.detail;
-    this.runCode({ clearTerm });
-  }
+  // ─────────────────────────── Editor handlers ───────────────────────────
 
   /**
    * Callback function for when the content has changed of an editor.
@@ -198,7 +55,6 @@ export default class App {
     await this.setEditorFileContent(editorComponent);
   }
 
-
   /**
    * Invoked after each LFS polling where each editor instance gets notified
    * that the VFS content has been changed, which requires to reload the file
@@ -212,6 +68,8 @@ export default class App {
     }
   }
 
+  // ─────────────────────────── Image handlers ────────────────────────────
+
   onImageSwitchedTo(imageComponent) {
     this.terminateLangWorker();
     this.updateRunButtonState(null);
@@ -224,61 +82,294 @@ export default class App {
     }
   }
 
-  async setImageFileContent(imageComponent) {
-    const filepath = imageComponent.getPath();
-    if (!filepath) return;
+  // ───────────────────────── Terminal key handlers ───────────────────────
 
-    try {
-      await this.vfs.readFile(filepath, MAX_FILE_SIZE);
-      const link = await this.vfs.getFileURL(filepath);
-      imageComponent.setSrc(link);
-    } catch (err) {
-      if (err instanceof FileTooLargeError) {
-        imageComponent.exceededFileSize();
-      } else if (err instanceof FileNotFoundError) {
-        console.warn('Editor file disappeared:', err.path);
-      } else {
-        console.error('Unexpected error reading file:', err);
-      }
+  /**
+   * Handle the terminal-level keyboard shortcuts. Attached to xterm by the
+   * terminal component, but the behaviour lives here because it is an app/layout
+   * concern. The key→action mapping lives in keymap.js (the TERMINAL scope);
+   * this looks up the matching binding and invokes the named action method
+   * below. Clearing the terminal (cmd/ctrl-k) is handled globally in the menubar
+   * so it works regardless of focus.
+   *
+   * @param {KeyboardEvent} event - The keyboard event from xterm.
+   * @returns {boolean|undefined} false to stop xterm from processing the key.
+   */
+  handleTerminalKeyEvent(event) {
+    const binding = matchKeyBinding(KeymapScope.TERMINAL, event);
+    if (!binding) return;
+
+    this[binding.action](event);
+    return binding.preventDefault ? false : undefined;
+  }
+
+  /**
+   * Stop the program currently running (ctrl-c). A no-op when nothing is
+   * running, so the key falls through to xterm (e.g. for copy). Also invoked
+   * directly by the menubar's "kill process" action.
+   */
+  handleControlC() {
+    if (this.langWorkerClient.isRunningCode) {
+      this.stopRunningProgramManually();
     }
   }
 
+  /** Increase the font size by one step (ctrl-=). */
+  zoomIn() {
+    this.layout.changeFontSize(this.layout.getCurrentFontSize() + 1);
+  }
 
-  /**
-   * Reload the file content from VFS.
-   *
-   * @async
-   * @param {EditorComponent} editorComponent - The editor component instance.
-   */
-  async setEditorFileContent(editorComponent) {
-    const path = editorComponent.getPath();
-    if (!path) return;
+  /** Decrease the font size by one step (ctrl--). */
+  zoomOut() {
+    this.layout.changeFontSize(this.layout.getCurrentFontSize() - 1);
+  }
 
-    const content = await this.vfs.readFile(path);
-    editorComponent.setContent(content);
+  /** Reset the font size to the default (ctrl-0). */
+  resetZoom() {
+    this.layout.changeFontSize(16);
+  }
+
+  /** Set the font size to the larger "demo" size (ctrl-9). */
+  zoomDemo() {
+    this.layout.changeFontSize(24);
   }
 
   /**
-   * Create a list of content objects based on the tabs config data.
-   *
-   * @param {object} tabs - An object where each key is the filename and the
-   * value is the default value the editor should have when the file is opened.
-   * @param {number} fontSize - The default font-size used for the content.
-   * @returns {array} List of content objects.
+   * Clear the terminal at the user's request (ctrl-k, the trash button, the
+   * menu item) and notify plugins, so e.g. the shell can render a fresh prompt.
+   * Pre-run clears use term.clear() directly and deliberately do not notify.
    */
-  generateConfigContent(tabs, fontSize) {
-    return Object.keys(tabs).map((filename) => ({
-      type: 'component',
-      componentName: 'editor',
-      componentState: {
-        fontSize,
-        value: tabs[filename],
-        path: filename,
+  clearTerminal() {
+    this.term?.clear();
+    triggerPluginEvent('onTerminalCleared');
+  }
+
+  /**
+   * Toggle keyboard focus between the active editor and the terminal (ctrl-`,
+   * the menu item). If the terminal currently holds focus, move to the editor,
+   * otherwise move to the terminal.
+   */
+  toggleEditorTerminalFocus() {
+    const termTextarea = this.term?.term?.textarea;
+    const terminalFocused = termTextarea && document.activeElement === termTextarea;
+    if (terminalFocused) {
+      this.getActiveEditor()?.focus();
+    } else {
+      this.term?.focus();
+    }
+  }
+
+  // ───────────────────── Run-button / layout handlers ────────────────────
+
+  /**
+   * Callback when the user clicks on the run-code button in the UI.
+   *
+   * @param {Event} event - The event object.
+   */
+  onRunCode(event) {
+    const { clearTerm } = event.detail;
+    this.runCode({ clearTerm });
+  }
+
+  // ─────────────────────────── Language worker ───────────────────────────
+
+  /**
+   * Create a new language worker client if none exists already. The existing
+   * client will be terminated and restarted if necessary. This is the single
+   * place where a client is constructed, so its handlers are always wired.
+   *
+   * @param {string} proglang - The proglang to spawn the related worker for.
+   */
+  createLangWorker(proglang) {
+    this.langWorkerClient.load(proglang);
+
+    if (!this.langWorkerClient.hasActiveWorker()) {
+      $('.worker-loading-label').hide();
+    }
+  }
+
+  /**
+  * Terminate the current language worker if it exists.
+   */
+  terminateLangWorker() {
+    if (this.langWorkerClient.hasActiveWorker()) {
+      this.langWorkerClient.terminate();
+    }
+    $('.worker-loading-label').hide();
+  }
+
+  // ─────────────────────────── Worker handlers ───────────────────────────
+
+  /**
+   * Build the app-side reaction callbacks handed to a language worker client.
+   * The client is pure transport and delegates every DOM/VFS/terminal reaction
+   * to these handlers, which are grouped here as the single object that is
+   * passed to the client. Arrow functions capture this instance, so they do not
+   * rely on _bindThis().
+   *
+   * @returns {object} The handlers object.
+   */
+  getLangWorkerHandlers() {
+    return {
+      /**
+       * The worker has finished initialising and is ready to run. Re-enable the
+       * worker UI buttons unless a queued command is about to run.
+       *
+       * @param {boolean} hasPendingCommand - Whether a queued command will run.
+       */
+      onReady: (hasPendingCommand) => {
+        $('.worker-loading-label').hide();
+
+        if (!hasPendingCommand) {
+          $('.run-user-code-btn').prop('disabled', false);
+          $('.clear-term-btn').prop('disabled', false);
+          $('.config-btn').prop('disabled', false);
+        }
       },
-      title: filename,
-      isClosable: false,
-    }));
+
+      /**
+       * Write a message produced by the worker to the terminal.
+       *
+       * @param {string} text - The message to write.
+       */
+      onWrite: (text) => {
+        this.term?.write(text);
+      },
+
+      /**
+       * Write an error message produced by the worker in red.
+       *
+       * @param {string} text - The error message to write.
+       */
+      onWriteError: (text) => {
+        this.term?.write(`\x1b[1;31m${text}\x1b[0m`);
+      },
+
+      /**
+       * The worker is requesting a line of standard input from the terminal.
+       */
+      onRequestStdin: () => this.term.waitForInput(),
+
+      /**
+       * A custom config button's command has finished executing.
+       */
+      onRunButtonCommandDone: () => {
+        $('.run-user-code-btn, .config-btn').prop('disabled', false);
+      },
+
+      /**
+       * The user's code has finished running or was aborted. Reset the run/stop
+       * button and clean up the terminal. Safe on normal completion too: there
+       * is nothing pending to dispose and the cursor is already hidden.
+       */
+      onRunEnded: () => {
+        // Only disable the button again if the current tab has a worker, because
+        // users can still run code through the contextmenu in the file-tree in
+        // the IDE app.
+        const activeEditor = this.getActiveEditor();
+        const disableRunBtn =
+          !activeEditor ||
+          !this.langWorkerClient.supports(getFileExtension(activeEditor.getFilename()));
+
+        // Print inverted `%` to terminal if last line of output was not terminated by a `\n`.
+        this.term?.printForgotNewline();
+
+        // Dispose any pending stdin prompt left by an aborted run and hide the cursor.
+        this.term?.disposeUserInput();
+        this.term?.hideTermCursor();
+
+        // Set focus to the active editor.
+        this.getActiveEditor().focus();
+
+        this.layout.onRunEnded({ disableRunBtn });
+
+        // If a run was started through runFile (e.g. by the shell), resolve its
+        // promise now so the caller can resume.
+        if (this._runEndResolver) {
+          const resolve = this._runEndResolver;
+          this._runEndResolver = null;
+          resolve();
+        }
+
+        // Notify plugins that the run has ended, after the terminal cleanup
+        // above (e.g. the shell, to restore its prompt and cursor).
+        triggerPluginEvent('onRunEnded');
+      },
+
+      /**
+       * Files were created or modified in the worker's internal filesystem
+       * during execution. Reflect the changes in the VFS, open tabs and the
+       * file tree.
+       *
+       * @async
+       * @param {array} newOrModifiedFiles - List of file objects.
+       */
+      onNewOrModifiedFiles: async (newOrModifiedFiles) => {
+        if (!Array.isArray(newOrModifiedFiles)) {
+          return;
+        }
+
+        for (const file of newOrModifiedFiles) {
+          // Check if the file already exists in the VFS.
+          if ((await this.vfs.pathExists(file.path))) {
+            // If the file already exists, update its content.
+            await this.vfs.updateFile(file.path, file.content);
+
+            // Check if there's an open tab for this file.
+            const tabComponent = this.getTabComponents().find((component) => {
+              const path = component.getPath();
+              return path == file.path;
+            });
+
+            // If so, update its content.
+            if (tabComponent) {
+              tabComponent.setContent(file.content);
+            }
+          } else {
+            // Otherwise, create a new file in the VFS.
+            await this.vfs.createFile(
+              file.path,
+              file.content,
+            );
+
+            // Automatically open new image files in a tab.
+            if (isImageExtension(file.path)) {
+              this.layout.addFileTab(file.path);
+            }
+          }
+
+          // Recreate the file tree.
+          await fileTreeManager.createFileTree();
+        }
+      },
+
+      /**
+       * Files were deleted from the worker's internal filesystem during
+       * execution. Remove them from the VFS and close any open tabs.
+       *
+       * @async
+       * @param {string[]} deletedPaths - List of file paths that were deleted.
+       */
+      onDeletedFiles: async (deletedPaths) => {
+        if (!Array.isArray(deletedPaths)) {
+          return;
+        }
+
+        for (const path of deletedPaths) {
+          await this.vfs.deleteFile(path, false);
+
+          const tabComponent = this.getTabComponents().find(
+            (component) => component.getPath() === path
+          );
+          if (tabComponent) {
+            tabComponent.close();
+          }
+        }
+      },
+    };
   }
+
+  // ──────────────────────────── Running code ─────────────────────────────
 
   /**
    * Runs the code inside the worker by sending all files to the worker along with
@@ -393,86 +484,6 @@ export default class App {
     });
   }
 
-  handleControlC(event) {
-    if (event.key === 'c' && event.ctrlKey && this.langWorkerClient.isRunningCode) {
-      this.stopRunningProgramManually();
-    }
-  }
-
-  /**
-   * Handle the terminal-level keyboard shortcuts. Attached to xterm by the
-   * terminal component, but the behaviour lives here because it is app/layout
-   * concern: ctrl-c stops a running program and ctrl with =/-/0/9 adjusts the
-   * font size. Clearing the terminal (cmd/ctrl-k) is handled globally in the
-   * menubar so it works regardless of focus.
-   *
-   * @param {KeyboardEvent} event - The keyboard event from xterm.
-   * @returns {boolean|undefined} false to stop xterm from processing the key.
-   */
-  handleTerminalKeyEvent(event) {
-    if (event.key === 'c' && event.ctrlKey) {
-      this.handleControlC(event);
-    } else if (event.key === '=' && event.ctrlKey) {
-      this.layout.changeFontSize(this.layout.getCurrentFontSize() + 1);
-      return false;
-    } else if (event.key === '-' && event.ctrlKey) {
-      this.layout.changeFontSize(this.layout.getCurrentFontSize() - 1);
-      return false;
-    } else if (event.key === '0' && event.ctrlKey) {
-      this.layout.changeFontSize(16);
-      return false;
-    } else if (event.key === '9' && event.ctrlKey) {
-      this.layout.changeFontSize(24);
-      return false;
-    }
-  }
-
-  /**
-   * Clear the terminal at the user's request (ctrl-k, the trash button, the
-   * menu item) and notify plugins, so e.g. the shell can render a fresh prompt.
-   * Pre-run clears use term.clear() directly and deliberately do not notify.
-   */
-  clearTerminal() {
-    this.term?.clear();
-    triggerPluginEvent('onTerminalCleared');
-  }
-
-  /**
-   * Toggle keyboard focus between the active editor and the terminal (ctrl-`,
-   * the menu item). If the terminal currently holds focus, move to the editor,
-   * otherwise move to the terminal.
-   */
-  toggleEditorTerminalFocus() {
-    const termTextarea = this.term?.term?.textarea;
-    const terminalFocused = termTextarea && document.activeElement === termTextarea;
-    if (terminalFocused) {
-      this.getActiveEditor()?.focus();
-    } else {
-      this.term?.focus();
-    }
-  }
-
-  /**
-   * Get the config object for the run-as button.
-   * This is executed just before the user runs the code from an editor.
-   * By default this returns null if not implemented in child classes.
-   *
-   * @returns {null|object} The config object if implemented.
-   */
-  getRunAsConfig() {
-    return null;
-  }
-
-  /**
-   * Get the hidden files that should be passed to the worker, but are not
-   * displayed as visual tabs inside the UI for the user.
-   *
-   * @returns {array} List of (hidden) files.
-   */
-  getHiddenFiles() {
-    return [];
-  }
-
   /**
    * Run the command of a custom config button.
    *
@@ -503,48 +514,35 @@ export default class App {
   }
 
   /**
-   * Create a new language worker client if none exists already. The existing
-   * client will be terminated and restarted if necessary. This is the single
-   * place where a client is constructed, so its handlers are always wired.
-   *
-   * @param {string} proglang - The proglang to spawn the related worker for.
+   * Stop the program the user is currently running: restart the worker so the
+   * next run starts fresh, then clear any pending output and print a termination
+   * notice. The restart triggers onRunEnded, which resets the UI and terminal.
    */
-  createLangWorker(proglang) {
-    this.langWorkerClient.load(proglang);
-
-    if (!this.langWorkerClient.hasActiveWorker()) {
-      $('.worker-loading-label').hide();
-    }
+  stopRunningProgramManually() {
+    this.langWorkerClient.restart();
+    this.term?.clearTermWriteBuffer();
+    this.term?.writeln('\x1b[1;31mProcess terminated\x1b[0m');
   }
 
   /**
-   * Build the app-side reaction callbacks handed to a language worker client.
-   * The client is pure transport and delegates every DOM/VFS/terminal reaction
-   * to these handlers. All methods are already bound to `this` via _bindThis().
+   * Get the config object for the run-as button.
+   * This is executed just before the user runs the code from an editor.
+   * By default this returns null if not implemented in child classes.
    *
-   * @returns {object} The handlers object.
+   * @returns {null|object} The config object if implemented.
    */
-  getLangWorkerHandlers() {
-    return {
-      onReady: this.onWorkerReady,
-      onWrite: this.onWorkerWrite,
-      onWriteError: this.onWorkerWriteError,
-      onRequestStdin: () => this.term.waitForInput(),
-      onRunButtonCommandDone: this.onWorkerRunButtonCommandDone,
-      onRunEnded: this.onRunEnded,
-      onNewOrModifiedFiles: this.onWorkerNewOrModifiedFiles,
-      onDeletedFiles: this.onWorkerDeletedFiles,
-    };
+  getRunAsConfig() {
+    return null;
   }
 
   /**
-  * Terminate the current language worker if it exists.
+   * Get the hidden files that should be passed to the worker, but are not
+   * displayed as visual tabs inside the UI for the user.
+   *
+   * @returns {array} List of (hidden) files.
    */
-  terminateLangWorker() {
-    if (this.langWorkerClient.hasActiveWorker()) {
-      this.langWorkerClient.terminate();
-    }
-    $('.worker-loading-label').hide();
+  getHiddenFiles() {
+    return [];
   }
 
   /**
@@ -560,166 +558,63 @@ export default class App {
     $('.run-user-code-btn, .config-btn').prop('disabled', !canRun);
   }
 
-  /**
-   * Worker handler: the worker has finished initialising and is ready to run.
-   * Re-enable the worker UI buttons unless a queued command is about to run.
-   *
-   * @param {boolean} hasPendingCommand - Whether a queued command will run now.
-   */
-  onWorkerReady(hasPendingCommand) {
-    $('.worker-loading-label').hide();
-
-    if (!hasPendingCommand) {
-      $('.run-user-code-btn').prop('disabled', false);
-      $('.clear-term-btn').prop('disabled', false);
-      $('.config-btn').prop('disabled', false);
-    }
-  }
+  // ──────────────────────────── File content ─────────────────────────────
 
   /**
-   * Worker handler: write a message produced by the worker to the terminal.
-   *
-   * @param {string} text - The message to write.
-   */
-  onWorkerWrite(text) {
-    this.term?.write(text);
-  }
-
-  /**
-   * Worker handler: write an error message produced by the worker in red.
-   *
-   * @param {string} text - The error message to write.
-   */
-  onWorkerWriteError(text) {
-    this.term?.write(`\x1b[1;31m${text}\x1b[0m`);
-  }
-
-  /**
-   * Worker handler: a custom config button's command has finished executing.
-   */
-  onWorkerRunButtonCommandDone() {
-    $('.run-user-code-btn, .config-btn').prop('disabled', false);
-  }
-
-  /**
-   * Stop the program the user is currently running: restart the worker so the
-   * next run starts fresh, then clear any pending output and print a termination
-   * notice. The restart triggers onRunEnded, which resets the UI and terminal.
-   */
-  stopRunningProgramManually() {
-    this.langWorkerClient.restart();
-    this.term?.clearTermWriteBuffer();
-    this.term?.writeln('\x1b[1;31mProcess terminated\x1b[0m');
-  }
-
-  /**
-   * Worker handler: files were created or modified in the worker's internal
-   * filesystem during execution. Reflect the changes in the VFS, open tabs and
-   * the file tree.
+   * Reload the file content from VFS.
    *
    * @async
-   * @param {array} newOrModifiedFiles - List of file objects.
+   * @param {EditorComponent} editorComponent - The editor component instance.
    */
-  async onWorkerNewOrModifiedFiles(newOrModifiedFiles) {
-    if (!Array.isArray(newOrModifiedFiles)) {
-      return;
-    }
+  async setEditorFileContent(editorComponent) {
+    const path = editorComponent.getPath();
+    if (!path) return;
 
-    for (const file of newOrModifiedFiles) {
-      // Check if the file already exists in the VFS.
-      if ((await this.vfs.pathExists(file.path))) {
-        // If the file already exists, update its content.
-        await this.vfs.updateFile(file.path, file.content);
+    const content = await this.vfs.readFile(path);
+    editorComponent.setContent(content);
+  }
 
-        // Check if there's an open tab for this file.
-        const tabComponent = this.getTabComponents().find((component) => {
-          const path = component.getPath();
-          return path == file.path;
-        });
+  async setImageFileContent(imageComponent) {
+    const filepath = imageComponent.getPath();
+    if (!filepath) return;
 
-        // If so, update its content.
-        if (tabComponent) {
-          tabComponent.setContent(file.content);
-        }
+    try {
+      await this.vfs.readFile(filepath, MAX_FILE_SIZE);
+      const link = await this.vfs.getFileURL(filepath);
+      imageComponent.setSrc(link);
+    } catch (err) {
+      if (err instanceof FileTooLargeError) {
+        imageComponent.exceededFileSize();
+      } else if (err instanceof FileNotFoundError) {
+        console.warn('Editor file disappeared:', err.path);
       } else {
-        // Otherwise, create a new file in the VFS.
-        await this.vfs.createFile(
-          file.path,
-          file.content,
-        );
-
-        // Automatically open new image files in a tab.
-        if (isImageExtension(file.path)) {
-          this.layout.addFileTab(file.path);
-        }
+        console.error('Unexpected error reading file:', err);
       }
-
-      // Recreate the file tree.
-      await fileTreeManager.createFileTree();
     }
   }
 
+  // ───────────────────────── Config & accessors ──────────────────────────
+
   /**
-   * Worker handler: files were deleted from the worker's internal filesystem
-   * during execution. Remove them from the VFS and close any open tabs.
+   * Create a list of content objects based on the tabs config data.
    *
-   * @async
-   * @param {string[]} deletedPaths - List of file paths that were deleted.
+   * @param {object} tabs - An object where each key is the filename and the
+   * value is the default value the editor should have when the file is opened.
+   * @param {number} fontSize - The default font-size used for the content.
+   * @returns {array} List of content objects.
    */
-  async onWorkerDeletedFiles(deletedPaths) {
-    if (!Array.isArray(deletedPaths)) {
-      return;
-    }
-
-    for (const path of deletedPaths) {
-      await this.vfs.deleteFile(path, false);
-
-      const tabComponent = this.getTabComponents().find(
-        (component) => component.getPath() === path
-      );
-      if (tabComponent) {
-        tabComponent.close();
-      }
-    }
-  }
-
-  /**
-   * Worker handler: the user's code has finished running or was aborted. Reset
-   * the run/stop button and clean up the terminal. Safe on normal completion
-   * too: there is nothing pending to dispose and the cursor is already hidden.
-   */
-  onRunEnded() {
-    // Only disable the button again if the current tab has a worker, because
-    // users can still run code through the contextmenu in the file-tree in the
-    // IDE app.
-    const activeEditor = this.getActiveEditor();
-    const disableRunBtn =
-      !activeEditor ||
-      !this.langWorkerClient.supports(getFileExtension(activeEditor.getFilename()));
-
-    // Print inverted `%` to terminal if last line of output was not terminated by a `\n`.
-    this.term?.printForgotNewline();
-
-    // Dispose any pending stdin prompt left by an aborted run and hide the cursor.
-    this.term?.disposeUserInput();
-    this.term?.hideTermCursor();
-
-    // Set focus to the active editor.
-    this.getActiveEditor().focus();
-
-    this.layout.onRunEnded({ disableRunBtn });
-
-    // If a run was started through runFile (e.g. by the shell), resolve its
-    // promise now so the caller can resume.
-    if (this._runEndResolver) {
-      const resolve = this._runEndResolver;
-      this._runEndResolver = null;
-      resolve();
-    }
-
-    // Notify plugins that the run has ended, after the terminal cleanup above
-    // (e.g. the shell, to restore its prompt and cursor).
-    triggerPluginEvent('onRunEnded');
+  generateConfigContent(tabs, fontSize) {
+    return Object.keys(tabs).map((filename) => ({
+      type: 'component',
+      componentName: 'editor',
+      componentState: {
+        fontSize,
+        value: tabs[filename],
+        path: filename,
+      },
+      title: filename,
+      isClosable: false,
+    }));
   }
 
   /**

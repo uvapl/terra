@@ -2,7 +2,6 @@ import { BASE_FONT_SIZE } from '../constants.js';
 import { getFileExtension, seconds } from '../helpers/shared.js';
 import { triggerPluginEvent } from '../plugin-manager.js';
 import { getLocalStorageItem } from '../local-storage-manager.js';
-import * as fileTreeManager from '../file-tree-manager.js';
 import Terra from '../terra.js';
 import TabComponent from './tab.component.js';
 
@@ -73,21 +72,32 @@ export default class EditorComponent extends TabComponent {
         .join('|');
     }
 
-    this.editor.commands.addCommand({
-      name: 'new-file',
-      bindKey: {win: 'Ctrl-N', mac: 'Ctrl-N'},
-      exec: () => {
-        fileTreeManager.createFile();
+    // Keyboard shortcuts that can be processed internally by the editor,
+    // as opposed to being routed through the app logic.
+    this.addCommands([
+      {
+        name: 'save',
+        bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
+        exec: () => {
+          // Literally do nothing here, because by default, we want to prevent
+          // the user (accidentally) saving the file with <cmd/ctrl + s>, which
+          // otherwise triggers the native browser save-file popup window.
+        }
+      },
+      {
+        name: 'moveLinesUp',
+        bindKey: { win: 'Ctrl+Alt+Up', mac: 'Ctrl+Option+Up' },
+        exec: () => {
+          console.log("move up");
+          this.moveLinesUp()
+        },
+      },
+      {
+        name: 'moveLinesDown',
+        bindKey: { win: 'Ctrl+Alt+Down', mac: 'Ctrl+Option+Down' },
+        exec: () => this.moveLinesDown(),
       }
-    });
-
-    this.editor.commands.addCommand({
-      name: 'new-folder',
-      bindKey: {win: 'Ctrl-Shift-N', mac: 'Ctrl-Shift-N'},
-      exec: () => {
-        fileTreeManager.createFolder();
-      }
-    });
+    ]);
   }
 
   /**
