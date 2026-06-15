@@ -30,3 +30,7 @@
 .lm_goldenlayout > div {
   max-width: 100%;
 }
+
+.terminal-component-container .lm_tabs {
+  display: none;
+}

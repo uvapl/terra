@@ -9,3 +9,7 @@
 @import 'include/term.css';
 @import 'include/editor.css';
 @import 'include/ide/image-component.css';
+
+.terminal-component-container .lm_tabs {
+  display: none;
+}

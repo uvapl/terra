@@ -33,3 +33,7 @@
   border: 1px solid var(--border-color);
   padding: 2px 0 0;
 }
+
+.terminal-component-container .lm_tabs {
+  display: none;
+}
