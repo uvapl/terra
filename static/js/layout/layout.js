@@ -21,7 +21,7 @@ import Terra from '../terra.js';
  * Current version of the default layout config. Increase if breaking changes
  * require all users to reload a fresh config.
  */
-const LAYOUT_CONFIG_VERSION = 2;
+const LAYOUT_CONFIG_VERSION = 3;
 
 /**
  * Default layout config that is used when the layout is created for the first
@@ -52,6 +52,7 @@ const DEFAULT_LAYOUT_CONFIG = {
         {
           type: 'component',
           componentName: 'terminal',
+          title: 'Terminal',
           componentState: { fontSize: BASE_FONT_SIZE },
           isClosable: false,
         }

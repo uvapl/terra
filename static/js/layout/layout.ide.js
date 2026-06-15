@@ -49,6 +49,7 @@ export default class IDELayout extends Layout {
             {
               type: 'component',
               componentName: 'terminal',
+              title: 'Terminal',
               componentState: { fontSize: BASE_FONT_SIZE },
               isClosable: false,
               reorderEnabled: true,
