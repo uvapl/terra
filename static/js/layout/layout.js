@@ -262,25 +262,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
         bindKey: { win: 'Ctrl+Enter', mac: 'Command+Enter' },
         exec: () => this.onRunCodeButtonClick(),
       },
-      {
-        name: 'save',
-        bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
-        exec: () => {
-          // Literally do nothing here, because by default, we want to prevent
-          // the user (accidentally) saving the file with <cmd/ctrl + s>, which
-          // triggers the native browser save-file popup window.
-        }
-      },
-      {
-        name: 'moveLinesUp',
-        bindKey: { win: 'Ctrl+Alt+Up', mac: 'Command+Option+Up' },
-        exec: () => editorComponent.moveLinesUp(),
-      },
-      {
-        name: 'moveLinesDown',
-        bindKey: { win: 'Ctrl+Alt+Down', mac: 'Command+Option+Down' },
-        exec: () => editorComponent.moveLinesDown(),
-      }
     ]);
   }
 
@@ -372,6 +353,24 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
     editorComponent.addEventListener('focus', () => this.onEditorFocus(editorComponent));
     editorComponent.addEventListener('destroy', () => this.onTabDestroy());
+
+    // Seems redundant
+    // editorComponent.addCommands([
+    //   {
+    //     name: 'new-file',
+    //     bindKey: {win: 'Ctrl-N', mac: 'Ctrl-N'},
+    //     exec: () => {
+    //       fileTreeManager.createFile();
+    //     }
+    //   },
+    //   {
+    //     name: 'new-folder',
+    //     bindKey: {win: 'Ctrl-Shift-N', mac: 'Ctrl-Shift-N'},
+    //     exec: () => {
+    //       fileTreeManager.createFolder();
+    //     }
+    //   },
+    // ])
   }
 
   /**
