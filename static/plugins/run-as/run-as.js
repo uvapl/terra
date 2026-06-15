@@ -19,7 +19,7 @@ export default class RunAsPlugin extends TerraPlugin {
 
   onLayoutLoaded = () => {
     this.$button = this.createTermButtonLeft({
-      text: `Run as...`,
+      text: `Run as`,
       id: 'run-as-btn',
       class: '',
       onClick: this.onButtonClick,

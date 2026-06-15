@@ -11,7 +11,7 @@
   user-select: none;
   -webkit-user-select: none;
   border-bottom: none;
-  height: 2.5rem;
+  min-height: 3.5rem;
 }
 
 .navbar-right ul {

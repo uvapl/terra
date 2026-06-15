@@ -5,8 +5,8 @@ import Terra from './terra.js';
 import { loadPlugins } from './plugin-manager.js';
 
 const plugins = [
-  'check50',
   'run-as',
+  'check50',
   'right-sidebar',
   'shell',
   // 'editor-unlink-killer',
