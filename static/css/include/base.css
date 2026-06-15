@@ -7,10 +7,10 @@
   --navbar-padding: 10px;
   --editor-tab-font-size: 12px;
   --modal-padding: 20px;
-  --tab-fg-color: #737373;
-  --tab-bg-color: #e1e1e1;
+  --tab-fg-color: #555;
+  --tab-bg-color: #d5d3d3;
   --active-tab-fg-color: #000;
-  --active-tab-bg-color: #f7f6f6;
+  --active-tab-bg-color: #fff;
   --border-color:transparent;
   --border-radius: 4px;
   --scrollbar-bg-color: #fff;
