@@ -21,7 +21,10 @@ export default class EmbedApp extends App {
   frameContent = null;
 
   async setupLayout() {
-    this.registerFrameListener();
+    // Listen for the content of the file to be received.
+    window.addEventListener('message', async (event) => {
+      this.frameContent = removeIndent(event.data);
+    });
 
     // Files for a specific embed are hosted in a subdirectory of the VFS.
     const slug = slugify(window.location.href);
@@ -60,7 +63,7 @@ export default class EmbedApp extends App {
     const content = this.generateConfigContent(tabs, fontSize);
 
     // Create the layout object.
-    const layout = this.createLayout(content, fontSize, {
+    const layout = new EmbedLayout(content, fontSize, {
       proglang,
       vertical: isVertical,
     });
@@ -73,26 +76,8 @@ export default class EmbedApp extends App {
     return layout;
   }
 
-  registerFrameListener() {
-    // Listen for the content of the file to be received.
-    window.addEventListener('message', async (event) => {
-      this.frameContent = removeIndent(event.data);
-    });
-  }
-
-  postSetupLayout() { }
-
   /**
-   * Create the layout object with the given content objects and font-size.
-   *
-   * @param {array} content - List of content objects.
-   * @param {number} fontSize - The default font-size to be used.
-   * @param {object} options - Additional options object.
-   * @param {boolean} options.vertical - Whether the layout should be vertical.
-   * @param {string} options.proglang - The programming language to be used
-   * @returns {EmbedLayout} The layout instance.
+   * Nothing to do in the post setup.
    */
-  createLayout(content, fontSize, options = {}) {
-    return new EmbedLayout(content, fontSize, options);
-  }
+  postSetupLayout() { }
 }

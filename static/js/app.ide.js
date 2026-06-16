@@ -1,14 +1,15 @@
 import App from './app.js';
 import IDELayout from './layout/layout.ide.js';
 import { MAX_FILE_SIZE } from './constants.js';
-import { getFileExtension, getRepoInfo, isValidFilename } from './helpers/shared.js';
+import { getFileExtension, isValidFilename } from './helpers/shared.js';
 import Terra from './terra.js';
-import { getLocalStorageItem } from './local-storage-manager.js';
 import * as fileTreeManager from './file-tree-manager.js';
-import { triggerPluginEvent, getPlugin } from './plugin-manager.js';
-import GitFS from './fs/git.js';
+import { getPlugin } from './plugin-manager.js';
 import { FileNotFoundError, FileTooLargeError } from './fs/vfs.js';
 import * as LFS from './fs/lfs.js';
+import { useStorageCoordinator } from './concerns/storage.js';
+import { useGit } from './concerns/git.js';
+import { useLFS } from './concerns/lfs.js';
 
 export default class IDEApp extends App {
   /**
@@ -22,6 +23,12 @@ export default class IDEApp extends App {
 
     // Files for the IDE are hosted in a subdirectory of the VFS.
     this.vfs.setBaseFolder('ide')
+
+    // Install the storage concerns. The coordinator must be installed before the
+    // backends, because each backend registers itself with the coordinator.
+    useStorageCoordinator(this);
+    useGit(this);
+    useLFS(this);
   }
 
   async setupLayout() {
@@ -357,217 +364,7 @@ export default class IDEApp extends App {
     };
   }
 
-  // ***** git FS *****
-
-  /**
-   * Called when starting the app to restore a previous Git connection, if
-   * available.
-   *
-   * @returns {Promise<boolean>} True if not configured OR re-connected.
-   */
-  async initGitFSAtStart() {
-    if (this.isGitConfigured()) {
-      console.log('Git project detected upon init');
-      return true;
-    }
-
-    // In fact, this function currently always returns true because making
-    // the Git connection is deferred until later.
-    return true;
-  }
-
-  /**
-   * Initiate connection to GitFS.
-   *
-   * To be called from menu by user.
-   */
-  async openGitFS() {
-    this.closeAllFiles();
-    await this.stopLFS();
-    await this.startGitFS();
-  }
-
-  /**
-   * Close connection to GitFS, reverting to browser temporary storage.
-   *
-   * To be called from menu by user.
-   */
-  async closeGitFS() {
-    this.closeAllFiles();
-    await this.stopGitFS();
-    await this.finishSwitchToLocalStorage();
-  }
-
-  /**
-   * Determines whether a Git repo is configured for use.
-   *
-   * @returns {boolean} True if configured and should be able to connect.
-   */
-  isGitConfigured() {
-    return getLocalStorageItem('git-repo');
-  }
-
-  /**
-   * Check whether the GitFS worker has been initialised.
-   *
-   * @returns {boolean} True if the worker has been initialised, false otherwise.
-   */
-  hasGitFSWorker() {
-    return this.gitfs instanceof GitFS;
-  }
-
-  /**
-   * Create a new GitFSWorker instance if it doesn't exist yet and only if the
-   * the user provided an access token and repository link that are saved in local
-   * storage. Otherwise, a worker will be created automatically when the user
-   * adds a new repository.
-   */
-  async startGitFS() {
-    await this.vfs.connect(null, 'ide-git');
-
-    const accessToken = getLocalStorageItem('git-access-token');
-    const repoLink = getLocalStorageItem('git-repo');
-    const repoInfo = getRepoInfo(repoLink);
-    if (repoInfo) {
-      fileTreeManager.setTitle(`${repoInfo.user}/${repoInfo.repo}`)
-    }
-
-    if (this.hasGitFSWorker()) {
-      // Pass `false` to *NOT* clear the git-repo and git-branch local storage
-      // items, because this if-statement only runs when the user is already
-      // connected to a repo and changed the repo URL. Thus, we shouldn't clear
-      // them; however, the clearing should only happen when terminate() is
-      // called in other places to exclusively terminate the worker without
-      // respawning another one.
-      this.gitfs.terminate(false);
-
-      this.gitfs = null;
-      this.closeAllFiles();
-    }
-
-    if (accessToken && repoLink) {
-      this.layout.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
-
-      const gitfs = new GitFS(this.vfs, repoLink);
-      this.gitfs = gitfs;
-      gitfs._createWorker(accessToken);
-
-      fileTreeManager.destroyTree();
-
-      console.log('Creating gitfs worker');
-      fileTreeManager.setInfoMsg('Cloning repository...');
-      triggerPluginEvent('onStorageChange', 'git');
-    }
-  }
-
-  /**
-   * Disconnect GitFS, removing file cache.
-   */
-  async stopGitFS() {
-    if (this.gitfs) {
-      this.gitfs.terminate();
-      this.gitfs = null;
-      await this.vfs.clear();
-      await this.vfs.connect(null, 'ide');
-    }
-  }
-
-  // ***** local FS API *****
-
-  /**
-   * Called when starting the app to restore a previous LFS connection, if
-   * available.
-   *
-   * @returns {Promise<boolean>} True if not configured OR re-connected.
-   */
-  async initLFSAtStart() {
-    // Re-open previous LFS project if available.
-    if (LFS.hasProjectLoaded()) {
-      const rootFolderHandle = await LFS.reopen();
-
-      // Might not succeed if saved LFS handle is stale.
-      if (rootFolderHandle) {
-        console.log('LFS project detected upon init');
-        await this.vfs.connect(rootFolderHandle);
-        return true;
-      } else {
-        console.log('Tried to reopen LFS but handle was stale.');
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Open a directory picker dialog and connects VFS to the selected directory.
-   *
-   * To be called from menu by user.
-   */
-  async openLFSFolder() {
-    let rootFolderHandle = await LFS.choose();
-    if (!rootFolderHandle) return;
-
-    this.closeAllFiles();
-
-    // Make sure GitFS is stopped before connecting LFS,
-    // and VFS cache for Git is cleared.
-    await this.stopGitFS();
-
-    fileTreeManager.removeLocalStorageWarning();
-    // Set file-tree title to the root folder name.
-    fileTreeManager.setTitle(await LFS.getBaseFolderName());
-
-    await this.vfs.connect(rootFolderHandle);
-
-    triggerPluginEvent('onStorageChange', 'lfs');
-
-    // Render the LFS contents.
-    await fileTreeManager.createFileTree();
-  }
-
-  /**
-   * Close the current LFS folder and use the VFS again.
-   * Gets called by the "Close Folder" menu item.
-   */
-  async closeLFSFolder() {
-    this.closeAllFiles();
-    await this.stopLFS();
-    this.finishSwitchToLocalStorage();
-  }
-
-  /**
-   * Disconnect the LFS from the current folder.
-   * Gets called when LFS is closed, or when a Git repo is connected.
-   */
-  async stopLFS() {
-    if (!LFS.hasProjectLoaded()) return;
-
-    await this.vfs.connect(null, 'ide');
-    LFS.close();
-    this.layout.setProjectMenuState({ closeProjectEnabled: false });
-  }
-
   // ***** FS helpers *****
-
-  /**
-   * Start listening to file system changes.
-   *
-   * N.B. Events will only be sent when local file system is connected,
-   * so it is OK to have this listener connected all the time.
-   */
-  async startLFSChangeListener() {
-    this.vfs.addEventListener('fileSystemChanged', async () => {
-      // We sometimes have a reason to not pick up changes,
-      // e.g. when the user is actively renaming an item.
-      if (Terra.v.blockFSPolling || !LFS.hasProjectLoaded()) return;
-
-      // Re-import from the VFS.
-      console.log('Reloading file tree from fs change');
-      await fileTreeManager.runFuncWithPersistedState(() =>
-        fileTreeManager.createFileTree(),
-      );
-    });
-  }
 
   /**
    * Rebuild the file tree when the VFS structure changes (a file or folder is
@@ -591,17 +388,5 @@ export default class IDEApp extends App {
     this.vfs.addEventListener('fileCreated', rebuild);
     this.vfs.addEventListener('folderCreated', rebuild);
     this.vfs.addEventListener('fileDeleted', rebuild);
-  }
-
-  /**
-   * Set-up user interface when disconnecting either LFS or GitFS.
-   * Also yields an event to plugins signaling FS change.
-   */
-  async finishSwitchToLocalStorage() {
-    fileTreeManager.removeInfoMsg();
-    await fileTreeManager.createFileTree(); // show empty file tree
-    fileTreeManager.showLocalStorageWarning();
-    fileTreeManager.setTitle('local storage');
-    triggerPluginEvent('onStorageChange', 'local');
   }
 }
