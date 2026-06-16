@@ -8,6 +8,7 @@ import * as LFS from './fs/lfs.js';
 import { useStorageCoordinator } from './concerns/storage.js';
 import { useGit } from './concerns/git.js';
 import { useLFS } from './concerns/lfs.js';
+import { useFileTree } from './concerns/file-tree.js';
 
 export default class IDEApp extends App {
   /**
@@ -27,6 +28,7 @@ export default class IDEApp extends App {
     useStorageCoordinator(this);
     useGit(this);
     useLFS(this);
+    useFileTree(this);
   }
 
   async setupLayout() {

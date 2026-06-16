@@ -64,7 +64,7 @@ export function setupFileDrop() {
     for (var i = 0; i < files.length; i++) {
       const item = getDataTransferFileEntry(files[i]);
       if (!item) continue;
-      _createFileSystemEntryInVFS(item).then(() => {
+      Terra.app.importFileSystemEntry(item).then(() => {
         createFileTree();
       });
     }
@@ -226,7 +226,7 @@ export async function createFile(path = null) {
   // Create the new file in the filesystem.
   const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
 
-  const fileName = await Terra.app.vfs.createFile(path);
+  const fileName = await Terra.app.createFileInVFS(path);
   const key = parentPath ? `${parentPath}/${fileName}` : fileName;
 
   // Create the new node in the file tree.
@@ -298,7 +298,7 @@ export async function createFolder(path = null) {
   const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
 
   // Create the new folder in the filesystem.
-  const folder = await Terra.app.vfs.createFolder(path);
+  const folder = await Terra.app.createFolderInVFS(path);
   const key = parentPath ? `${parentPath}/${folder.name}` : folder.name;
 
   // Create the new node in the file tree.
@@ -346,7 +346,7 @@ export async function createFolder(path = null) {
  * @returns {Promise<array>} List with file tree objects.
  */
 async function createFromVFS() {
-  const basicTree = await Terra.app.vfs.getFileTree();
+  const basicTree = await Terra.app.getFileTree();
 
   /**
    * Convert a minimal file tree into FancyTree-compatible format.
@@ -407,17 +407,8 @@ function deleteNode(node) {
   });
 
   $modal.find('.confirm-btn').click(async () => {
-    if (node.data.isFile) {
-      Terra.app.closeFile(node.key);
-    } else if (node.data.isFolder) {
-      await Terra.app.closeFilesFromFolder(node.key);
-    }
-
-    // Delete from the VFS.
-    const fn = node.data.isFolder
-      ? Terra.app.vfs.deleteFolder
-      : Terra.app.vfs.deleteFile;
-    await fn(node.key);
+    // Close any affected tabs and delete the entry from the VFS.
+    await Terra.app.deleteEntry(node.key, node.data.isFolder);
 
     // Delete from the file tree.
     node.remove();
@@ -470,7 +461,7 @@ function _createContextMenuItems($trigger, event) {
         name: 'Download',
         callback: () => {
           Terra.v.userClickedContextMenuItem = true;
-          Terra.app.vfs.downloadFolder(node.key);
+          Terra.app.downloadEntry(node.key, true);
           Terra.v.blockFSPolling = false;
         },
       };
@@ -483,7 +474,7 @@ function _createContextMenuItems($trigger, event) {
         name: 'Download',
         callback: () => {
           Terra.v.userClickedContextMenuItem = true;
-          Terra.app.vfs.downloadFile(node.key);
+          Terra.app.downloadEntry(node.key, false);
           Terra.v.blockFSPolling = false;
         },
       };
@@ -733,26 +724,12 @@ function _beforeCloseEditNodeCallback(event, data) {
     return false;
   }
 
-  const fn = sourceNode.data.isFolder
-    ? Terra.app.vfs.moveFolder
-    : Terra.app.vfs.moveFile;
-
   const srcPath = sourceNode.key;
   const parentPath = parentNodeKey.startsWith('root') ? null : parentNodeKey;
   const destPath = parentPath ? `${parentPath}/${newName}` : newName;
 
-  fn(srcPath, destPath).then(() => {
-    // Update the node's path (recurively).
-    if (sourceNode.data.isFile) {
-      sourceNode.key = destPath;
-
-      // If the moved file is also the active editor tab, update the tab's
-      // filename and path in-place.
-      Terra.app.updateOpenTabPath(srcPath, destPath);
-    } else if (sourceNode.data.isFolder) {
-      _updateFolderKeysRecursively(sourceNode);
-    }
-  });
+  Terra.app.moveEntry(srcPath, destPath, sourceNode.data.isFolder)
+    .then(() => _syncMovedNodeKeys(sourceNode, srcPath, destPath));
 
   // Destroy the leftover tooltip if it exists.
   destroyTooltip('renameNode');
@@ -897,41 +874,6 @@ function _dragEndCallback() {
 }
 
 /**
- * Create a file or folder in the VFS from a FileSystemFileEntry object.
- *
- * @param {FileSystemFileEntry} item - The file or folder entry.
- * @param {string} [path] - The path of the entry.
- * @param {string} [targetNodePath] - The path of the node it was dropped onto.
- * @return {Promise<void>} Resolves when the file or folder has been created.
- */
-function _createFileSystemEntryInVFS(item, path = '', targetNodePath = null) {
-  return new Promise((resolve) => {
-    if (item.isFile) {
-      item.file((file) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const buffer = e.target.result;
-          const destPath = [targetNodePath, path, file.name].filter((s) => s).join('/');
-          Terra.app.vfs.createFile(destPath, buffer).then(() => {
-            resolve();
-          });
-        };
-        reader.readAsArrayBuffer(file);
-      });
-    } else if (item.isDirectory) {
-      const dirReader = item.createReader();
-      dirReader.readEntries(async (entries) => {
-        for (const entry of entries) {
-          const subpath = path ? `${path}/${item.name}` : item.name;
-          await _createFileSystemEntryInVFS(entry, subpath, targetNodePath);
-        }
-        resolve();
-      });
-    }
-  });
-}
-
-/**
  * Callback when the user stops dragging and dropping a node in the file tree.
  *
  * @param {FancytreeNode} targetNode - The node where the other node was dropped
@@ -948,17 +890,13 @@ function _dragStopCallback(targetNode, data) {
     for (var i = 0; i < data.files.length; i++) {
       const item = getDataTransferFileEntry(data.dataTransfer.items[i]);
       if (!item) continue
-      _createFileSystemEntryInVFS(item, '', parentPath).then(() => {
+      Terra.app.importFileSystemEntry(item, '', parentPath).then(() => {
         createFileTree();
       });
     }
   } else if (sourceNode) { // user moved a node in the file tree
     // If the dropped node became a root node, unset parentId.
     const srcPath = sourceNode.key;
-    const fn = sourceNode.data.isFolder
-      ? Terra.app.vfs.moveFolder
-      : Terra.app.vfs.moveFile;
-
     const destPath = parentPath ? `${parentPath}/${sourceNode.title}` : sourceNode.title;
 
     if (srcPath == destPath) {
@@ -979,40 +917,56 @@ function _dragStopCallback(targetNode, data) {
       targetNode.setExpanded();
     }
 
-    fn(srcPath, destPath).then(() => {
-      // Update the node keys.
-      if (sourceNode.data.isFile) {
-        sourceNode.key = destPath;
-
-        // If the moved file is also the active editor tab, update the tab's
-        // filename and path in-place.
-        Terra.app.updateOpenTabPath(srcPath, destPath);
-      } else if (sourceNode.data.isFolder) {
-        _updateFolderKeysRecursively(sourceNode);
-      }
-    });
+    Terra.app.moveEntry(srcPath, destPath, sourceNode.data.isFolder)
+      .then(() => _syncMovedNodeKeys(sourceNode, srcPath, destPath));
   }
 }
 
 /**
- * Update the folder key recursively for all child nodes.
+ * After a file/folder has been moved in the VFS, update the moved node's key(s)
+ * in the tree and re-point any open editor tabs to the new path(s).
+ *
+ * @param {FancytreeNode} sourceNode - The node that was moved.
+ * @param {string} srcPath - The node's previous absolute path.
+ * @param {string} destPath - The node's new absolute path.
+ */
+function _syncMovedNodeKeys(sourceNode, srcPath, destPath) {
+  if (sourceNode.data.isFile) {
+    sourceNode.key = destPath;
+
+    // If the moved file is also the active editor tab, update the tab's
+    // filename and path in-place.
+    Terra.app.updateOpenTabPath(srcPath, destPath);
+  } else if (sourceNode.data.isFolder) {
+    const renamedFiles = _updateFolderKeysRecursively(sourceNode);
+    renamedFiles.forEach(({ src, dest }) => Terra.app.updateOpenTabPath(src, dest));
+  }
+}
+
+/**
+ * Update the folder key recursively for all child nodes, collecting the
+ * {src, dest} path pairs of every affected file so the caller can re-point open
+ * editor tabs (a controller concern kept out of this tree walk).
  *
  * @param {FancytreeNode} folderNode - The folder node to update recursively.
+ * @returns {Array<{src: string, dest: string}>} Renamed file path pairs.
  */
 function _updateFolderKeysRecursively(folderNode) {
   folderNode.key = getAbsoluteNodePath(folderNode);
 
+  const renamedFiles = [];
   const childNodes = folderNode.children || [];
   for (const childNode of childNodes) {
     if (childNode.data.isFolder) {
-      _updateFolderKeysRecursively(childNode);
+      renamedFiles.push(..._updateFolderKeysRecursively(childNode));
     } else {
       const srcPath = childNode.key;
       const destPath = getAbsoluteNodePath(childNode);
       childNode.key = destPath;
-      Terra.app.updateOpenTabPath(srcPath, destPath);
+      renamedFiles.push({ src: srcPath, dest: destPath });
     }
   }
+  return renamedFiles;
 }
 
 /**
