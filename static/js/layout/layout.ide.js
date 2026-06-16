@@ -93,7 +93,7 @@ export default class IDELayout extends Layout {
       {
         name: 'closeFile',
         bindKey: 'Ctrl+W',
-        exec: () => this.dispatchEvent(new CustomEvent('closeFile')),
+        exec: () => this.closeFile(),
         readOnly: true,
       },
       {
@@ -322,6 +322,80 @@ export default class IDELayout extends Layout {
       !tabComponents[0].getPath() &&
       tabComponents[0].getContent() === ''
     );
+  }
+
+  /**
+   * Destroy this layout and replace it with a fresh instance that preserves the
+   * currently open tabs. The caller supplies a factory that builds the
+   * replacement from the preserved content config, and an `afterRecreate` hook
+   * (invoked before init) to re-wire app-level listeners onto the new instance.
+   *
+   * @param {(contentConfig: Array) => IDELayout} createReplacement - Factory
+   * that builds the replacement layout from the preserved tab config.
+   * @param {(next: IDELayout) => void} afterRecreate - Hook to wire up the new
+   * instance (e.g. reassign the app's layout reference and register listeners)
+   * before it is initialised.
+   * @returns {IDELayout} The new layout instance.
+   */
+  recreate(createReplacement, afterRecreate) {
+    const contentConfig = this.serializeTabs();
+
+    this.resetLayout = true;
+    this.destroy();
+
+    const next = createReplacement(contentConfig);
+    afterRecreate(next);
+    next.init();
+    next.resetLayout = false;
+
+    return next;
+  }
+
+  /**
+   * Close a tab by its file path, or the active tab when no path is given.
+   *
+   * @param {string} [filepath] - The absolute file path of the tab to close.
+   */
+  closeFile(filepath) {
+    const component = filepath
+      ? this.getTabComponents().find((component) => component.getPath() === filepath)
+      : this.getActiveEditor();
+
+    if (component) {
+      component.close();
+    }
+  }
+
+  /**
+   * Close every open tab whose file lives under the given folder path,
+   * including nested files in subfolders.
+   *
+   * @param {string} path - The absolute folderpath to close all files from.
+   */
+  closeFilesFromFolder(path) {
+    this.getTabComponents().forEach((component) => {
+      const subfilepath = component.getPath();
+      if (subfilepath?.startsWith(path)) {
+        this.closeFile(subfilepath);
+      }
+    });
+  }
+
+  /**
+   * Snapshot all open tabs as a GoldenLayout content-config array, capturing
+   * each tab's filename, component type, path and current content.
+   *
+   * @returns {Array<object>} The content configuration for the open tabs.
+   */
+  serializeTabs() {
+    return this.getTabComponents().map((component) => ({
+      title: component.getFilename(),
+      componentName: component.getComponentName(),
+      componentState: {
+        path: component.getPath(),
+        value: component.getContent(),
+      },
+    }));
   }
 
   closeAllTabs() {

@@ -1,8 +1,7 @@
 import { DROP_AREA_INDICATOR_CLASS } from './ide/constants.js';
-import { getFileExtension, getPartsFromPath, isValidFilename } from './helpers/shared.js'
+import { getFileExtension, isValidFilename } from './helpers/shared.js'
 import { createModal, hideModal, showModal } from './modal.js'
 import Terra from './terra.js'
-import EditorComponent from './layout/editor.component.js';
 import { createTooltip, destroyTooltip } from './tooltip-manager.js';
 import * as LFS from './fs/lfs.js';
 
@@ -749,7 +748,7 @@ function _beforeCloseEditNodeCallback(event, data) {
 
       // If the moved file is also the active editor tab, update the tab's
       // filename and path in-place.
-      _updateOpenTab(srcPath, destPath);
+      Terra.app.updateOpenTabPath(srcPath, destPath);
     } else if (sourceNode.data.isFolder) {
       _updateFolderKeysRecursively(sourceNode);
     }
@@ -759,35 +758,6 @@ function _beforeCloseEditNodeCallback(event, data) {
   destroyTooltip('renameNode');
 
   return true;
-}
-
-/**
- * Update the open tab's filename and path when a file is renamed.
- *
- * @param {string} srcPath - The source path of the file.
- * @param {string} destPath - The destination path of the file.
- */
-function _updateOpenTab(srcPath, destPath) {
-  // Find the tab component that corresponds to the file.
-  const tabComponent = Terra.app.getTabComponents().find(
-    (tabComponent) => tabComponent.getPath() === srcPath
-  );
-
-  // Update it if it exists.
-  if (tabComponent) {
-    const newName = getPartsFromPath(destPath).name;
-    tabComponent.setPath(destPath);
-
-    if (tabComponent instanceof EditorComponent) {
-      const proglang = newName.includes('.') ? getFileExtension(newName) : 'text';
-      tabComponent.setProgLang(proglang);
-      Terra.app.createLangWorker(proglang);
-    }
-
-    // For some reason no update is triggered, so we trigger it manually.
-    // This will reload the content if needed.
-    Terra.app.layout.emit('stateChanged');
-  }
 }
 
 /**
@@ -1016,7 +986,7 @@ function _dragStopCallback(targetNode, data) {
 
         // If the moved file is also the active editor tab, update the tab's
         // filename and path in-place.
-        _updateOpenTab(srcPath, destPath);
+        Terra.app.updateOpenTabPath(srcPath, destPath);
       } else if (sourceNode.data.isFolder) {
         _updateFolderKeysRecursively(sourceNode);
       }
@@ -1040,7 +1010,7 @@ function _updateFolderKeysRecursively(folderNode) {
       const srcPath = childNode.key;
       const destPath = getAbsoluteNodePath(childNode);
       childNode.key = destPath;
-      _updateOpenTab(srcPath, destPath);
+      Terra.app.updateOpenTabPath(srcPath, destPath);
     }
   }
 }
