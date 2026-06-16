@@ -277,6 +277,26 @@ export default class EditorComponent extends TabComponent {
   }
 
   /**
+   * Reload the editor with new content while keeping the caret where the user
+   * left it. Optionally reset the undo history (used after an external/VFS
+   * reload so the reload itself is not undoable).
+   *
+   * @param {string} content - The new editor content.
+   * @param {object} [options]
+   * @param {boolean} [options.clearUndoStack=false] - Whether to clear the
+   * undo stack after applying the content.
+   */
+  reloadContent = (content, { clearUndoStack = false } = {}) => {
+    const cursorPos = this.getCursorPosition();
+    this.setContent(content);
+    this.setCursorPosition(cursorPos);
+
+    if (clearUndoStack) {
+      this.clearUndoStack();
+    }
+  }
+
+  /**
    * Retrieve the current content of the editor.
    *
    * @returns {string} All editor lines concatenated with \n characters.

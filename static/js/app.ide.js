@@ -1,11 +1,9 @@
 import App from './app.js';
 import IDELayout from './layout/layout.ide.js';
-import { MAX_FILE_SIZE } from './constants.js';
 import { getFileExtension, isValidFilename } from './helpers/shared.js';
 import Terra from './terra.js';
 import * as fileTreeManager from './file-tree-manager.js';
 import { getPlugin } from './plugin-manager.js';
-import { FileNotFoundError, FileTooLargeError } from './fs/vfs.js';
 import * as LFS from './fs/lfs.js';
 import { useStorageCoordinator } from './concerns/storage.js';
 import { useGit } from './concerns/git.js';
@@ -70,38 +68,37 @@ export default class IDEApp extends App {
   }
 
   /**
-   * Reset the layout to its initial state.
+   * Reset the layout to its initial state. The layout owns the destroy/recreate
+   * lifecycle (see IDELayout.recreate); here we only supply how to build the
+   * replacement and how to re-wire it to the app afterwards.
    */
   resetLayout() {
-    const oldContentConfig = this.layout.getTabComponents().map((component) => ({
-      title: component.getFilename(),
-      componentName: component.getComponentName(),
-      componentState: {
-        path: component.getPath(),
-        value: component.getContent(),
+    this.layout.recreate(
+      (contentConfig) => this.createLayout(true, contentConfig),
+      (next) => {
+        // Reassign before registerLayoutEvents(), which wires onto this.layout.
+        // postSetupLayout is intentionally not re-bound to 'initialised', as its
+        // side effects should only happen at app init.
+        this.layout = next;
+        this.registerLayoutEvents();
+        next.on('initialised', this._restartActiveWorkerAfterReset);
+      },
+    );
+  }
+
+  /**
+   * After a layout reset, restart the language worker for the active tab so it
+   * starts from a clean state — only when a worker is active and supports the
+   * active tab's language.
+   */
+  _restartActiveWorkerAfterReset() {
+    setTimeout(() => {
+      const editorComponent = this.layout.getActiveEditor();
+      const proglang = getFileExtension(editorComponent.getFilename());
+      if (this.langWorkerClient.hasActiveWorker() && this.langWorkerClient.supports(proglang)) {
+        this.langWorkerClient.restart();
       }
-    }));
-
-    this.layout.resetLayout = true;
-    this.layout.destroy();
-    this.layout = this.createLayout(true, oldContentConfig);
-
-    // Re-attach the base-class listeners (runCode, editor events) to the new
-    // layout instance. Note that postSetupLayout is intentionally not re-bound
-    // to 'initialised', as its side effects should only happen at app init.
-    this.registerLayoutEvents();
-
-    this.layout.on('initialised', () => {
-      setTimeout(() => {
-        const editorComponent = this.layout.getActiveEditor();
-        const proglang = getFileExtension(editorComponent.getFilename());
-        if (this.langWorkerClient.hasActiveWorker() && this.langWorkerClient.supports(proglang)) {
-          this.langWorkerClient.restart();
-        }
-      }, 10);
-    });
-    this.layout.init();
-    this.layout.resetLayout = false;
+    }, 10);
   }
 
   /**
@@ -123,39 +120,6 @@ export default class IDEApp extends App {
   }
 
   /**
-   * Reload the file content.
-   *
-   * @param {EditorComponent} editorComponent - The editor component instance.
-   * @param {boolean} clearUndoStack - Whether to clear the undo stack or not.
-   */
-  async setEditorFileContent(editorComponent, clearUndoStack = false) {
-    const filepath = editorComponent.getPath();
-    if (!filepath) return;
-
-    try {
-      const content = await this.vfs.readFile(filepath, MAX_FILE_SIZE);
-
-      editorComponent.setContent(content);
-
-      const cursorPos = editorComponent.getCursorPosition();
-      editorComponent.setContent(content);
-      editorComponent.setCursorPosition(cursorPos);
-
-      if (clearUndoStack) {
-        editorComponent.clearUndoStack();
-      }
-    } catch (err) {
-      if (err instanceof FileTooLargeError) {
-        editorComponent.exceededFileSize();
-      } else if (err instanceof FileNotFoundError) {
-        console.warn('Editor file disappeared:', err.path);
-      } else {
-        console.error('Unexpected error reading file:', err);
-      }
-    }
-  }
-
-  /**
    * Create the layout object with the given content objects and font-size.
    *
    * @param {boolean} [forceDefaultLayout=false] Whether to force the default layout.
@@ -169,7 +133,6 @@ export default class IDEApp extends App {
     // resetLayout() replaces the layout instance and the new instance needs
     // these listeners too.
     layout.addEventListener('saveFile', () => this.saveFile());
-    layout.addEventListener('closeFile', () => this.closeFile());
 
     return layout;
   }
@@ -278,20 +241,10 @@ export default class IDEApp extends App {
     await this.vfs.createFile(filepath, editorComponent.getContent());
     await fileTreeManager.createFileTree();
 
-    // Change the Untitled tab to the new filename.
-    editorComponent.setPath(filepath);
-
-    // Update the container state.
-    editorComponent.extendState({ path: filepath });
-
-    // For some reason no layout update is triggered, so we trigger an update.
-    this.layout.emit('stateChanged');
-
+    // Re-point the Untitled tab at the new file (path, title, highlighting,
+    // persisted state) and spawn the matching worker.
     const proglang = getFileExtension(filename);
-
-    // Set correct syntax highlighting.
-    editorComponent.setProgLang(proglang);
-
+    this.layout.repointTab(editorComponent, filepath, proglang);
     this.createLangWorker(proglang);
 
     return null;
@@ -305,11 +258,28 @@ export default class IDEApp extends App {
    */
   openFile(filepath) {
     this.layout.addFileTab(filepath);
-
     const proglang = getFileExtension(filepath);
     this.createLangWorker(proglang);
   }
 
+  /**
+   * Re-point any open tab when its file is renamed or moved in the VFS, and
+   * (re)spawn the worker for the new language. A no-op when the file isn't open.
+   * Called by the file tree after a rename/move so it doesn't have to reach into
+   * the layout or tab components itself.
+   *
+   * @param {string} srcPath - The previous absolute path.
+   * @param {string} destPath - The new absolute path.
+   */
+  updateOpenTabPath(srcPath, destPath) {
+    const filename = destPath.split('/').pop();
+    const proglang = filename.includes('.') ? getFileExtension(filename) : 'text';
+
+    const tabComponent = this.layout.repointTabByPath(srcPath, destPath, proglang);
+    if (tabComponent) {
+      this.createLangWorker(proglang);
+    }
+  }
 
   /**
    * Close the active tab in the editor.
@@ -318,13 +288,7 @@ export default class IDEApp extends App {
    * not provided, the active tab will be closed.
    */
   closeFile(filepath) {
-    const component = filepath
-      ? this.layout.getTabComponents().find((component) => component.getPath() === filepath)
-      : this.layout.getActiveEditor();
-
-    if (component) {
-      component.close();
-    }
+    this.layout.closeFile(filepath);
   }
 
   /**
@@ -339,13 +303,8 @@ export default class IDEApp extends App {
    *
    * @param {string} path - The absolute folderpath to close all files from.
    */
-  async closeFilesFromFolder(path) {
-    this.layout.getTabComponents().forEach((component) => {
-      const subfilepath = component.getPath();
-      if (subfilepath?.startsWith(path)) {
-        this.closeFile(subfilepath);
-      }
-    });
+  closeFilesFromFolder(path) {
+    this.layout.closeFilesFromFolder(path);
   }
 
   /**

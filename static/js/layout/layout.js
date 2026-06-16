@@ -779,6 +779,47 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   /**
+   * Re-point an open tab at a new file path: update its path/title, apply the
+   * caller-supplied syntax highlighting for editor tabs, and persist the layout
+   * state. The proglang is derived by the caller; it is ignored for non-editor
+   * tabs such as images.
+   *
+   * @param {TabComponent} tabComponent - The tab to re-point.
+   * @param {string} filepath - The new absolute file path.
+   * @param {string} proglang - The programming language for the editor tab.
+   */
+  repointTab(tabComponent, filepath, proglang) {
+    tabComponent.setPath(filepath); // also updates the title + container state
+
+    if (tabComponent instanceof EditorComponent) {
+      tabComponent.setProgLang(proglang);
+    }
+
+    // GoldenLayout doesn't emit on a programmatic path change; trigger
+    // persistence (and any content reload) manually.
+    this.emit('stateChanged');
+  }
+
+  /**
+   * Re-point an already-open tab from one path to another (e.g. after a file is
+   * renamed or moved in the VFS). A no-op when no tab is open for `srcPath`.
+   *
+   * @param {string} srcPath - The previous absolute file path.
+   * @param {string} destPath - The new absolute file path.
+   * @param {string} proglang - The programming language for the editor tab.
+   * @returns {?TabComponent} The repointed tab, or null when no tab matched.
+   */
+  repointTabByPath(srcPath, destPath, proglang) {
+    const tabComponent = this.getTabComponents().find(
+      (component) => component.getPath() === srcPath
+    );
+    if (!tabComponent) return null;
+
+    this.repointTab(tabComponent, destPath, proglang);
+    return tabComponent;
+  }
+
+  /**
    * Open a file in the editor, or switch to the tab if it's already open.
    *
    * N.B. This function assumes that another editor tab is already present.

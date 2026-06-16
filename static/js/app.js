@@ -64,7 +64,7 @@ export default class App extends BaseApp {
    */
   async onEditorReloadRequested(editorComponent) {
     if (!Terra.v.blockFSPolling) {
-      await this.setEditorFileContent(editorComponent, true);
+      await this.setEditorFileContent(editorComponent, { clearUndoStack: true });
     }
   }
 
@@ -554,17 +554,26 @@ export default class App extends BaseApp {
   // ──────────────────────────── File content ─────────────────────────────
 
   /**
-   * Reload the file content from VFS.
+   * Reload the editor content from the VFS. The VFS read (and its file-size
+   * cap) is the app/data concern handled here; applying the content to the view
+   * (cursor preservation, undo stack) is delegated to the editor component.
    *
    * @async
    * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {object} [options]
+   * @param {boolean} [options.clearUndoStack=false] - Whether to clear the undo
+   * stack after the content is applied.
    */
-  async setEditorFileContent(editorComponent) {
+  async setEditorFileContent(editorComponent, { clearUndoStack = false } = {}) {
     const path = editorComponent.getPath();
     if (!path) return;
 
-    const content = await this.vfs.readFile(path);
-    editorComponent.setContent(content);
+    try {
+      const content = await this.vfs.readFile(path, MAX_FILE_SIZE);
+      editorComponent.reloadContent(content, { clearUndoStack });
+    } catch (err) {
+      this._applyFileReadError(err, editorComponent);
+    }
   }
 
   async setImageFileContent(imageComponent) {
@@ -576,13 +585,24 @@ export default class App extends BaseApp {
       const link = await this.vfs.getFileURL(filepath);
       imageComponent.setSrc(link);
     } catch (err) {
-      if (err instanceof FileTooLargeError) {
-        imageComponent.exceededFileSize();
-      } else if (err instanceof FileNotFoundError) {
-        console.warn('Editor file disappeared:', err.path);
-      } else {
-        console.error('Unexpected error reading file:', err);
-      }
+      this._applyFileReadError(err, imageComponent);
+    }
+  }
+
+  /**
+   * Translate a VFS read error into the matching component-level UI reaction.
+   * Shared by the editor and image read paths.
+   *
+   * @param {Error} err - The error thrown by the VFS read.
+   * @param {TabComponent} component - The component to react on (editor/image).
+   */
+  _applyFileReadError(err, component) {
+    if (err instanceof FileTooLargeError) {
+      component.exceededFileSize();
+    } else if (err instanceof FileNotFoundError) {
+      console.warn('File disappeared:', err.path);
+    } else {
+      console.error('Unexpected error reading file:', err);
     }
   }
 
