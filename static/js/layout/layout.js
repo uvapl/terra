@@ -122,8 +122,8 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @type {array}
    */
   termStartupMessage = [
-    'Click the "Run" button to execute code.',
-    'Click the trash bin icon to clear this terminal screen.'
+    'Press Cmd-Enter to run your code.',
+    'Press Cmd-K to clear this terminal.'
   ];
 
   /**
