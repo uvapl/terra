@@ -148,9 +148,7 @@ export default class App extends BaseApp {
    * otherwise move to the terminal.
    */
   toggleEditorTerminalFocus() {
-    const termTextarea = this.term?.term?.textarea;
-    const terminalFocused = termTextarea && document.activeElement === termTextarea;
-    if (terminalFocused) {
+    if (this.term?.hasFocus()) {
       this.getActiveEditor()?.focus();
     } else {
       this.term?.focus();

@@ -163,6 +163,14 @@ export default class TerminalComponent {
     this.terminalInstance.focus();
   }
 
+  hasFocus = () => {
+    if (this.terminalInstance.textarea) {
+      return document.activeElement === this.terminalInstance.textarea;
+    } else {
+      console.log("non area")
+    }
+  }
+
   /**
    * Emit an event to the container.
    *
@@ -183,7 +191,7 @@ export default class TerminalComponent {
 
     const fontSize = this.state.fontSize || BASE_FONT_SIZE;
 
-    this.term = new Terminal({
+    this.terminalInstance = new Terminal({
       convertEol: true,
       disableStdin: true,
       cursorBlink: true,
@@ -233,7 +241,7 @@ export default class TerminalComponent {
       this.terminalInstance.destroy();
     }
 
-    this.term = null;
+    this.terminalInstance = null;
   }
 
   /**
@@ -284,7 +292,6 @@ export default class TerminalComponent {
     this.inputHandler = onKey || null;
     this.inputPasteHandler = onPaste || null;
     this.showTermCursor();
-    // this.term.focus();
   }
 
   /**
