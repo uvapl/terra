@@ -67,7 +67,6 @@ export default class ShellPlugin extends TerraPlugin {
       return;
     }
 
-    this.printBanner();
     this.term.acquireInput('shell', { onKey: this.handleKey, onPaste: this.handlePaste });
     this.renderPrompt();
   }
@@ -212,10 +211,6 @@ export default class ShellPlugin extends TerraPlugin {
     this.line = '';
     this.cursor = 0;
     this.render();
-  }
-
-  printBanner = () => {
-    // this.term.writeln('Terra shell');
   }
 
   writeOut = (content) => {
