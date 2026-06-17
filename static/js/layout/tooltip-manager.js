@@ -1,4 +1,4 @@
-import { isObject } from './helpers/shared.js';
+import { isObject } from '../lib/helpers.js';
 
 /**
  * Object that holds all tooltips.
@@ -33,4 +33,3 @@ export function destroyTooltip(key) {
     delete tooltips[key];
   }
 }
-

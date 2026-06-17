@@ -1,6 +1,5 @@
-import { getRepoInfo } from '../helpers/shared.js';
-import { getLocalStorageItem } from '../local-storage-manager.js';
-import * as fileTreeManager from '../file-tree-manager.js';
+import { getRepoInfo } from '../lib/helpers.js';
+import { getLocalStorageItem } from '../lib/local-storage-manager.js';
 import { triggerPluginEvent } from '../plugin-manager.js';
 import GitFS from '../fs/git.js';
 
@@ -86,7 +85,7 @@ export function useGit(app) {
       const repoLink = getLocalStorageItem('git-repo');
       const repoInfo = getRepoInfo(repoLink);
       if (repoInfo) {
-        fileTreeManager.setTitle(`${repoInfo.user}/${repoInfo.repo}`)
+        this.fileTree.setTitle(`${repoInfo.user}/${repoInfo.repo}`)
       }
 
       if (this.hasGitFSWorker()) {
@@ -109,10 +108,9 @@ export function useGit(app) {
         this.gitfs = gitfs;
         gitfs._createWorker(accessToken);
 
-        fileTreeManager.destroyTree();
-
         console.log('Creating gitfs worker');
-        fileTreeManager.setInfoMsg('Cloning repository...');
+        // showMessage tears down the tree, so no separate destroy is needed.
+        this.fileTree.showMessage('Cloning repository...');
         triggerPluginEvent('onStorageChange', 'git');
       }
     },

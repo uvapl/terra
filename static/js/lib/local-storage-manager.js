@@ -2,7 +2,7 @@
  * Handles anything regarding the local storage saving and retrieval.
  */
 
-import { IS_IDE } from './constants.js';
+import { IS_IDE } from '../constants.js';
 
 
 

@@ -1,8 +1,8 @@
-import * as idb from '../idb.js';
+import * as idb from '../lib/idb.js';
 import {
   setLocalStorageItem,
   getLocalStorageItem,
-} from '../local-storage-manager.js';
+} from '../lib/local-storage-manager.js';
 
 /**
  * Check whether LFS is available in the browser.

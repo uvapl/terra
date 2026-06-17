@@ -24,7 +24,7 @@ import DOMPurify from './vendor/dompurify-3.1.6.min.js';
 import {
   setLocalStorageItem,
   getLocalStorageItem,
-} from './local-storage-manager.js';
+} from './lib/local-storage-manager.js';
 
 const SPOILER_REGEX = /\{%\s*spoiler(?:\s+"([^"]*)")?\s*%\}([\s\S]*?)\{%\s*endspoiler\s*%\}/g;
 const NEXT_REGEX = /\{%\s*next(?:\s+"([^"]*)")?\s*%\}/;

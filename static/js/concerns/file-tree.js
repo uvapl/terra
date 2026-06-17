@@ -1,131 +1,189 @@
+import FileTreeComponent from '../layout/file-tree.component.js';
+import * as LFS from '../fs/lfs.js';
+import { getFileExtension } from '../lib/helpers.js';
+
 /**
- * File-tree controller concern.
+ * File-tree concern.
  *
- * Installs the glue the file-tree view (file-tree-manager.js) needs to keep the
- * VFS, open editor tabs and workers in sync with what the user does in the tree.
- * file-tree-manager.js stays a FancyTree adapter and calls these methods via
- * `Terra.app.<method>` for anything that touches the VFS, tabs or workers.
+ * Installs the file-tree behaviour onto an app instance: it creates the
+ * FancyTree view component (exposed as `app.fileTree`) and makes the app the
+ * component's controller — its `delegate` for user intents and the owner of the
+ * tree-coordination methods (create / refresh / move / delete + VFS reactions).
  *
- * @param {App} app - The app instance to install the file-tree controller on.
+ * This mirrors how the app already handles the editor and image components'
+ * events (onEditorTextChanged, onImageReloadRequested, …): the components
+ * report, the app coordinates. Because the coordination lives on the app, these
+ * methods reach the VFS, tabs and workers directly (this.vfs, this.openFile, …) —
+ * no separate "workspace" abstraction is needed.
+ *
+ * Presentation (title, in-place messages, bottom message, localstorage warning)
+ * stays on the component and is reached directly via `app.fileTree`, like any
+ * other public collaborator (`app.layout`, `app.vfs`).
+ *
+ * @param {App} app - The app instance to install the file tree on.
  */
 export function useFileTree(app) {
+  const component = new FileTreeComponent();
+  app.fileTree = component;
+  component.delegate = app;
+
   Object.assign(app, {
     /**
-     * Get the minimal file tree from the VFS, for the view to convert into a
-     * FancyTree-compatible structure.
+     * Re-read the VFS tree and re-render the component in place.
      *
-     * @async
-     * @returns {Promise<object[]>} Minimal tree (title, folder, children).
-     */
-    getFileTree() {
-      return this.vfs.getFileTree();
-    },
-
-    /**
-     * Create a new file in the VFS.
-     *
-     * @async
-     * @param {string|null} [path] - The path for the new file, or null for a new
-     * file in the root folder.
-     * @returns {Promise<string>} The name of the created file.
-     */
-    createFileInVFS(path = null) {
-      return this.vfs.createFile(path);
-    },
-
-    /**
-     * Create a new folder in the VFS.
-     *
-     * @async
-     * @param {string|null} [path] - The path for the new folder, or null for a
-     * new folder in the root folder.
-     * @returns {Promise<object>} The created folder object.
-     */
-    createFolderInVFS(path = null) {
-      return this.vfs.createFolder(path);
-    },
-
-    /**
-     * Move a file or folder in the VFS.
-     *
-     * @async
-     * @param {string} srcPath - The current absolute path.
-     * @param {string} destPath - The new absolute path.
-     * @param {boolean} isFolder - Whether the entry is a folder.
      * @returns {Promise<void>}
      */
-    moveEntry(srcPath, destPath, isFolder) {
-      const fn = isFolder ? this.vfs.moveFolder : this.vfs.moveFile;
-      return fn(srcPath, destPath);
+    refreshFileTree() {
+      return this.vfs.getFileTree().then((tree) => this.fileTree.render(tree));
     },
 
     /**
-     * Delete a file or folder: close any affected editor tabs, then delete the
-     * entry from the VFS.
+     * Re-read the VFS tree and force a full re-instantiation of the component
+     * (e.g. after a git clone replaces everything).
      *
-     * @async
-     * @param {string} path - The absolute path of the entry to delete.
-     * @param {boolean} isFolder - Whether the entry is a folder.
      * @returns {Promise<void>}
      */
-    async deleteEntry(path, isFolder) {
+    rebuildFileTree() {
+      return this.vfs.getFileTree().then((tree) => this.fileTree.recreate(tree));
+    },
+
+    /**
+     * Create a new file in the VFS, refresh the tree, open it and start renaming.
+     *
+     * @param {string|null} [path] - Path for the new file, or null for the root.
+     * @returns {Promise<void>}
+     */
+    async createFile(path = null) {
+      const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
+      const fileName = await this.vfs.createFile(path);
+      const key = parentPath ? `${parentPath}/${fileName}` : fileName;
+
+      await this.refreshFileTree();
+      this.openFile(key);
+      this.fileTree.startInlineRename(key);
+    },
+
+    /**
+     * Create a new folder in the VFS, refresh the tree and start renaming.
+     *
+     * @param {string|null} [path] - Path for the new folder, or null for the root.
+     * @returns {Promise<void>}
+     */
+    async createFolder(path = null) {
+      const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
+      const folder = await this.vfs.createFolder(path);
+      const key = parentPath ? `${parentPath}/${folder.name}` : folder.name;
+
+      await this.refreshFileTree();
+      this.fileTree.startInlineRename(key);
+    },
+
+    // ── Component intents (the app is the component's delegate) ──
+
+    /** A file node was activated (clicked). */
+    onFileActivated(key) {
+      this.openFile(key);
+    },
+
+    /** A node was moved or renamed (the component already moved it visually). */
+    async onNodeMoved(srcPath, destPath, isFolder) {
+      const move = isFolder ? this.vfs.moveFolder : this.vfs.moveFile;
+      await move(srcPath, destPath);
+
+      const pairs = this.fileTree.applyRelocatedKeys(srcPath, destPath, isFolder);
+      pairs.forEach(({ src, dest }) => this.updateOpenTabPath(src, dest));
+    },
+
+    /** A node deletion was confirmed by the user. */
+    async onNodeDeleted(key, isFolder) {
       if (isFolder) {
-        await this.closeFilesFromFolder(path);
+        await this.closeFilesFromFolder(key);
       } else {
-        this.closeFile(path);
+        this.closeFile(key);
       }
 
-      const fn = isFolder ? this.vfs.deleteFolder : this.vfs.deleteFile;
-      await fn(path);
+      const remove = isFolder ? this.vfs.deleteFolder : this.vfs.deleteFile;
+      await remove(key);
+
+      await this.refreshFileTree();
     },
 
-    /**
-     * Download a file or folder from the VFS.
-     *
-     * @param {string} path - The absolute path of the entry to download.
-     * @param {boolean} isFolder - Whether the entry is a folder.
-     */
-    downloadEntry(path, isFolder) {
-      const fn = isFolder ? this.vfs.downloadFolder : this.vfs.downloadFile;
-      fn(path);
+    /** Local filesystem entries were dropped onto the tree. */
+    async onFilesDropped(entries, destParentKey) {
+      for (const entry of entries) {
+        await importEntry(this.vfs, entry, '', destParentKey);
+      }
+      await this.refreshFileTree();
     },
 
-    /**
-     * Create a file or folder in the VFS from a FileSystemEntry object, such as
-     * one obtained when the user drags a file/folder from their local
-     * filesystem onto the file tree. Recurses into directories.
-     *
-     * @async
-     * @param {FileSystemEntry} item - The file or folder entry.
-     * @param {string} [path] - The path of the entry.
-     * @param {string} [targetNodePath] - The path of the node it was dropped onto.
-     * @return {Promise<void>} Resolves when the file or folder has been created.
-     */
-    importFileSystemEntry(item, path = '', targetNodePath = null) {
-      return new Promise((resolve) => {
-        if (item.isFile) {
-          item.file((file) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              const buffer = e.target.result;
-              const destPath = [targetNodePath, path, file.name].filter((s) => s).join('/');
-              this.vfs.createFile(destPath, buffer).then(() => {
-                resolve();
-              });
-            };
-            reader.readAsArrayBuffer(file);
-          });
-        } else if (item.isDirectory) {
-          const dirReader = item.createReader();
-          dirReader.readEntries(async (entries) => {
-            for (const entry of entries) {
-              const subpath = path ? `${path}/${item.name}` : item.name;
-              await this.importFileSystemEntry(entry, subpath, targetNodePath);
-            }
-            resolve();
-          });
-        }
+    /** A download was requested from the context menu. */
+    onDownloadRequested(key, isFolder) {
+      const download = isFolder ? this.vfs.downloadFolder : this.vfs.downloadFile;
+      download(key);
+    },
+
+    /** A run was requested from the context menu. */
+    onRunRequested(key) {
+      this.runCode({ filepath: key });
+    },
+
+    /** @returns {boolean} Whether download is offered (only on temporary storage). */
+    canDownload() {
+      return !LFS.hasProjectLoaded();
+    },
+
+    /** @returns {boolean} Whether the file's language can be run. */
+    canRun(key) {
+      return this.langWorkerClient.supports(getFileExtension(key));
+    },
+  });
+
+  // Rebuild the tree when the VFS structure changes from outside the tree UI
+  // (shell touch/mkdir, output redirection, or local filesystem polling), unless
+  // the user is mid-interaction. Consolidates what used to be two separate
+  // listeners (FS-structure events and LFS fileSystemChanged).
+  const rebuildOnChange = () => {
+    if (!app.isFSReloadSuspended()) app.refreshFileTree();
+  };
+  app.vfs.addEventListener('fileCreated', rebuildOnChange);
+  app.vfs.addEventListener('folderCreated', rebuildOnChange);
+  app.vfs.addEventListener('fileDeleted', rebuildOnChange);
+  app.vfs.addEventListener('fileSystemChanged', rebuildOnChange);
+}
+
+/**
+ * Create a file or folder in the VFS from a FileSystemEntry (e.g. dragged from
+ * the local filesystem). Recurses into directories.
+ *
+ * @param {VirtualFileSystem} vfs - The VFS to write into.
+ * @param {FileSystemEntry} item - The file or folder entry.
+ * @param {string} [path] - Path of the entry relative to the drop target.
+ * @param {string} [targetNodePath] - Path of the node it was dropped onto.
+ * @returns {Promise<void>}
+ */
+function importEntry(vfs, item, path = '', targetNodePath = null) {
+  return new Promise((resolve) => {
+    if (item.isFile) {
+      item.file((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const buffer = e.target.result;
+          const destPath = [targetNodePath, path, file.name].filter((s) => s).join('/');
+          vfs.createFile(destPath, buffer).then(() => resolve());
+        };
+        reader.readAsArrayBuffer(file);
       });
-    },
+    } else if (item.isDirectory) {
+      const dirReader = item.createReader();
+      dirReader.readEntries(async (entries) => {
+        for (const entry of entries) {
+          const subpath = path ? `${path}/${item.name}` : item.name;
+          await importEntry(vfs, entry, subpath, targetNodePath);
+        }
+        resolve();
+      });
+    } else {
+      resolve();
+    }
   });
 }

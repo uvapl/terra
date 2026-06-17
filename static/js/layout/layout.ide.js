@@ -1,9 +1,9 @@
 import Layout from './layout.js';
-import { setLocalStorageItem } from '../local-storage-manager.js';
-import * as fileTreeManager from '../file-tree-manager.js';
+import Terra from '../terra.js';
+import { setLocalStorageItem } from '../lib/local-storage-manager.js';
 import { BASE_FONT_SIZE, MAX_FILE_SIZE } from '../constants.js';
-import { createModal, hideModal, showModal } from '../modal.js';
-import { createTooltip, destroyTooltip } from '../tooltip-manager.js';
+import { createModal, hideModal, showModal } from '../layout/modal.js';
+import { createTooltip, destroyTooltip } from './tooltip-manager.js';
 
 export default class IDELayout extends Layout {
   /**
@@ -99,12 +99,12 @@ export default class IDELayout extends Layout {
       {
         name: 'createNewFileTreeFile',
         bindKey: 'Ctrl+T',
-        exec: () => fileTreeManager.createFile(),
+        exec: () => Terra.app.createFile(),
       },
       {
         name: 'createNewFileTreeFolder',
         bindKey: 'Ctrl+Shift+T',
-        exec: () => fileTreeManager.createFolder(),
+        exec: () => Terra.app.createFolder(),
       },
       {
         name: 'increaseFontSize',

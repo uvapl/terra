@@ -1,4 +1,4 @@
-import { getFileExtension } from '../helpers/shared.js';
+import { getFileExtension } from '../lib/helpers.js';
 import TabComponent from './tab.component.js';
 import { triggerPluginEvent } from '../plugin-manager.js';
 

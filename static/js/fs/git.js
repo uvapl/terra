@@ -1,13 +1,12 @@
-import { createModal, hideModal, showModal } from '../modal.js';
+import { createModal, hideModal, showModal } from '../layout/modal.js';
 import Terra from '../terra.js';
 import {
   setLocalStorageItem,
   getLocalStorageItem,
-} from '../local-storage-manager.js';
-import * as fileTreeManager from '../file-tree-manager.js';
-import { isBase64, seconds, slugify, isImageExtension } from '../helpers/shared.js';
+} from '../lib/local-storage-manager.js';
+import { isBase64, seconds, slugify, isImageExtension } from '../lib/helpers.js';
 import { GITHUB_URL_PATTERN } from '../ide/constants.js';
-import debounce from '../debouncer.js';
+import debounce from '../lib/debouncer.js';
 
 /**
  * GitFS worker class that handles all Git operations.
@@ -48,7 +47,7 @@ export default class GitFS {
 
   bindPageReloadEvent = () => {
     $(window).on('beforeunload', (e) => {
-      if (fileTreeManager.hasBottomMsg()) {
+      if (Terra.app.fileTree.hasBottomMessage()) {
         const message = 'The app is currently syncing changes to GitHub. Are you sure you want to reload the page?';
         e.preventDefault();
         e.returnValue = message;
@@ -245,7 +244,7 @@ export default class GitFS {
       // Triggered for primary and secondary rate limit.
       case 'rate-limit': {
         const retryAfter = Math.ceil(payload.retryAfter / 60);
-        fileTreeManager.setErrorMsg('Exceeded GitHub API limit.');
+        Terra.app.fileTree.showMessage('Exceeded GitHub API limit.', { error: true });
 
         const $modal = createModal({
           title: 'Exceeded GitHub API limit',
@@ -282,21 +281,21 @@ export default class GitFS {
         break;
 
       case 'clone-success':
-        fileTreeManager.removeInfoMsg();
-        fileTreeManager.removeLocalStorageWarning();
+        Terra.app.fileTree.clearMessage();
+        Terra.app.fileTree.clearLocalStorageWarning();
 
         this.importToVFS(payload.repoContents).then(() => {
           Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
-          fileTreeManager.createFileTree(true);
+          Terra.app.rebuildFileTree();
         });
         break;
 
       case 'request-success':
         // If there was an error message, the file tree is gone, thus we have to
         // recreate the file tree.
-        if (this.isReady && fileTreeManager.hasInfoMsg()) {
-          fileTreeManager.removeInfoMsg();
-          fileTreeManager.createFileTree(true);
+        if (this.isReady && Terra.app.fileTree.hasMessage()) {
+          Terra.app.fileTree.clearMessage();
+          Terra.app.rebuildFileTree();
         }
         break;
 
@@ -316,19 +315,19 @@ export default class GitFS {
         }
 
 
-        fileTreeManager.setErrorMsg(`Failed to clone repository<br/><br/>${errMsg}`);
+        Terra.app.fileTree.showMessage(`Failed to clone repository<br/><br/>${errMsg}`, { error: true });
         break;
 
       case 'clone-fail':
-        fileTreeManager.setErrorMsg('Failed to clone repository');
+        Terra.app.fileTree.showMessage('Failed to clone repository', { error: true });
         break;
 
       case 'queue-busy':
-        fileTreeManager.showBottomMsg('Syncing changes to GitHub...');
+        Terra.app.fileTree.showBottomMessage('Syncing changes to GitHub...');
         break;
 
       case 'queue-done':
-        fileTreeManager.removeBottomMsg();
+        Terra.app.fileTree.clearBottomMessage();
         break;
     }
   }

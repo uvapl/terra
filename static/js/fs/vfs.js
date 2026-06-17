@@ -1,4 +1,4 @@
-import { getPartsFromPath } from '../helpers/shared.js';
+import { getPartsFromPath } from '../lib/helpers.js';
 
 /**
  * VFS interface for the main thread ---

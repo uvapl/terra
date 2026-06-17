@@ -9,10 +9,10 @@ import {
   saveConfig,
   loadStoredConfig,
 } from './app.lab.config.js';
-import { getFileExtension } from './helpers/shared.js';
+import { getFileExtension } from './lib/helpers.js';
 import LabLayout from './layout/layout.lab.js';
 import { loadReadme } from './app.lab.readme.js';
-import { getLocalStorageItem } from './local-storage-manager.js';
+import { getLocalStorageItem } from './lib/local-storage-manager.js';
 
 export default class LabApp extends App {
   /**

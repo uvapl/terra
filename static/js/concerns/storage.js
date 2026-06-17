@@ -1,4 +1,3 @@
-import * as fileTreeManager from '../file-tree-manager.js';
 import { triggerPluginEvent } from '../plugin-manager.js';
 
 /**
@@ -45,10 +44,10 @@ export function useStorageCoordinator(app) {
      * FS change. Shared by the backends' close paths.
      */
     async finishSwitchToLocalStorage() {
-      fileTreeManager.removeInfoMsg();
-      await fileTreeManager.createFileTree(); // show empty file tree
-      fileTreeManager.showLocalStorageWarning();
-      fileTreeManager.setTitle('local storage');
+      this.fileTree.clearMessage();
+      await this.refreshFileTree(); // show empty file tree
+      this.fileTree.showLocalStorageWarning();
+      this.fileTree.setTitle('local storage');
       triggerPluginEvent('onStorageChange', 'local');
     },
   });

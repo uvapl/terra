@@ -1,6 +1,6 @@
-import { isImageExtension } from '../helpers/shared.js';
+import { isImageExtension } from '../lib/helpers.js';
 import { Octokit } from '../vendor/octokit-core-6.1.3.min.js';
-import TaskQueue from '../task-queue.js';
+import TaskQueue from '../lib/task-queue.js';
 
 const GITHUB_REPO_URL_PATTERN = /^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/;
 
