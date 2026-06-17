@@ -131,6 +131,13 @@ export default class TerminalComponent {
   }
 
   /**
+   * Clear current line.
+   */
+  clearCurrentLine = (msg) => {
+    this.term.write('\r\x1b[2K');
+  }
+
+  /**
    * Print an inverted `%` when the last write did not end in a newline (zsh
    * style), so trailing output without a final newline stays visible. Called
    * at the end of a run.

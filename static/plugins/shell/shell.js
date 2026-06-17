@@ -96,7 +96,7 @@ export default class ShellPlugin extends TerraPlugin {
     if (!this.term || this.term.inputOwner !== 'shell') return;
 
     this.externalRun = true;
-    this.term.write('\r\n');
+    this.term.clearCurrentLine();
     this.term.releaseInput('shell');
   }
 
