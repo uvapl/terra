@@ -5,12 +5,12 @@ import {
   slugify,
   parseQueryParams,
   removeIndent,
-} from './helpers/shared.js';
+} from './lib/helpers.js';
 import Terra from './terra.js';
 import {
   getLocalStorageItem,
   updateLocalStoragePrefix
-} from './local-storage-manager.js';
+} from './lib/local-storage-manager.js';
 import EmbedLayout from './layout/layout.embed.js';
 
 export default class EmbedApp extends App {

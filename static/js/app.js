@@ -1,6 +1,4 @@
-import { getFileExtension, isImageExtension } from './helpers/shared.js'
-import Terra from './terra.js';
-import * as fileTreeManager from './file-tree-manager.js';
+import { getFileExtension, isImageExtension } from './lib/helpers.js'
 import { FileNotFoundError, FileTooLargeError } from './fs/vfs.js';
 import BaseApp from './app.base.js';
 import { triggerPluginEvent } from './plugin-manager.js';
@@ -63,7 +61,7 @@ export default class App extends BaseApp {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   async onEditorReloadRequested(editorComponent) {
-    if (!Terra.v.blockFSPolling) {
+    if (!this.isFSReloadSuspended()) {
       await this.setEditorFileContent(editorComponent, { clearUndoStack: true });
     }
   }
@@ -77,7 +75,7 @@ export default class App extends BaseApp {
   }
 
   onImageReloadRequested(imageComponent) {
-    if (!Terra.v.blockFSPolling) {
+    if (!this.isFSReloadSuspended()) {
       this.setImageFileContent(imageComponent);
     }
   }
@@ -331,8 +329,8 @@ export default class App extends BaseApp {
             }
           }
 
-          // Recreate the file tree.
-          await fileTreeManager.createFileTree();
+          // Recreate the file tree (IDE app only).
+          await this.refreshFileTree?.();
         }
       },
 

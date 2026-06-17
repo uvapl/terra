@@ -1,6 +1,6 @@
 import { getPlugin, TerraPlugin } from '../../js/plugin-manager.js';
-import { seconds, getPartsFromPath } from '../../js/helpers/shared.js';
-import { createModal, hideModal, showModal } from '../../js/modal.js';
+import { seconds, getPartsFromPath } from '../../js/lib/helpers.js';
+import { createModal, hideModal, showModal } from '../../js/layout/modal.js';
 import Terra from '../../js/terra.js';
 
 const BASE_URL = 'https://checkz.proglab.nl'

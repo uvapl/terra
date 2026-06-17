@@ -1,5 +1,5 @@
-import { formatDate } from '../helpers/shared.js';
-import { createModal, hideModal, showModal } from '../modal.js';
+import { formatDate } from '../lib/helpers.js';
+import { createModal, hideModal, showModal } from '../layout/modal.js';
 import Layout from './layout.js';
 
 export default class ExamLayout extends Layout {

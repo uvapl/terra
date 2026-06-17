@@ -5,7 +5,7 @@ import {
   mergeObjects,
   eventTargetMixin,
   seconds,
-} from '../helpers/shared.js';
+} from '../lib/helpers.js';
 import ImageComponent from './image.component.js';
 import EditorComponent from './editor.component.js';
 import TerminalComponent from './term.component.js';
@@ -13,7 +13,7 @@ import { triggerPluginEvent } from '../plugin-manager.js';
 import {
   setLocalStorageItem,
   getLocalStorageItem
-} from '../local-storage-manager.js';
+} from '../lib/local-storage-manager.js';
 import Terra from '../terra.js';
 
 /**

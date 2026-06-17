@@ -1,7 +1,7 @@
 import { BASE_FONT_SIZE } from '../constants.js';
-import { getFileExtension, seconds } from '../helpers/shared.js';
+import { getFileExtension, seconds } from '../lib/helpers.js';
 import { triggerPluginEvent } from '../plugin-manager.js';
-import { getLocalStorageItem } from '../local-storage-manager.js';
+import { getLocalStorageItem } from '../lib/local-storage-manager.js';
 import Terra from '../terra.js';
 import TabComponent from './tab.component.js';
 

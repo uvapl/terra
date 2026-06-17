@@ -1,5 +1,5 @@
 import { BASE_FONT_SIZE } from '../constants.js';
-import { getPartsFromPath } from '../helpers/shared.js';
+import { getPartsFromPath } from '../lib/helpers.js';
 
 export default class TabComponent extends EventTarget {
   /**

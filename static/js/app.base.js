@@ -1,4 +1,4 @@
-import { getFileExtension } from './helpers/shared.js'
+import { getFileExtension } from './lib/helpers.js'
 import LangWorkerClient from './workers/lang-worker-client.js';
 import VirtualFileSystem from './fs/vfs.js';
 
@@ -30,6 +30,16 @@ export default class BaseApp {
   vfs = null;
 
   /**
+   * Whether reactive reloads from the VFS are currently suspended because the
+   * user is mid-interaction (editing in an editor, renaming/dragging a tree
+   * node, a context menu is open, …). It guards both editor/image content
+   * reloads and file-tree rebuilds. Use the suspend/resume/isFSReloadSuspended
+   * methods rather than touching this directly.
+   * @type {boolean}
+   */
+  _fsReloadSuspended = false;
+
+  /**
    * The terminal component, or null when it does not (yet) exist. The layout
    * owns the terminal's lifecycle; this is a convenience accessor so the rest
    * of the app does not reach through the layout on every use.
@@ -37,6 +47,25 @@ export default class BaseApp {
    */
   get term() {
     return this.layout?.term ?? null;
+  }
+
+  /**
+   * Suspend reactive reloads from the VFS while the user is mid-interaction.
+   * Last-writer-wins (a plain boolean): some interactions clear it without a
+   * matching set, matching the previous shared-flag behaviour.
+   */
+  suspendFSReload() {
+    this._fsReloadSuspended = true;
+  }
+
+  /** Resume reactive reloads from the VFS. */
+  resumeFSReload() {
+    this._fsReloadSuspended = false;
+  }
+
+  /** @returns {boolean} True while reactive VFS reloads are suspended. */
+  isFSReloadSuspended() {
+    return this._fsReloadSuspended;
   }
 
   constructor() {

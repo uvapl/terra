@@ -1,10 +1,9 @@
 import App from './app.js';
 import IDELayout from './layout/layout.ide.js';
-import { getFileExtension, isValidFilename } from './helpers/shared.js';
-import Terra from './terra.js';
-import * as fileTreeManager from './file-tree-manager.js';
+import { getFileExtension, isValidFilename } from './lib/helpers.js';
 import { getPlugin } from './plugin-manager.js';
 import * as LFS from './fs/lfs.js';
+import { useFileTree } from './concerns/file-tree.js';
 import { useStorageCoordinator } from './concerns/storage.js';
 import { useGit } from './concerns/git.js';
 import { useLFS } from './concerns/lfs.js';
@@ -21,6 +20,10 @@ export default class IDEApp extends App {
 
     // Files for the IDE are hosted in a subdirectory of the VFS.
     this.vfs.setBaseFolder('ide')
+
+    // The file-tree concern: creates the view component (app.fileTree) and makes
+    // this app its controller (delegate + coordination methods).
+    useFileTree(this);
 
     // Install the storage concerns. The coordinator must be installed before the
     // backends, because each backend registers itself with the coordinator.
@@ -45,11 +48,11 @@ export default class IDEApp extends App {
     } else if (LFS.hasProjectLoaded()) {
       // Enable close-folder menu item.
       this.layout.setProjectMenuState({ closeProjectEnabled: true });
-      fileTreeManager.setTitle(await LFS.getBaseFolderName());
+      this.fileTree.setTitle(await LFS.getBaseFolderName());
     }
 
     // Initialize file tree.
-    await fileTreeManager.createFileTree();
+    await this.refreshFileTree();
 
     // Start GitFS if already connected.
     if (this.isGitConfigured()) {
@@ -58,11 +61,8 @@ export default class IDEApp extends App {
 
     // Warn if no external file system is connected.
     if (!this.isGitConfigured() && !LFS.hasProjectLoaded()) {
-      fileTreeManager.showLocalStorageWarning();
+      this.fileTree.showLocalStorageWarning();
     }
-
-    this.startLFSChangeListener();
-    this.startFSStructureListener();
 
     this.layout.refresh();
   }
@@ -107,7 +107,7 @@ export default class IDEApp extends App {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   onEditorEditingStarted(editorComponent) {
-    Terra.v.blockFSPolling = true;
+    this.suspendFSReload();
   }
 
   /**
@@ -116,7 +116,7 @@ export default class IDEApp extends App {
    * @param {EditorComponent} editorComponent - The editor component instance.
    */
   onEditorEditingStopped(editorComponent) {
-    Terra.v.blockFSPolling = false;
+    this.resumeFSReload();
   }
 
   /**
@@ -239,7 +239,7 @@ export default class IDEApp extends App {
 
     // Create a new file in the VFS and then refresh the file tree.
     await this.vfs.createFile(filepath, editorComponent.getContent());
-    await fileTreeManager.createFileTree();
+    await this.refreshFileTree();
 
     // Re-point the Untitled tab at the new file (path, title, highlighting,
     // persisted state) and spawn the matching worker.
@@ -323,29 +323,4 @@ export default class IDEApp extends App {
     };
   }
 
-  // ***** FS helpers *****
-
-  /**
-   * Rebuild the file tree when the VFS structure changes (a file or folder is
-   * created or deleted), regardless of the active storage backend. This makes
-   * the tree reflect changes made outside the file-tree UI — e.g. files and
-   * folders created by the shell via touch, mkdir, or output redirection.
-   *
-   * Content-only changes (fileContentChanged, e.g. autosave) are intentionally
-   * ignored, as they do not alter the tree structure.
-   */
-  async startFSStructureListener() {
-    const rebuild = async () => {
-      // Skip while the user is mid-action (e.g. renaming a tree item).
-      if (Terra.v.blockFSPolling) return;
-
-      await fileTreeManager.runFuncWithPersistedState(() =>
-        fileTreeManager.createFileTree(),
-      );
-    };
-
-    this.vfs.addEventListener('fileCreated', rebuild);
-    this.vfs.addEventListener('folderCreated', rebuild);
-    this.vfs.addEventListener('fileDeleted', rebuild);
-  }
 }

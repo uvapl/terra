@@ -20,13 +20,13 @@ import {
   isValidUrl,
   parseQueryParams,
   slugify,
-} from './helpers/shared.js';
+} from './lib/helpers.js';
 import {
   isDefaultLocalStoragePrefix,
   setLocalStorageItem,
   getLocalStorageItem,
   updateLocalStoragePrefix,
-} from './local-storage-manager.js';
+} from './lib/local-storage-manager.js';
 
 /**
  * YAML schema that understands the custom !include/!exclude tags used in the

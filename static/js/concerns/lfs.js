@@ -1,5 +1,3 @@
-import Terra from '../terra.js';
-import * as fileTreeManager from '../file-tree-manager.js';
 import { triggerPluginEvent } from '../plugin-manager.js';
 import * as LFS from '../fs/lfs.js';
 
@@ -54,16 +52,16 @@ export function useLFS(app) {
       // and their VFS cache is cleared.
       await this.activateStorageBackend('lfs');
 
-      fileTreeManager.removeLocalStorageWarning();
+      this.fileTree.clearLocalStorageWarning();
       // Set file-tree title to the root folder name.
-      fileTreeManager.setTitle(await LFS.getBaseFolderName());
+      this.fileTree.setTitle(await LFS.getBaseFolderName());
 
       await this.vfs.connect(rootFolderHandle);
 
       triggerPluginEvent('onStorageChange', 'lfs');
 
       // Render the LFS contents.
-      await fileTreeManager.createFileTree();
+      await this.refreshFileTree();
     },
 
     /**
@@ -86,26 +84,6 @@ export function useLFS(app) {
       await this.vfs.connect(null, 'ide');
       LFS.close();
       this.layout.setProjectMenuState({ closeProjectEnabled: false });
-    },
-
-    /**
-     * Start listening to file system changes.
-     *
-     * N.B. Events will only be sent when local file system is connected,
-     * so it is OK to have this listener connected all the time.
-     */
-    async startLFSChangeListener() {
-      this.vfs.addEventListener('fileSystemChanged', async () => {
-        // We sometimes have a reason to not pick up changes,
-        // e.g. when the user is actively renaming an item.
-        if (Terra.v.blockFSPolling || !LFS.hasProjectLoaded()) return;
-
-        // Re-import from the VFS.
-        console.log('Reloading file tree from fs change');
-        await fileTreeManager.runFuncWithPersistedState(() =>
-          fileTreeManager.createFileTree(),
-        );
-      });
     },
   });
 

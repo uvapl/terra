@@ -22,8 +22,8 @@ import {
   seconds,
   slugify,
   isImageExtension
-} from '../helpers/shared.js';
-import debounce from '../debouncer.js';
+} from '../lib/helpers.js';
+import debounce from '../lib/debouncer.js';
 
 const blacklistedPaths = [
   'site-packages', // when user folder has python virtual env

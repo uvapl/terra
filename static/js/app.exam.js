@@ -18,14 +18,14 @@ import {
   getFileExtension,
   getRandNumBetween,
   seconds,
-} from './helpers/shared.js';
+} from './lib/helpers.js';
 import ExamLayout from './layout/layout.exam.js';
 import {
   setLocalStorageItem,
   getLocalStorageItem,
   removeLocalStorageItem,
-} from './local-storage-manager.js';
-import { notify, notifyError } from './notifications.js';
+} from './lib/local-storage-manager.js';
+import { notify, notifyError } from './layout/notifications.js';
 
 export default class ExamApp extends App {
   /**

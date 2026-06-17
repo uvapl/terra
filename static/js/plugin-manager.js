@@ -2,12 +2,12 @@ import {
   makeHtmlAttrs,
   slugify,
   isObject,
-} from './helpers/shared.js';
+} from './lib/helpers.js';
 import Terra from './terra.js';
 import {
   setLocalStorageItem,
   getLocalStorageItem,
-} from './local-storage-manager.js';
+} from './lib/local-storage-manager.js';
 
 /**
  * Contains a reference to all loaded plugins.

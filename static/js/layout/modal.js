@@ -1,5 +1,5 @@
-import { isObject, uuidv4 } from './helpers/shared.js';
-import { MODAL_ANIM_DURATION } from './constants.js';
+import { isObject, uuidv4 } from '../lib/helpers.js';
+import { MODAL_ANIM_DURATION } from '../constants.js';
 
 /**
  * Create a new modal, append its HTML to the body, and returns the new modal.

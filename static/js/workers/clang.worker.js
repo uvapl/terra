@@ -2,9 +2,14 @@
 // Licensed under the Apache License 2.0. See LICENSE.wasm-clang for details.
 
 import BaseAPI from './base-api.js';
-import { CLANG_C_FLAGS, CLANG_LD_FLAGS } from '../ide/constants.js';
-import { makeCmdPlaceholder } from '../ide/helpers.js';
-import { getPartsFromPath } from '../helpers/shared.js';
+import { getPartsFromPath } from '../lib/helpers.js';
+
+const CLANG_C_FLAGS = [
+  '-O0', '-std=c11', '-O0', '-Wall', '-Werror', '-Wextra',
+  '-Wno-unused-variable', '-Wno-sign-compare', '-Wno-unused-parameter',
+  '-Wshadow', '-D_XOPEN_SOURCE'
+];
+const CLANG_LD_FLAGS = ['-lc', '-lcs50'];
 
 function readStr(u8, o, len = -1) {
   let str = '';
@@ -673,6 +678,26 @@ class API extends BaseAPI {
     }
   }
 }
+
+/**
+ * Make a command placeholder for the clang compile command.
+ *
+ *
+ * @param {string[]} srcFiles - List of files to compile.
+ * @param {string} target - Name of the output file (target).
+ * @returns {string} The command.
+ */
+function makeCmdPlaceholder(srcFilenames, target) {
+  const cmd = [
+    'clang', ...CLANG_C_FLAGS,
+    '-o', target,
+    ...srcFilenames,
+    ...CLANG_LD_FLAGS,
+  ];
+
+  return cmd.join(' ');
+}
+
 
 // =============================================================================
 // Worker message handling.

@@ -1,4 +1,4 @@
-import { isMac } from './helpers/shared.js';
+import { isMac } from './lib/helpers.js';
 
 /**
  * Declarative keyboard bindings, grouped by scope.

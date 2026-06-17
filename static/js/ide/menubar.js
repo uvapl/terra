@@ -1,15 +1,14 @@
 ////////////////////////////////////////////////////////////////////////////////
 // This file contains the logic for the menubar at the top of the IDE app.
 ////////////////////////////////////////////////////////////////////////////////
-import { isMac } from '../helpers/shared.js';
-import { createModal, hideModal, showModal } from '../modal.js';
+import { isMac } from '../lib/helpers.js';
+import { createModal, hideModal, showModal } from '../layout/modal.js';
 import Terra from '../terra.js';
 import {
   setLocalStorageItem,
   getLocalStorageItem,
   removeLocalStorageItem,
-} from '../local-storage-manager.js';
-import * as fileTreeManager from '../file-tree-manager.js';
+} from '../lib/local-storage-manager.js';
 import { GITHUB_URL_PATTERN } from './constants.js';
 import * as LFS from '../fs/lfs.js';
 
@@ -47,7 +46,7 @@ export function renderGitRepoBranches(branches) {
 
     Terra.app.gitfs.setRepoBranch(newBranch);
 
-    fileTreeManager.setInfoMsg('Cloning repository...');
+    Terra.app.fileTree.showMessage('Cloning repository...');
     Terra.app.gitfs.clone();
 
     Terra.app.closeAllFiles();
@@ -89,10 +88,10 @@ function closeActiveMenuBarMenu(event) {
   const isNotNewFileOrFolderBtn = !$(event.target).is('#menu-item--new-file, #menu-item--new-folder');
   const editorComponent = Terra.app.getActiveEditor();
   if (isInsideMenu && isNotNewFileOrFolderBtn && editorComponent && editorComponent.ready) {
-    // Set Terra.v.blockFSPolling to prevent file contents being reloaded
-    Terra.v.blockFSPolling = true;
+    // Suspend reactive reloads to prevent file contents being reloaded
+    Terra.app.suspendFSReload();
     editorComponent.focus();
-    Terra.v.blockFSPolling = false;
+    Terra.app.resumeFSReload();
   }
 
   // Close the active menu only when it is not a disabled menu item.
@@ -140,11 +139,11 @@ function registerMenubarEventListeners() {
 
   // All submenu item event listeners.
   // =================================
-  $('#menu-item--new-file').click(() => fileTreeManager.createFile());
-  Mousetrap.bind([isMac() ? 'ctrl+n' : 'alt+n'], () => fileTreeManager.createFile());
+  $('#menu-item--new-file').click(() => Terra.app.createFile());
+  Mousetrap.bind([isMac() ? 'ctrl+n' : 'alt+n'], () => Terra.app.createFile());
 
-  $('#menu-item--new-folder').click(() => fileTreeManager.createFolder());
-  Mousetrap.bind([isMac() ? 'ctrl+shift+n' : 'alt+shift+n'], () => fileTreeManager.createFolder());
+  $('#menu-item--new-folder').click(() => Terra.app.createFolder());
+  Mousetrap.bind([isMac() ? 'ctrl+shift+n' : 'alt+shift+n'], () => Terra.app.createFolder());
 
   $('#menu-item--close-file').click(() => Terra.app.closeFile());
   Mousetrap.bind(['ctrl+w'], () => Terra.app.closeFile());
@@ -231,14 +230,14 @@ function registerMenubarEventListeners() {
 const Menubar = {};
 
 Menubar.openNewFile = () => {
-  fileTreeManager.createFile();
+  Terra.app.createFile();
 };
 
 Menubar.openLFSFolder = () => {
   if (!LFS.available()) return;
 
   Terra.app.openLFSFolder().then(() => {
-    fileTreeManager.removeInfoMsg();
+    Terra.app.fileTree.clearMessage();
     $('#menu-item--close-project').removeClass('disabled');
   });
 };
