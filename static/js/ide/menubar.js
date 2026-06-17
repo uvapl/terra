@@ -140,13 +140,13 @@ function registerMenubarEventListeners() {
   // All submenu item event listeners.
   // =================================
   $('#menu-item--new-file').click(() => Terra.app.createFile());
-  Mousetrap.bind([isMac() ? 'ctrl+n' : 'alt+n'], () => Terra.app.createFile());
+  Mousetrap.bindGlobal([isMac() ? 'ctrl+n' : 'alt+n'], () => Terra.app.createFile());
 
   $('#menu-item--new-folder').click(() => Terra.app.createFolder());
-  Mousetrap.bind([isMac() ? 'ctrl+shift+n' : 'alt+shift+n'], () => Terra.app.createFolder());
+  Mousetrap.bindGlobal([isMac() ? 'ctrl+shift+n' : 'alt+shift+n'], () => Terra.app.createFolder());
 
   $('#menu-item--close-file').click(() => Terra.app.closeFile());
-  Mousetrap.bind(['ctrl+w'], () => Terra.app.closeFile());
+  Mousetrap.bindGlobal(['ctrl+w'], () => Terra.app.closeFile());
 
   $('#menu-item--comment').click(Menubar.toggleComment);
 
@@ -171,24 +171,25 @@ function registerMenubarEventListeners() {
   $('#menu-item--find-previous').click(Menubar.findPrev);
 
   $('#menu-item--search').click(Menubar.search);
-  Mousetrap.bind(['ctrl+f', 'meta+f'], Menubar.search);
+  Mousetrap.bind(['mod+f'], (e) => { Menubar.search(); e.preventDefault(); });
 
   $('#menu-item--replace').click(Menubar.replace);
   Mousetrap.bind([isMac() ? 'command+option+f' : 'ctrl+alt+f'], Menubar.replace);
 
   $('#menu-item--increase-font-size').click(Menubar.increaseFontSize);
-  Mousetrap.bind(['ctrl+='], Menubar.increaseFontSize);
+  Mousetrap.bindGlobal(['ctrl+='], Menubar.increaseFontSize);
 
   $('#menu-item--decrease-font-size').click(Menubar.decreaseFontSize);
-  Mousetrap.bind(['ctrl+-'], Menubar.decreaseFontSize);
+  Mousetrap.bindGlobal(['ctrl+-'], Menubar.decreaseFontSize);
 
   $('#menu-item--default-font-size').click(Menubar.defaultFontSize);
-  Mousetrap.bind(['ctrl+0'], Menubar.defaultFontSize);
+  Mousetrap.bindGlobal(['ctrl+0'], Menubar.defaultFontSize);
 
   $('#menu-item--demo-font-size').click(Menubar.demoFontSize);
-  Mousetrap.bind(['ctrl+9'], Menubar.demoFontSize);
+  Mousetrap.bindGlobal(['ctrl+9'], Menubar.demoFontSize);
 
   $('#menu-item--duplicate-line').click(Menubar.duplicateLine);
+
   $('#menu-item--select-all').click(Menubar.selectAll);
 
   $('#menu-item--run-tab').click(Menubar.runTab);
@@ -203,28 +204,28 @@ function registerMenubarEventListeners() {
   $('#menu-item--toggle-focus').click(() => Terra.app.toggleEditorTerminalFocus());
 
   // Prevent the default browser save dialog when pressing ctrl+s or cmd+s.
-  Mousetrap.bind(['ctrl+s', 'meta+s'], (event) => event.preventDefault());
+  Mousetrap.bindGlobal(['ctrl+s', 'meta+s'], (event) => {
+    event.preventDefault();
+    Terra.app.layout.dispatchEvent(new CustomEvent('saveFile'));
+  });
+
+  Mousetrap.bindGlobal('command+k', (e) => {
+    Terra.app.clearTerminal();
+    e.preventDefault();
+  }, 'keydown');
+
+  Mousetrap.bindGlobal('ctrl+`', () => Terra.app.toggleEditorTerminalFocus(), 'keydown')
 
   // Clear the terminal with cmd+k (mac) / ctrl+k regardless of what is focused.
   // We can't use Mousetrap here because it ignores key events originating from
   // text inputs, and both the editor and terminal are textarea-based. A
   // capture-phase listener fires before the editor or terminal consumes the key.
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'k' && (isMac() ? event.metaKey : event.ctrlKey)) {
-      event.preventDefault();
-      Terra.app.clearTerminal();
-    }
-  }, true);
-
-  // Toggle focus between the active editor and the terminal with ctrl+`,
-  // regardless of what is focused. Same capture-phase approach as cmd+k above,
-  // so it fires before the editor or terminal consumes the key.
-  document.addEventListener('keydown', (event) => {
-    if (event.key === '`' && event.ctrlKey) {
-      event.preventDefault();
-      Terra.app.toggleEditorTerminalFocus();
-    }
-  }, true);
+  // document.addEventListener('keydown', (event) => {
+  //   if (event.key === 'k' && (isMac() ? event.metaKey : event.ctrlKey)) {
+  //     event.preventDefault();
+  //     Terra.app.clearTerminal();
+  //   }
+  // }, true);
 }
 
 const Menubar = {};
@@ -321,10 +322,10 @@ Menubar.replace = () => {
   Terra.app.getActiveEditor().editor.execCommand('replace');
 };
 
-Menubar.increaseFontSize = () => Terra.app.layout.changeFontSize(Terra.app.layout.getCurrentFontSize() + 1);
-Menubar.decreaseFontSize = () => Terra.app.layout.changeFontSize(Terra.app.layout.getCurrentFontSize() - 1);
-Menubar.defaultFontSize = () => Terra.app.layout.changeFontSize(16);
-Menubar.demoFontSize = () => Terra.app.layout.changeFontSize(24);
+Menubar.increaseFontSize = () => Terra.app.layout.increaseFontSize();
+Menubar.decreaseFontSize = () => Terra.app.layout.decreaseFontSize();
+Menubar.defaultFontSize = () => Terra.app.layout.setFontSizeDefault();
+Menubar.demoFontSize = () => Terra.app.layout.setFontSizeDemo();
 
 Menubar.duplicateLine = () => {
   Terra.app.getActiveEditor().editor.execCommand('duplicateSelection');

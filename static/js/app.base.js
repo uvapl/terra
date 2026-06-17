@@ -1,6 +1,7 @@
 import { getFileExtension } from './lib/helpers.js'
 import LangWorkerClient from './workers/lang-worker-client.js';
 import VirtualFileSystem from './fs/vfs.js';
+import Layout from './layout/layout.js';
 
 /**
  * Composition + wiring layer shared by every app.

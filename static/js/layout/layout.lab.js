@@ -1,3 +1,4 @@
+import { BASE_FONT_SIZE } from './constants.js';
 import Layout from './layout.js';
 
 export default class LabLayout extends Layout {
@@ -13,7 +14,37 @@ export default class LabLayout extends Layout {
    * @param {object} options - Additional options object.
    * @param {string} options.proglang - The programming language to be used.
    */
-  constructor(content, fontSize, options = {}) {
+  constructor(files, fontSize, options = {}) {
+
+    // Get the font-size stored in local storage or use fallback value.
+    const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
+
+    // Create the content objects that represent each tab in the editor. The
+    // file contents are not embedded: each editor loads them from the VFS
+    // when it is shown.
+    const content = files.map((filename) => ({
+      type: 'component',
+      componentName: 'editor',
+      componentState: {
+        fontSize,
+        path: filename,
+      },
+      title: filename,
+      isClosable: false,
+    }));
+
+    // A lab without files (e.g. the minimal `lab50: true` form) still needs
+    // at least one tab in the editor stack.
+    if (content.length === 0) {
+      content.push({
+        type: 'component',
+        componentName: 'editor',
+        componentState: { fontSize },
+        title: 'Untitled',
+        isClosable: false,
+      });
+    }
+
     const defaultLayoutConfig = {
       settings: {
         showPopoutIcon: false,
