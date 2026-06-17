@@ -276,7 +276,7 @@
  *  Local storage warning
  * ========================================================================== */
 .local-storage-warning {
-  position: fixed;
+  /*position: fixed;*/
   bottom: 0;
   left: 0;
   width: var(--file-tree-width);
@@ -284,6 +284,8 @@
   border-top: 1px solid var(--border-color);
   background-color: #ffb7b3;
   color: var(--color-black);
+  border-bottom-left-radius: 0.25rem;
+  border-bottom-right-radius: 0.25rem;
 }
 
 .local-storage-warning .warning-icon {
@@ -302,7 +304,7 @@
 }
 
 .localstorage-mode {
-  padding-bottom: 130px;
+  /*padding-bottom: 130px;*/
 }
 
 /* ==========================================================================
