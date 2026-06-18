@@ -184,6 +184,7 @@ export default class TerminalComponent {
     this.terminalInstance = new Terminal({
       convertEol: true,
       disableStdin: true,
+      cursorStyle: 'bar',
       cursorBlink: true,
       fontFamily,
       fontSize,
@@ -191,6 +192,8 @@ export default class TerminalComponent {
     });
     this.terminalInstance.loadAddon(this.fitAddon);
     this.terminalInstance.open(this.container.getElement()[0]);
+    // show cursor immediately
+    this.terminalInstance.write('\x1b[?25h');
     this.fitAddon.fit();
 
     // A single, persistent input pipeline: every keystroke and paste is routed
@@ -208,9 +211,7 @@ export default class TerminalComponent {
       $(window).trigger('resize');
     }, 0);
 
-
     this.setFontSize(fontSize);
-    this.hideTermCursor();
   }
 
   /**
@@ -278,7 +279,6 @@ export default class TerminalComponent {
     this.inputOwner = owner;
     this.inputHandler = onKey || null;
     this.inputPasteHandler = onPaste || null;
-    this.showTermCursor();
   }
 
   /**
@@ -295,12 +295,6 @@ export default class TerminalComponent {
     this.inputOwner = prev.owner;
     this.inputHandler = prev.onKey;
     this.inputPasteHandler = prev.onPaste;
-
-    if (this.inputOwner) {
-      this.showTermCursor();
-    } else {
-      this.hideTermCursor();
-    }
   }
 
   /**
@@ -310,13 +304,6 @@ export default class TerminalComponent {
    */
   disposeUserInput = () => {
     this.releaseInput('program');
-  }
-
-  /**
-   * Hide the cursor inside the terminal component.
-   */
-  hideTermCursor = () => {
-    this.terminalInstance.write('\x1b[?25l');
   }
 
   /**

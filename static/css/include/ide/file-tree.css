@@ -286,6 +286,7 @@
   color: var(--color-black);
   border-bottom-left-radius: 0.25rem;
   border-bottom-right-radius: 0.25rem;
+  hyphens: auto;
 }
 
 .local-storage-warning .warning-icon {

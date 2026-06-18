@@ -163,7 +163,7 @@ export default class FileTreeComponent {
           <img src="static/img/icons/warning.png" alt="warning icon" class="warning-icon" /> Warning
         </div>
         <p>
-          You're currently using temporary browser storage. Clearing website data will
+          You are currently using temporary browser storage. Clearing website data will
           delete project files and folders permanently.
         </p>
       </div>
