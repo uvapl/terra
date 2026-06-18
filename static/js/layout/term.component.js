@@ -29,7 +29,7 @@ export default class TerminalComponent {
    * Reference to the xterm.js component.
    * @type {Terminal}
    */
-  term = null;
+  terminalInstance = null;
 
   /**
    * Identifies who currently owns keyboard input on the terminal. One of
@@ -113,7 +113,7 @@ export default class TerminalComponent {
     this.lastWriteNotTerminated = typeof msg !== 'string' || !msg.endsWith('\n');
 
     try {
-      this.term.write(msg);
+      this.terminalInstance.write(msg);
     } catch (e) {
       console.log('Caught write error on the terminal - clearing buffer;');
       console.log(e);
@@ -127,7 +127,14 @@ export default class TerminalComponent {
    * @param {string} msg - The message to write.
    */
   writeln = (msg) => {
-    this.term.writeln(msg);
+    this.terminalInstance.writeln(msg);
+  }
+
+  /**
+   * Clear current line.
+   */
+  clearCurrentLine = (msg) => {
+    this.terminalInstance.write('\r\x1b[2K');
   }
 
   /**
@@ -146,14 +153,22 @@ export default class TerminalComponent {
    * Clear the terminal screen.
    */
   clear = () => {
-    this.term.reset();
+    this.terminalInstance.reset();
   }
 
   /**
    * Focus the terminal component.
    */
   focus = () => {
-    this.term.focus();
+    this.terminalInstance.focus();
+  }
+
+  hasFocus = () => {
+    if (this.terminalInstance.textarea) {
+      return document.activeElement === this.terminalInstance.textarea;
+    } else {
+      console.log("non area")
+    }
   }
 
   /**
@@ -174,31 +189,33 @@ export default class TerminalComponent {
     // Add custom class for styling purposes.
     this.getParentComponentElement().classList.add('component-container', 'terminal-component-container');
 
+    const fontFamily = "12px/normal 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Source Code Pro', 'source-code-pro', monospace";
     const fontSize = this.state.fontSize || BASE_FONT_SIZE;
 
-    this.term = new Terminal({
+    this.terminalInstance = new Terminal({
       convertEol: true,
       disableStdin: true,
       cursorBlink: true,
+      fontFamily,
       fontSize,
       lineHeight: 1.2
     });
-    this.term.loadAddon(this.fitAddon);
-    this.term.open(this.container.getElement()[0]);
+    this.terminalInstance.loadAddon(this.fitAddon);
+    this.terminalInstance.open(this.container.getElement()[0]);
     this.fitAddon.fit();
 
     // Attach the key handler here (xterm wiring), but let the injected handler
     // decide what the terminal-level shortcuts (ctrl-c, ctrl-k, font size) do.
-    this.term._core._customKeyEventHandler = (event) => this.onKeyEvent(event);
+    this.terminalInstance._core._customKeyEventHandler = (event) => this.onKeyEvent(event);
 
     // A single, persistent input pipeline: every keystroke and paste is routed
     // to whoever currently owns input (see acquireInput/releaseInput). When
     // there is no owner the events are dropped, which is the default behaviour
     // for environments without a shell (e.g. the exam).
-    this.term.onKey((e) => {
+    this.terminalInstance.onKey((e) => {
       if (this.inputHandler) this.inputHandler(e);
     });
-    this.term.textarea.addEventListener('paste', this._handlePaste);
+    this.terminalInstance.textarea.addEventListener('paste', this._handlePaste);
 
     // Trigger a single resize after the terminal has rendered to make sure it
     // fits the whole parent width and doesn't leave any gaps near the edges.
@@ -222,11 +239,11 @@ export default class TerminalComponent {
    * Callback when the container is destroyed.
    */
   onContainerDestroy = () => {
-    if (this.term && typeof this.term.destroy === 'function') {
-      this.term.destroy();
+    if (this.terminalInstance && typeof this.terminalInstance.destroy === 'function') {
+      this.terminalInstance.destroy();
     }
 
-    this.term = null;
+    this.terminalInstance = null;
   }
 
   /**
@@ -243,7 +260,7 @@ export default class TerminalComponent {
    */
   setFontSize = (fontSize) => {
     this.container.extendState({ fontSize });
-    this.term.options.fontSize = fontSize;
+    this.terminalInstance.options.fontSize = fontSize;
     this.fitAddon.fit();
   };
 
@@ -277,7 +294,6 @@ export default class TerminalComponent {
     this.inputHandler = onKey || null;
     this.inputPasteHandler = onPaste || null;
     this.showTermCursor();
-    // this.term.focus();
   }
 
   /**
@@ -315,14 +331,14 @@ export default class TerminalComponent {
    * Hide the cursor inside the terminal component.
    */
   hideTermCursor = () => {
-    this.term.write('\x1b[?25l');
+    this.terminalInstance.write('\x1b[?25l');
   }
 
   /**
    * Show the cursor inside the terminal component.
    */
   showTermCursor = () => {
-    this.term.write('\x1b[?25h');
+    this.terminalInstance.write('\x1b[?25h');
   }
 
   /**
@@ -361,7 +377,7 @@ export default class TerminalComponent {
       const onKey = (e) => {
         // Only append allowed characters.
         if (!this.blacklistedKeys.includes(e.key)) {
-          this.term.write(e.key);
+          this.terminalInstance.write(e.key);
           this.userInput += e.key;
         }
 
@@ -369,7 +385,7 @@ export default class TerminalComponent {
         // triggering a backspace '\b' character and then insert a space at that
         // position to clear the character.
         if (e.key === '\u007f' && this.userInput.length > 0) {
-          this.term.write('\b \b');
+          this.terminalInstance.write('\b \b');
           this.userInput = this.userInput.slice(0, -1);
         }
 
@@ -378,7 +394,7 @@ export default class TerminalComponent {
           this.releaseInput('program');
 
           // Trigger a real enter in the terminal.
-          this.term.write('\n');
+          this.terminalInstance.write('\n');
           this.userInput += '\n';
 
           resolve(this.userInput);
@@ -386,7 +402,7 @@ export default class TerminalComponent {
       };
 
       const onPaste = (text) => {
-        this.term.write(text);
+        this.terminalInstance.write(text);
         this.userInput += text;
       };
 
@@ -406,8 +422,8 @@ export default class TerminalComponent {
    *   'Error: write data discarded, use flow control to avoid losing data'
    */
   clearTermWriteBuffer = () => {
-    if (this.term && this.term._core) {
-      this.term._core._writeBuffer._writeBuffer = [];
+    if (this.terminalInstance && this.terminalInstance._core) {
+      this.terminalInstance._core._writeBuffer._writeBuffer = [];
     }
   }
 

@@ -1,4 +1,4 @@
-import { BASE_FONT_SIZE } from '../constants.js';
+import { BASE_FONT_SIZE, DEMO_FONT_SIZE } from '../constants.js';
 import {
   isImageExtension,
   isObject,
@@ -122,8 +122,8 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @type {array}
    */
   termStartupMessage = [
-    'Click the "Run" button to execute code.',
-    'Click the trash bin icon to clear this terminal screen.'
+    'Press Cmd-Enter to run your code.',
+    'Press Cmd-K to clear this terminal.'
   ];
 
   /**
@@ -242,9 +242,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   /**
-   * Register commands for the editor component.
+   * Keyboard shortcuts for editor tabs, for all variants of the app.
    *
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorComponent} editorComponent
    */
   registerEditorCommands(editorComponent) {
     editorComponent.addCommands([
@@ -344,24 +344,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
     editorComponent.addEventListener('focus', () => this.onEditorFocus(editorComponent));
     editorComponent.addEventListener('destroy', () => this.onTabDestroy());
-
-    // Seems redundant
-    // editorComponent.addCommands([
-    //   {
-    //     name: 'new-file',
-    //     bindKey: {win: 'Ctrl-N', mac: 'Ctrl-N'},
-    //     exec: () => {
-    //       fileTreeManager.createFile();
-    //     }
-    //   },
-    //   {
-    //     name: 'new-folder',
-    //     bindKey: {win: 'Ctrl-Shift-N', mac: 'Ctrl-Shift-N'},
-    //     exec: () => {
-    //       fileTreeManager.createFolder();
-    //     }
-    //   },
-    // ])
   }
 
   /**
@@ -445,16 +427,17 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @returns {object} - Fully configured object.
    */
   _createEditorTab(config = {}) {
-    return({
+    const { componentState, ...rest } = config;
+    return {
       type: 'component',
       componentName: 'editor',
       title: 'Untitled',
+      ...rest,
       componentState: {
-        fontSize: BASE_FONT_SIZE,
-        ...config.componentState
+        fontSize: this.getCurrentFontSize(),
+        ...componentState
       },
-      ...config,
-    });
+    };
   }
 
   /**
@@ -525,7 +508,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   addActiveStates() {
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');
-    const currentFontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
+    const currentFontSize = this.getCurrentFontSize()
     $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
 
     // Add active state to theme dropdown.
@@ -673,6 +656,22 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     const $items = $('#font-size-menu').find('li[data-val]');
     $items.removeClass('active');
     $items.filter(`[data-val="${newSize}"]`).addClass('active');
+  }
+
+  increaseFontSize() {
+    this.changeFontSize(this.getCurrentFontSize() + 1);
+  }
+
+  decreaseFontSize() {
+    this.changeFontSize(this.getCurrentFontSize() - 1);
+  }
+
+  setFontSizeDefault() {
+    this.changeFontSize(BASE_FONT_SIZE);
+  }
+
+  setFontSizeDemo() {
+    this.changeFontSize(DEMO_FONT_SIZE);
   }
 
   /**

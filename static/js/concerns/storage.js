@@ -47,7 +47,7 @@ export function useStorageCoordinator(app) {
       this.fileTree.clearMessage();
       await this.refreshFileTree(); // show empty file tree
       this.fileTree.showLocalStorageWarning();
-      this.fileTree.setTitle('local storage');
+      this.fileTree.setTitle('temporary storage');
       triggerPluginEvent('onStorageChange', 'local');
     },
   });

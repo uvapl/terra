@@ -14,7 +14,23 @@ export default class EmbedLayout extends Layout {
    * @param {boolean} options.vertical - Whether the layout should be vertical.
    * @param {string} options.proglang - The programming language to be used
    */
-  constructor(content, fontSize, options = {}) {
+  constructor(tabs, options = {}) {
+    // Get the font-size stored in local storage or use fallback value.
+    const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
+
+    // Create the config for each tab.
+    const content = Object.keys(tabs).map((filename) => ({
+      type: 'component',
+      componentName: 'editor',
+      componentState: {
+        fontSize,
+        value: tabs[filename],
+        path: filename,
+      },
+      title: filename,
+      isClosable: false,
+    }));
+
     const defaultLayoutConfig = {
       dimensions: {
         borderWidth: 0,

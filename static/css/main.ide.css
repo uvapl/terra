@@ -31,21 +31,22 @@
 }
 
 .lm_header .lm_tab {
-  padding-right: 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.lm_header .lm_tab .lm_title {
+  margin-left: 1px;
 }
 
 .lm_header .lm_tab .lm_close_tab {
-  top: 50%;
-  transform: translateY(-50%);
-  background-image: url('../img/icons/close.png');
-  background-size: contain;
-}
-
-.lm_header .lm_tab.lm_active .lm_close_tab {
-  opacity: 0.4;
+  position: relative;
+  top: 0; right: 0;
 }
 
 .lm_header .lm_tab.lm_active .lm_close_tab:hover {
+  background-color: lightgray;
   opacity: 1;
 }
 
@@ -56,6 +57,7 @@
 
 .layout-outer-container {
   overflow: hidden;
+  background: var(--ide-panel-bg);
 }
 
 .dark-mode .lm_tab .lm_close_tab {

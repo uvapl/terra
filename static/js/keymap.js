@@ -29,10 +29,6 @@ export const KeymapScope = {
 const BINDINGS = {
   [KeymapScope.TERMINAL]: [
     { key: 'c', ctrl: true, action: 'handleControlC' },
-    { key: '=', ctrl: true, action: 'zoomIn', preventDefault: true },
-    { key: '-', ctrl: true, action: 'zoomOut', preventDefault: true },
-    { key: '0', ctrl: true, action: 'resetZoom', preventDefault: true },
-    { key: '9', ctrl: true, action: 'zoomDemo', preventDefault: true },
   ],
 };
 

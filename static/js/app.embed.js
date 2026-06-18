@@ -1,5 +1,4 @@
 import App from './app.js';
-import { BASE_FONT_SIZE } from './constants.js';
 import {
   getFileExtension,
   slugify,
@@ -56,14 +55,8 @@ export default class EmbedApp extends App {
     // Get the programming language based on the filename.
     const proglang = getFileExtension(queryParams.filename);
 
-    // Get the font-size stored in local storage or use fallback value.
-    const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
-
-    // Create the content objects that represent each tab in the editor.
-    const content = this.generateConfigContent(tabs, fontSize);
-
     // Create the layout object.
-    const layout = new EmbedLayout(content, fontSize, {
+    const layout = new EmbedLayout(tabs, {
       proglang,
       vertical: isVertical,
     });

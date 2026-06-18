@@ -22,7 +22,8 @@ export { IS_DEV, IS_IFRAME, IS_IDE };
 /**
  * Sets the default font-size for the upper-right select element.
  */
-export const BASE_FONT_SIZE = 18;
+export const BASE_FONT_SIZE = 16;
+export const DEMO_FONT_SIZE = 26;
 
 /**
  * The interval time between auto-saves, defined in milliseconds.

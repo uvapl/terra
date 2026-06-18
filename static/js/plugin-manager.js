@@ -236,8 +236,6 @@ export class TerraPlugin {
   // onEditorLoad = (editorComponent) => { }
   // onEditorLock = (editorComponent) => { }
   // onEditorUnlock = (editorComponent) => { }
-  // setEditorTheme = (theme, editorComponent) => { }
-  // setEditorFontSize = (fontSize, editorComponent) => { }
   // onEditorContainerResize = (editorComponent) => { }
   // onEditorDestroy = (editorComponent) => { }
   // onEditorContentChanged (editorComponent) => { }

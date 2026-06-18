@@ -1,6 +1,5 @@
 import App from './app.js';
 import {
-  BASE_FONT_SIZE,
   AUTOSAVE_INTERVAL,
   AUTOSAVE_START_OFFSET,
 } from './constants.js';
@@ -71,26 +70,19 @@ export default class ExamApp extends App {
     // Get the programming language based on tabs filename.
     const proglang = getFileExtension(Object.keys(this.config.tabs)[0]);
 
-    // Get the font-size stored in local storage or use fallback value.
-    const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
-
-    // Create the content objects that represent each tab in the editor.
-    const content = this.generateConfigContent(this.config.tabs, fontSize);
-
-    // Load the exam files.
+    // Load the exam templates into the file system.
     if (isNewExam) {
       await this.vfs.clear();
 
       await Promise.all(
-        content.map((file) => this.vfs.createFile(
-          file.title,
-          file.componentState.value,
-        ))
+        Object.entries(this.config.tabs).map(([title, fileContent]) =>
+          this.vfs.createFile(title, fileContent)
+        )
       )
     }
 
     // Initialize the layout.
-    this.layout = new ExamLayout(content, fontSize, {
+    this.layout = new ExamLayout(this.config.tabs, {
       proglang,
       hiddenFiles: this.config.hidden_tabs,
       buttonConfig: this.config.buttons,

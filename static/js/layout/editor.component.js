@@ -57,47 +57,16 @@ export default class EditorComponent extends TabComponent {
     const proglang = filename.includes('.') ? getFileExtension(filename) : 'text';
     this.setProgLang(proglang);
 
-    // Remove default sublime Ctrl+Enter command.
-    this.editor.commands.removeCommand('addLineAfter');
-
     // Remove default Ctrl+N and Ctrl+Shift+N keybindings since we want them to
     // be handled by Terra globally.
-    //
-    // NOTE: We only remove the keybinding, because we want to keep the original
-    // command functionality for the other keybind.
+    // Only the keybinding must be removed, because the commands have other
+    // shortcuts (e.g. just the down arrow!).
     for (const cmd of ['golinedown', 'selectdown']) {
       this.editor.commands.commands[cmd].bindKey.mac = this.editor.commands.commands[cmd].bindKey.mac
         .split('|')
         .filter((cmd) => !['Ctrl-N', 'Ctrl-Shift-N'].includes(cmd))
         .join('|');
     }
-
-    // Keyboard shortcuts that can be processed internally by the editor,
-    // as opposed to being routed through the app logic.
-    this.addCommands([
-      {
-        name: 'save',
-        bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
-        exec: () => {
-          // Literally do nothing here, because by default, we want to prevent
-          // the user (accidentally) saving the file with <cmd/ctrl + s>, which
-          // otherwise triggers the native browser save-file popup window.
-        }
-      },
-      {
-        name: 'moveLinesUp',
-        bindKey: { win: 'Ctrl+Alt+Up', mac: 'Ctrl+Option+Up' },
-        exec: () => {
-          console.log("move up");
-          this.moveLinesUp()
-        },
-      },
-      {
-        name: 'moveLinesDown',
-        bindKey: { win: 'Ctrl+Alt+Down', mac: 'Ctrl+Option+Down' },
-        exec: () => this.moveLinesDown(),
-      }
-    ]);
   }
 
   /**
@@ -112,8 +81,6 @@ export default class EditorComponent extends TabComponent {
     contentContainer.appendChild(editorContainer);
 
     this.editor = ace.edit(editorContainer);
-    this.editor.setKeyboardHandler('ace/keyboard/sublime');
-    this.editor.setOption('fontSize');
     this.editor.setOption('enableSnippets', false);
     this.editor.setOption('enableBasicAutocompletion', true);
     this.editor.setOption('enableLiveAutocompletion', true);
@@ -413,7 +380,7 @@ export default class EditorComponent extends TabComponent {
    */
   setFontSize = (fontSize) => {
     this.container.extendState({ fontSize });
-    this.editor.setFontSize(`${fontSize}px`);
+    this.editor.setFontSize(fontSize);
   }
 
   /**
@@ -630,12 +597,11 @@ export default class EditorComponent extends TabComponent {
 
     this.container.on('themeChanged', (theme) => {
       this.setTheme(theme);
-      triggerPluginEvent('setEditorTheme', theme, this);
     });
 
+    // Triggers when font changed by user (not on first load)
     this.container.on('fontSizeChanged', (fontSize) => {
       this.setFontSize(fontSize);
-      triggerPluginEvent('setEditorFontSize', fontSize, this);
     });
 
     this.container.on('resize', () => {

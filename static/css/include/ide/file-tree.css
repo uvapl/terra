@@ -48,6 +48,7 @@
 }
 
 .file-tree-container .title {
+  padding-left: 5px;
   font-size: 14px;
   flex-grow: 1;
   color: var(--tab-fg-color);
@@ -116,7 +117,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  padding-left: var(--file-tree-first-indent);
+  padding-left: var(--file-tree-padding);
 }
 
 .fancytree-container ul {
@@ -124,6 +125,11 @@
   margin: 0;
   padding: 0;
   padding-left: var(--file-tree-indent);
+}
+
+.fancytree-container li {
+  display: flex;
+  flex-direction: column;
 }
 
 .fancytree-node {
@@ -169,41 +175,22 @@
 }
 
 .file-tree-folder-icon {
+  width: 1em;
+  height: 1em;
   background-image: url('../../../img/icons/folder.png');
 }
 
-.fancytree-folder > .fancytree-expander {
-  pointer-events: none;
-  display: block;
-  width: 12px;
-  height: 12px;
-  background-repeat: no-repeat;
-  background-size: 12px;
-  background-position: center 50%;
-  margin-right: 5px;
+.fancytree-expanded > .file-tree-folder-icon {
+  background-image: url('../../../img/icons/bs-folder2-open.svg');
 }
 
-/* Indent folder content */
-.fancytree-container > li > ul {
-  padding-left: var(--file-tree-indent);
-}
-
-/* Unindent folders so the caret sticks out a little (to the left) */
-.file-tree ul .fancytree-folder {
-  margin-left: -17px;
-}
-
-.fancytree-expanded > .fancytree-expander {
-  background-image: url('../../../img/icons/arrow-head-down.png');
-}
-
-.fancytree-node:not(.fancytree-expanded) > .fancytree-expander {
-  background-image: url('../../../img/icons/arrow-head-right.png');
+.fancytree-node:not(.fancytree-expanded) > .file-tree-folder-icon {
+  background-image: url('../../../img/icons/bs-folder.svg');
 }
 
 /* Empty folders are always shown with a downward-pointing caret */
-.fancytree-folder:not(.fancytree-has-children) > .fancytree-expander {
-  background-image: url('../../../img/icons/arrow-head-down.png');
+.fancytree-folder:not(.fancytree-has-children) > .file-tree-folder-icon {
+  background-image: url('../../../img/icons/bs-folder2-open.svg');
 }
 
 .fancytree-node input {
@@ -289,7 +276,7 @@
  *  Local storage warning
  * ========================================================================== */
 .local-storage-warning {
-  position: fixed;
+  /*position: fixed;*/
   bottom: 0;
   left: 0;
   width: var(--file-tree-width);
@@ -297,6 +284,8 @@
   border-top: 1px solid var(--border-color);
   background-color: #ffb7b3;
   color: var(--color-black);
+  border-bottom-left-radius: 0.25rem;
+  border-bottom-right-radius: 0.25rem;
 }
 
 .local-storage-warning .warning-icon {
@@ -315,7 +304,7 @@
 }
 
 .localstorage-mode {
-  padding-bottom: 130px;
+  /*padding-bottom: 130px;*/
 }
 
 /* ==========================================================================

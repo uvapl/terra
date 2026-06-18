@@ -73,6 +73,7 @@ export default class IDEApp extends App {
    * replacement and how to re-wire it to the app afterwards.
    */
   resetLayout() {
+    this.layout.setFontSizeDefault();
     this.layout.recreate(
       (contentConfig) => this.createLayout(true, contentConfig),
       (next) => {
@@ -120,7 +121,7 @@ export default class IDEApp extends App {
   }
 
   /**
-   * Create the layout object with the given content objects and font-size.
+   * Create the layout object with the given content objects.
    *
    * @param {boolean} [forceDefaultLayout=false] Whether to force the default layout.
    * @param {Array} [contentConfig=[]] The content configuration for the layout.

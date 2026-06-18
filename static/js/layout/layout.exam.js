@@ -15,7 +15,23 @@ export default class ExamLayout extends Layout {
    * @param {object} options.buttonConfig - Object containing buttons with their
    * commands that will be rendered by the layout.
    */
-  constructor(content, fontSize, options = {}) {
+  constructor(tabs, options = {}) {
+    // Get the font-size stored in local storage or use fallback value.
+    const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
+
+    // Create the config for each tab.
+    const content = Object.keys(tabs).map((filename) => ({
+      type: 'component',
+      componentName: 'editor',
+      componentState: {
+        fontSize,
+        value: tabs[filename],
+        path: filename,
+      },
+      title: filename,
+      isClosable: false,
+    }));
+
     const defaultLayoutConfig = {
       settings: {
         showPopoutIcon: false,

@@ -94,6 +94,7 @@ export default class App extends BaseApp {
    * @returns {boolean|undefined} false to stop xterm from processing the key.
    */
   handleTerminalKeyEvent(event) {
+    if (event.type !== 'keydown') return;
     const binding = matchKeyBinding(KeymapScope.TERMINAL, event);
     if (!binding) return;
 
@@ -114,22 +115,22 @@ export default class App extends BaseApp {
 
   /** Increase the font size by one step (ctrl-=). */
   zoomIn() {
-    this.layout.changeFontSize(this.layout.getCurrentFontSize() + 1);
+    this.layout.increaseFontSize();
   }
 
   /** Decrease the font size by one step (ctrl--). */
   zoomOut() {
-    this.layout.changeFontSize(this.layout.getCurrentFontSize() - 1);
+    this.layout.decreaseFontSize();
   }
 
   /** Reset the font size to the default (ctrl-0). */
   resetZoom() {
-    this.layout.changeFontSize(16);
+    this.layout.setFontSizeDefault();
   }
 
   /** Set the font size to the larger "demo" size (ctrl-9). */
   zoomDemo() {
-    this.layout.changeFontSize(24);
+    this.layout.setFontSizeDemo();
   }
 
   /**
@@ -148,9 +149,7 @@ export default class App extends BaseApp {
    * otherwise move to the terminal.
    */
   toggleEditorTerminalFocus() {
-    const termTextarea = this.term?.term?.textarea;
-    const terminalFocused = termTextarea && document.activeElement === termTextarea;
-    if (terminalFocused) {
+    if (this.term?.hasFocus()) {
       this.getActiveEditor()?.focus();
     } else {
       this.term?.focus();
@@ -605,28 +604,6 @@ export default class App extends BaseApp {
   }
 
   // ───────────────────────── Config & accessors ──────────────────────────
-
-  /**
-   * Create a list of content objects based on the tabs config data.
-   *
-   * @param {object} tabs - An object where each key is the filename and the
-   * value is the default value the editor should have when the file is opened.
-   * @param {number} fontSize - The default font-size used for the content.
-   * @returns {array} List of content objects.
-   */
-  generateConfigContent(tabs, fontSize) {
-    return Object.keys(tabs).map((filename) => ({
-      type: 'component',
-      componentName: 'editor',
-      componentState: {
-        fontSize,
-        value: tabs[filename],
-        path: filename,
-      },
-      title: filename,
-      isClosable: false,
-    }));
-  }
 
   /**
    * Get all tab components from the layout.
