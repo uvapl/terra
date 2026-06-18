@@ -243,7 +243,6 @@ export default class App extends BaseApp {
 
         // Dispose any pending stdin prompt left by an aborted run and hide the cursor.
         this.term?.disposeUserInput();
-        this.term?.hideTermCursor();
 
         // Set focus to the active editor.
         this.getActiveEditor().focus();
@@ -375,6 +374,11 @@ export default class App extends BaseApp {
    * @param {boolean} [options.runAs] - Whether the runAs config should be used.
    */
   async _startRun({ filepath, runAs = false }) {
+    // Immediately find out language based on extension, and bail if
+    // indeterminate.
+    const proglang = getFileExtension(filepath);
+    if (!proglang) return;
+
     // Notify plugins that a run is starting (e.g. the shell, to yield the
     // terminal and start program output on a fresh line).
     triggerPluginEvent('onRunStart');
@@ -389,7 +393,6 @@ export default class App extends BaseApp {
     files = files.concat(this.getHiddenFiles());
 
     // Create a new worker instance if needed.
-    const proglang = getFileExtension(filepath);
     this.createLangWorker(proglang);
 
     // Build args to send to the worker's runUserCode function.
