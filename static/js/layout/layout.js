@@ -242,9 +242,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   /**
-   * Register commands for the editor component.
+   * Keyboard shortcuts for editor tabs, for all variants of the app.
    *
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorComponent} editorComponent
    */
   registerEditorCommands(editorComponent) {
     editorComponent.addCommands([
@@ -344,24 +344,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
     editorComponent.addEventListener('focus', () => this.onEditorFocus(editorComponent));
     editorComponent.addEventListener('destroy', () => this.onTabDestroy());
-
-    // Seems redundant
-    // editorComponent.addCommands([
-    //   {
-    //     name: 'new-file',
-    //     bindKey: {win: 'Ctrl-N', mac: 'Ctrl-N'},
-    //     exec: () => {
-    //       fileTreeManager.createFile();
-    //     }
-    //   },
-    //   {
-    //     name: 'new-folder',
-    //     bindKey: {win: 'Ctrl-Shift-N', mac: 'Ctrl-Shift-N'},
-    //     exec: () => {
-    //       fileTreeManager.createFolder();
-    //     }
-    //   },
-    // ])
   }
 
   /**

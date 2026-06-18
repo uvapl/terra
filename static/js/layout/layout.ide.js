@@ -81,8 +81,26 @@ export default class IDELayout extends Layout {
     }
   }
 
+  /**
+   * Keyboard shortcuts for editor tabs specific to the IDE.
+   *
+   * @param {*} editorComponent
+   */
   registerEditorCommands(editorComponent) {
     super.registerEditorCommands(editorComponent);
+    editorComponent.addCommands([
+      {
+        name: 'save',
+        bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
+        exec: () => this.dispatchEvent(new CustomEvent('saveFile')),
+      },
+      {
+        name: 'closeFile',
+        bindKey: 'Ctrl+W',
+        exec: () => this.closeFile(),
+        readOnly: true,
+      },
+    ])
     editorComponent.onCommandExec((event) => this._validateFileSizeLimit(event, editorComponent));
   }
 
