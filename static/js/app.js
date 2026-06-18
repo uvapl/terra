@@ -3,7 +3,6 @@ import { FileNotFoundError, FileTooLargeError } from './fs/vfs.js';
 import BaseApp from './app.base.js';
 import { triggerPluginEvent } from './plugin-manager.js';
 import { MAX_FILE_SIZE } from './constants.js';
-import { KeymapScope, matchKeyBinding } from './keymap.js';
 
 /**
  * Base class that is extended for each of the apps.
@@ -82,61 +81,17 @@ export default class App extends BaseApp {
 
   // ───────────────────────── Terminal key handlers ───────────────────────
 
-  /**
-   * Handle the terminal-level keyboard shortcuts. Attached to xterm by the
-   * terminal component, but the behaviour lives here because it is an app/layout
-   * concern. The key→action mapping lives in keymap.js (the TERMINAL scope);
-   * this looks up the matching binding and invokes the named action method
-   * below. Clearing the terminal (cmd/ctrl-k) is handled globally in the menubar
-   * so it works regardless of focus.
-   *
-   * @param {KeyboardEvent} event - The keyboard event from xterm.
-   * @returns {boolean|undefined} false to stop xterm from processing the key.
-   */
-  handleTerminalKeyEvent(event) {
-    if (event.type !== 'keydown') return;
-    const binding = matchKeyBinding(KeymapScope.TERMINAL, event);
-    if (!binding) return;
-
-    this[binding.action](event);
-    return binding.preventDefault ? false : undefined;
-  }
-
-  /**
-   * Stop the program currently running (ctrl-c). A no-op when nothing is
-   * running, so the key falls through to xterm (e.g. for copy). Also invoked
-   * directly by the menubar's "kill process" action.
-   */
-  handleControlC() {
+  /** Stop the program currently running. A no-op when nothing is running. */
+  terminateWorker() {
     if (this.langWorkerClient.isRunningCode) {
       this.stopRunningProgramManually();
     }
   }
 
-  /** Increase the font size by one step (ctrl-=). */
-  zoomIn() {
-    this.layout.increaseFontSize();
-  }
-
-  /** Decrease the font size by one step (ctrl--). */
-  zoomOut() {
-    this.layout.decreaseFontSize();
-  }
-
-  /** Reset the font size to the default (ctrl-0). */
-  resetZoom() {
-    this.layout.setFontSizeDefault();
-  }
-
-  /** Set the font size to the larger "demo" size (ctrl-9). */
-  zoomDemo() {
-    this.layout.setFontSizeDemo();
-  }
-
   /**
-   * Clear the terminal at the user's request (ctrl-k, the trash button, the
-   * menu item) and notify plugins, so e.g. the shell can render a fresh prompt.
-   * Pre-run clears use term.clear() directly and deliberately do not notify.
+   * Clear the terminal at the user's request and notify plugins, so e.g. the
+   * shell can render a fresh prompt. Pre-run clears use term.clear() directly
+   * and deliberately do not notify.
    */
   clearTerminal() {
     this.term?.clear();
@@ -144,9 +99,9 @@ export default class App extends BaseApp {
   }
 
   /**
-   * Toggle keyboard focus between the active editor and the terminal (ctrl-`,
-   * the menu item). If the terminal currently holds focus, move to the editor,
-   * otherwise move to the terminal.
+   * Toggle keyboard focus between the active editor and the terminal. If the
+   * terminal currently holds focus, move to the editor, otherwise move to the
+   * terminal.
    */
   toggleEditorTerminalFocus() {
     if (this.term?.hasFocus()) {
@@ -154,6 +109,28 @@ export default class App extends BaseApp {
     } else {
       this.term?.focus();
     }
+  }
+
+  // ───────────────────── View handlers ────────────────────
+
+  /** Increase the font size by one step. */
+  zoomIn() {
+    this.layout.increaseFontSize();
+  }
+
+  /** Decrease the font size by one step. */
+  zoomOut() {
+    this.layout.decreaseFontSize();
+  }
+
+  /** Reset the font size to the default. */
+  resetZoom() {
+    this.layout.setFontSizeDefault();
+  }
+
+  /** Set the font size to the larger "demo" size. */
+  zoomDemo() {
+    this.layout.setFontSizeDemo();
   }
 
   // ───────────────────── Run-button / layout handlers ────────────────────
@@ -402,7 +379,6 @@ export default class App extends BaseApp {
     // terminal and start program output on a fresh line).
     triggerPluginEvent('onRunStart');
 
-    // Focus the terminal, such that the user can immediately invoke ctrl+c.
     this.term.focus();
 
     $('.run-user-code-btn, .config-btn').prop('disabled', true);

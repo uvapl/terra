@@ -2,6 +2,7 @@ import App from './app.js';
 import IDELayout from './layout/layout.ide.js';
 import { getFileExtension, isValidFilename } from './lib/helpers.js';
 import { getPlugin } from './plugin-manager.js';
+import { removeLocalStorageItem } from './lib/local-storage-manager.js';
 import * as LFS from './fs/lfs.js';
 import { useFileTree } from './concerns/file-tree.js';
 import { useStorageCoordinator } from './concerns/storage.js';
@@ -68,6 +69,18 @@ export default class IDEApp extends App {
   }
 
   /**
+   * Close the currently open project, whichever storage backend it uses (Git or
+   * LFS), reverting to browser temporary storage. Invoked by the "Close Project"
+   * menu item.
+   */
+  async closeProject() {
+    removeLocalStorageItem('git-repo');
+    await this.closeGitFS();
+    await this.closeLFSFolder();
+    this.layout.setProjectMenuState({ closeProjectEnabled: false });
+  }
+
+  /**
    * Reset the layout to its initial state. The layout owns the destroy/recreate
    * lifecycle (see IDELayout.recreate); here we only supply how to build the
    * replacement and how to re-wire it to the app afterwards.
@@ -125,7 +138,7 @@ export default class IDEApp extends App {
    *
    * @param {boolean} [forceDefaultLayout=false] Whether to force the default layout.
    * @param {Array} [contentConfig=[]] The content configuration for the layout.
-   * @returns {Layout} The layout instance.
+   * @returns {IDELayout} The layout instance.
    */
   createLayout(forceDefaultLayout = false, contentConfig = []) {
     const layout = new IDELayout(forceDefaultLayout, contentConfig);

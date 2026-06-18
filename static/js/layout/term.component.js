@@ -71,20 +71,9 @@ export default class TerminalComponent {
     '\r',     // Enter
   ]
 
-  /**
-   * Injected handler for terminal-level key shortcuts (ctrl-c, ctrl-k, font
-   * size). The component only wires it to xterm; the behaviour lives in the
-   * app. Receives the KeyboardEvent and returns false to stop xterm from
-   * processing the key. Defaults to a no-op.
-   * @type {function}
-   */
-  onKeyEvent = () => {};
-
-  constructor(container, state, { onKeyEvent } = {}) {
+  constructor(container, state) {
     this.container = container;
     this.state = state;
-
-    if (onKeyEvent) this.onKeyEvent = onKeyEvent;
 
     this.init();
   }
@@ -203,10 +192,6 @@ export default class TerminalComponent {
     this.terminalInstance.loadAddon(this.fitAddon);
     this.terminalInstance.open(this.container.getElement()[0]);
     this.fitAddon.fit();
-
-    // Attach the key handler here (xterm wiring), but let the injected handler
-    // decide what the terminal-level shortcuts (ctrl-c, ctrl-k, font size) do.
-    this.terminalInstance._core._customKeyEventHandler = (event) => this.onKeyEvent(event);
 
     // A single, persistent input pipeline: every keystroke and paste is routed
     // to whoever currently owns input (see acquireInput/releaseInput). When

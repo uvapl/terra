@@ -43,6 +43,8 @@ export function useLFS(app) {
      * To be called from menu by user.
      */
     async openLFSFolder() {
+      if (!LFS.available()) return;
+
       let rootFolderHandle = await LFS.choose();
       if (!rootFolderHandle) return;
 
@@ -62,6 +64,9 @@ export function useLFS(app) {
 
       // Render the LFS contents.
       await this.refreshFileTree();
+
+      this.fileTree.clearMessage();
+      this.layout.setProjectMenuState({ closeProjectEnabled: true });
     },
 
     /**

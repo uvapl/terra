@@ -15,6 +15,7 @@ import {
   getLocalStorageItem
 } from '../lib/local-storage-manager.js';
 import Terra from '../terra.js';
+import commands from '../commands.js';
 
 /**
  * Current version of the default layout config. Increase if breaking changes
@@ -110,13 +111,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   term = null;
 
   /**
-   * Handler for terminal-level key shortcuts, provided by the app and injected
-   * into the terminal component. Null until the app sets it.
-   * @type {?function}
-   */
-  onTerminalKey = null;
-
-  /**
    * Default terminal startup message.
    * Each element in the array is written on a separate line.
    * @type {array}
@@ -197,14 +191,10 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     this.registerComponent('image', ImageComponent);
     this.registerComponent('editor', EditorComponent);
 
-    // Inject the terminal key handler (set by the app) so the component never
-    // reaches out to the app itself. A plain function is used (not an arrow) so
-    // GoldenLayout can `new` it; returning an object makes `new` yield it.
-    const layout = this;
+    // A plain function is used (not an arrow) so GoldenLayout can `new` it;
+    // returning an object makes `new` yield it.
     this.registerComponent('terminal', function (container, state) {
-      return new TerminalComponent(container, state, {
-        onKeyEvent: (event) => layout.onTerminalKey?.(event),
-      });
+      return new TerminalComponent(container, state);
     });
 
     $(window).on('resize', () => {
@@ -247,13 +237,8 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @param {EditorComponent} editorComponent
    */
   registerEditorCommands(editorComponent) {
-    editorComponent.addCommands([
-      {
-        name: 'run',
-        bindKey: { win: 'Ctrl+Enter', mac: 'Command+Enter' },
-        exec: () => this.onRunCodeButtonClick(),
-      },
-    ]);
+    // Apply editor-scope commands declared in the registry (core + plugins).
+    commands.registerEditorCommands(editorComponent);
   }
 
   /**

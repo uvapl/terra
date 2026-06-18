@@ -144,10 +144,6 @@ export default class BaseApp {
   registerLayoutEvents() {
     this.layout.addEventListener('runCode', this.onRunCode);
 
-    // Provide the terminal-level key handler to the layout, which injects it
-    // into the terminal component (so the component does not reach the app).
-    this.layout.onTerminalKey = this.handleTerminalKeyEvent;
-
     // Listen for editor events being emitted.
     const editorEvents = [
       'onEditorEditingStarted',

@@ -88,19 +88,9 @@ export default class IDELayout extends Layout {
    */
   registerEditorCommands(editorComponent) {
     super.registerEditorCommands(editorComponent);
-    editorComponent.addCommands([
-      {
-        name: 'save',
-        bindKey: { win: 'Ctrl+S', mac: 'Command+S' },
-        exec: () => this.dispatchEvent(new CustomEvent('saveFile')),
-      },
-      {
-        name: 'closeFile',
-        bindKey: 'Ctrl+W',
-        exec: () => this.closeFile(),
-        readOnly: true,
-      },
-    ])
+    // 'save' (mod-s) and 'closeFile' (option-w) are now global commands in the
+    // registry (commands.ide.js), so they fire from the terminal too and are
+    // not registered as editor-scope Ace commands here.
     editorComponent.onCommandExec((event) => this._validateFileSizeLimit(event, editorComponent));
   }
 
@@ -198,7 +188,6 @@ export default class IDELayout extends Layout {
 
   /**
    * Prompt the user with a modal for a filename and in which folder to save it.
-   * This function gets triggered on each 'save' keystroke, i.e. <cmd/ctrl + s>.
    *
    * @param {object} options - The save modal options.
    * @param {string} options.filename - The filename to prefill in the input.
