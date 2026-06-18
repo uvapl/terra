@@ -271,13 +271,7 @@ export default class GitFS {
       }
 
       case 'fetch-branches-success':
-        // Import the renderGitRepoBranches dynamically, because if we put this
-        // at the top then the menubar.js will also be loaded for the Exam and
-        // Embed application, which is something we do not want.
-        import('../ide/menubar.js').then((module) => {
-          const { renderGitRepoBranches } = module;
-          renderGitRepoBranches(payload.branches);
-        });
+        Terra.app.renderGitRepoBranches(payload.branches);
         break;
 
       case 'clone-success':

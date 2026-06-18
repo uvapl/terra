@@ -141,6 +141,26 @@ export default class EditorComponent extends TabComponent {
     }
   }
 
+  /** Copy the editor's selection to the system clipboard. */
+  copyToClipboard = () => {
+    if (!this.editor.selection.isEmpty()) {
+      navigator.clipboard.writeText(this.editor.getSelectedText());
+    }
+  }
+
+  /** Copy the editor's selection, then delete it. */
+  cutToClipboard = () => {
+    this.copyToClipboard();
+    this.editor.insert('');
+  }
+
+  /** Insert the clipboard contents at the editor's cursor. */
+  pasteFromClipboard = () => {
+    navigator.clipboard.readText().then((text) => {
+      this.editor.insert(text);
+    });
+  }
+
   /**
    * Callback when the editor content changes, triggered each keystroke.
    */
