@@ -108,7 +108,7 @@ export function useGit(app) {
       }
 
       if (accessToken && repoLink) {
-        this.layout.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
+        this.view.lockEditors();
 
         const gitfs = new GitFS(this.vfs, repoLink);
         this.gitfs = gitfs;

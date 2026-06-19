@@ -279,7 +279,7 @@ function installGlobalKeyboard() {
 }
 
 function _activeEditor() {
-  return Terra.app && Terra.app.getActiveEditor ? Terra.app.getActiveEditor() : null;
+  return Terra.app?.view?.getActiveEditor?.() ?? null;
 }
 
 function _onGlobalKeydown(event) {

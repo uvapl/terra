@@ -56,7 +56,7 @@ export default class EmbedApp extends App {
     const proglang = getFileExtension(queryParams.filename);
 
     // The embed controller reads persisted state and builds the embed layout.
-    const layout = new EmbedController({
+    this.view = new EmbedController({
       delegate: this,
       tabs,
       proglang,
@@ -64,15 +64,10 @@ export default class EmbedApp extends App {
     });
 
     $('body').addClass(isVertical ? 'vertical' : 'horizontal');
-
-    // Make layout instance available at all times.
-    this.layout = layout;
-
-    return layout;
   }
 
   /**
    * Nothing to do in the post setup.
    */
-  postSetupLayout() { }
+  afterSetupLayout() { }
 }

@@ -258,33 +258,6 @@ export default class IDELayout extends Layout {
   }
 
   /**
-   * Destroy this layout and replace it with a fresh instance that preserves the
-   * currently open tabs. The caller supplies a factory that builds the
-   * replacement from the preserved content config, and an `afterRecreate` hook
-   * (invoked before init) to re-wire app-level listeners onto the new instance.
-   *
-   * @param {(contentConfig: Array) => IDELayout} createReplacement - Factory
-   * that builds the replacement layout from the preserved tab config.
-   * @param {(next: IDELayout) => void} afterRecreate - Hook to wire up the new
-   * instance (e.g. reassign the app's layout reference and register listeners)
-   * before it is initialised.
-   * @returns {IDELayout} The new layout instance.
-   */
-  recreate(createReplacement, afterRecreate) {
-    const contentConfig = this.serializeTabs();
-
-    this.resetLayout = true;
-    this.destroy();
-
-    const next = createReplacement(contentConfig);
-    afterRecreate(next);
-    next.init();
-    next.resetLayout = false;
-
-    return next;
-  }
-
-  /**
    * Close a tab by its file path, or the active tab when no path is given.
    *
    * @param {string} [filepath] - The absolute file path of the tab to close.

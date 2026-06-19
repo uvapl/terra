@@ -28,12 +28,6 @@ import { notify, notifyError } from './components/notifications.js';
 
 export default class ExamApp extends App {
   /**
-   * Reference to the exam layout instance.
-   * @type {ExamLayout}
-   */
-  layout = null;
-
-  /**
    * Contains a reference to the exam config.
    * @type {object}
    */
@@ -55,7 +49,7 @@ export default class ExamApp extends App {
       isNewExam = await this.loadConfig();
     } catch (err) {
       // Remove the right navbar when the application failed to initialise.
-      ExamLayout.removeNavbar();
+      ExamController.removeNavbar();
       throw err;
     }
 
@@ -82,7 +76,7 @@ export default class ExamApp extends App {
     }
 
     // The exam controller reads persisted state and builds the exam layout.
-    this.layout = new ExamController({
+    this.view = new ExamController({
       delegate: this,
       tabs: this.config.tabs,
       hiddenFiles: this.config.hidden_tabs,
@@ -92,13 +86,13 @@ export default class ExamApp extends App {
     });
   }
 
-  postSetupLayout() {
+  afterSetupLayout() {
     // The previous session may have ended with changes the server never
     // received; in that case start with the changed flag raised so the
     // content is saved again.
     this.editorContentChanged = getLocalStorageItem('editor-content-changed', false);
 
-    this.layout.setPageTitle(this.config.course_name, this.config.exam_name);
+    this.view.setPageTitle(this.config.course_name, this.config.exam_name);
 
     // Register the auto-save after a certain auto-save offset time to prevent
     // the server receives many requests at once. This helps to spread them out
@@ -115,7 +109,7 @@ export default class ExamApp extends App {
 
     // Make the right navbar visible and add the click event listener to the
     // submit button.
-    this.layout.showNavbar(this.onSubmitButtonClicked);
+    this.view.showNavbar(this.onSubmitButtonClicked);
 
     // Immediately lock everything if this exam is configured as being locked.
     if (this.config.locked === true) {
@@ -239,7 +233,7 @@ export default class ExamApp extends App {
     this.terminateLangWorker();
 
     // Make the entire UI read-only.
-    this.layout.showLockedState({ prevAutoSaveTime: this.prevAutoSaveTime });
+    this.view.showLockedState({ prevAutoSaveTime: this.prevAutoSaveTime });
   }
 
   /**
@@ -320,7 +314,7 @@ export default class ExamApp extends App {
       notify(`Last save at ${autoSaveTime}`);
       this.prevAutoSaveTime = currDate;
 
-      this.layout.setSubmitModalSuccess({ evalLink: this.config.eval_link });
+      this.view.setSubmitModalSuccess({ evalLink: this.config.eval_link });
     }
   }
 
@@ -340,7 +334,7 @@ export default class ExamApp extends App {
     // Go through each tab and create a Blob with the file contents of that tab
     // and append it to the form data.
     await Promise.all(
-      this.layout.getEditorComponents().map(async (editorComponent) => {
+      this.view.getEditorComponents().map(async (editorComponent) => {
         const filename = editorComponent.getFilename();
         const filepath = editorComponent.getPath();
         const content = await this.vfs.readFile(filepath);
@@ -356,7 +350,7 @@ export default class ExamApp extends App {
    * Show the submit exam modal and do one final submit of all the contents.
    */
   onSubmitButtonClicked() {
-    this.layout.showSubmitExamModal({ prevAutoSaveTime: this.prevAutoSaveTime });
+    this.view.showSubmitExamModal({ prevAutoSaveTime: this.prevAutoSaveTime });
 
     // Wait for the modal to be shown and then execute the code.
     // interval = 300ms for the opening transition to be completed.
@@ -383,12 +377,12 @@ export default class ExamApp extends App {
    * @returns {array<object<string,string>>} List of (hidden) file objects.
    */
   getHiddenFiles() {
-    const hiddenFileKeys = Object.keys(this.layout.hiddenFiles);
+    const hiddenFileKeys = Object.keys(this.view.hiddenFiles);
     if (hiddenFileKeys.length > 0) {
       return hiddenFileKeys.map((filename) => ({
         path: filename,
         name: filename,
-        content: this.layout.hiddenFiles[filename],
+        content: this.view.hiddenFiles[filename],
       }));
     }
 

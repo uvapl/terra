@@ -66,7 +66,7 @@ export function useLFS(app) {
       await this.refreshFileTree();
 
       this.fileTree.clearMessage();
-      this.layout.setProjectMenuState({ closeProjectEnabled: true });
+      this.view.setProjectMenuState({ closeProjectEnabled: true });
     },
 
     /**
@@ -88,7 +88,7 @@ export function useLFS(app) {
 
       await this.vfs.connect(null, 'ide');
       LFS.close();
-      this.layout.setProjectMenuState({ closeProjectEnabled: false });
+      this.view.setProjectMenuState({ closeProjectEnabled: false });
     },
   });
 

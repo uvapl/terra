@@ -8,4 +8,8 @@ export default class LabController extends BaseController {
   buildLayout(options) {
     return new LabLayout(options);
   }
+
+  setPageTitle(config) {
+    this.layout.setPageTitle(config);
+  }
 }

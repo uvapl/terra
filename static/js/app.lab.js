@@ -15,12 +15,6 @@ import { getLocalStorageItem } from './lib/local-storage-manager.js';
 
 export default class LabApp extends App {
   /**
-   * Reference to the lab layout instance.
-   * @type {LabLayout}
-   */
-  layout = null;
-
-  /**
    * Contains a reference to the lab config.
    * @type {object}
    */
@@ -83,7 +77,7 @@ export default class LabApp extends App {
     // Get the programming language based on the first filename.
     const proglang = getFileExtension(config.files[0]);
 
-    this.layout = new LabController({
+    this.view = new LabController({
       delegate: this,
       files: config.files,
       proglang,
@@ -91,8 +85,8 @@ export default class LabApp extends App {
     });
   }
 
-  postSetupLayout() {
-    this.layout.setPageTitle(this.config);
+  afterSetupLayout() {
+    this.view.setPageTitle(this.config);
 
     loadReadme(this.config, $('#readme'));
   }

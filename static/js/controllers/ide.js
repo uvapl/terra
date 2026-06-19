@@ -10,6 +10,54 @@ export default class IDEController extends BaseController {
   }
 
   /**
+   * Reset the layout: snapshot the open tabs, destroy the current layout and
+   * build a fresh default one that re-opens those tabs. The controller instance
+   * persists; only its `this.layout` is swapped. The caller is responsible for
+   * (re)initialising the new layout via `this.layout.init()`.
+   *
+   * @returns {IDELayout} The replacement layout.
+   */
+  recreate() {
+    this.setFontSizeDefault();
+    const contentConfig = this.layout.serializeTabs();
+
+    // Prevent the dying layout from auto-inserting an Untitled tab as its tabs
+    // are torn down.
+    this.layout.resetLayout = true;
+    this.layout.destroy();
+
+    this.createLayout({ forceDefaultLayout: true, contentConfig });
+
+    // The next init() is a reset: tell onReady() to fire afterLayoutReset.
+    this._pendingReset = true;
+
+    // return this.layout;
+    this.init();
+  }
+
+  // ── Layout API (IDE-specific) ──
+
+  setProjectMenuState(state) {
+    this.layout.setProjectMenuState(state);
+  }
+
+  showSaveFileModal(options) {
+    this.layout.showSaveFileModal(options);
+  }
+
+  closeFile(filepath) {
+    this.layout.closeFile(filepath);
+  }
+
+  closeAllTabs() {
+    this.layout.closeAllTabs();
+  }
+
+  closeFilesFromFolder(path) {
+    this.layout.closeFilesFromFolder(path);
+  }
+
+  /**
    * Strip editor contents before persisting: the IDE reloads file contents from
    * the VFS on restore, so only pathless (Untitled) tabs need to keep their
    * value.

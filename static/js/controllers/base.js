@@ -23,8 +23,10 @@ const LAYOUT_CONFIG_VERSION = 3;
  * never touches local storage; at runtime it reads/writes settings back through
  * the controller via `this.delegate`.
  *
- * Members the controller does not implement are forwarded to the wrapped layout
- * through a Proxy, so the app can still reach layout methods via `this.layout`.
+ * The controller exposes the layout as `controller.layout`. The app calls the
+ * layout directly for view/tab operations, and the controller only for its own
+ * concerns: run-button state (onRunEnded / checkForStopCodeButton), persistence,
+ * and recreate(). The layout calls back into the controller via `this.delegate`.
  */
 export default class BaseController {
   /**
@@ -37,7 +39,20 @@ export default class BaseController {
    */
   constructor({ delegate, ...layoutOptions }) {
     this.delegate = delegate;
+    this.createLayout(layoutOptions);
+  }
 
+  /**
+   * Build the layout, wire it to this controller, and expose it as
+   * `this.layout`. The app reads `controller.layout` and calls the layout
+   * directly for view/tab operations; it only goes through the controller for
+   * the controller's own concerns (run-button state, persistence, recreate).
+   * Reused by recreate() to swap in a fresh layout.
+   *
+   * @param {object} layoutOptions - Variant options passed to buildLayout(),
+   * augmented with the resolved persisted state.
+   */
+  createLayout(layoutOptions) {
     // Resolve persisted state up front so the layout can receive it as plain
     // constructor parameters (it never reads storage itself).
     const restoredConfig = this.resolveRestoredConfig(layoutOptions.forceDefaultLayout);
@@ -49,29 +64,9 @@ export default class BaseController {
       restoredConfig,
     });
 
-    // Members not defined on the controller resolve on the wrapped layout.
-    // Subclass methods take precedence (they live on the proxied target's
-    // prototype chain, so `prop in target` finds them first).
-    const controller = new Proxy(this, {
-      get(target, prop, receiver) {
-        if (prop in target) {
-          return Reflect.get(target, prop, receiver);
-        }
-        const value = target.layout[prop];
-        return typeof value === 'function' ? value.bind(target.layout) : value;
-      },
-      set(target, prop, value, receiver) {
-        if (prop in target) {
-          return Reflect.set(target, prop, value, receiver);
-        }
-        target.layout[prop] = value;
-        return true;
-      },
-    });
-
-    // The layout reports user-driven events to its controller, which forwards
-    // them to the app delegate.
-    this.layout.delegate = controller;
+    // The layout reports user-driven events back to this controller (which
+    // forwards them to the app delegate) and reads/writes settings through it.
+    this.layout.delegate = this;
 
     // The controller owns layout persistence: whenever GoldenLayout reports a
     // structural change, store the (possibly transformed) config.
@@ -81,7 +76,7 @@ export default class BaseController {
       }
     });
 
-    return controller;
+    return this.layout;
   }
 
   /**
@@ -122,12 +117,107 @@ export default class BaseController {
     return JSON.parse(storedConfig);
   }
 
+  // ── Layout API exposed to the app ──
+  // The app talks only to the controller; these thin wrappers forward to the
+  // layout (which keeps the DOM and GoldenLayout-internal implementations).
+
+  /** Render the layout (GoldenLayout init). */
+  init() {
+    this.layout.init();
+  }
+
+  /** @returns {?TerminalComponent} The terminal component, or null. */
+  get term() {
+    return this.layout?.term ?? null;
+  }
+
+  getActiveEditor() {
+    return this.layout.getActiveEditor();
+  }
+
+  getTabComponents() {
+    return this.layout.getTabComponents();
+  }
+
+  getEditorComponents() {
+    return this.layout.getEditorComponents();
+  }
+
+  addFileTab(filepath) {
+    this.layout.addFileTab(filepath);
+  }
+
+  repointTab(tabComponent, filepath, proglang) {
+    return this.layout.repointTab(tabComponent, filepath, proglang);
+  }
+
+  repointTabByPath(srcPath, destPath, proglang) {
+    return this.layout.repointTabByPath(srcPath, destPath, proglang);
+  }
+
+  emitToAllComponents(event, data) {
+    this.layout.emitToAllComponents(event, data);
+  }
+
+  increaseFontSize() {
+    this.layout.increaseFontSize();
+  }
+
+  decreaseFontSize() {
+    this.layout.decreaseFontSize();
+  }
+
+  setFontSizeDefault() {
+    this.layout.setFontSizeDefault();
+  }
+
+  setFontSizeDemo() {
+    this.layout.setFontSizeDemo();
+  }
+
+  refresh() {
+    this.layout.refresh();
+  }
+
+  /**
+   * Lock all open editors (read-only). Called by the Git backend while a
+   * clone/connect is in flight, so the storage layer never reaches into the
+   * view directly.
+   */
+  lockEditors() {
+    this.view.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
+  }
+
+  /**
+   * Unlock all open editors. Called by the Git backend after a clone/pull so
+   * the storage layer never reaches into the view directly.
+   */
+  unlockEditors() {
+    this.view.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
+  }
+
   // ── Delegate callbacks reported by the layout, forwarded to the app ──
   // These replace the old layout EventTarget bus. The app implements whichever
   // it cares about; optional chaining skips the rest.
 
+  /**
+   * Reported by the layout once it has rendered (every init, including after a
+   * reset). Dispatches the lifecycle hooks to the app: `onReady` every time,
+   * `afterSetupLayout` once (initial build only), and `afterLayoutReset` after a
+   * recreate. This replaces the app's old `layout.on('initialised', …)` wiring.
+   */
   onReady() {
     this.delegate.onReady?.();
+
+    if (!this._afterSetupDone) {
+      this._afterSetupDone = true;
+      this.delegate.afterSetupLayout?.();
+    }
+
+    if (this._pendingReset) {
+      this._pendingReset = false;
+      this.delegate.afterLayoutReset?.();
+    }
   }
 
   onRunCode(detail) {

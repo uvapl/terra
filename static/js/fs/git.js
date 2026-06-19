@@ -279,7 +279,7 @@ export default class GitFS {
         Terra.app.fileTree.clearLocalStorageWarning();
 
         this.importToVFS(payload.repoContents).then(() => {
-          Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
+          Terra.app.view.unlockEditors();
           Terra.app.rebuildFileTree();
         });
         break;
@@ -349,6 +349,6 @@ export default class GitFS {
     }
 
     // Trigger a vfsChanged event, such that all editors reload their content.
-    Terra.app.layout.emitToAllComponents('vfsChanged');
+    Terra.app.reloadComponentsFromVFS();
   }
 }
