@@ -1,9 +1,9 @@
-import './ide/commands.ide.js';
+import './app.ide.commands.js';
 
 import IDEApp from './app.ide.js';
 import Terra from './terra.js';
 import commands from './commands.js';
-import { initMenubar } from './layout/menubar.js';
+import { initMenubar } from './components/menubar.js';
 import { loadPlugins } from './plugin-manager.js';
 
 const plugins = [

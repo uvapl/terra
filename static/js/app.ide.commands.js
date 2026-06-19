@@ -17,8 +17,8 @@
 // changes (e.g. 110 -> 200), reproducing the old manual separators.
 ////////////////////////////////////////////////////////////////////////////////
 
-import commands from '../commands.js';
-import Terra from '../terra.js';
+import commands from './commands.js';
+import Terra from './terra.js';
 
 // The editor of the currently active tab, resolved at call time.
 const editor = () => Terra.app.getActiveEditor();
@@ -186,7 +186,7 @@ commands.addCommands([
   // Global, no menu entry -----------------------------------------------------
   {
     name: 'save', scope: 'global', bindKey: 'mod-s',
-    exec: () => Terra.app.layout.dispatchEvent(new CustomEvent('saveFile')),
+    exec: () => Terra.app.saveFile(),
   },
 ]);
 

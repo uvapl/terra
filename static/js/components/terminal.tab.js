@@ -3,7 +3,7 @@ import { BASE_FONT_SIZE } from '../constants.js';
 /**
  * Terminal component for GoldenLayout.
  */
-export default class TerminalComponent {
+export default class TerminalTab {
   /**
    * An addon for xterm.js that enables fitting the terminal's dimensions to a
    * containing element. This addon requires xterm.js v4+.

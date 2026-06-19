@@ -9,7 +9,7 @@ import {
   loadStoredConfig,
 } from './app.lab.config.js';
 import { getFileExtension } from './lib/helpers.js';
-import LabLayout from './layout/layout.lab.js';
+import LabController from './controllers/lab.js';
 import { loadReadme } from './app.lab.readme.js';
 import { getLocalStorageItem } from './lib/local-storage-manager.js';
 
@@ -83,7 +83,9 @@ export default class LabApp extends App {
     // Get the programming language based on the first filename.
     const proglang = getFileExtension(config.files[0]);
 
-    this.layout = new LabLayout(config.files, {
+    this.layout = new LabController({
+      delegate: this,
+      files: config.files,
       proglang,
       forceDefaultLayout: this.isNewLab,
     });

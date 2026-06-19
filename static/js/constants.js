@@ -43,3 +43,6 @@ export const MODAL_ANIM_DURATION = 300;
 
 // The maximum file size in bytes allowed for files.
 export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+// Allowed URLs for git connections in the IDE.
+export const GITHUB_URL_PATTERN = /^https:\/\/github.com\/([\w-]+)\/([\w-]+)(?:\.git)?/;

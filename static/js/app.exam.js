@@ -18,13 +18,13 @@ import {
   getRandNumBetween,
   seconds,
 } from './lib/helpers.js';
-import ExamLayout from './layout/layout.exam.js';
+import ExamController from './controllers/exam.js';
 import {
   setLocalStorageItem,
   getLocalStorageItem,
   removeLocalStorageItem,
 } from './lib/local-storage-manager.js';
-import { notify, notifyError } from './layout/notifications.js';
+import { notify, notifyError } from './components/notifications.js';
 
 export default class ExamApp extends App {
   /**
@@ -81,9 +81,10 @@ export default class ExamApp extends App {
       )
     }
 
-    // Initialize the layout.
-    this.layout = new ExamLayout(this.config.tabs, {
-      proglang,
+    // The exam controller reads persisted state and builds the exam layout.
+    this.layout = new ExamController({
+      delegate: this,
+      tabs: this.config.tabs,
       hiddenFiles: this.config.hidden_tabs,
       buttonConfig: this.config.buttons,
       autocomplete: this.config.autocomplete,

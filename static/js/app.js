@@ -27,7 +27,7 @@ export default class App extends BaseApp {
    * called first in child classes before any additional functionality.
    *
    * @async
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    */
   async onEditorTextChanged(editorComponent) {
     const path = editorComponent.getPath();
@@ -40,7 +40,7 @@ export default class App extends BaseApp {
    * This is default functionality and super.onEditorSwitchedTo() must be
    * called first in child classes before any additional functionality.
    *
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    */
   async onEditorSwitchedTo(editorComponent) {
     if (editorComponent.ready) {
@@ -57,7 +57,7 @@ export default class App extends BaseApp {
    * that the VFS content has been changed, which requires to reload the file
    * content from the vfs.
    *
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    */
   async onEditorReloadRequested(editorComponent) {
     if (!this.isFSReloadSuspended()) {
@@ -136,12 +136,13 @@ export default class App extends BaseApp {
   // ───────────────────── Run-button / layout handlers ────────────────────
 
   /**
-   * Callback when the user clicks on the run-code button in the UI.
+   * Delegate callback when the user clicks the run-code button (or triggers run
+   * via a shortcut). Invoked by the controller with the run options directly.
    *
-   * @param {Event} event - The event object.
+   * @param {object} detail - Run options.
+   * @param {boolean} detail.clearTerm - Whether to clear the terminal first.
    */
-  onRunCode(event) {
-    const { clearTerm } = event.detail;
+  onRunCode({ clearTerm }) {
     this.runCode({ clearTerm });
   }
 
@@ -535,7 +536,7 @@ export default class App extends BaseApp {
    * (cursor preservation, undo stack) is delegated to the editor component.
    *
    * @async
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    * @param {object} [options]
    * @param {boolean} [options.clearUndoStack=false] - Whether to clear the undo
    * stack after the content is applied.
@@ -570,7 +571,7 @@ export default class App extends BaseApp {
    * Shared by the editor and image read paths.
    *
    * @param {Error} err - The error thrown by the VFS read.
-   * @param {TabComponent} component - The component to react on (editor/image).
+   * @param {BaseTab} component - The component to react on (editor/image).
    */
   _applyFileReadError(err, component) {
     if (err instanceof FileTooLargeError) {
@@ -587,7 +588,7 @@ export default class App extends BaseApp {
   /**
    * Get all tab components from the layout.
    *
-   * @returns {TabComponent[]} List containing all open tab components.
+   * @returns {BaseTab[]} List containing all open tab components.
    */
   getTabComponents() {
     return this.layout.getTabComponents();

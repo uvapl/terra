@@ -1,11 +1,11 @@
-import { createModal, hideModal, showModal } from '../layout/modal.js';
+import { createModal, hideModal, showModal } from '../components/modal.js';
 import Terra from '../terra.js';
 import {
   setLocalStorageItem,
   getLocalStorageItem,
 } from '../lib/local-storage-manager.js';
 import { isBase64, seconds, slugify, isImageExtension } from '../lib/helpers.js';
-import { GITHUB_URL_PATTERN } from '../ide/constants.js';
+import { GITHUB_URL_PATTERN } from '../constants.js';
 import debounce from '../lib/debouncer.js';
 
 /**

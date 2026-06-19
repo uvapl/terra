@@ -3,25 +3,12 @@ import {
   isImageExtension,
   isObject,
   mergeObjects,
-  eventTargetMixin,
-  seconds,
 } from '../lib/helpers.js';
-import ImageComponent from './image.component.js';
-import EditorComponent from './editor.component.js';
-import TerminalComponent from './term.component.js';
+import ImageTab from '../components/image.tab.js';
+import EditorTab from '../components/editor.tab.js';
+import TerminalTab from '../components/terminal.tab.js';
 import { triggerPluginEvent } from '../plugin-manager.js';
-import {
-  setLocalStorageItem,
-  getLocalStorageItem
-} from '../lib/local-storage-manager.js';
-import Terra from '../terra.js';
 import commands from '../commands.js';
-
-/**
- * Current version of the default layout config. Increase if breaking changes
- * require all users to reload a fresh config.
- */
-const LAYOUT_CONFIG_VERSION = 3;
 
 /**
  * Default layout config that is used when the layout is created for the first
@@ -61,7 +48,7 @@ const DEFAULT_LAYOUT_CONFIG = {
   ]
 };
 
-export default class Layout extends eventTargetMixin(GoldenLayout) {
+export default class Layout extends GoldenLayout {
   /**
    * Whether the layout has been initialised. This is different from the
    * GoldenLayout `this.isInitialised` property, which is true when the layout
@@ -75,14 +62,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * @type {boolean}
    */
   tabsClosable = true;
-
-  /**
-   * Only for the Exam app we will have only one programming language,
-   * which we bind in the layout class, in order to check whether we should
-   * render additional config buttons.
-   * @type {string}
-   */
-  proglang = null;
 
   /**
    * The button config only available in the Exam app.
@@ -141,34 +120,43 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
   /**
    * Reference to the current active tab instance in the layout.
-   * @type {TabComponent}
+   * @type {BaseTab}
    */
   activeTab = null;
 
+  /**
+   * The controller that owns this layout. The layout reports user-driven events
+   * to it (`this.delegate.onX?.()`) and reads/writes persisted settings through
+   * it. Set by the controller right after construction.
+   * @type {?BaseController}
+   */
+  delegate = null;
+
+  /**
+   * The current theme ('light' | 'dark'). Seeded from the controller-supplied
+   * value and kept in sync by setTheme(); the layout never reads it from
+   * storage itself.
+   * @type {string}
+   */
+  theme = 'light';
+
+  /**
+   * @param {object} additionalLayoutConfig - The variant's default layout config,
+   * merged onto DEFAULT_LAYOUT_CONFIG when starting fresh.
+   * @param {object} options - Controller-supplied options. The controller
+   * resolves persisted state and passes it in here.
+   * @param {?object} [options.restoredConfig] - The stored GoldenLayout config to
+   * restore, or null/undefined to start from the (merged) default.
+   * @param {string} [options.theme] - The persisted theme to apply on render.
+   */
   constructor(additionalLayoutConfig, options = {}) {
-    let layoutConfig = getLocalStorageItem('layout');
-
-    const layoutConfigVersion = getLocalStorageItem('layout-version');
-    const layoutConfigVersionNumber = parseInt(layoutConfigVersion, 10);
-
-    if (
-      !layoutConfig ||
-      options.forceDefaultLayout ||
-      isNaN(layoutConfigVersionNumber) ||
-      layoutConfigVersionNumber < LAYOUT_CONFIG_VERSION
-    ) {
-      // Load default config.
-      layoutConfig = mergeObjects(DEFAULT_LAYOUT_CONFIG, additionalLayoutConfig);
-      setLocalStorageItem('layout-version', LAYOUT_CONFIG_VERSION)
-    } else {
-      // Load previous config from user's storage.
-      layoutConfig = JSON.parse(layoutConfig);
-    }
+    const layoutConfig = options.restoredConfig
+      || mergeObjects(DEFAULT_LAYOUT_CONFIG, additionalLayoutConfig);
 
     super(layoutConfig, $('#layout'));
 
-    this.proglang = options.proglang;
     this.vertical = options.vertical;
+    this.theme = options.theme || 'light';
 
     if (isObject(options.hiddenFiles)) {
       this.hiddenFiles = options.hiddenFiles;
@@ -178,23 +166,17 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       this.buttonConfig = options.buttonConfig;
     }
 
-    this.on('stateChanged', () => {
-      if (this.isInitialised) {
-        this.onStateChanged();
-      }
-    });
-
     this.on('initialised', () => this.onInitialised(options));
     this.on('stackCreated', (stack) => this.onStackCreated(stack, options));
     this.on('tabCreated', (tab) => this.onTabCreated(tab));
 
-    this.registerComponent('image', ImageComponent);
-    this.registerComponent('editor', EditorComponent);
+    this.registerComponent('image', ImageTab);
+    this.registerComponent('editor', EditorTab);
 
     // A plain function is used (not an arrow) so GoldenLayout can `new` it;
     // returning an object makes `new` yield it.
     this.registerComponent('terminal', function (container, state) {
-      return new TerminalComponent(container, state);
+      return new TerminalTab(container, state);
     });
 
     $(window).on('resize', () => {
@@ -217,7 +199,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    */
   onInitialised(options) {
     this.emitToAllComponents('afterFirstRender');
-    this.setTheme(getLocalStorageItem('theme') || 'light');
+    this.setTheme(this.theme);
     this.renderButtons();
     this.showTermStartupMessage();
     triggerPluginEvent('onLayoutLoaded');
@@ -229,12 +211,17 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     if (this.vertical) {
       this.emitToAllComponents('verticalLayout');
     }
+
+    // The run button now exists; tell the controller the layout is ready so it
+    // (via the app) can spawn the language worker for the active tab and sync
+    // the run button. Replaces the app's old `.on('initialised')` worker hook.
+    this.delegate?.onReady?.();
   }
 
   /**
    * Keyboard shortcuts for editor tabs, for all variants of the app.
    *
-   * @param {EditorComponent} editorComponent
+   * @param {EditorTab} editorComponent
    */
   registerEditorCommands(editorComponent) {
     // Apply editor-scope commands declared in the registry (core + plugins).
@@ -244,7 +231,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   /**
    * Retrieve components from the layout.
    *
-   * @returns {TabComponent[]} List containing all open tab components.
+   * @returns {BaseTab[]} List containing all open tab components.
    */
   getTabComponents() {
     return this.tabs.map((tab) => tab.contentItem.instance);
@@ -253,10 +240,10 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   /**
    * Retrieve all editor components from the layout.
    *
-   * @returns {EditorComponent[]} List containing all open editor tabs' components.
+   * @returns {EditorTab[]} List containing all open editor tabs' components.
    */
   getEditorComponents() {
-    return this.getTabComponents().filter((component) => component instanceof EditorComponent);
+    return this.getTabComponents().filter((component) => component instanceof EditorTab);
   }
 
   /**
@@ -279,19 +266,17 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   onImageTabCreated(tab) {
     const imageComponent = tab.contentItem.instance;
 
-    // Bind event listeners to custom image component events.
-    // key = local editor event name
-    // value = external event name that the app will listen to
+    // Forward custom image component events to the controller delegate.
+    // key = local component event name
+    // value = delegate method the controller forwards to the app
     const events = {
       'show': 'onImageSwitchedTo',
       'vfsChanged': 'onImageReloadRequested',
     }
 
-    for (const [internalEventName, externalEventName] of Object.entries(events)) {
+    for (const [internalEventName, delegateMethod] of Object.entries(events)) {
       imageComponent.addEventListener(internalEventName, () => {
-        this.dispatchEvent(new CustomEvent(externalEventName, {
-          detail: { tabComponent: imageComponent }
-        }));
+        this.delegate?.[delegateMethod]?.(imageComponent);
       });
     }
 
@@ -308,9 +293,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
 
     this.registerEditorCommands(editorComponent);
 
-    // Bind event listeners to custom editor component events.
-    // key = local editor event name
-    // value = external event name that the app will listen to
+    // Forward custom editor component events to the controller delegate.
+    // key = local component event name
+    // value = delegate method the controller forwards to the app
     const events = {
       'startEditing': 'onEditorEditingStarted',
       'stopEditing': 'onEditorEditingStopped',
@@ -319,11 +304,9 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
       'vfsChanged': 'onEditorReloadRequested',
     }
 
-    for (const [internalEventName, externalEventName] of Object.entries(events)) {
+    for (const [internalEventName, delegateMethod] of Object.entries(events)) {
       editorComponent.addEventListener(internalEventName, () => {
-        this.dispatchEvent(new CustomEvent(externalEventName, {
-          detail: { tabComponent: editorComponent }
-        }));
+        this.delegate?.[delegateMethod]?.(editorComponent);
       });
     }
 
@@ -384,7 +367,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   /**
    * Callback when an editor is focused.
    *
-   * @param {EditorComponent} editorComponent
+   * @param {EditorTab} editorComponent
    */
   onEditorFocus(editorComponent) {
     this.setActiveEditor(editorComponent);
@@ -469,7 +452,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * Render the config buttons through the app config.
    */
   renderConfigButtons() {
-    if (this.proglang === 'py' && isObject(this.buttonConfig)) {
+    if (isObject(this.buttonConfig)) {
       Object.keys(this.buttonConfig).forEach((name) => {
         const id = name.replace(/\s/g, '-').toLowerCase();
         const selector = `#${id}`;
@@ -482,7 +465,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
         $(this.buttonContainerSelector)
           .append(`<button id="${id}" class="button config-btn ${id}-btn">${name}</button>`);
 
-        $(selector).click(() => Terra.app.runButtonCommand(selector, cmd));
+        $(selector).click(() => this.delegate?.onConfigButtonCommand?.(selector, cmd));
       });
     }
   }
@@ -497,7 +480,7 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
 
     // Add active state to theme dropdown.
-    const currentTheme = getLocalStorageItem('theme') || 'light';
+    const currentTheme = this.theme;
     const $editorThemeMenu = $('#editor-theme-menu');
     $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
   }
@@ -537,15 +520,6 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   /**
-   * Invoked on any change happening inside the internal GoldenLayout structure.
-   */
-  onStateChanged() {
-    const config = this.toConfig();
-    const state = JSON.stringify(config);
-    setLocalStorageItem('layout', state);
-  }
-
-  /**
    * Callback function when the user selects a new theme, which consequently
    * changes the theme of the layout and all components.
    *
@@ -563,7 +537,8 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
     }
 
     this.emitToAllComponents('themeChanged', theme);
-    setLocalStorageItem('theme', theme);
+    this.theme = theme;
+    this.delegate?.setStoredTheme(theme);
   }
 
   /**
@@ -631,13 +606,13 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   }
 
   getCurrentFontSize() {
-    return parseInt(getLocalStorageItem('font-size', BASE_FONT_SIZE));
+    return this.delegate.getStoredFontSize();
   }
 
   changeFontSize(newSize) {
     newSize = Math.max(8, Math.min(72, newSize));
     this.emitToAllComponents('fontSizeChanged', newSize);
-    setLocalStorageItem('font-size', newSize);
+    this.delegate.setStoredFontSize(newSize);
     const $items = $('#font-size-menu').find('li[data-val]');
     $items.removeClass('active');
     $items.filter(`[data-val="${newSize}"]`).addClass('active');
@@ -696,22 +671,20 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    * Callback when the user clicks the run-code button or pressed ctrl/cmd+enter.
    */
   onRunCodeButtonClick() {
-    this.dispatchEvent(new CustomEvent('runCode', {
-      detail: { clearTerm: false },
-    }));
+    this.delegate?.onRunCode?.({ clearTerm: false });
   }
 
   /**
    * Callback when the user clicks the clear-term button.
    */
   onClearTermButtonClick() {
-    Terra.app.clearTerminal();
+    this.delegate?.onClearTerm?.();
   }
 
   /**
    * Set the active editor component.
    *
-   * @param {EditorComponent} editorComponent - The editor component to set as active.
+   * @param {EditorTab} editorComponent - The editor component to set as active.
    */
   setActiveEditor(editorComponent) {
     this.activeTab = editorComponent;
@@ -720,63 +693,59 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
   /**
    * Get the active editor component.
    *
-   * @returns {EditorComponent} - The active editor component.
+   * @returns {EditorTab} - The active editor component.
    */
   getActiveEditor() {
     return this.activeTab;
   }
 
   /**
-   * Change the run-code button to a stop-code button if the code
-   * does not finish immediately (potentially infinite loop scenario).
+   * Set the run button to 'run' or 'stop' presentation. Mechanical primitive:
+   * the layout owns the button DOM but knows nothing about run lifecycle — the
+   * controller decides when to switch modes.
+   *
+   * @param {'run'|'stop'} mode
    */
-  checkForStopCodeButton() {
-    this.showStopCodeButtonTimeoutId = setTimeout(() => {
-      const $button = $('#run-code');
-      const newText = $button.text().replace('Run', 'Stop');
-      $button.text(newText)
-        .prop('disabled', false)
-        .removeClass('primary-btn')
-        .addClass('danger-btn');
-    }, seconds(0.2));
+  setRunButtonMode(mode) {
+    const $button = $('#run-code');
+    if (mode === 'stop') {
+      $button.text('Stop').removeClass('primary-btn').addClass('danger-btn');
+    } else {
+      $button.text('Run').removeClass('danger-btn').addClass('primary-btn');
+    }
   }
 
   /**
-   * Change the stop-code button back to a run-code button.
+   * Enable or disable the run button.
+   *
+   * @param {boolean} enabled
    */
-  onRunEnded({ disableRunBtn }) {
-    const $button = $('#run-code');
-    const newText = $button.text().replace('Stop', 'Run');
-    $button.text(newText)
-      .prop('disabled', disableRunBtn)
-      .addClass('primary-btn')
-      .removeClass('danger-btn');
+  setRunButtonEnabled(enabled) {
+    $('#run-code').prop('disabled', !enabled);
+  }
 
-    if (!disableRunBtn) {
-      $('.config-btn').prop('disabled', false);
-    }
-
-    if (this.showStopCodeButtonTimeoutId) {
-      clearTimeout(this.showStopCodeButtonTimeoutId);
-      this.showStopCodeButtonTimeoutId = null;
-    }
+  /**
+   * Enable or disable the app-config buttons (Exam/Embed extra run buttons).
+   *
+   * @param {boolean} enabled
+   */
+  setConfigButtonsEnabled(enabled) {
+    $('.config-btn').prop('disabled', !enabled);
   }
 
   /**
    * Re-point an open tab at a new file path: update its path/title, apply the
    * caller-supplied syntax highlighting for editor tabs, and persist the layout
-   * state. The proglang is derived by the caller; it is ignored for non-editor
-   * tabs such as images.
+   * state.
    *
-   * @param {TabComponent} tabComponent - The tab to re-point.
+   * @param {BaseTab} tabComponent - The tab to re-point.
    * @param {string} filepath - The new absolute file path.
-   * @param {string} proglang - The programming language for the editor tab.
    */
-  repointTab(tabComponent, filepath, proglang) {
+  repointTab(tabComponent, filepath) {
     tabComponent.setPath(filepath); // also updates the title + container state
 
-    if (tabComponent instanceof EditorComponent) {
-      tabComponent.setProgLang(proglang);
+    if (tabComponent instanceof EditorTab) {
+      tabComponent.setProgLang();
     }
 
     // GoldenLayout doesn't emit on a programmatic path change; trigger
@@ -790,16 +759,15 @@ export default class Layout extends eventTargetMixin(GoldenLayout) {
    *
    * @param {string} srcPath - The previous absolute file path.
    * @param {string} destPath - The new absolute file path.
-   * @param {string} proglang - The programming language for the editor tab.
-   * @returns {?TabComponent} The repointed tab, or null when no tab matched.
+   * @returns {?BaseTab} The repointed tab, or null when no tab matched.
    */
-  repointTabByPath(srcPath, destPath, proglang) {
+  repointTabByPath(srcPath, destPath) {
     const tabComponent = this.getTabComponents().find(
       (component) => component.getPath() === srcPath
     );
     if (!tabComponent) return null;
 
-    this.repointTab(tabComponent, destPath, proglang);
+    this.repointTab(tabComponent, destPath);
     return tabComponent;
   }
 

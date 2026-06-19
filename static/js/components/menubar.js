@@ -2,7 +2,7 @@
 // Menubar interaction for the IDE app.
 //
 // The menu *structure* is built dynamically by commands.buildMenu() from the
-// registry (see commands.ide.js), and the menu *actions* live with their
+// registry (see app.ide.commands.js), and the menu *actions* live with their
 // respective concerns (the app, the LFS/Git concerns, etc.). This file only
 // owns the open/close interaction for the dynamically built menu.
 ////////////////////////////////////////////////////////////////////////////////

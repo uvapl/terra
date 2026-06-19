@@ -1,6 +1,6 @@
 import { getPartsFromPath } from '../lib/helpers.js';
 
-export default class TabComponent extends EventTarget {
+export default class BaseTab extends EventTarget {
   /**
    * Component container object.
    * @type {GoldenLayout.ItemContainer}

@@ -122,15 +122,6 @@ export function getRandNumBetween(lower, upper) {
 }
 
 /**
- * Check whether the current user OS is Mac.
- *
- * @returns {boolean} True when the system is detected as a Mac-like system.
- */
-export function isMac() {
-  return /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform);
-}
-
-/**
  * Make a url with a given query params object.
  *
  * @param {string} url - The URL where the query params will be appended to.

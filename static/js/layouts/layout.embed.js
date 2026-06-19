@@ -8,15 +8,13 @@ export default class EmbedLayout extends Layout {
   /**
    * Create the layout.
    *
-   * @param {array} content - List of content objects.
-   * @param {number} fontSize - The default font-size to be used.
-   * @param {object} options - Additional options object.
+   * @param {object} options - Controller-supplied options.
+   * @param {object} options.tabs - Map of filename to content for each tab.
+   * @param {number} options.fontSize - The default font-size to be used.
    * @param {boolean} options.vertical - Whether the layout should be vertical.
-   * @param {string} options.proglang - The programming language to be used
    */
-  constructor(tabs, options = {}) {
-    // Get the font-size stored in local storage or use fallback value.
-    const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
+  constructor(options = {}) {
+    const { tabs, fontSize } = options;
 
     // Create the config for each tab.
     const content = Object.keys(tabs).map((filename) => ({
@@ -80,8 +78,6 @@ export default class EmbedLayout extends Layout {
 
 
   onRunCodeButtonClick() {
-    this.dispatchEvent(new CustomEvent('runCode', {
-      detail: { clearTerm: true },
-    }));
+    this.delegate?.onRunCode?.({ clearTerm: true });
   }
 }

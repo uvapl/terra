@@ -51,7 +51,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 import Terra from './terra.js';
-import { isMac } from './lib/helpers.js';
 
 const _commands = new Map(); // name -> command
 const _submenus = new Map(); // 'View/Font size' -> { position, id }
@@ -299,7 +298,7 @@ function _onGlobalKeydown(event) {
  * Only commands with both `bindKey` and `exec` are translated into Ace commands;
  * native aliases (carrying `command`) are already bound by Ace itself.
  *
- * @param {EditorComponent} editorComponent
+ * @param {EditorTab} editorComponent
  */
 function registerEditorCommands(editorComponent) {
   const editorCommands = getCommands()
@@ -468,6 +467,15 @@ function buildMenu(containerSelector) {
     $li.append(renderDropdown(topNode));
     $menubar.append($li);
   }
+}
+
+/**
+ * Check whether the current user OS is Mac.
+ *
+ * @returns {boolean} True when the system is detected as a Mac-like system.
+ */
+function isMac() {
+  return /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform);
 }
 
 // ===========================================================================

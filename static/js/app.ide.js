@@ -1,5 +1,5 @@
 import App from './app.js';
-import IDELayout from './layout/layout.ide.js';
+import IDEController from './controllers/ide.js';
 import { getFileExtension, isValidFilename } from './lib/helpers.js';
 import { getPlugin } from './plugin-manager.js';
 import { removeLocalStorageItem } from './lib/local-storage-manager.js';
@@ -90,11 +90,12 @@ export default class IDEApp extends App {
     this.layout.recreate(
       (contentConfig) => this.createLayout(true, contentConfig),
       (next) => {
-        // Reassign before registerLayoutEvents(), which wires onto this.layout.
-        // postSetupLayout is intentionally not re-bound to 'initialised', as its
-        // side effects should only happen at app init.
+        // The replacement already has its controller delegate wired from
+        // construction (run/editor/ready events included), so only the
+        // reset-specific worker restart is added here. postSetupLayout is
+        // intentionally not re-bound, as its side effects should only happen at
+        // app init.
         this.layout = next;
-        this.registerLayoutEvents();
         next.on('initialised', this._restartActiveWorkerAfterReset);
       },
     );
@@ -118,7 +119,7 @@ export default class IDEApp extends App {
   /**
    * Callback function when the user starts typing.
    *
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    */
   onEditorEditingStarted(editorComponent) {
     this.suspendFSReload();
@@ -127,7 +128,7 @@ export default class IDEApp extends App {
   /**
    * Callback function when the user stops typing.
    *
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    */
   onEditorEditingStopped(editorComponent) {
     this.resumeFSReload();
@@ -138,17 +139,13 @@ export default class IDEApp extends App {
    *
    * @param {boolean} [forceDefaultLayout=false] Whether to force the default layout.
    * @param {Array} [contentConfig=[]] The content configuration for the layout.
-   * @returns {IDELayout} The layout instance.
+   * @returns {IDEController} The controller wrapping the new layout.
    */
   createLayout(forceDefaultLayout = false, contentConfig = []) {
-    const layout = new IDELayout(forceDefaultLayout, contentConfig);
-
-    // Attach listeners here rather than in registerLayoutEvents(), because
-    // resetLayout() replaces the layout instance and the new instance needs
-    // these listeners too.
-    layout.addEventListener('saveFile', () => this.saveFile());
-
-    return layout;
+    // The controller reads persisted state and builds the IDE layout. The app
+    // holds the controller as this.layout and reaches the layout through it. The
+    // save command calls this.saveFile() directly (see app.ide.commands.js).
+    return new IDEController({ delegate: this, forceDefaultLayout, contentConfig });
   }
 
   /**
@@ -235,7 +232,7 @@ export default class IDEApp extends App {
    * tree and point the editor tab at the new file.
    *
    * @async
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    * @param {string} filename - The filename for the new file.
    * @param {string} parentPath - The absolute folder path to save the file in,
    * or an empty string for the root folder.
@@ -258,7 +255,7 @@ export default class IDEApp extends App {
     // Re-point the Untitled tab at the new file (path, title, highlighting,
     // persisted state) and spawn the matching worker.
     const proglang = getFileExtension(filename);
-    this.layout.repointTab(editorComponent, filepath, proglang);
+    this.layout.repointTab(editorComponent, filepath);
     this.createLangWorker(proglang);
 
     return null;

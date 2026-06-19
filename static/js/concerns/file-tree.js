@@ -1,4 +1,4 @@
-import FileTreeComponent from '../layout/file-tree.component.js';
+import FileTreeComponent from '../components/filetree.js';
 import * as LFS from '../fs/lfs.js';
 import { getFileExtension } from '../lib/helpers.js';
 
