@@ -160,6 +160,13 @@
   max-width: 300px;
 }
 
+/* While editing, the title holds an input whose border bleeds into the node's
+ * padding (see `.fancytree-node input`); relax the ellipsis clip so the top and
+ * bottom border aren't cut off. */
+.fancytree-title:has(input) {
+  overflow: visible;
+}
+
 .file-tree-icon {
   display: block;
   width: 16px;
@@ -195,10 +202,23 @@
 }
 
 .fancytree-node input {
+  /* Strip the input's default box contributions so its line box matches the
+   * title text, then add a real editing border. The negative margins pull the
+   * added border + padding out into the node's existing padding (3px vertical,
+   * 5px horizontal), so the frame is visible and the row keeps the same height.
+   * FancyTree sets the input width inline (`adjustWidthOfs: 8` in the edit
+   * config) to leave room for the horizontal padding + border so short names
+   * aren't clipped; `box-sizing: border-box` keeps them inside that width. */
+  box-sizing: border-box;
+  margin: -2px -4px;
+  padding: 1px 3px;
+  border: 1px solid #999;
+  border-radius: var(--border-radius);
   outline: 0;
-  border: 1px dotted var(--color-black);
-  width: 100%;
   font: inherit;
+  line-height: inherit;
+  color: inherit;
+  background: var(--color-white);
 }
 
 /* ==========================================================================
