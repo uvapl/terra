@@ -118,6 +118,7 @@
   margin: 0;
   padding: 0;
   padding-left: var(--file-tree-padding);
+  padding-right: var(--file-tree-padding);
 }
 
 .fancytree-container ul {
@@ -143,7 +144,7 @@
   align-items: center;
 }
 
-.fancytree-node:not(.fancytree-drop-accept):not(.fancytree-drop-reject):not(.fancytree-statusnode-nodata):hover {
+.fancytree-node:not(.fancytree-drop-accept):not(.fancytree-drop-reject):not(.fancytree-statusnode-nodata):hover, .fancytree-node.selected-for-context {
   background-color: var(--tab-bg-color);
   cursor: pointer;
 }

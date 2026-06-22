@@ -277,7 +277,7 @@ export default class FileTreeComponent {
     // @see http://swisnl.github.io/jQuery-contextMenu/docs.html
     $.contextMenu({
       zIndex: 10,
-      selector: '#file-tree span.fancytree-title',
+      selector: '#file-tree span.fancytree-node',
       build: this._createContextMenuItems,
       events: {
         show: () => {
@@ -288,6 +288,12 @@ export default class FileTreeComponent {
           if (!this._userClickedContextMenuItem) {
             this.delegate.resumeFSReload();
           }
+          document
+            .querySelectorAll(".fancytree-node.selected-for-context")
+            .forEach((n) => {
+              const node = $.ui.fancytree.getNode(n);
+              if (node) node.removeClass("selected-for-context");
+            });
         },
       },
     });
@@ -569,6 +575,7 @@ export default class FileTreeComponent {
   _createContextMenuItems = ($trigger) => {
     const menu = {};
     const node = $.ui.fancytree.getNode($trigger[0]);
+    node.addClass("selected-for-context");
     const { isFolder, isFile } = node.data;
 
     if (isFolder) {
