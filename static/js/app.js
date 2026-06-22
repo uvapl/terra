@@ -191,6 +191,12 @@ export default class App extends BaseApp {
    */
   getLangWorkerHandlers() {
     return {
+      onLoad: (hasPendingCommand) => {
+        if (hasPendingCommand) {
+          this.term?.write('\x1b[2mWaiting for runtime to fully load, just a sec...\x1b[0m');
+        }
+      },
+
       /**
        * The worker has finished initialising and is ready to run. Re-enable the
        * worker UI buttons unless a queued command is about to run.
@@ -198,6 +204,9 @@ export default class App extends BaseApp {
        * @param {boolean} hasPendingCommand - Whether a queued command will run.
        */
       onReady: (hasPendingCommand) => {
+        if (hasPendingCommand) {
+          this.term.clearCurrentLine();
+        }
         if (!hasPendingCommand) {
           $('.run-user-code-btn').prop('disabled', false);
           $('.clear-term-btn').prop('disabled', false);
@@ -233,6 +242,14 @@ export default class App extends BaseApp {
        */
       onRunButtonCommandDone: () => {
         $('.run-user-code-btn, .config-btn').prop('disabled', false);
+      },
+
+      /**
+       * The user's code has started running. If it does not finish quickly,
+       * turn the run button into a stop button so the user can abort it.
+       */
+      onRunStarted: () => {
+        this.view.checkForStopCodeButton();
       },
 
       /**
@@ -403,9 +420,6 @@ export default class App extends BaseApp {
     // Append hidden files if present.
     files = files.concat(this.getHiddenFiles());
 
-    // Create a new worker instance if needed.
-    this.createLangWorker(proglang);
-
     // Build args to send to the worker's runUserCode function.
     const runUserCodeArgs = [filepath, files];
 
@@ -419,18 +433,7 @@ export default class App extends BaseApp {
       }
     }
 
-    const run = () => {
-      this.langWorkerClient.runUserCode(...runUserCodeArgs);
-      this.view.checkForStopCodeButton();
-    };
-
-    if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
-      // Worker is still loading — queue the command to run once it's ready.
-      this.langWorkerClient.pendingCommand = run;
-      this.term?.writeln('\x1b[2mWaiting for runtime to fully load, just a sec...\x1b[0m');
-    } else if (this.langWorkerClient.hasActiveWorker()) {
-      run();
-    }
+    this.langWorkerClient.start(proglang, runUserCodeArgs);
   }
 
   /**
@@ -487,7 +490,7 @@ export default class App extends BaseApp {
     if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
       // Worker is still loading — queue the command to run once it's ready.
       this.langWorkerClient.pendingCommand = run;
-      this.term?.writeln('\x1b[2mWaiting for runtime to fully load, just a sec...\x1b[0m');
+      this.term?.write('\x1b[2mWaiting for runtime to fully load, just a sec...\x1b[0m');
     } else if (this.langWorkerClient.isReady) {
       run();
     }

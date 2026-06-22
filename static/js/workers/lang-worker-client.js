@@ -64,7 +64,7 @@ export default class LangWorkerClient {
    *
    * @param {object} handlers - App-side reaction callbacks. Required keys:
    * onReady, onWrite, onWriteError, onRequestStdin, onRunButtonCommandDone,
-   * onRunEnded, onNewOrModifiedFiles, onDeletedFiles.
+   * onRunStarted, onRunEnded, onNewOrModifiedFiles, onDeletedFiles.
    */
   constructor(handlers) {
     this.handlers = handlers;
@@ -96,7 +96,7 @@ export default class LangWorkerClient {
    *
    * @param {string} proglang - The programming language to load a worker for.
    */
-  load(proglang) {
+  load(proglang, pendingCommand = null) {
     // Unsupported language: make sure no worker keeps running.
     if (!this.supports(proglang)) {
       this.terminate();
@@ -109,10 +109,29 @@ export default class LangWorkerClient {
       this.terminate();
     }
 
-    if (!this.worker) {
-      this.proglang = proglang;
-      this._createWorker();
+    if (this.worker) {
+      // Worker already exists for this proglang. Run the command now if it has
+      // finished initialising, otherwise queue it so the 'ready' handler runs
+      // it once the (re)loading worker signals ready.
+      if (pendingCommand) {
+        if (this.isReady) {
+          pendingCommand();
+        } else {
+          this.pendingCommand = pendingCommand;
+          this.handlers.onLoad(true);
+        }
+      }
+      return;
     }
+
+    this.pendingCommand = pendingCommand;
+    this.handlers.onLoad(!!pendingCommand);
+    this.proglang = proglang;
+    this._createWorker();
+  }
+
+  start(proglang, runArgs) {
+    this.load(proglang, () => this.runUserCode(...runArgs))
   }
 
   /**
@@ -139,18 +158,8 @@ export default class LangWorkerClient {
    * run already reported completion) stays silent.
    */
   terminate() {
-    // Safe to call when idle: nothing to tear down without an active worker.
-    if (!this.worker) {
-      return;
-    }
-
-    console.log(`Terminating existing ${this.proglang} worker`);
-
     const wasRunning = this.isRunningCode;
-    this.isRunningCode = false;
-    this.isReady = false;
-    this.worker.terminate();
-    this.worker = null;
+    this._destroyWorker();
 
     // Only when we abort a still-running program: a normal run already reported
     // its end via the 'runUserCodeCallback' message, so the Pyodide post-run
@@ -158,6 +167,26 @@ export default class LangWorkerClient {
     if (wasRunning) {
       this.handlers.onRunEnded();
     }
+  }
+
+  /**
+   * Pure transport teardown: kill the active worker and reset client state.
+   * Safe to call when idle. Has no app/UI side effects — callers that need to
+   * report the run as ended (terminate) or recreate the worker (restart) do so
+   * themselves.
+   */
+  _destroyWorker() {
+    // Safe to call when idle: nothing to tear down without an active worker.
+    if (!this.worker) {
+      return;
+    }
+
+    console.log(`Terminating existing ${this.proglang} worker`);
+
+    this.isRunningCode = false;
+    this.isReady = false;
+    this.worker.terminate();
+    this.worker = null;
   }
 
   /**
@@ -201,6 +230,10 @@ export default class LangWorkerClient {
    */
   runUserCode(activeTabPath, vfsFiles, runAsConfig) {
     this.isRunningCode = true;
+
+    // Single funnel for a user-code run (immediate or queued via pendingCommand),
+    // so the app can flip the run button into a stop button from one place.
+    this.handlers.onRunStarted();
 
     this.port.postMessage({
       id: 'runUserCode',
@@ -247,8 +280,18 @@ export default class LangWorkerClient {
    * the Pyodide post-run reset.
    */
   restart() {
-    this.terminate();
+    const wasRunning = this.isRunningCode;
+    this._destroyWorker();
+
+    // Spawn the fresh worker before notifying the app. onRunEnded focuses the
+    // editor, which re-enters load() via the focus handler; with a live worker
+    // already in place for the same proglang, that call is a harmless no-op
+    // instead of spawning a competing second worker.
     this._createWorker();
+
+    if (wasRunning) {
+      this.handlers.onRunEnded();
+    }
   }
 
   /**
