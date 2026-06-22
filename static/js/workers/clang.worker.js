@@ -637,10 +637,17 @@ class API extends BaseAPI {
         continue;
       }
 
-      // Make parent dirs before creating the final file inside it.
+      // Make parent dirs before creating the final file inside it. Each
+      // directory node must be created individually and in order, as its
+      // parent has to exist already.
       const { parentPath } = getPartsFromPath(file.path);
       if (parentPath) {
-        this.memfs.addDirectory(parentPath);
+        const segments = parentPath.split('/');
+        let dirPath = '';
+        for (const segment of segments) {
+          dirPath = dirPath ? `${dirPath}/${segment}` : segment;
+          this.memfs.addDirectory(dirPath);
+        }
       }
 
       const basename = file.path.replace(/\.c$/, '');
