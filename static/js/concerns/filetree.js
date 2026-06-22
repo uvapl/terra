@@ -87,13 +87,19 @@ export function useFileTree(app) {
       this.openFile(key);
     },
 
-    /** A node was moved or renamed (the component already moved it visually). */
+    /** A node was moved (drag-drop); the component already moved it visually. */
     async onNodeMoved(srcPath, destPath, isFolder) {
       const move = isFolder ? this.vfs.moveFolder : this.vfs.moveFile;
       await move(srcPath, destPath);
 
       const pairs = this.fileTree.applyRelocatedKeys(srcPath, destPath, isFolder);
       pairs.forEach(({ src, dest }) => this.updateOpenTabPath(src, dest));
+    },
+
+    /** A node was renamed via inline edit; move it, then refocus the editor. */
+    async onNodeRenamed(srcPath, destPath, isFolder) {
+      await this.onNodeMoved(srcPath, destPath, isFolder);
+      this.focusActiveEditor();
     },
 
     /** A node deletion was confirmed by the user. */

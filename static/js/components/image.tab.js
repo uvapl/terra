@@ -62,6 +62,23 @@ export default class ImageTab extends BaseTab {
   }
 
   /**
+   * Update the displayed image directly from raw file content. Used when a
+   * program run modifies an already-open image: reading back through the VFS
+   * would race the debounced disk write and show the previous image, so we
+   * build a blob URL straight from the new bytes.
+   *
+   * @param {ArrayBuffer|Uint8Array} content - The raw image bytes.
+   */
+  setContent = (content) => {
+    if (this.img.src) {
+      URL.revokeObjectURL(this.img.src);
+    }
+
+    const blob = new Blob([content], { type: this.getFileMimeType() });
+    this.setSrc(URL.createObjectURL(blob));
+  }
+
+  /**
    * Get the base64 encoded string of the image src attribute.
    *
    * @returns {string} Base64 encoded string.

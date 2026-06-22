@@ -267,15 +267,21 @@ const handlers = {
    * @param {boolean} isUserInvoked - Whether user invoked the action.
    * @returns {Promise<FileSystemFileHandle>} The updated file handle.
    */
-  async updateFile(path, content, isUserInvoked = true) {
+  async updateFile(path, content, isUserInvoked = true, immediate = false) {
     const handle = await getFileHandleByPath(path);
     if (!handle) return;
 
-    debounce(
-      `file-update-${slugify(path)}`,
-      seconds(0.2),
-      () => writeFile(handle, content)
-    );
+    if (immediate) {
+      // Write synchronously (e.g. for program run output), so a subsequent
+      // read sees the new content instead of racing the debounced write.
+      await writeFile(handle, content);
+    } else {
+      debounce(
+        `file-update-${slugify(path)}`,
+        seconds(0.2),
+        () => writeFile(handle, content)
+      );
+    }
 
     if (isUserInvoked) {
       self.postMessage({

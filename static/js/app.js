@@ -191,6 +191,12 @@ export default class App extends BaseApp {
    */
   getLangWorkerHandlers() {
     return {
+      onLoad: (hasPendingCommand) => {
+        if (hasPendingCommand) {
+          this.term?.write('\x1b[2mWaiting for runtime to fully load, just a sec...\x1b[0m');
+        }
+      },
+
       /**
        * The worker has finished initialising and is ready to run. Re-enable the
        * worker UI buttons unless a queued command is about to run.
@@ -198,6 +204,9 @@ export default class App extends BaseApp {
        * @param {boolean} hasPendingCommand - Whether a queued command will run.
        */
       onReady: (hasPendingCommand) => {
+        if (hasPendingCommand) {
+          this.term.clearCurrentLine();
+        }
         if (!hasPendingCommand) {
           $('.run-user-code-btn').prop('disabled', false);
           $('.clear-term-btn').prop('disabled', false);
@@ -233,6 +242,14 @@ export default class App extends BaseApp {
        */
       onRunButtonCommandDone: () => {
         $('.run-user-code-btn, .config-btn').prop('disabled', false);
+      },
+
+      /**
+       * The user's code has started running. If it does not finish quickly,
+       * turn the run button into a stop button so the user can abort it.
+       */
+      onRunStarted: () => {
+        this.view.checkForStopCodeButton();
       },
 
       /**
@@ -289,18 +306,34 @@ export default class App extends BaseApp {
         for (const file of newOrModifiedFiles) {
           // Check if the file already exists in the VFS.
           if ((await this.vfs.pathExists(file.path))) {
-            // If the file already exists, update its content.
-            await this.vfs.updateFile(file.path, file.content);
-
-            // Check if there's an open tab for this file.
+            // If there's an open tab for this file, update its content first.
+            // Both editor and image tabs accept the raw content directly (image
+            // tabs build a blob URL from the bytes). This must happen before the
+            // updateFile() below, which transfers the content's ArrayBuffer to
+            // the VFS worker and would leave it detached here.
             const tabComponent = this.view.getTabComponents().find((component) => {
               const path = component.getPath();
               return path == file.path;
             });
-
-            // If so, update its content.
             if (tabComponent) {
               tabComponent.setContent(file.content);
+
+              // Bring an updated image to the front so the change is visible.
+              if (isImageExtension(file.path)) {
+                tabComponent.setActive();
+              }
+            }
+
+            // Persist the new content to the VFS. Write immediately (rather
+            // than the debounced default) so that opening a tab below reads the
+            // latest content instead of the previous version.
+            await this.vfs.updateFile(file.path, file.content, true, true);
+
+            // If an existing image isn't open yet, open it in a tab. This must
+            // run after updateFile so the tab reads the latest content from the
+            // VFS (the in-memory ArrayBuffer was transferred away above).
+            if (!tabComponent && isImageExtension(file.path)) {
+              this.view.addFileTab(file.path);
             }
           } else {
             // Otherwise, create a new file in the VFS.
@@ -403,9 +436,6 @@ export default class App extends BaseApp {
     // Append hidden files if present.
     files = files.concat(this.getHiddenFiles());
 
-    // Create a new worker instance if needed.
-    this.createLangWorker(proglang);
-
     // Build args to send to the worker's runUserCode function.
     const runUserCodeArgs = [filepath, files];
 
@@ -419,18 +449,7 @@ export default class App extends BaseApp {
       }
     }
 
-    const run = () => {
-      this.langWorkerClient.runUserCode(...runUserCodeArgs);
-      this.view.checkForStopCodeButton();
-    };
-
-    if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
-      // Worker is still loading — queue the command to run once it's ready.
-      this.langWorkerClient.pendingCommand = run;
-      this.term?.writeln('\x1b[2mWaiting for runtime to fully load, just a sec...\x1b[0m');
-    } else if (this.langWorkerClient.hasActiveWorker()) {
-      run();
-    }
+    this.langWorkerClient.start(proglang, runUserCodeArgs);
   }
 
   /**
@@ -487,7 +506,7 @@ export default class App extends BaseApp {
     if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
       // Worker is still loading — queue the command to run once it's ready.
       this.langWorkerClient.pendingCommand = run;
-      this.term?.writeln('\x1b[2mWaiting for runtime to fully load, just a sec...\x1b[0m');
+      this.term?.write('\x1b[2mWaiting for runtime to fully load, just a sec...\x1b[0m');
     } else if (this.langWorkerClient.isReady) {
       run();
     }

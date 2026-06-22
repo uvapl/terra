@@ -353,6 +353,10 @@ export default class FileTreeComponent {
         // @see https://github-wiki-see.page/m/mar10/fancytree/wiki/ExtEdit
         edit: {
           triggerStart: ['dblclick'],
+          // FancyTree sets the input width inline to `titleWidth + adjustWidthOfs`.
+          // Widen it to cover the input's horizontal padding (2×3px) + border
+          // (2×1px) so short names aren't clipped (see `.fancytree-node input`).
+          adjustWidthOfs: 16,
           edit: this._onStartEdit,
           beforeClose: this._onBeforeCloseEdit,
           close: this._onAfterCloseEdit,
@@ -366,7 +370,12 @@ export default class FileTreeComponent {
   /** User clicked a node: activate a file, or toggle a folder. */
   _onClick = (event, data) => {
     if (data.node.data.isFile) {
-      this.delegate.onFileActivated(data.node.key);
+      // Debounce file activation so a double-click (which starts an inline
+      // rename) doesn't open the file and steal focus from the edit input.
+      clearTimeout(this._activateTimeout);
+      this._activateTimeout = setTimeout(() => {
+        this.delegate.onFileActivated(data.node.key);
+      }, 200);
     } else if (data.node.data.isFolder) {
       clearTimeout(this._toggleTimeout);
 
@@ -389,6 +398,7 @@ export default class FileTreeComponent {
   _onStartEdit = (event, data) => {
     this.delegate.suspendFSReload();
     clearTimeout(this._toggleTimeout);
+    clearTimeout(this._activateTimeout);
     data.input.select();
 
     $(data.input).attr({
@@ -440,16 +450,25 @@ export default class FileTreeComponent {
     const parentPath = parentNodeKey.startsWith('root') ? null : parentNodeKey;
     const destPath = parentPath ? `${parentPath}/${newName}` : newName;
 
-    this.delegate.onNodeMoved(srcPath, destPath, sourceNode.data.isFolder);
+    // Stash the validated rename; the actual move is performed in
+    // `_onAfterCloseEdit`, once FancyTree has written the new title onto the
+    // node (folder key recomputation reads it via getAbsoluteNodePath).
+    this._pendingRename = { srcPath, destPath, isFolder: sourceNode.data.isFolder };
 
     destroyTooltip('renameNode');
     return true;
   };
 
-  /** Inline editor was removed: re-sort and resume reloads. */
+  /** Inline editor was removed: re-sort, resume reloads, and commit any rename. */
   _onAfterCloseEdit = () => {
     this._sort();
     this.delegate.resumeFSReload();
+
+    if (this._pendingRename) {
+      const { srcPath, destPath, isFolder } = this._pendingRename;
+      this._pendingRename = null;
+      this.delegate.onNodeRenamed(srcPath, destPath, isFolder);
+    }
   };
 
   /** User started dragging a node. */
