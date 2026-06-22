@@ -6,7 +6,7 @@ import Terra from '../terra.js';
 import BaseTab from './base.tab.js';
 
 /**
- * Editor component for GoldenLayout.
+ * Editor component for GoldenLayout, based on the Ace editor.
  */
 export default class EditorTab extends BaseTab {
   /**
