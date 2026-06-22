@@ -409,6 +409,7 @@ function renderCommandLi(node) {
     } else if (cmd.command && editor) {
       editor.editor.execCommand(cmd.command);
     }
+    _activeEditor().focus();
   });
 
   return $li;
