@@ -17,11 +17,11 @@
 // changes (e.g. 110 -> 200), reproducing the old manual separators.
 ////////////////////////////////////////////////////////////////////////////////
 
-import commands from '../commands.js';
-import Terra from '../terra.js';
+import commands from './commands.js';
+import Terra from './terra.js';
 
 // The editor of the currently active tab, resolved at call time.
-const editor = () => Terra.app.getActiveEditor();
+const editor = () => Terra.app.view.getActiveEditor();
 
 // Container ordering + fixed ids for the data-driven submenus (so layout.js can
 // keep targeting #editor-theme-menu / #font-size-menu unchanged).
@@ -141,22 +141,22 @@ commands.addCommands([
   {
     name: 'increaseFontSize', scope: 'global', bindKey: 'ctrl-=',
     menuItem: { path: 'View/Font size/Increase', position: 100 },
-    exec: () => Terra.app.layout.increaseFontSize(),
+    exec: () => Terra.app.view.increaseFontSize(),
   },
   {
     name: 'decreaseFontSize', scope: 'global', bindKey: 'ctrl--',
     menuItem: { path: 'View/Font size/Decrease', position: 110 },
-    exec: () => Terra.app.layout.decreaseFontSize(),
+    exec: () => Terra.app.view.decreaseFontSize(),
   },
   {
     name: 'defaultFontSize', scope: 'global', bindKey: 'ctrl-0',
     menuItem: { path: 'View/Font size/Default', position: 120 },
-    exec: () => Terra.app.layout.setFontSizeDefault(),
+    exec: () => Terra.app.view.setFontSizeDefault(),
   },
   {
     name: 'demoFontSize', scope: 'global', bindKey: 'ctrl-9',
     menuItem: { path: 'View/Font size/Demo Mode', position: 130 },
-    exec: () => Terra.app.layout.setFontSizeDemo(),
+    exec: () => Terra.app.view.setFontSizeDemo(),
   },
   {
     name: 'clearTerminal', scope: 'global', bindKey: 'mod-k',
@@ -186,7 +186,7 @@ commands.addCommands([
   // Global, no menu entry -----------------------------------------------------
   {
     name: 'save', scope: 'global', bindKey: 'mod-s',
-    exec: () => Terra.app.layout.dispatchEvent(new CustomEvent('saveFile')),
+    exec: () => Terra.app.saveFile(),
   },
 ]);
 

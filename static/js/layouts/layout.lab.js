@@ -1,4 +1,3 @@
-import { BASE_FONT_SIZE } from './constants.js';
 import Layout from './layout.js';
 
 export default class LabLayout extends Layout {
@@ -9,15 +8,12 @@ export default class LabLayout extends Layout {
    * is rendered in a fixed sidebar next to the layout container and is not
    * part of the GoldenLayout structure.
    *
-   * @param {array} content - List of content objects.
-   * @param {number} fontSize - The default font-size to be used.
-   * @param {object} options - Additional options object.
-   * @param {string} options.proglang - The programming language to be used.
+   * @param {object} options - Controller-supplied options.
+   * @param {array} options.files - List of filenames to open as tabs.
+   * @param {number} options.fontSize - The default font-size to be used.
    */
-  constructor(files, fontSize, options = {}) {
-
-    // Get the font-size stored in local storage or use fallback value.
-    const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
+  constructor(options = {}) {
+    const { files, fontSize } = options;
 
     // Create the content objects that represent each tab in the editor. The
     // file contents are not embedded: each editor loads them from the VFS

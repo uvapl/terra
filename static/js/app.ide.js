@@ -1,10 +1,10 @@
 import App from './app.js';
-import IDELayout from './layout/layout.ide.js';
+import IDEController from './controllers/ide.js';
 import { getFileExtension, isValidFilename } from './lib/helpers.js';
 import { getPlugin } from './plugin-manager.js';
 import { removeLocalStorageItem } from './lib/local-storage-manager.js';
 import * as LFS from './fs/lfs.js';
-import { useFileTree } from './concerns/file-tree.js';
+import { useFileTree } from './concerns/filetree.js';
 import { useStorageCoordinator } from './concerns/storage.js';
 import { useGit } from './concerns/git.js';
 import { useLFS } from './concerns/lfs.js';
@@ -39,16 +39,24 @@ export default class IDEApp extends App {
     // that we open earlier, otherwise we will open a fresh Untitled.
     const reset =
       !(await this.initLFSAtStart()) && !(await this.initGitFSAtStart());
-    this.layout = this.createLayout(reset);
+
+    // The controller reads persisted state and builds the IDE layout. The app
+    // talks only to the controller. The save command calls this.saveFile()
+    // directly (see app.ide.commands.js).
+    this.view = new IDEController({
+      delegate: this,
+      forceDefaultLayout: reset,
+      contentConfig: []
+    });
   }
 
-  async postSetupLayout() {
+  async afterSetupLayout() {
     if (!LFS.available()) {
       // Disable open-folder if the FileSystemAPI is not supported.
-      this.layout.setProjectMenuState({ openFolderEnabled: false });
+      this.view.setProjectMenuState({ openFolderEnabled: false });
     } else if (LFS.hasProjectLoaded()) {
       // Enable close-folder menu item.
-      this.layout.setProjectMenuState({ closeProjectEnabled: true });
+      this.view.setProjectMenuState({ closeProjectEnabled: true });
       this.fileTree.setTitle(await LFS.getBaseFolderName());
     }
 
@@ -65,7 +73,7 @@ export default class IDEApp extends App {
       this.fileTree.showLocalStorageWarning();
     }
 
-    this.layout.refresh();
+    this.view.refresh();
   }
 
   /**
@@ -77,37 +85,29 @@ export default class IDEApp extends App {
     removeLocalStorageItem('git-repo');
     await this.closeGitFS();
     await this.closeLFSFolder();
-    this.layout.setProjectMenuState({ closeProjectEnabled: false });
+    this.view.setProjectMenuState({ closeProjectEnabled: false });
   }
 
   /**
-   * Reset the layout to its initial state. The layout owns the destroy/recreate
-   * lifecycle (see IDELayout.recreate); here we only supply how to build the
-   * replacement and how to re-wire it to the app afterwards.
+   * Reset the layout to its initial state. The controller owns the
+   * destroy/recreate lifecycle (see IDEController.recreate); here we reset the
+   * font size, refresh our layout reference and re-init.
+   * The controller rebuilds its layout (preserving open tabs) and re-inits.
+   * It fires afterLayoutReset() on this app once the new layout is ready;
+   * afterSetupLayout is intentionally not re-run (init-only side effects).
    */
   resetLayout() {
-    this.layout.setFontSizeDefault();
-    this.layout.recreate(
-      (contentConfig) => this.createLayout(true, contentConfig),
-      (next) => {
-        // Reassign before registerLayoutEvents(), which wires onto this.layout.
-        // postSetupLayout is intentionally not re-bound to 'initialised', as its
-        // side effects should only happen at app init.
-        this.layout = next;
-        this.registerLayoutEvents();
-        next.on('initialised', this._restartActiveWorkerAfterReset);
-      },
-    );
+    this.view.recreate();
   }
 
   /**
-   * After a layout reset, restart the language worker for the active tab so it
-   * starts from a clean state — only when a worker is active and supports the
-   * active tab's language.
+   * Delegate hook invoked by the controller after a layout reset. Restart the
+   * language worker for the active tab so it starts from a clean state — only
+   * when a worker is active and supports the active tab's language.
    */
-  _restartActiveWorkerAfterReset() {
+  afterLayoutReset() {
     setTimeout(() => {
-      const editorComponent = this.layout.getActiveEditor();
+      const editorComponent = this.view.getActiveEditor();
       const proglang = getFileExtension(editorComponent.getFilename());
       if (this.langWorkerClient.hasActiveWorker() && this.langWorkerClient.supports(proglang)) {
         this.langWorkerClient.restart();
@@ -118,7 +118,7 @@ export default class IDEApp extends App {
   /**
    * Callback function when the user starts typing.
    *
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    */
   onEditorEditingStarted(editorComponent) {
     this.suspendFSReload();
@@ -127,28 +127,10 @@ export default class IDEApp extends App {
   /**
    * Callback function when the user stops typing.
    *
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    */
   onEditorEditingStopped(editorComponent) {
     this.resumeFSReload();
-  }
-
-  /**
-   * Create the layout object with the given content objects.
-   *
-   * @param {boolean} [forceDefaultLayout=false] Whether to force the default layout.
-   * @param {Array} [contentConfig=[]] The content configuration for the layout.
-   * @returns {IDELayout} The layout instance.
-   */
-  createLayout(forceDefaultLayout = false, contentConfig = []) {
-    const layout = new IDELayout(forceDefaultLayout, contentConfig);
-
-    // Attach listeners here rather than in registerLayoutEvents(), because
-    // resetLayout() replaces the layout instance and the new instance needs
-    // these listeners too.
-    layout.addEventListener('saveFile', () => this.saveFile());
-
-    return layout;
   }
 
   /**
@@ -162,7 +144,7 @@ export default class IDEApp extends App {
     const runAsPlugin = getPlugin('run-as');
     const state = runAsPlugin.getState();
 
-    const editorComponent = this.layout.getActiveEditor();
+    const editorComponent = this.view.getActiveEditor();
     const activeTabPath = editorComponent.getPath();
     const defaultTarget = editorComponent.getFilename().replace(/\.c$/, '');
 
@@ -190,7 +172,7 @@ export default class IDEApp extends App {
    * @async
    */
   async saveFile() {
-    const editorComponent = this.layout.getActiveEditor();
+    const editorComponent = this.view.getActiveEditor();
 
     if (!editorComponent) return;
 
@@ -200,34 +182,12 @@ export default class IDEApp extends App {
     if (existingFilepath && (await this.vfs.pathExists(existingFilepath)))
       return;
 
-    this.layout.showSaveFileModal({
+    this.view.showSaveFileModal({
       filename: editorComponent.getFilename(),
-      folders: await this.getFolderList(),
+      folders: await this.vfs.getFolderList(),
       onSave: (filename, parentPath) =>
         this.saveFileAs(editorComponent, filename, parentPath),
     });
-  }
-
-  /**
-   * List all folders in the VFS recursively, in depth-first order.
-   *
-   * @async
-   * @param {string} [parentPath] - The absolute parent folder path where
-   * subfolders will be fetched from.
-   * @param {number} [depth] - The current nesting depth.
-   * @returns {Promise<array<object>>} List of `{ path, depth }` folder objects.
-   */
-  async getFolderList(parentPath = '', depth = 0) {
-    const folders = [];
-
-    const subfolders = await this.vfs.listFoldersInFolder(parentPath);
-    for (const folderName of subfolders) {
-      const subfolderpath = parentPath ? `${parentPath}/${folderName}` : folderName;
-      folders.push({ path: subfolderpath, depth });
-      folders.push(...(await this.getFolderList(subfolderpath, depth + 1)));
-    }
-
-    return folders;
   }
 
   /**
@@ -235,7 +195,7 @@ export default class IDEApp extends App {
    * tree and point the editor tab at the new file.
    *
    * @async
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    * @param {string} filename - The filename for the new file.
    * @param {string} parentPath - The absolute folder path to save the file in,
    * or an empty string for the root folder.
@@ -258,7 +218,7 @@ export default class IDEApp extends App {
     // Re-point the Untitled tab at the new file (path, title, highlighting,
     // persisted state) and spawn the matching worker.
     const proglang = getFileExtension(filename);
-    this.layout.repointTab(editorComponent, filepath, proglang);
+    this.view.repointTab(editorComponent, filepath);
     this.createLangWorker(proglang);
 
     return null;
@@ -271,7 +231,7 @@ export default class IDEApp extends App {
    * @param {string} filepath - The path of the file to open.
    */
   openFile(filepath) {
-    this.layout.addFileTab(filepath);
+    this.view.addFileTab(filepath);
     const proglang = getFileExtension(filepath);
     this.createLangWorker(proglang);
   }
@@ -289,7 +249,7 @@ export default class IDEApp extends App {
     const filename = destPath.split('/').pop();
     const proglang = filename.includes('.') ? getFileExtension(filename) : 'text';
 
-    const tabComponent = this.layout.repointTabByPath(srcPath, destPath, proglang);
+    const tabComponent = this.view.repointTabByPath(srcPath, destPath, proglang);
     if (tabComponent) {
       this.createLangWorker(proglang);
     }
@@ -298,18 +258,18 @@ export default class IDEApp extends App {
   /**
    * Close the active tab in the editor.
    *
-   * @param {string} filepath - The absolute file path of the tab to close. If
+   * @param {string?} filepath - The absolute file path of the tab to close. If
    * not provided, the active tab will be closed.
    */
   closeFile(filepath) {
-    this.layout.closeFile(filepath);
+    this.view.closeFile(filepath);
   }
 
   /**
    * Close all tabs in the editor.
    */
   closeAllFiles() {
-    this.layout.closeAllTabs();
+    this.view.closeAllTabs();
   }
 
   /**
@@ -318,7 +278,7 @@ export default class IDEApp extends App {
    * @param {string} path - The absolute folderpath to close all files from.
    */
   closeFilesFromFolder(path) {
-    this.layout.closeFilesFromFolder(path);
+    this.view.closeFilesFromFolder(path);
   }
 
   /**
@@ -328,7 +288,7 @@ export default class IDEApp extends App {
    * @returns {Promise<object>} The file object.
    */
   async getActiveEditorFileObject() {
-    const editorComponent = this.layout.getActiveEditor();
+    const editorComponent = this.view.getActiveEditor();
     const filepath = editorComponent.getPath();
     const content = await this.vfs.readFile(filepath);
     return {

@@ -3,12 +3,12 @@ import { getFileExtension, seconds } from '../lib/helpers.js';
 import { triggerPluginEvent } from '../plugin-manager.js';
 import { getLocalStorageItem } from '../lib/local-storage-manager.js';
 import Terra from '../terra.js';
-import TabComponent from './tab.component.js';
+import BaseTab from './base.tab.js';
 
 /**
- * Editor component for GoldenLayout.
+ * Editor component for GoldenLayout, based on the Ace editor.
  */
-export default class EditorComponent extends TabComponent {
+export default class EditorTab extends BaseTab {
   /**
    * Whether the editor has been rendered.
    * @type {boolean}
@@ -52,10 +52,7 @@ export default class EditorComponent extends TabComponent {
     this.setTheme(getLocalStorageItem('theme') || 'light');
     this.setFontSize(this.state.fontSize || BASE_FONT_SIZE);
 
-    // Set the proglang, or use 'text' as the filetype if there's no file ext.
-    const filename = this.getFilename();
-    const proglang = filename.includes('.') ? getFileExtension(filename) : 'text';
-    this.setProgLang(proglang);
+    this.setProgLang();
 
     // Remove default Ctrl+N and Ctrl+Shift+N keybindings since we want them to
     // be handled by Terra globally.
@@ -503,7 +500,11 @@ export default class EditorComponent extends TabComponent {
    *
    * @param {string} proglang - File extension or programming language.
    */
-  setProgLang = (proglang) => {
+  setProgLang = () => {
+    // Set the proglang, or use 'text' as the filetype if there's no file ext.
+    const filename = this.getFilename();
+    const proglang = filename.includes('.') ? getFileExtension(filename) : 'text';
+
     let mode;
 
     // By default, the mode is just the proglang itself.

@@ -1,11 +1,11 @@
 import { getFileExtension } from '../lib/helpers.js';
-import TabComponent from './tab.component.js';
+import BaseTab from './base.tab.js';
 import { triggerPluginEvent } from '../plugin-manager.js';
 
 /**
  * Image component for GoldenLayout.
  */
-export default class ImageComponent extends TabComponent {
+export default class ImageTab extends BaseTab {
   constructor(container, state) {
     super(container, state);
 

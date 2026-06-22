@@ -1,6 +1,6 @@
 import { isValidFilename } from '../lib/helpers.js';
-import { createModal, hideModal, showModal } from '../layout/modal.js';
-import { createTooltip, destroyTooltip } from './tooltip-manager.js';
+import { createModal, hideModal, showModal } from './modal.js';
+import { createTooltip, destroyTooltip } from './tooltip.js';
 
 /** CSS class marking the active drop target during a drag. */
 const DROP_AREA_INDICATOR_CLASS = 'drop-area-indicator';

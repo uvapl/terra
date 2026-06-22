@@ -1,5 +1,5 @@
 import { formatDate } from '../lib/helpers.js';
-import { createModal, hideModal, showModal } from '../layout/modal.js';
+import { createModal, hideModal, showModal } from '../components/modal.js';
 import Layout from './layout.js';
 
 export default class ExamLayout extends Layout {
@@ -11,13 +11,11 @@ export default class ExamLayout extends Layout {
    * @param {array} content - List of content objects.
    * @param {number} fontSize - The default font-size to be used.
    * @param {object} options - Additional options object.
-   * @param {string} options.proglang - The programming language to be used.
    * @param {object} options.buttonConfig - Object containing buttons with their
    * commands that will be rendered by the layout.
    */
-  constructor(tabs, options = {}) {
-    // Get the font-size stored in local storage or use fallback value.
-    const fontSize = getLocalStorageItem('font-size', BASE_FONT_SIZE);
+  constructor(options = {}) {
+    const { tabs, fontSize } = options;
 
     // Create the config for each tab.
     const content = Object.keys(tabs).map((filename) => ({

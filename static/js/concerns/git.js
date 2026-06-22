@@ -5,8 +5,8 @@ import {
   removeLocalStorageItem,
 } from '../lib/local-storage-manager.js';
 import { triggerPluginEvent } from '../plugin-manager.js';
-import { createModal, hideModal, showModal } from '../layout/modal.js';
-import { GITHUB_URL_PATTERN } from '../ide/constants.js';
+import { createModal, hideModal, showModal } from '../components/modal.js';
+import { GITHUB_URL_PATTERN } from '../constants.js';
 import GitFS from '../fs/git.js';
 
 /**
@@ -108,7 +108,7 @@ export function useGit(app) {
       }
 
       if (accessToken && repoLink) {
-        this.layout.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
+        this.view.lockEditors();
 
         const gitfs = new GitFS(this.vfs, repoLink);
         this.gitfs = gitfs;

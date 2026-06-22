@@ -1,7 +1,6 @@
 import { getFileExtension } from './lib/helpers.js'
 import LangWorkerClient from './workers/lang-worker-client.js';
 import VirtualFileSystem from './fs/vfs.js';
-import Layout from './layout/layout.js';
 
 /**
  * Composition + wiring layer shared by every app.
@@ -13,10 +12,12 @@ import Layout from './layout/layout.js';
  */
 export default class BaseApp {
   /**
-   * Reference to the GoldenLayout instance.
-   * @type {Layout}
+   * Reference to the controller, the app's single interface to the UI. The
+   * controller builds and owns the layout; the app never holds the layout
+   * directly.
+   * @type {BaseController}
    */
-  layout = null;
+  controller = null;
 
   /**
    * Reference to the current language worker client.
@@ -41,13 +42,14 @@ export default class BaseApp {
   _fsReloadSuspended = false;
 
   /**
-   * The terminal component, or null when it does not (yet) exist. The layout
-   * owns the terminal's lifecycle; this is a convenience accessor so the rest
-   * of the app does not reach through the layout on every use.
-   * @type {?TerminalComponent}
+   * The terminal component, or null when it does not (yet) exist. The controller
+   * (via the layout) owns the terminal's lifecycle; this is a convenience
+   * accessor so the rest of the app does not reach through the controller on
+   * every use.
+   * @type {?TerminalTab}
    */
   get term() {
-    return this.layout?.term ?? null;
+    return this.view?.term ?? null;
   }
 
   /**
@@ -112,13 +114,10 @@ export default class BaseApp {
     // Await the setupLayout because some apps might need to do async work.
     await this.setupLayout();
 
-    // We register the postSetupLayout as a callback, which will be called when
-    // the subsequent init() function has finished. This is only done once: a
-    // replacement layout (e.g. after a reset) must not re-run postSetupLayout.
-    this.layout.on('initialised', this.postSetupLayout);
-
-    this.registerLayoutEvents();
-    this.layout.init();
+    // Render the layout. All layout-driven lifecycle (run/editor/image events,
+    // and the afterSetupLayout / afterLayoutReset hooks) reaches the app through
+    // the controller delegate, so no event registration is needed here.
+    this.view.init();
   }
 
   /**
@@ -132,47 +131,21 @@ export default class BaseApp {
   /**
    * Child classes that extend this class are expected to implement this.
    */
-  postSetupLayout() {
-    console.info('postSetupLayout() not implemented');
+  afterSetupLayout() {
+    console.info('afterSetupLayout() not implemented');
   }
 
   /**
-   * Add event listeners to the layout instance. This must be called again
-   * whenever the layout instance is replaced (e.g. after a layout reset),
-   * because the listeners are attached to the instance itself.
+   * Delegate callback invoked (via the controller) once the layout has rendered
+   * and the run button exists. Spawns the worker for the initially active tab's
+   * language and sets the run button to match. The editor 'show' events fire
+   * before the run button exists, so this has to be applied here. Runs on every
+   * layout, including replacements after a reset.
    */
-  registerLayoutEvents() {
-    this.layout.addEventListener('runCode', this.onRunCode);
-
-    // Listen for editor events being emitted.
-    const editorEvents = [
-      'onEditorEditingStarted',
-      'onEditorEditingStopped',
-      'onEditorTextChanged',
-      'onEditorSwitchedTo',
-      'onEditorReloadRequested',
-      'onImageSwitchedTo',
-      'onImageReloadRequested',
-    ];
-
-    editorEvents.forEach((eventName) => {
-      this.layout.addEventListener(eventName, async (event) => {
-        const { tabComponent } = event.detail;
-        if (typeof this[eventName] === 'function') {
-          this[eventName](tabComponent);
-        }
-      });
-    });
-
-    // Once the layout (and thus its run button) has rendered, spawn the worker
-    // for the initially active tab's language and set the run button to match.
-    // The editor 'show' events fire before the run button exists, so this has to
-    // be (re)applied here rather than relying on those events alone.
-    this.layout.on('initialised', () => {
-      const activeEditor = this.getActiveEditor();
-      const filename = activeEditor ? activeEditor.getFilename() : null;
-      this.createLangWorker(getFileExtension(filename));
-      this.updateRunButtonState(filename);
-    });
+  onReady() {
+    const activeEditor = this.view.getActiveEditor();
+    const filename = activeEditor ? activeEditor.getFilename() : null;
+    this.createLangWorker(getFileExtension(filename));
+    this.updateRunButtonState(filename);
   }
 }

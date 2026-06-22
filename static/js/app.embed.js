@@ -10,7 +10,7 @@ import {
   getLocalStorageItem,
   updateLocalStoragePrefix
 } from './lib/local-storage-manager.js';
-import EmbedLayout from './layout/layout.embed.js';
+import EmbedController from './controllers/embed.js';
 
 export default class EmbedApp extends App {
   /**
@@ -55,22 +55,19 @@ export default class EmbedApp extends App {
     // Get the programming language based on the filename.
     const proglang = getFileExtension(queryParams.filename);
 
-    // Create the layout object.
-    const layout = new EmbedLayout(tabs, {
+    // The embed controller reads persisted state and builds the embed layout.
+    this.view = new EmbedController({
+      delegate: this,
+      tabs,
       proglang,
       vertical: isVertical,
     });
 
     $('body').addClass(isVertical ? 'vertical' : 'horizontal');
-
-    // Make layout instance available at all times.
-    this.layout = layout;
-
-    return layout;
   }
 
   /**
    * Nothing to do in the post setup.
    */
-  postSetupLayout() { }
+  afterSetupLayout() { }
 }

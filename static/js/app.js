@@ -27,7 +27,7 @@ export default class App extends BaseApp {
    * called first in child classes before any additional functionality.
    *
    * @async
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    */
   async onEditorTextChanged(editorComponent) {
     const path = editorComponent.getPath();
@@ -40,7 +40,7 @@ export default class App extends BaseApp {
    * This is default functionality and super.onEditorSwitchedTo() must be
    * called first in child classes before any additional functionality.
    *
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    */
   async onEditorSwitchedTo(editorComponent) {
     if (editorComponent.ready) {
@@ -57,7 +57,7 @@ export default class App extends BaseApp {
    * that the VFS content has been changed, which requires to reload the file
    * content from the vfs.
    *
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    */
   async onEditorReloadRequested(editorComponent) {
     if (!this.isFSReloadSuspended()) {
@@ -105,9 +105,19 @@ export default class App extends BaseApp {
    */
   toggleEditorTerminalFocus() {
     if (this.term?.hasFocus()) {
-      this.getActiveEditor()?.focus();
+      this.view.getActiveEditor()?.focus();
     } else {
       this.term?.focus();
+    }
+  }
+
+  focusActiveEditor() {
+    const editorComponent = this.view.getActiveEditor();
+    if (editorComponent && editorComponent.ready) {
+      // Suspend reactive reloads to prevent file contents being reloaded
+      this.suspendFSReload();
+      editorComponent.focus();
+      this.resumeFSReload();
     }
   }
 
@@ -115,33 +125,34 @@ export default class App extends BaseApp {
 
   /** Increase the font size by one step. */
   zoomIn() {
-    this.layout.increaseFontSize();
+    this.view.increaseFontSize();
   }
 
   /** Decrease the font size by one step. */
   zoomOut() {
-    this.layout.decreaseFontSize();
+    this.view.decreaseFontSize();
   }
 
   /** Reset the font size to the default. */
   resetZoom() {
-    this.layout.setFontSizeDefault();
+    this.view.setFontSizeDefault();
   }
 
   /** Set the font size to the larger "demo" size. */
   zoomDemo() {
-    this.layout.setFontSizeDemo();
+    this.view.setFontSizeDemo();
   }
 
   // ───────────────────── Run-button / layout handlers ────────────────────
 
   /**
-   * Callback when the user clicks on the run-code button in the UI.
+   * Delegate callback when the user clicks the run-code button (or triggers run
+   * via a shortcut). Invoked by the controller with the run options directly.
    *
-   * @param {Event} event - The event object.
+   * @param {object} detail - Run options.
+   * @param {boolean} detail.clearTerm - Whether to clear the terminal first.
    */
-  onRunCode(event) {
-    const { clearTerm } = event.detail;
+  onRunCode({ clearTerm }) {
     this.runCode({ clearTerm });
   }
 
@@ -233,7 +244,7 @@ export default class App extends BaseApp {
         // Only disable the button again if the current tab has a worker, because
         // users can still run code through the contextmenu in the file-tree in
         // the IDE app.
-        const activeEditor = this.getActiveEditor();
+        const activeEditor = this.view.getActiveEditor();
         const disableRunBtn =
           !activeEditor ||
           !this.langWorkerClient.supports(getFileExtension(activeEditor.getFilename()));
@@ -245,9 +256,9 @@ export default class App extends BaseApp {
         this.term?.disposeUserInput();
 
         // Set focus to the active editor.
-        this.getActiveEditor().focus();
+        this.view.getActiveEditor().focus();
 
-        this.layout.onRunEnded({ disableRunBtn });
+        this.view.onRunEnded({ disableRunBtn });
 
         // If a run was started through runFile (e.g. by the shell), resolve its
         // promise now so the caller can resume.
@@ -282,7 +293,7 @@ export default class App extends BaseApp {
             await this.vfs.updateFile(file.path, file.content);
 
             // Check if there's an open tab for this file.
-            const tabComponent = this.getTabComponents().find((component) => {
+            const tabComponent = this.view.getTabComponents().find((component) => {
               const path = component.getPath();
               return path == file.path;
             });
@@ -300,7 +311,7 @@ export default class App extends BaseApp {
 
             // Automatically open new image files in a tab.
             if (isImageExtension(file.path)) {
-              this.layout.addFileTab(file.path);
+              this.view.addFileTab(file.path);
             }
           }
 
@@ -324,7 +335,7 @@ export default class App extends BaseApp {
         for (const path of deletedPaths) {
           await this.vfs.deleteFile(path, false);
 
-          const tabComponent = this.getTabComponents().find(
+          const tabComponent = this.view.getTabComponents().find(
             (component) => component.getPath() === path
           );
           if (tabComponent) {
@@ -358,7 +369,7 @@ export default class App extends BaseApp {
     }
 
     // Run a given file path, or otherwise the active file.
-    const filepath = options.filepath || this.layout.getActiveEditor().getPath();
+    const filepath = options.filepath || this.view.getActiveEditor().getPath();
     await this._startRun({ filepath, runAs: options.runAs });
   }
 
@@ -410,7 +421,7 @@ export default class App extends BaseApp {
 
     const run = () => {
       this.langWorkerClient.runUserCode(...runUserCodeArgs);
-      this.layout.checkForStopCodeButton();
+      this.view.checkForStopCodeButton();
     };
 
     if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
@@ -467,7 +478,7 @@ export default class App extends BaseApp {
 
     this.term.clear();
 
-    const activeTabName = this.layout.getActiveEditor().getFilename();
+    const activeTabName = this.view.getActiveEditor().getFilename();
     let files = await this.vfs.getAllFiles();
     files = files.concat(this.getHiddenFiles());
 
@@ -535,7 +546,7 @@ export default class App extends BaseApp {
    * (cursor preservation, undo stack) is delegated to the editor component.
    *
    * @async
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    * @param {object} [options]
    * @param {boolean} [options.clearUndoStack=false] - Whether to clear the undo
    * stack after the content is applied.
@@ -570,7 +581,7 @@ export default class App extends BaseApp {
    * Shared by the editor and image read paths.
    *
    * @param {Error} err - The error thrown by the VFS read.
-   * @param {TabComponent} component - The component to react on (editor/image).
+   * @param {BaseTab} component - The component to react on (editor/image).
    */
   _applyFileReadError(err, component) {
     if (err instanceof FileTooLargeError) {
@@ -582,23 +593,13 @@ export default class App extends BaseApp {
     }
   }
 
-  // ───────────────────────── Config & accessors ──────────────────────────
+  // ─────────────────────── Layout collaborator hooks ─────────────────────
 
   /**
-   * Get all tab components from the layout.
-   *
-   * @returns {TabComponent[]} List containing all open tab components.
+   * Tell all open components to reload their content from the VFS. Called by the
+   * Git backend after it rewrites files.
    */
-  getTabComponents() {
-    return this.layout.getTabComponents();
-  }
-
-  /**
-   * Get the active editor component from the layout.
-   *
-   * @returns {Editor} the active editor instance.
-   */
-  getActiveEditor() {
-    return this.layout.getActiveEditor();
+  reloadComponentsFromVFS() {
+    this.view.emitToAllComponents('vfsChanged');
   }
 }

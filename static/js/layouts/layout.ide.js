@@ -1,18 +1,19 @@
 import Layout from './layout.js';
-import Terra from '../terra.js';
-import { setLocalStorageItem } from '../lib/local-storage-manager.js';
 import { BASE_FONT_SIZE, MAX_FILE_SIZE } from '../constants.js';
-import { createModal, hideModal, showModal } from '../layout/modal.js';
-import { createTooltip, destroyTooltip } from './tooltip-manager.js';
+import { createModal, hideModal, showModal } from '../components/modal.js';
+import { createTooltip, destroyTooltip } from '../components/tooltip.js';
 
 export default class IDELayout extends Layout {
   /**
    * Create the layout.
    *
-   * @param {boolean} [forceDefaultLayout=false] Whether to force the default layout.
-   * @param {Array} [contentConfig=[]] The content configuration for the layout.
+   * @param {object} [options] - Controller-supplied options (theme,
+   * restoredConfig, …) passed through to the base Layout.
+   * @param {Array} [options.contentConfig=[]] The content configuration for the layout.
    */
-  constructor(forceDefaultLayout = false, contentConfig = []) {
+  constructor(options = {}) {
+    const { contentConfig = [] } = options;
+
     const defaultContentConfig = contentConfig.map((tab) => ({
       type: 'component',
       componentName: 'editor',
@@ -59,7 +60,7 @@ export default class IDELayout extends Layout {
       ]
     };
 
-    super(defaultLayoutConfig, { forceDefaultLayout });
+    super(defaultLayoutConfig, options);
   }
 
   /**
@@ -89,7 +90,7 @@ export default class IDELayout extends Layout {
   registerEditorCommands(editorComponent) {
     super.registerEditorCommands(editorComponent);
     // 'save' (mod-s) and 'closeFile' (option-w) are now global commands in the
-    // registry (commands.ide.js), so they fire from the terminal too and are
+    // registry (app.ide.commands.js), so they fire from the terminal too and are
     // not registered as editor-scope Ace commands here.
     editorComponent.onCommandExec((event) => this._validateFileSizeLimit(event, editorComponent));
   }
@@ -98,7 +99,7 @@ export default class IDELayout extends Layout {
    * Validates whether the file size exceeds the maximum size per keystroke.
    *
    * @param {Event} event - The event object.
-   * @param {EditorComponent} editorComponent - The editor component instance.
+   * @param {EditorTab} editorComponent - The editor component instance.
    */
   _validateFileSizeLimit(event, editorComponent) {
     // Verify whether the user exceeded the maximum file size when either
@@ -144,32 +145,6 @@ export default class IDELayout extends Layout {
     this.addButtonEventListeners();
     this.addActiveStates();
   };
-
-  onStateChanged() {
-    // Exclude the content from all editors for the IDE, because the content
-    // is reloaded from the VFS when the layout is restored.
-    const config = this._removeEditorValue(this.toConfig());
-
-    const state = JSON.stringify(config);
-    setLocalStorageItem('layout', state);
-  }
-
-  _removeEditorValue(config) {
-    if (config.content) {
-      config.content.forEach((item) => {
-        if (item.type === 'component') {
-          // Keep the value of pathless (Untitled) tabs, because those cannot
-          // be reloaded from the VFS.
-          if (item.componentState.path) {
-            item.componentState.value = '';
-          }
-        } else {
-          this._removeEditorValue(item);
-        }
-      });
-    }
-    return config;
-  }
 
   /**
    * Creates the HTML for the folder options in the save file modal.
@@ -280,33 +255,6 @@ export default class IDELayout extends Layout {
       !tabComponents[0].getPath() &&
       tabComponents[0].getContent() === ''
     );
-  }
-
-  /**
-   * Destroy this layout and replace it with a fresh instance that preserves the
-   * currently open tabs. The caller supplies a factory that builds the
-   * replacement from the preserved content config, and an `afterRecreate` hook
-   * (invoked before init) to re-wire app-level listeners onto the new instance.
-   *
-   * @param {(contentConfig: Array) => IDELayout} createReplacement - Factory
-   * that builds the replacement layout from the preserved tab config.
-   * @param {(next: IDELayout) => void} afterRecreate - Hook to wire up the new
-   * instance (e.g. reassign the app's layout reference and register listeners)
-   * before it is initialised.
-   * @returns {IDELayout} The new layout instance.
-   */
-  recreate(createReplacement, afterRecreate) {
-    const contentConfig = this.serializeTabs();
-
-    this.resetLayout = true;
-    this.destroy();
-
-    const next = createReplacement(contentConfig);
-    afterRecreate(next);
-    next.init();
-    next.resetLayout = false;
-
-    return next;
   }
 
   /**

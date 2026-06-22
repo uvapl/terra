@@ -1,11 +1,11 @@
-import { createModal, hideModal, showModal } from '../layout/modal.js';
+import { createModal, hideModal, showModal } from '../components/modal.js';
 import Terra from '../terra.js';
 import {
   setLocalStorageItem,
   getLocalStorageItem,
 } from '../lib/local-storage-manager.js';
 import { isBase64, seconds, slugify, isImageExtension } from '../lib/helpers.js';
-import { GITHUB_URL_PATTERN } from '../ide/constants.js';
+import { GITHUB_URL_PATTERN } from '../constants.js';
 import debounce from '../lib/debouncer.js';
 
 /**
@@ -279,7 +279,7 @@ export default class GitFS {
         Terra.app.fileTree.clearLocalStorageWarning();
 
         this.importToVFS(payload.repoContents).then(() => {
-          Terra.app.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
+          Terra.app.view.unlockEditors();
           Terra.app.rebuildFileTree();
         });
         break;
@@ -349,6 +349,6 @@ export default class GitFS {
     }
 
     // Trigger a vfsChanged event, such that all editors reload their content.
-    Terra.app.layout.emitToAllComponents('vfsChanged');
+    Terra.app.reloadComponentsFromVFS();
   }
 }

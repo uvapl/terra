@@ -121,6 +121,28 @@ export default class VirtualFileSystem extends EventTarget {
   getFileTree = (path = '') => this._send('getFileTree', [path]);
 
   /**
+   * List all folders in the VFS recursively, in depth-first order.
+   *
+   * @async
+   * @param {string} [parentPath] - The absolute parent folder path where
+   * subfolders will be fetched from.
+   * @param {number} [depth] - The current nesting depth.
+   * @returns {Promise<object[]>} List of `{ path, depth }` folder objects.
+   */
+  getFolderList = async (parentPath = '', depth = 0) => {
+    const folders = [];
+
+    const subfolders = await this.listFoldersInFolder(parentPath);
+    for (const folderName of subfolders) {
+      const subfolderpath = parentPath ? `${parentPath}/${folderName}` : folderName;
+      folders.push({ path: subfolderpath, depth });
+      folders.push(...(await this.getFolderList(subfolderpath, depth + 1)));
+    }
+
+    return folders;
+  };
+
+  /**
    * Download a file through the browser by creating a new blob and using
    * FileSaver.js to save it.
    *

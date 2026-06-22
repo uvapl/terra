@@ -1,6 +1,6 @@
-import FileTreeComponent from '../layout/file-tree.component.js';
-import * as LFS from '../fs/lfs.js';
-import { getFileExtension } from '../lib/helpers.js';
+import FileTreeComponent from "../components/filetree.js";
+import * as LFS from "../fs/lfs.js";
+import { getFileExtension } from "../lib/helpers.js";
 
 /**
  * File-tree concern.
@@ -18,7 +18,7 @@ import { getFileExtension } from '../lib/helpers.js';
  *
  * Presentation (title, in-place messages, bottom message, localstorage warning)
  * stays on the component and is reached directly via `app.fileTree`, like any
- * other public collaborator (`app.layout`, `app.vfs`).
+ * other public collaborator (`app.view`, `app.vfs`).
  *
  * @param {App} app - The app instance to install the file tree on.
  */
@@ -33,8 +33,9 @@ export function useFileTree(app) {
      *
      * @returns {Promise<void>}
      */
-    refreshFileTree() {
-      return this.vfs.getFileTree().then((tree) => this.fileTree.render(tree));
+    async refreshFileTree() {
+      const tree = await this.vfs.getFileTree();
+      this.fileTree.render(tree);
     },
 
     /**
@@ -43,8 +44,9 @@ export function useFileTree(app) {
      *
      * @returns {Promise<void>}
      */
-    rebuildFileTree() {
-      return this.vfs.getFileTree().then((tree) => this.fileTree.recreate(tree));
+    async rebuildFileTree() {
+      const tree = await this.vfs.getFileTree();
+      this.fileTree.recreate(tree);
     },
 
     /**
@@ -54,7 +56,7 @@ export function useFileTree(app) {
      * @returns {Promise<void>}
      */
     async createFile(path = null) {
-      const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
+      const parentPath = path ? path.split("/").slice(0, -1).join("/") : null;
       const fileName = await this.vfs.createFile(path);
       const key = parentPath ? `${parentPath}/${fileName}` : fileName;
 
@@ -70,7 +72,7 @@ export function useFileTree(app) {
      * @returns {Promise<void>}
      */
     async createFolder(path = null) {
-      const parentPath = path ? path.split('/').slice(0, -1).join('/') : null;
+      const parentPath = path ? path.split("/").slice(0, -1).join("/") : null;
       const folder = await this.vfs.createFolder(path);
       const key = parentPath ? `${parentPath}/${folder.name}` : folder.name;
 
@@ -111,7 +113,7 @@ export function useFileTree(app) {
     /** Local filesystem entries were dropped onto the tree. */
     async onFilesDropped(entries, destParentKey) {
       for (const entry of entries) {
-        await importEntry(this.vfs, entry, '', destParentKey);
+        await importEntry(this.vfs, entry, "", destParentKey);
       }
       await this.refreshFileTree();
     },
@@ -145,10 +147,10 @@ export function useFileTree(app) {
   const rebuildOnChange = () => {
     if (!app.isFSReloadSuspended()) app.refreshFileTree();
   };
-  app.vfs.addEventListener('fileCreated', rebuildOnChange);
-  app.vfs.addEventListener('folderCreated', rebuildOnChange);
-  app.vfs.addEventListener('fileDeleted', rebuildOnChange);
-  app.vfs.addEventListener('fileSystemChanged', rebuildOnChange);
+  app.vfs.addEventListener("fileCreated", rebuildOnChange);
+  app.vfs.addEventListener("folderCreated", rebuildOnChange);
+  app.vfs.addEventListener("fileDeleted", rebuildOnChange);
+  app.vfs.addEventListener("fileSystemChanged", rebuildOnChange);
 }
 
 /**
@@ -161,14 +163,14 @@ export function useFileTree(app) {
  * @param {string} [targetNodePath] - Path of the node it was dropped onto.
  * @returns {Promise<void>}
  */
-function importEntry(vfs, item, path = '', targetNodePath = null) {
+function importEntry(vfs, item, path = "", targetNodePath = null) {
   return new Promise((resolve) => {
     if (item.isFile) {
       item.file((file) => {
         const reader = new FileReader();
         reader.onload = (e) => {
           const buffer = e.target.result;
-          const destPath = [targetNodePath, path, file.name].filter((s) => s).join('/');
+          const destPath = [targetNodePath, path, file.name].filter((s) => s).join("/");
           vfs.createFile(destPath, buffer).then(() => resolve());
         };
         reader.readAsArrayBuffer(file);
