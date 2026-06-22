@@ -366,7 +366,12 @@ export default class FileTreeComponent {
   /** User clicked a node: activate a file, or toggle a folder. */
   _onClick = (event, data) => {
     if (data.node.data.isFile) {
-      this.delegate.onFileActivated(data.node.key);
+      // Debounce file activation so a double-click (which starts an inline
+      // rename) doesn't open the file and steal focus from the edit input.
+      clearTimeout(this._activateTimeout);
+      this._activateTimeout = setTimeout(() => {
+        this.delegate.onFileActivated(data.node.key);
+      }, 200);
     } else if (data.node.data.isFolder) {
       clearTimeout(this._toggleTimeout);
 
@@ -389,6 +394,7 @@ export default class FileTreeComponent {
   _onStartEdit = (event, data) => {
     this.delegate.suspendFSReload();
     clearTimeout(this._toggleTimeout);
+    clearTimeout(this._activateTimeout);
     data.input.select();
 
     $(data.input).attr({
