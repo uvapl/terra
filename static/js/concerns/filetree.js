@@ -89,10 +89,14 @@ export function useFileTree(app) {
 
     /** A node was moved (drag-drop); the component already moved it visually. */
     async onNodeMoved(srcPath, destPath, isFolder) {
+      // perform the move in the file system
       const move = isFolder ? this.vfs.moveFolder : this.vfs.moveFile;
       await move(srcPath, destPath);
 
+      // work the move recursively into the filetree and collect any changed paths
       const pairs = this.fileTree.applyRelocatedKeys(srcPath, destPath, isFolder);
+
+      // work the move into any open tabs
       pairs.forEach(({ src, dest }) => this.updateOpenTabPath(src, dest));
     },
 

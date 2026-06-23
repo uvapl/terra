@@ -462,12 +462,19 @@ export default class FileTreeComponent {
   /** Inline editor was removed: re-sort, resume reloads, and commit any rename. */
   _onAfterCloseEdit = () => {
     this._sort();
-    this.delegate.resumeFSReload();
 
     if (this._pendingRename) {
       const { srcPath, destPath, isFolder } = this._pendingRename;
       this._pendingRename = null;
-      this.delegate.onNodeRenamed(srcPath, destPath, isFolder);
+      // Keep FS reloads suspended until the move completes. The move emits a
+      // `folderCreated` event mid-flight (the destination is created before the
+      // source is deleted); resuming early would let that event trigger a tree
+      // rebuild against the intermediate VFS state, leaving the old folder
+      // alongside the new one (most visible for empty folders).
+      Promise.resolve(this.delegate.onNodeRenamed(srcPath, destPath, isFolder))
+        .finally(() => this.delegate.resumeFSReload());
+    } else {
+      this.delegate.resumeFSReload();
     }
   };
 
