@@ -317,22 +317,27 @@ class API extends BaseAPI {
    * containing the filename and content of the corresponding editor tab.
    */
   runUserCode({ activeTabPath, vfsFiles }) {
+    const activeTab = vfsFiles.find((file) => file.path === activeTabPath);
+
+    // Resolve the filename up front (cheap string work) and write the command
+    // prompt to the terminal *before* the heavier filesystem work below, so the
+    // "$ python3 <file>" line shows up immediately and any pause happens after
+    // it rather than before it.
+    const hasParent = activeTab.path.includes('/');
+    const { name, parentPath } = getPartsFromPath(activeTab.path);
+    const filename = hasParent ? name : activeTab.path;
+    this.hostWriteCmd(`python3 ${filename}`);
+
     try {
       // Ensure that we always operate from the home directory as a fresh start.
       this.pyodide.FS.chdir(HOME_DIR);
 
       this.writeFilesToVirtualFS(vfsFiles);
 
-      const activeTab = vfsFiles.find((file) => file.path === activeTabPath);
-      let filename = activeTab.path;
-      if (activeTab.path.includes('/')) {
+      if (hasParent) {
         // Change directory to the folder of the active file.
-        const { name, parentPath } = getPartsFromPath(activeTab.path);
-        filename = name;
         this.pyodide.FS.chdir(parentPath);
       }
-
-      this.hostWriteCmd(`python3 ${filename}`);
 
       const error = this.run(activeTab.content, activeTabPath);
       if (error) {
