@@ -185,7 +185,7 @@ export default class BaseController {
    * view directly.
    */
   lockEditors() {
-    this.view.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
+    this.layout.getEditorComponents().forEach((editorComponent) => editorComponent.lock());
   }
 
   /**
@@ -193,7 +193,7 @@ export default class BaseController {
    * the storage layer never reaches into the view directly.
    */
   unlockEditors() {
-    this.view.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
+    this.layout.getEditorComponents().forEach((editorComponent) => editorComponent.unlock());
   }
 
   // ── Delegate callbacks reported by the layout, forwarded to the app ──
