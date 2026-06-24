@@ -6,19 +6,11 @@ export default class ExamLayout extends Layout {
   tabsClosable = false;
 
   /**
-   * Additional toolbar buttons defined in exam config.
-   * @type {object}
-   */
-  buttonConfig = null;
-
-  /**
    * Create the layout.
    *
    * @param {array} content - List of content objects.
    * @param {number} fontSize - The default font-size to be used.
    * @param {object} options - Additional options object.
-   * @param {object} options.buttonConfig - Object containing buttons with their
-   * commands that will be rendered by the layout.
    */
   constructor(options = {}) {
     const { tabs, fontSize } = options;
@@ -56,10 +48,6 @@ export default class ExamLayout extends Layout {
     };
 
     super(defaultLayoutConfig, options);
-
-    if (isObject(options.buttonConfig)) {
-      this.buttonConfig = options.buttonConfig;
-    }
   }
 
   /**
@@ -75,35 +63,6 @@ export default class ExamLayout extends Layout {
 
     const $header = $('.terminal-component-container').find('.lm_header');
     $header.append(`<div class="toolbar" id="toolbar"></div>`);
-
-    this.addToolbarButtonsFromConfig();
-  }
-
-  /**
-   * Render the config buttons declared in the app's buttonConfig into the
-   * toolbar.
-   */
-  addToolbarButtonsFromConfig() {
-    if (!isObject(this.buttonConfig)) return;
-
-    Object.keys(this.buttonConfig).forEach((name, index) => {
-      const id = name.replace(/\s/g, '-').toLowerCase();
-      const selector = `#${id}`;
-
-      let cmd = this.buttonConfig[name];
-      if (!Array.isArray(cmd)) {
-        cmd = cmd.split('\n');
-      }
-
-      this.delegate.commands.register([{
-        name: `config-${id}`,
-        button: { id, label: name, class: `config-btn ${id}-btn`, position: 300 + index * 10 },
-        isAvailable: ({ app }) => app.canRunActiveTab(),
-        exec: ({ app }) => app.runButtonCommand(selector, cmd),
-      }]);
-
-      this.delegate.surfaces.renderButton(`config-${id}`, $('#toolbar'));
-    });
   }
 
   /**

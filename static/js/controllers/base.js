@@ -39,23 +39,21 @@ export default class BaseController {
    * instead of restoring the stored one.
    * Remaining options are variant-specific and passed through to buildLayout().
    */
-  constructor({ delegate, ...layoutOptions }) {
+  constructor({ delegate, commandRegistry, ...layoutOptions }) {
     this.delegate = delegate;
+    this.commandRegistry = commandRegistry;
 
-    // The app owns the command catalog (delegate.commands); the controller owns
-    // its surfacing — the menubar/buttons/keyboard DOM and the invalidate pass.
-    // The layout reaches both via `this.delegate.commands` / `.surfaces`.
-    this.surfaces = new CommandSurfaces(this.delegate.commands);
-    this.registerCommands();
+    this.surfaces = new CommandSurfaces(this.commandRegistry);
+    this.setupCommandSurfaces();
     this.createLayout(layoutOptions);
   }
 
   /**
-   * Register the variant's command config into the app's registry, and (for
-   * variants with a menubar/keyboard) build those surfaces. Variant controllers
-   * override this. The base is a no-op so a variant with no commands is valid.
+   * Build the variant's command surfaces (menubar, global keyboard shortcuts).
+   * Variant controllers override this. The base is a no-op so a variant with
+   * no surfaces is valid.
    */
-  registerCommands() {}
+  setupCommandSurfaces() {}
 
   /**
    * The command registry (owned by the app). Exposed here so the layout — whose
@@ -65,7 +63,7 @@ export default class BaseController {
    * @returns {CommandRegistry}
    */
   get commands() {
-    return this.delegate.commands;
+    return this.commands;
   }
 
   /**

@@ -10,6 +10,7 @@ import {
 } from './app.lab.config.js';
 import { getFileExtension } from './lib/helpers.js';
 import LabController from './controllers/lab.js';
+import labCommandConfig from './commands/config.lab.js';
 import { loadReadme } from './app.lab.readme.js';
 import { getLocalStorageItem } from './lib/local-storage-manager.js';
 
@@ -76,6 +77,8 @@ export default class LabApp extends App {
 
     // Get the programming language based on the first filename.
     const proglang = getFileExtension(config.files[0]);
+
+    this.commands.register(labCommandConfig.commands);
 
     this.view = new LabController({
       delegate: this,

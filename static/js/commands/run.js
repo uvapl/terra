@@ -13,13 +13,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * The run button is enabled only when the active tab's language has a worker
- * and no runtime is currently spinning up. This is the single predicate that
- * the surfaces' invalidate() pulls to set the button's enabled state.
- */
-const runAvailable = ({ app }) => app.canRunActiveTab();
-
-/**
  * Build the run-button command. The only per-variant difference is whether the
  * terminal is cleared before each run (the embed variant clears; the rest do
  * not), so that is parameterised here.
@@ -30,7 +23,7 @@ const runAvailable = ({ app }) => app.canRunActiveTab();
 export const makeRunButtonCommand = (runOptions = {}) => ({
   name: 'runTab',
   button: { id: 'run-code', label: 'Run', class: 'primary-btn run-user-code-btn', position: -100 },
-  isAvailable: runAvailable,
+  isAvailable: ({ app }) => app.canRunActiveTab(),
   exec: ({ app }) => app.runCode(runOptions),
 });
 

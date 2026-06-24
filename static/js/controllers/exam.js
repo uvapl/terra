@@ -1,6 +1,5 @@
 import BaseController from './base.js';
 import ExamLayout from '../layouts/layout.exam.js';
-import examCommandConfig from '../commands/config.exam.js';
 
 /**
  * Controller for the Exam app variant.
@@ -10,9 +9,7 @@ export default class ExamController extends BaseController {
     return new ExamLayout(options);
   }
 
-  registerCommands() {
-    this.delegate.commands.register(examCommandConfig.commands);
-
+  setupCommandSurfaces() {
     // Exam has no menubar, but it does have global keyboard shortcuts (clear).
     this.surfaces.installGlobalKeyboard();
   }
