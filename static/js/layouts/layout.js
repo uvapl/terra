@@ -122,7 +122,7 @@ export default class Layout extends GoldenLayout {
    * Reference to the current active tab instance in the layout.
    * @type {BaseTab}
    */
-  activeTab = null;
+  activeEditor = null;
 
   /**
    * The controller that owns this layout. The layout reports user-driven events
@@ -325,8 +325,8 @@ export default class Layout extends GoldenLayout {
     // When the layout is loaded from local storage, the first tab that will be
     // created by GoldenLayout is the one the user has opened. Additionally, the
     // active tab will be overridden when another editor becomes active.
-    if (!this.activeTab) {
-      this.activeTab = tab.contentItem.instance;
+    if (!this.getActiveEditor()) {
+      this.setActiveEditor(tab.contentItem.instance);
     }
 
     // The onTabCreated is *also* triggered when a user is dragging tabs around,
@@ -427,7 +427,7 @@ export default class Layout extends GoldenLayout {
       // it's needed to be able to close image tabs, which do not get focus.
       this.editorStack.on('activeContentItemChanged', (param) => {
         if (typeof param.container.getComponent === 'function') {
-          this.activeTab = param.container.getComponent();
+          this.setActiveEditor(param.container.getComponent());
         }
       });
     }
@@ -687,7 +687,7 @@ export default class Layout extends GoldenLayout {
    * @param {EditorTab} editorComponent - The editor component to set as active.
    */
   setActiveEditor(editorComponent) {
-    this.activeTab = editorComponent;
+    this.activeEditor = editorComponent;
   }
 
   /**
@@ -696,7 +696,7 @@ export default class Layout extends GoldenLayout {
    * @returns {EditorTab} - The active editor component.
    */
   getActiveEditor() {
-    return this.activeTab;
+    return this.activeEditor;
   }
 
   /**
