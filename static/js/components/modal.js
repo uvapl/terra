@@ -54,6 +54,8 @@ export function createModal(modalOptions = {}) {
   $modal.off('keydown').on('keydown', (e) => {
     if (e.key === 'Enter') {
       $modal.find('.modal-footer .primary-btn').click();
+    } else if (e.key === 'Escape') {
+      hideModal($modal);
     }
   });
 
