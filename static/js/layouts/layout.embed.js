@@ -51,33 +51,27 @@ export default class EmbedLayout extends Layout {
     super(defaultLayoutConfig, options);
   }
 
-  renderButtons() {
-    const runCodeButtonHtml = this.getRunCodeButtonHtml();
+  /**
+   * Customize layout as loaded.
+   */
+  initCustomContent() {
     const settingsMenuHtml = this.getSettingsMenuHtml();
 
-    const $editorContainer = $('.editor-component-container');
-    const $terminalContainer = $('.terminal-component-container');
+    // The run button is built into the static `#toolbar` by the controller's
+    // buildToolbar pass. The settings dropdown stays in the GoldenLayout
+    // controls: vertical layout puts them on the editor, horizontal on the
+    // terminal. (The embed run command clears the terminal before each run;
+    // see config.embed.js.)
+    const $controls = this.vertical
+      ? $('.editor-component-container').find('.lm_controls')
+      : $('.terminal-component-container').find('.lm_controls');
 
-    if (this.vertical) {
-      // Vertical layout
-      $editorContainer
-        .find('.lm_controls')
-        .append(runCodeButtonHtml)
-        .append(settingsMenuHtml);
-    } else {
-      // Horizontal layout.
-      $terminalContainer.find('.lm_controls')
-        .append(runCodeButtonHtml)
-        .append(settingsMenuHtml);
-    }
+    $controls.append(settingsMenuHtml);
 
-    this.renderConfigButtons();
-    this.addActiveStates();
-    this.addButtonEventListeners();
-  }
+    const $header = this.vertical
+      ? $('.editor-component-container').find('.lm_header')
+      : $('.terminal-component-container').find('.lm_header');
 
-
-  onRunCodeButtonClick() {
-    this.delegate?.onRunCode?.({ clearTerm: true });
+    $header.append(`<div class="toolbar" id="toolbar"></div>`);
   }
 }

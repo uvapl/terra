@@ -82,22 +82,39 @@ export class TerraPlugin {
    */
   createTermButtonLeft(buttonConfig) {
     const buttonHtml = this.createTermButtonHtml(buttonConfig);
-    const $toolbar = $('.navbar-toolbar');
-    if ($toolbar.length) {
-      // The navbar toolbar lives in the page chrome and survives a layout
-      // reset, but onLayoutLoaded re-fires on every init. Remove any existing
-      // button with this id first so a reset replaces it instead of appending
-      // a duplicate.
-      $(`#${buttonConfig.id}`).remove();
-      $toolbar.append(buttonHtml);
-    } else {
-      $('.terminal-component-container .lm_header').append(buttonHtml);
-    }
+    // The toolbar lives in the page chrome and survives a layout reset, but
+    // onLayoutLoaded re-fires on every init. Remove any existing button with
+    // this id first so a reset replaces it instead of appending a duplicate.
+    // Left/right ordering is handled by CSS `order`.
+    $(`#${buttonConfig.id}`).remove();
+    $('#toolbar').append(buttonHtml);
 
     const $button = $(`#${buttonConfig.id}`);
     $button.click(buttonConfig.onClick);
 
+    this._registerButtonAvailability(buttonConfig);
+
     return $button;
+  }
+
+  /**
+   * If the button declares an `isAvailable` predicate, register it with the
+   * command registry so its enabled state is pulled by the same invalidate()
+   * pass as the run/config buttons — the plugin does not push enable/disable
+   * itself. The button's click is already wired above; only its availability is
+   * registered here.
+   *
+   * @param {object} buttonConfig
+   */
+  _registerButtonAvailability(buttonConfig) {
+    if (!buttonConfig.isAvailable) return;
+
+    Terra.app.commands.register([{
+      name: `plugin-${buttonConfig.id}`,
+      button: { id: buttonConfig.id },
+      isAvailable: buttonConfig.isAvailable,
+    }]);
+    Terra.app.view.invalidateActions();
   }
 
   /**
@@ -110,20 +127,17 @@ export class TerraPlugin {
    */
   createTermButtonRight(buttonConfig) {
     const buttonHtml = this.createTermButtonHtml(buttonConfig);
-    const $toolbar = $('.navbar-toolbar');
-    if ($toolbar.length) {
-      // In the navbar toolbar, position is handled by CSS `order`, so a plain
-      // append keeps the markup simple. The toolbar survives a layout reset
-      // while onLayoutLoaded re-fires, so drop any existing button with this id
-      // first to replace it rather than append a duplicate.
-      $(`#${buttonConfig.id}`).remove();
-      $toolbar.append(buttonHtml);
-    } else {
-      $('.terminal-component-container .lm_header > .lm_controls').prepend(buttonHtml);
-    }
+    // Position within the toolbar is handled by CSS `order`, so a plain append
+    // keeps the markup simple. The toolbar survives a layout reset while
+    // onLayoutLoaded re-fires, so drop any existing button with this id first to
+    // replace it rather than append a duplicate.
+    $(`#${buttonConfig.id}`).remove();
+    $('#toolbar').append(buttonHtml);
 
     const $button = $(`#${buttonConfig.id}`);
     $button.click(buttonConfig.onClick);
+
+    this._registerButtonAvailability(buttonConfig);
 
     return $button;
   }

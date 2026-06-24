@@ -79,6 +79,7 @@ export default class LabApp extends App {
 
     this.view = new LabController({
       delegate: this,
+      commandRegistry: this.commands,
       files: config.files,
       proglang,
       forceDefaultLayout: this.isNewLab,

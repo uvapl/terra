@@ -78,6 +78,7 @@ export default class ExamApp extends App {
     // The exam controller reads persisted state and builds the exam layout.
     this.view = new ExamController({
       delegate: this,
+      commandRegistry: this.commands,
       tabs: this.config.tabs,
       hiddenFiles: this.config.hidden_tabs,
       buttonConfig: this.config.buttons,

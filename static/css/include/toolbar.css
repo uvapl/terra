@@ -3,7 +3,7 @@
  *  to live in the terminal component header.
  * ========================================================================== */
 
-.navbar-toolbar {
+.toolbar {
   display: flex;
   align-items: center;
   /* One cohesive button group with a subtle deep-blue gradient and
@@ -14,7 +14,7 @@
 }
 
 /* Compact, icon-led buttons that read as one cohesive toolbar. */
-.navbar-toolbar .button {
+.toolbar .button {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -30,17 +30,17 @@
 }
 
 /* Hairline dividers between the grouped buttons. */
-.navbar-toolbar .button + .button {
+.toolbar .button + .button {
   margin-left: 0;
   box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.18);
 }
 
-.navbar-toolbar .button:not([disabled]):hover {
+.toolbar .button:not([disabled]):hover {
   background: rgba(255, 255, 255, 0.15);
 }
 
 /* Colorized icons, rendered as a leading pseudo-element on each button. */
-.navbar-toolbar .button::before {
+.toolbar .button::before {
   content: '';
   display: inline-block;
   width: 16px;
@@ -51,74 +51,74 @@
   flex: 0 0 auto;
 }
 
-.navbar-toolbar .button[disabled] {
+.toolbar .button[disabled] {
   opacity: 0.5;
 }
 
 /* Run button — the primary action, pushed to the far right of the group. */
-.navbar-toolbar #run-code {
+.toolbar #run-code {
   color: #fff;
   font-weight: 600;
 }
 
-.navbar-toolbar #run-code:not([disabled]):hover {
+.toolbar #run-code:not([disabled]):hover {
   background: rgba(255, 255, 255, 0.15);
 }
 
-.navbar-toolbar #run-code::before {
-  background-image: url('../../../img/icons/play.svg');
+.toolbar #run-code::before {
+  background-image: url('../../img/icons/play.svg');
 }
 
 /* Stop state (swapped in while a program is running). */
-.navbar-toolbar #run-code.danger-btn {
+.toolbar #run-code.danger-btn {
   color: #fff;
 }
 
-.navbar-toolbar #run-code.danger-btn:not([disabled]):hover {
+.toolbar #run-code.danger-btn:not([disabled]):hover {
   background: rgba(255, 255, 255, 0.15);
 }
 
-.navbar-toolbar #run-code.danger-btn::before {
-  background-image: url('../../../img/icons/stop.svg');
+.toolbar #run-code.danger-btn::before {
+  background-image: url('../../img/icons/stop.svg');
 }
 
 /* Clear terminal — icon only, sits just left of Run. */
-.navbar-toolbar #clear-term {
+.toolbar #clear-term {
   padding: 0 12px;
 }
 
-.navbar-toolbar #clear-term::before {
-  background-image: url('../../../img/icons/trash-colored.svg');
+.toolbar #clear-term::before {
+  background-image: url('../../img/icons/trash-colored.svg');
 }
 
 /* Override the base trash-bin icon rules (and their dark-mode swap). */
-.navbar-toolbar .clear-term-btn:before,
-.dark-mode .navbar-toolbar .clear-term-btn:before {
-  background-image: url('../../../img/icons/trash-colored.svg');
+.toolbar .clear-term-btn:before,
+.dark-mode .toolbar .clear-term-btn:before {
+  background-image: url('../../img/icons/trash-colored.svg');
   opacity: 1;
   width: 16px;
   height: 16px;
 }
 
-.navbar-toolbar #run-as-btn::before {
-  background-image: url('../../../img/icons/sliders.svg');
+.toolbar #run-as-btn::before {
+  background-image: url('../../img/icons/sliders.svg');
 }
 
-.navbar-toolbar #run-check50-btn::before {
-  background-image: url('../../../img/icons/check-badge.svg');
+.toolbar #run-check50-btn::before {
+  background-image: url('../../img/icons/check-badge.svg');
 }
 
-.navbar-toolbar .config-btn::before {
-  background-image: url('../../../img/icons/terminal.svg');
+.toolbar .config-btn::before {
+  background-image: url('../../img/icons/terminal.svg');
 }
 
 /* ========================================================================== */
 /* Dark Mode                                                                  */
 /* ========================================================================== */
-.dark-mode .navbar-toolbar .button {
+.dark-mode .toolbar .button {
   color: #fff;
 }
 
-.dark-mode .navbar-toolbar .button:not([disabled]):hover {
+.dark-mode .toolbar .button:not([disabled]):hover {
   background: rgba(255, 255, 255, 0.15);
 }

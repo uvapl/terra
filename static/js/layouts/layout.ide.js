@@ -63,6 +63,10 @@ export default class IDELayout extends Layout {
     super(defaultLayoutConfig, options);
   }
 
+  initCustomContent() {
+    // No customizations here.
+  };
+
   /**
    * Enable or disable the project-related items in the menubar.
    *
@@ -90,8 +94,8 @@ export default class IDELayout extends Layout {
   registerEditorCommands(editorComponent) {
     super.registerEditorCommands(editorComponent);
     // 'save' (mod-s) and 'closeFile' (option-w) are now global commands in the
-    // registry (app.ide.commands.js), so they fire from the terminal too and are
-    // not registered as editor-scope Ace commands here.
+    // registry (commands/config.ide.js), so they fire from the terminal too and
+    // are not registered as editor-scope Ace commands here.
     editorComponent.onCommandExec((event) => this._validateFileSizeLimit(event, editorComponent));
   }
 
@@ -127,24 +131,6 @@ export default class IDELayout extends Layout {
       }
     }
   }
-
-  renderButtons() {
-    // The navbar toolbar lives in the page chrome, outside the GoldenLayout
-    // container, so it survives a layout reset/destroy. Inject the run-code
-    // button HTML only once; appending unconditionally would stack a duplicate
-    // button on every re-init. CSS `order` controls its final position relative
-    // to the plugin buttons injected afterwards.
-    if (!$('#run-code').length) {
-      $(this.buttonContainerSelector).append(this.getRunCodeButtonHtml());
-    }
-
-    // Event handlers close over `this` (the layout instance, recreated on
-    // reset), so they are (re)bound on every init to point at the current
-    // instance. addButtonEventListeners is idempotent (off-then-on), so this
-    // does not stack handlers on the persistent buttons.
-    this.addButtonEventListeners();
-    this.addActiveStates();
-  };
 
   /**
    * Creates the HTML for the folder options in the save file modal.

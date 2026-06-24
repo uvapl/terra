@@ -4,6 +4,7 @@ import {
   setLocalStorageItem,
 } from '../lib/local-storage-manager.js';
 import { BASE_FONT_SIZE } from '../constants.js';
+import CommandSurfaces from '../commands/surfaces.js';
 
 /**
  * Current version of the default layout config. Bump it when a breaking change
@@ -25,8 +26,9 @@ const LAYOUT_CONFIG_VERSION = 3;
  *
  * The controller exposes the layout as `controller.layout`. The app calls the
  * layout directly for view/tab operations, and the controller only for its own
- * concerns: run-button state (onRunEnded / checkForStopCodeButton), persistence,
- * and recreate(). The layout calls back into the controller via `this.delegate`.
+ * concerns: the command registry (which owns action availability + the run/stop
+ * lifecycle), persistence, and recreate(). The layout calls back into the
+ * controller via `this.delegate`.
  */
 export default class BaseController {
   /**
@@ -39,7 +41,31 @@ export default class BaseController {
    */
   constructor({ delegate, ...layoutOptions }) {
     this.delegate = delegate;
+
+    // The app owns the command catalog (delegate.commands); the controller owns
+    // its surfacing — the menubar/buttons/keyboard DOM and the invalidate pass.
+    // The layout reaches both via `this.delegate.commands` / `.surfaces`.
+    this.surfaces = new CommandSurfaces(this.delegate.commands);
+    this.registerCommands();
     this.createLayout(layoutOptions);
+  }
+
+  /**
+   * Register the variant's command config into the app's registry, and (for
+   * variants with a menubar/keyboard) build those surfaces. Variant controllers
+   * override this. The base is a no-op so a variant with no commands is valid.
+   */
+  registerCommands() {}
+
+  /**
+   * The command registry (owned by the app). Exposed here so the layout — whose
+   * delegate is this controller — can register commands without reaching past
+   * the controller to the app.
+   *
+   * @returns {CommandRegistry}
+   */
+  get commands() {
+    return this.delegate.commands;
   }
 
   /**
@@ -75,6 +101,12 @@ export default class BaseController {
         this.persistLayoutConfig();
       }
     });
+
+    // Build the toolbar from the registered commands' button surfaces, into the
+    // static `#toolbar` div in the page chrome — the mirror of the menubar, and
+    // (like the menubar) built before the layout renders. Every variant has a
+    // `#toolbar`, so this is shared here rather than per-variant.
+    this.layout.on('initialised', () => { this.onLayoutInitialised() });
 
     return this.layout;
   }
@@ -206,7 +238,8 @@ export default class BaseController {
    * `afterSetupLayout` once (initial build only), and `afterLayoutReset` after a
    * recreate. This replaces the app's old `layout.on('initialised', …)` wiring.
    */
-  onReady() {
+  onLayoutInitialised() {
+    this.surfaces.buildToolbar('#toolbar');
     this.delegate.onReady?.();
 
     if (!this._afterSetupDone) {
@@ -218,10 +251,6 @@ export default class BaseController {
       this._pendingReset = false;
       this.delegate.afterLayoutReset?.();
     }
-  }
-
-  onRunCode(detail) {
-    this.delegate.onRunCode?.(detail);
   }
 
   onEditorEditingStarted(tabComponent) {
@@ -252,24 +281,36 @@ export default class BaseController {
     this.delegate.onImageReloadRequested?.(tabComponent);
   }
 
-  onClearTerm() {
-    this.delegate.clearTerminal?.();
-  }
-
-  onConfigButtonCommand(selector, cmd) {
-    this.delegate.runButtonCommand?.(selector, cmd);
+  // ── Action availability ──
+  // Re-pull every command's predicate and reflect it onto its surfaces (run
+  // button, config buttons, menu items, plugin buttons). The app calls this on
+  // the transitions that change availability; nothing pushes button state.
+  invalidateActions() {
+    this.surfaces.invalidate();
   }
 
   // ── Run-button lifecycle ──
-  // The controller owns the run/stop semantics; the layout exposes only the
-  // mechanical button primitives (setRunButtonMode / setRunButtonEnabled /
+  // Steady-state enablement is predicate-driven (invalidateActions). The
+  // run/stop *transition* below is imperative: a run is starting/in-flight/ended
+  // is a transient state the predicates do not model. The layout exposes only
+  // the mechanical button primitives (setRunButtonMode / setRunButtonEnabled /
   // setConfigButtonsEnabled).
 
   /**
-   * If the running program does not finish quickly (potential infinite loop),
-   * turn the run button into a stop button so the user can abort it.
+   * A run is being kicked off: disable the run and config buttons until the
+   * run-started timer flips the run button into its stop affordance.
    */
-  checkForStopCodeButton() {
+  runStarting() {
+    this.layout.setRunButtonEnabled(false);
+    this.layout.setConfigButtonsEnabled(false);
+  }
+
+  /**
+   * The program has started running. If it does not finish quickly (potential
+   * infinite loop), turn the run button into a stop button so the user can
+   * abort it.
+   */
+  runStarted() {
     this.showStopCodeButtonTimeoutId = setTimeout(() => {
       this.layout.setRunButtonMode('stop');
       this.layout.setRunButtonEnabled(true);
@@ -277,24 +318,19 @@ export default class BaseController {
   }
 
   /**
-   * Reset the button back to a run button when a run has finished.
-   *
-   * @param {object} options
-   * @param {boolean} options.disableRunBtn - Whether the run button should stay
-   * disabled (e.g. the active tab is not runnable).
+   * The run has finished (or was aborted). Reset the button back to its run
+   * presentation, cancel the pending stop-button timer, and hand enablement
+   * back to the predicates via invalidate().
    */
-  onRunEnded({ disableRunBtn }) {
+  runEnded() {
     this.layout.setRunButtonMode('run');
-    this.layout.setRunButtonEnabled(!disableRunBtn);
-
-    if (!disableRunBtn) {
-      this.layout.setConfigButtonsEnabled(true);
-    }
 
     if (this.showStopCodeButtonTimeoutId) {
       clearTimeout(this.showStopCodeButtonTimeoutId);
       this.showStopCodeButtonTimeoutId = null;
     }
+
+    this.invalidateActions();
   }
 
   /**

@@ -1,9 +1,5 @@
-import './app.ide.commands.js';
-
 import IDEApp from './app.ide.js';
 import Terra from './terra.js';
-import commands from './commands.js';
-import { initMenubar } from './components/menubar.js';
 import { loadPlugins } from './plugin-manager.js';
 
 const plugins = [
@@ -15,13 +11,9 @@ const plugins = [
 ];
 
 loadPlugins(plugins).then(() => {
+    // The controller registers the IDE command config and builds the menubar +
+    // global keyboard during setupLayout (see IDEController). All that is left
+    // here is to construct and initialise the app.
     Terra.app = new IDEApp();
-
-    // Build the menubar from the registered commands (core + plugin) and bind
-    // global shortcuts before the app initialises its layout.
-    commands.buildMenu('.menubar');
-    initMenubar();
-    commands.installGlobalKeyboard();
-
     Terra.app.init();
 });

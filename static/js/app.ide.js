@@ -42,9 +42,10 @@ export default class IDEApp extends App {
 
     // The controller reads persisted state and builds the IDE layout. The app
     // talks only to the controller. The save command calls this.saveFile()
-    // directly (see app.ide.commands.js).
+    // directly (see commands/config.ide.js).
     this.view = new IDEController({
       delegate: this,
+      commandRegistry: this.commands,
       forceDefaultLayout: reset,
       contentConfig: []
     });

@@ -1,9 +1,15 @@
-import { formatDate } from '../lib/helpers.js';
+import { formatDate, isObject } from '../lib/helpers.js';
 import { createModal, hideModal, showModal } from '../components/modal.js';
 import Layout from './layout.js';
 
 export default class ExamLayout extends Layout {
   tabsClosable = false;
+
+  /**
+   * Additional toolbar buttons defined in exam config.
+   * @type {object}
+   */
+  buttonConfig = null;
 
   /**
    * Create the layout.
@@ -50,21 +56,54 @@ export default class ExamLayout extends Layout {
     };
 
     super(defaultLayoutConfig, options);
+
+    if (isObject(options.buttonConfig)) {
+      this.buttonConfig = options.buttonConfig;
+    }
   }
 
-  renderButtons() {
-    const runCodeButtonHtml = this.getRunCodeButtonHtml();
-    const clearTermButtonHtml = this.getClearTermButtonHtml();
+  /**
+   * Customize layout as loaded.
+   */
+  initCustomContent() {
     const settingsMenuHtml = this.getSettingsMenuHtml();
 
-    // Add run-code, clear-term and settings menu to the DOM.
-    const $terminalContainer = $('.terminal-component-container');
-    $terminalContainer.find('.lm_header').append(runCodeButtonHtml).append(clearTermButtonHtml);
-    $terminalContainer.find('.lm_controls').append(settingsMenuHtml);
+    // The run and clear buttons are built into the static `#toolbar` by the
+    // controller's buildToolbar pass; only the settings dropdown and the
+    // data-driven config buttons are placed here.
+    $('.terminal-component-container').find('.lm_controls').append(settingsMenuHtml);
 
-    this.renderConfigButtons();
-    this.addActiveStates();
-    this.addButtonEventListeners();
+    const $header = $('.terminal-component-container').find('.lm_header');
+    $header.append(`<div class="toolbar" id="toolbar"></div>`);
+
+    this.addToolbarButtonsFromConfig();
+  }
+
+  /**
+   * Render the config buttons declared in the app's buttonConfig into the
+   * toolbar.
+   */
+  addToolbarButtonsFromConfig() {
+    if (!isObject(this.buttonConfig)) return;
+
+    Object.keys(this.buttonConfig).forEach((name, index) => {
+      const id = name.replace(/\s/g, '-').toLowerCase();
+      const selector = `#${id}`;
+
+      let cmd = this.buttonConfig[name];
+      if (!Array.isArray(cmd)) {
+        cmd = cmd.split('\n');
+      }
+
+      this.delegate.commands.register([{
+        name: `config-${id}`,
+        button: { id, label: name, class: `config-btn ${id}-btn`, position: 300 + index * 10 },
+        isAvailable: ({ app }) => app.canRunActiveTab(),
+        exec: ({ app }) => app.runButtonCommand(selector, cmd),
+      }]);
+
+      this.delegate.surfaces.renderButton(`config-${id}`, $('#toolbar'));
+    });
   }
 
   /**

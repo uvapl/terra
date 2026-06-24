@@ -58,6 +58,7 @@ export default class EmbedApp extends App {
     // The embed controller reads persisted state and builds the embed layout.
     this.view = new EmbedController({
       delegate: this,
+      commandRegistry: this.commands,
       tabs,
       proglang,
       vertical: isVertical,

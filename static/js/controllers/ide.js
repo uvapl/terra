@@ -1,5 +1,7 @@
 import BaseController from './base.js';
 import IDELayout from '../layouts/layout.ide.js';
+import ideCommandConfig from '../commands/config.ide.js';
+import { initMenubar } from '../components/menubar.js';
 
 /**
  * Controller for the IDE app variant.
@@ -7,6 +9,23 @@ import IDELayout from '../layouts/layout.ide.js';
 export default class IDEController extends BaseController {
   buildLayout(options) {
     return new IDELayout(options);
+  }
+
+  /**
+   * Register the IDE command config and, because the IDE has a menubar and
+   * global keyboard shortcuts, build the menubar and install the global
+   * keyboard. Runs from the base constructor, before the layout is built; the
+   * run button itself is placed later when the layout renders.
+   */
+  registerCommands() {
+    this.delegate.commands.register(ideCommandConfig.commands, {
+      submenus: ideCommandConfig.submenus,
+      rawItems: ideCommandConfig.rawItems,
+    });
+
+    this.surfaces.buildMenu('.menubar');
+    initMenubar();
+    this.surfaces.installGlobalKeyboard();
   }
 
   /**
