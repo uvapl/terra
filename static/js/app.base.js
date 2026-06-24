@@ -1,6 +1,8 @@
 import { getFileExtension } from './lib/helpers.js'
 import LangWorkerClient from './workers/lang-worker-client.js';
 import VirtualFileSystem from './fs/vfs.js';
+import CommandRegistry from './commands/registry.js';
+import Terra from './terra.js';
 
 /**
  * Composition + wiring layer shared by every app.
@@ -24,6 +26,14 @@ export default class BaseApp {
    * @type {LangWorkerClient}
    */
   langWorkerClient = null;
+
+  /**
+   * The command registry: the catalog of actions the user can trigger, which all
+   * act on this app. The app owns the catalog; the controller owns its surfacing
+   * (menubar/buttons/keyboard) via CommandSurfaces.
+   * @type {CommandRegistry}
+   */
+  commands = null;
 
   /**
    * Reference to the Virtual File System (VFS) instance.
@@ -80,6 +90,10 @@ export default class BaseApp {
     // spawns a worker thread on demand once a supported language is loaded. The
     // handler object (getLangWorkerHandlers) is defined on the App subclass.
     this.langWorkerClient = new LangWorkerClient(this.getLangWorkerHandlers());
+
+    // The app owns the command registry; commands dispatch against this app.
+    // Exposed on Terra so plugins and the console can reach it.
+    this.commands = new CommandRegistry(this);
   }
 
   /**
@@ -146,6 +160,6 @@ export default class BaseApp {
     const activeEditor = this.view.getActiveEditor();
     const filename = activeEditor ? activeEditor.getFilename() : null;
     this.createLangWorker(getFileExtension(filename));
-    this.updateRunButtonState(filename);
+    this.view.invalidateActions();
   }
 }

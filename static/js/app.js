@@ -47,7 +47,7 @@ export default class App extends BaseApp {
       this.createLangWorker(editorComponent.proglang);
     }
 
-    this.updateRunButtonState(editorComponent.getFilename());
+    this.view.invalidateActions();
 
     await this.setEditorFileContent(editorComponent);
   }
@@ -69,7 +69,7 @@ export default class App extends BaseApp {
 
   onImageSwitchedTo(imageComponent) {
     this.terminateLangWorker();
-    this.updateRunButtonState(null);
+    this.view.invalidateActions();
     this.setImageFileContent(imageComponent);
   }
 
@@ -143,19 +143,6 @@ export default class App extends BaseApp {
     this.view.setFontSizeDemo();
   }
 
-  // ───────────────────── Run-button / layout handlers ────────────────────
-
-  /**
-   * Delegate callback when the user clicks the run-code button (or triggers run
-   * via a shortcut). Invoked by the controller with the run options directly.
-   *
-   * @param {object} detail - Run options.
-   * @param {boolean} detail.clearTerm - Whether to clear the terminal first.
-   */
-  onRunCode({ clearTerm }) {
-    this.runCode({ clearTerm });
-  }
-
   // ─────────────────────────── Language worker ───────────────────────────
 
   /**
@@ -195,6 +182,7 @@ export default class App extends BaseApp {
         if (hasPendingCommand) {
           this.term?.write('\x1b[2mWaiting for runtime to fully load, just a sec...\x1b[0m');
         }
+        this.view.invalidateActions();
       },
 
       /**
@@ -208,9 +196,9 @@ export default class App extends BaseApp {
           this.term.clearCurrentLine();
         }
         if (!hasPendingCommand) {
-          $('.run-user-code-btn').prop('disabled', false);
-          $('.clear-term-btn').prop('disabled', false);
-          $('.config-btn').prop('disabled', false);
+          // The runtime finished loading: re-pull availability so the run and
+          // config buttons enable for the (now runnable) active tab.
+          this.view.invalidateActions();
         }
       },
 
@@ -241,7 +229,7 @@ export default class App extends BaseApp {
        * A custom config button's command has finished executing.
        */
       onRunButtonCommandDone: () => {
-        $('.run-user-code-btn, .config-btn').prop('disabled', false);
+        this.view.invalidateActions();
       },
 
       /**
@@ -249,7 +237,7 @@ export default class App extends BaseApp {
        * turn the run button into a stop button so the user can abort it.
        */
       onRunStarted: () => {
-        this.view.checkForStopCodeButton();
+        this.view.runStarted();
       },
 
       /**
@@ -258,14 +246,6 @@ export default class App extends BaseApp {
        * is nothing pending to dispose and the cursor is already hidden.
        */
       onRunEnded: () => {
-        // Only disable the button again if the current tab has a worker, because
-        // users can still run code through the contextmenu in the file-tree in
-        // the IDE app.
-        const activeEditor = this.view.getActiveEditor();
-        const disableRunBtn =
-          !activeEditor ||
-          !this.langWorkerClient.supports(getFileExtension(activeEditor.getFilename()));
-
         // Print inverted `%` to terminal if last line of output was not terminated by a `\n`.
         this.term?.printForgotNewline();
 
@@ -275,7 +255,10 @@ export default class App extends BaseApp {
         // Set focus to the active editor.
         this.view.getActiveEditor().focus();
 
-        this.view.onRunEnded({ disableRunBtn });
+        // Reset the run/stop button and re-pull availability. The run button's
+        // predicate handles the case where the active tab is not runnable (e.g.
+        // code was launched via the file-tree context menu in the IDE).
+        this.view.runEnded();
 
         // If a run was started through runFile (e.g. by the shell), resolve its
         // promise now so the caller can resume.
@@ -429,7 +412,7 @@ export default class App extends BaseApp {
 
     this.term.focus();
 
-    $('.run-user-code-btn, .config-btn').prop('disabled', true);
+    this.view.runStarting();
 
     let files = await this.vfs.getAllFiles();
 
@@ -493,7 +476,7 @@ export default class App extends BaseApp {
   async runButtonCommand(selector, cmd) {
     const $button = $(selector);
     if ($button.prop('disabled')) return;
-    $('.run-user-code-btn, .config-btn').prop('disabled', true);
+    this.view.runStarting();
 
     this.term.clear();
 
@@ -545,16 +528,20 @@ export default class App extends BaseApp {
   }
 
   /**
-   * Enable the run button only when the given file's language has a worker;
-   * disable it otherwise (e.g. plain text, an image, or an Untitled file).
-   * Called whenever the active tab changes.
+   * Whether the active tab is something the language worker can run. This is the
+   * single fact the run-button (and config-button) predicates pull through the
+   * command registry's invalidate() pass; the app decides it, the view applies
+   * it. Returns false when there is no active editor (e.g. an image tab).
    *
-   * @param {string|null} filename - The active tab's filename, or null when the
-   * active tab is not a runnable editor (e.g. an image).
+   * @returns {boolean}
    */
-  updateRunButtonState(filename) {
-    const canRun = this.langWorkerClient.supports(getFileExtension(filename));
-    $('.run-user-code-btn, .config-btn').prop('disabled', !canRun);
+  canRunActiveTab() {
+    // `this.view` is briefly absent while the controller is still being
+    // constructed (the toolbar's initial build evaluates this predicate before
+    // the controller is assigned); treat that as not-runnable until onReady's
+    // invalidate re-evaluates.
+    const editor = this.view?.getActiveEditor?.();
+    return !!editor && this.langWorkerClient.supports(getFileExtension(editor.getFilename()));
   }
 
   // ──────────────────────────── File content ─────────────────────────────

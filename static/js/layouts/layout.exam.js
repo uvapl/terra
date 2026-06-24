@@ -1,4 +1,4 @@
-import { formatDate } from '../lib/helpers.js';
+import { formatDate, isObject } from '../lib/helpers.js';
 import { createModal, hideModal, showModal } from '../components/modal.js';
 import Layout from './layout.js';
 
@@ -11,8 +11,6 @@ export default class ExamLayout extends Layout {
    * @param {array} content - List of content objects.
    * @param {number} fontSize - The default font-size to be used.
    * @param {object} options - Additional options object.
-   * @param {object} options.buttonConfig - Object containing buttons with their
-   * commands that will be rendered by the layout.
    */
   constructor(options = {}) {
     const { tabs, fontSize } = options;
@@ -52,19 +50,19 @@ export default class ExamLayout extends Layout {
     super(defaultLayoutConfig, options);
   }
 
-  renderButtons() {
-    const runCodeButtonHtml = this.getRunCodeButtonHtml();
-    const clearTermButtonHtml = this.getClearTermButtonHtml();
+  /**
+   * Customize layout as loaded.
+   */
+  initCustomContent() {
     const settingsMenuHtml = this.getSettingsMenuHtml();
 
-    // Add run-code, clear-term and settings menu to the DOM.
-    const $terminalContainer = $('.terminal-component-container');
-    $terminalContainer.find('.lm_header').append(runCodeButtonHtml).append(clearTermButtonHtml);
-    $terminalContainer.find('.lm_controls').append(settingsMenuHtml);
+    // The run and clear buttons are built into the static `#toolbar` by the
+    // controller's buildToolbar pass; only the settings dropdown and the
+    // data-driven config buttons are placed here.
+    $('.terminal-component-container').find('.lm_controls').append(settingsMenuHtml);
 
-    this.renderConfigButtons();
-    this.addActiveStates();
-    this.addButtonEventListeners();
+    const $header = $('.terminal-component-container').find('.lm_header');
+    $header.append(`<div class="toolbar" id="toolbar"></div>`);
   }
 
   /**

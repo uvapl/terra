@@ -11,6 +11,7 @@ import {
   updateLocalStoragePrefix
 } from './lib/local-storage-manager.js';
 import EmbedController from './controllers/embed.js';
+import embedCommandConfig from './commands/config.embed.js';
 
 export default class EmbedApp extends App {
   /**
@@ -55,9 +56,12 @@ export default class EmbedApp extends App {
     // Get the programming language based on the filename.
     const proglang = getFileExtension(queryParams.filename);
 
+    this.commands.register(embedCommandConfig.commands);
+
     // The embed controller reads persisted state and builds the embed layout.
     this.view = new EmbedController({
       delegate: this,
+      commandRegistry: this.commands,
       tabs,
       proglang,
       vertical: isVertical,

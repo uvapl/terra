@@ -82,7 +82,7 @@ export default class Check50Plugin extends TerraPlugin {
   onButtonClick = async () => {
     if (this.$button.is(':disabled')) return;
 
-    const editorComponent = Terra.app.layout.getActiveEditor();
+    const editorComponent = Terra.app.view.getActiveEditor();
     if (!editorComponent || editorComponent.proglang !== 'c') return;
 
     const { path: filepath } = await Terra.app.getActiveEditorFileObject();

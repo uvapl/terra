@@ -64,18 +64,18 @@ export default class LabLayout extends Layout {
     super(defaultLayoutConfig, options);
   }
 
-  renderButtons() {
-    const runCodeButtonHtml = this.getRunCodeButtonHtml();
-    const clearTermButtonHtml = this.getClearTermButtonHtml();
+  /**
+   * Customize layout as loaded.
+   */
+  initCustomContent() {
     const settingsMenuHtml = this.getSettingsMenuHtml();
 
-    // Add run-code, clear-term and settings menu to the DOM.
-    const $terminalContainer = $('.terminal-component-container');
-    $terminalContainer.find('.lm_header').append(runCodeButtonHtml).append(clearTermButtonHtml);
-    $terminalContainer.find('.lm_controls').append(settingsMenuHtml);
+    // The run and clear buttons are built into the static `#toolbar` by the
+    // controller's buildToolbar pass; only the settings dropdown is placed here.
+    $('.terminal-component-container').find('.lm_controls').append(settingsMenuHtml);
 
-    this.addActiveStates();
-    this.addButtonEventListeners();
+    const $header = $('.terminal-component-container').find('.lm_header');
+    $header.append(`<div class="toolbar" id="toolbar"></div>`);
   }
 
   /**

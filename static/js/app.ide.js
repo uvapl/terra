@@ -1,5 +1,6 @@
 import App from './app.js';
 import IDEController from './controllers/ide.js';
+import ideCommandConfig from './commands/config.ide.js';
 import { getFileExtension, isValidFilename } from './lib/helpers.js';
 import { getPlugin } from './plugin-manager.js';
 import { removeLocalStorageItem } from './lib/local-storage-manager.js';
@@ -40,11 +41,17 @@ export default class IDEApp extends App {
     const reset =
       !(await this.initLFSAtStart()) && !(await this.initGitFSAtStart());
 
+    this.commands.register(ideCommandConfig.commands, {
+      submenus: ideCommandConfig.submenus,
+      rawItems: ideCommandConfig.rawItems,
+    });
+
     // The controller reads persisted state and builds the IDE layout. The app
     // talks only to the controller. The save command calls this.saveFile()
-    // directly (see app.ide.commands.js).
+    // directly (see commands/config.ide.js).
     this.view = new IDEController({
       delegate: this,
+      commandRegistry: this.commands,
       forceDefaultLayout: reset,
       contentConfig: []
     });

@@ -9,6 +9,11 @@ export default class LabController extends BaseController {
     return new LabLayout(options);
   }
 
+  setupCommandSurfaces() {
+    // Lab has no menubar, but it does have a global keyboard shortcut (clear).
+    this.surfaces.installGlobalKeyboard();
+  }
+
   setPageTitle(config) {
     this.layout.setPageTitle(config);
   }

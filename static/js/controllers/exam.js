@@ -9,6 +9,11 @@ export default class ExamController extends BaseController {
     return new ExamLayout(options);
   }
 
+  setupCommandSurfaces() {
+    // Exam has no menubar, but it does have global keyboard shortcuts (clear).
+    this.surfaces.installGlobalKeyboard();
+  }
+
   /**
    * Remove the right navbar when the app failed to initialise. Static because no
    * controller/layout instance exists yet at that point.

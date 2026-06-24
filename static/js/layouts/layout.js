@@ -8,7 +8,6 @@ import ImageTab from '../components/image.tab.js';
 import EditorTab from '../components/editor.tab.js';
 import TerminalTab from '../components/terminal.tab.js';
 import { triggerPluginEvent } from '../plugin-manager.js';
-import commands from '../commands.js';
 
 /**
  * Default layout config that is used when the layout is created for the first
@@ -62,12 +61,6 @@ export default class Layout extends GoldenLayout {
    * @type {boolean}
    */
   tabsClosable = true;
-
-  /**
-   * The button config only available in the Exam app.
-   * @type {object}
-   */
-  buttonConfig = null;
 
   /**
    * Wether to show a vertical layout where the terminal is below the editor
@@ -162,10 +155,6 @@ export default class Layout extends GoldenLayout {
       this.hiddenFiles = options.hiddenFiles;
     }
 
-    if (isObject(options.buttonConfig)) {
-      this.buttonConfig = options.buttonConfig;
-    }
-
     this.on('initialised', () => this.onInitialised(options));
     this.on('stackCreated', (stack) => this.onStackCreated(stack, options));
     this.on('tabCreated', (tab) => this.onTabCreated(tab));
@@ -198,9 +187,11 @@ export default class Layout extends GoldenLayout {
    * @param {object} options - Options passed to the layout.
    */
   onInitialised(options) {
+    this.initCustomContent();
     this.emitToAllComponents('afterFirstRender');
     this.setTheme(this.theme);
-    this.renderButtons();
+    this.addActiveStates();
+    this.addButtonEventListeners();
     this.showTermStartupMessage();
     triggerPluginEvent('onLayoutLoaded');
 
@@ -211,11 +202,6 @@ export default class Layout extends GoldenLayout {
     if (this.vertical) {
       this.emitToAllComponents('verticalLayout');
     }
-
-    // The run button now exists; tell the controller the layout is ready so it
-    // (via the app) can spawn the language worker for the active tab and sync
-    // the run button. Replaces the app's old `.on('initialised')` worker hook.
-    this.delegate?.onReady?.();
   }
 
   /**
@@ -225,7 +211,7 @@ export default class Layout extends GoldenLayout {
    */
   registerEditorCommands(editorComponent) {
     // Apply editor-scope commands declared in the registry (core + plugins).
-    commands.registerEditorCommands(editorComponent);
+    this.delegate.surfaces.registerEditorCommands(editorComponent);
   }
 
   /**
@@ -266,6 +252,11 @@ export default class Layout extends GoldenLayout {
   onImageTabCreated(tab) {
     const imageComponent = tab.contentItem.instance;
 
+    // Mark this tab active as soon as it is shown, before the delegate reacts.
+    // Registered first so it runs before the 'show' forwarding below, which
+    // triggers an availability re-pull that reads the active tab.
+    imageComponent.addEventListener('show', () => this.setActiveEditor(imageComponent));
+
     // Forward custom image component events to the controller delegate.
     // key = local component event name
     // value = delegate method the controller forwards to the app
@@ -292,6 +283,12 @@ export default class Layout extends GoldenLayout {
     const editorComponent = tab.contentItem.instance;
 
     this.registerEditorCommands(editorComponent);
+
+    // Mark this tab active as soon as it is shown, before the delegate reacts.
+    // Registered first so it runs before the 'show' forwarding below, which
+    // triggers an availability re-pull (canRunActiveTab) that reads the active
+    // tab — otherwise the re-pull would see the previously active tab.
+    editorComponent.addEventListener('show', () => this.setActiveEditor(editorComponent));
 
     // Forward custom editor component events to the controller delegate.
     // key = local component event name
@@ -434,43 +431,6 @@ export default class Layout extends GoldenLayout {
   }
 
   /**
-   * Selector for the container that holds the run/clear/plugin action buttons.
-   *
-   * Defaults to the terminal component header. When a navbar toolbar is present
-   * (the IDE), the buttons live there instead so they read as a single mini
-   * toolbar aligned to the right of the navbar.
-   *
-   * @returns {string}
-   */
-  get buttonContainerSelector() {
-    return $('.navbar-toolbar').length
-      ? '.navbar-toolbar'
-      : '.terminal-component-container .lm_header';
-  }
-
-  /**
-   * Render the config buttons through the app config.
-   */
-  renderConfigButtons() {
-    if (isObject(this.buttonConfig)) {
-      Object.keys(this.buttonConfig).forEach((name) => {
-        const id = name.replace(/\s/g, '-').toLowerCase();
-        const selector = `#${id}`;
-
-        let cmd = this.buttonConfig[name];
-        if (!Array.isArray(cmd)) {
-          cmd = cmd.split('\n');
-        }
-
-        $(this.buttonContainerSelector)
-          .append(`<button id="${id}" class="button config-btn ${id}-btn">${name}</button>`);
-
-        $(selector).click(() => this.delegate?.onConfigButtonCommand?.(selector, cmd));
-      });
-    }
-  }
-
-  /**
    * Add active states in the UI for certain dropdowns.
    */
   addActiveStates() {
@@ -542,27 +502,6 @@ export default class Layout extends GoldenLayout {
   }
 
   /**
-   * Retrieve the HTML for the run code button.
-   *
-   * @returns {string}
-   */
-  getRunCodeButtonHtml() {
-    // Rendered disabled by default; enabled once a supported language's worker
-    // is ready (or when switching to a runnable tab). Prevents the button from
-    // being clickable for a non-runnable initial tab such as an Untitled file.
-    return `<button id="run-code" class="button primary-btn run-user-code-btn" disabled>Run</button>`;
-  };
-
-  /**
-   * Retrieve the HTML for the clear terminal button.
-   *
-   * @returns {string}
-   */
-  getClearTermButtonHtml() {
-    return `<button id="clear-term" class="button clear-term-btn" title="Clear terminal"></button>`;
-  }
-
-  /**
    * Retrieve the HTML for the settings menu.
    *
    * @returns {string}
@@ -601,8 +540,8 @@ export default class Layout extends GoldenLayout {
    * Abstract function where the run-code, clear-term and additional
    * buttons and dropdown should be rendered.
    */
-  renderButtons() {
-    console.info('renderButtons() is not implemented');
+  initCustomContent() {
+    console.info('initCustomContent() is not implemented');
   }
 
   getCurrentFontSize() {
@@ -643,8 +582,8 @@ export default class Layout extends GoldenLayout {
     // handlers close over `this` (the layout instance, recreated on reset).
     // Namespaced off-then-on rebinds the handlers to the current instance
     // instead of stacking a new handler on top of the old (destroyed) one.
-    $('#run-code').off('click.layout').on('click.layout', () => this.onRunCodeButtonClick());
-    $('#clear-term').off('click.layout').on('click.layout', () => this.onClearTermButtonClick());
+    // The run and clear buttons' clicks are wired by the command surfaces
+    // (buildToolbar / renderButton), not here.
 
     // Update font-size for all components on change.
     $('#font-size-menu').find('li[data-val]').off('click.layout').on('click.layout', (event) => {
@@ -666,20 +605,6 @@ export default class Layout extends GoldenLayout {
       }
     });
   };
-
-  /**
-   * Callback when the user clicks the run-code button or pressed ctrl/cmd+enter.
-   */
-  onRunCodeButtonClick() {
-    this.delegate?.onRunCode?.({ clearTerm: false });
-  }
-
-  /**
-   * Callback when the user clicks the clear-term button.
-   */
-  onClearTermButtonClick() {
-    this.delegate?.onClearTerm?.();
-  }
 
   /**
    * Set the active editor component.
