@@ -30,7 +30,7 @@
   width: 750px;
   min-width: 400px;
   max-height: calc(100vh - 40px);
-  background-color: var(--color-white);
+  background-color: var(--ide-panel-bg);
   border-radius: var(--border-radius);
   opacity: 0;
   transition-timing-function: ease;
@@ -47,7 +47,7 @@
 }
 
 .modal-header {
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--ide-tint-border);
   padding: var(--modal-padding);
   display: flex;
   align-items: center;
@@ -78,7 +78,7 @@
 
 .modal-footer {
   padding: var(--modal-padding);
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--ide-tint-border);
   display: flex;
   justify-content: space-between;
 }
