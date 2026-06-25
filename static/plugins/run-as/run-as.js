@@ -1,5 +1,5 @@
-import { TerraPlugin } from '../../js/plugin-manager.js';
-import { createModal, hideModal, showModal } from '../../js/components/modal.js';
+import { TerraPlugin } from '../../js/lib/plugin-manager.js';
+import { createModal, hideModal, showModal } from '../../js/ui/components/modal.js';
 import Terra from '../../js/terra.js';
 
 export default class RunAsPlugin extends TerraPlugin {
@@ -24,11 +24,11 @@ export default class RunAsPlugin extends TerraPlugin {
       class: '',
       onClick: this.onButtonClick,
       disabled: true,
-      // "Run as" only applies to C files. The button's enabled state is pulled
-      // by the command surfaces' invalidate() pass (on tab switches etc.), so
-      // the plugin no longer pushes enable/disable on focus/image events. The
-      // registry injects the active editor into the predicate's context.
-      isAvailable: ({ editor }) => editor?.proglang === 'c',
+      isAvailable: ({ app, editor }) => {
+        if (app.getRunStatus() != "running") {
+          return editor?.proglang === 'c'
+        }
+      },
     });
   }
 

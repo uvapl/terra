@@ -1,4 +1,4 @@
-import { createModal, hideModal, showModal } from '../components/modal.js';
+import { createModal, hideModal, showModal } from '../ui/components/modal.js';
 import Terra from '../terra.js';
 import {
   setLocalStorageItem,
@@ -348,7 +348,7 @@ export default class GitFS {
       await this.vfs.createFile(file.path, content, false);
     }
 
-    // Trigger a vfsChanged event, such that all editors reload their content.
-    Terra.app.reloadComponentsFromVFS();
+    // Let all editors reload their content.
+    Terra.app.reloadOpenFiles();
   }
 }

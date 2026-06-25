@@ -1,6 +1,6 @@
-import { getPlugin, TerraPlugin } from '../../js/plugin-manager.js';
+import { getPlugin, TerraPlugin } from '../../js/lib/plugin-manager.js';
 import { seconds, getPartsFromPath } from '../../js/lib/helpers.js';
-import { createModal, hideModal, showModal } from '../../js/components/modal.js';
+import { createModal, hideModal, showModal } from '../../js/ui/components/modal.js';
 import Terra from '../../js/terra.js';
 
 const BASE_URL = 'https://checkz.proglab.nl'
@@ -42,23 +42,12 @@ export default class Check50Plugin extends TerraPlugin {
       id: 'run-check50-btn',
       class: 'primary-btn',
       onClick: this.onButtonClick,
-      disabled: true,
+      isAvailable: ({ app, editor }) => {
+        if (app.getRunStatus() != "running") {
+          return editor?.proglang === 'c'
+        }
+      },
     });
-  }
-
-  onImageSwitchedTo = (imageComponent) => {
-    if (!this.$button) return;
-    this.$button.prop('disabled', true);
-  }
-
-  onEditorFocus = (editorComponent) => {
-    if (!this.$button) return;
-
-    if (editorComponent.proglang === 'c' && !this.$button.is(':disabled.loading')) {
-      this.$button.prop('disabled', false);
-    } else {
-      this.$button.prop('disabled', true);
-    }
   }
 
   onStorageChange = (storageName, prevStorageName) => {
@@ -202,7 +191,7 @@ export default class Check50Plugin extends TerraPlugin {
 
       // Add close button handler.
       $('.check50-close-btn').click(() => {
-        clearInterval(Terra.v.check50PollingIntervalId);
+        clearInterval(this.check50PollingIntervalId);
         this.enableCheck50Button();
         this.rightSidebarPlugin.destroy();
       });
@@ -223,12 +212,12 @@ export default class Check50Plugin extends TerraPlugin {
   }
 
   pollCheck50Results = (id) => {
-    Terra.v.check50PollingIntervalId = setInterval(() => {
+    this.check50PollingIntervalId = setInterval(() => {
       fetch(`${BASE_URL}/get/${id}`)
         .then((response) => response.json())
         .then((response) => {
           if (response.status === 'finished') {
-            clearInterval(Terra.v.check50PollingIntervalId);
+            clearInterval(this.check50PollingIntervalId);
             this.enableCheck50Button();
             this.showCheck50Results(response.result.check50);
           }

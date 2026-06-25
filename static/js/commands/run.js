@@ -23,7 +23,16 @@
 export const makeRunButtonCommand = (runOptions = {}) => ({
   name: 'runTab',
   button: { id: 'run-code', label: 'Run', class: 'primary-btn run-user-code-btn', position: -100 },
-  isAvailable: ({ app }) => app.canRunActiveTab(),
+  isAvailable: ({ app }) => {
+    const $button = $('#run-code');
+    if (app.getRunStatus() == "running") {
+      $button.text('Stop').removeClass('primary-btn').addClass('danger-btn');
+      return true;
+    } else {
+      $button.text('Run').removeClass('danger-btn').addClass('primary-btn');
+    }
+    return app.canRunActiveTab();
+  },
   exec: ({ app }) => app.runCode(runOptions),
 });
 
