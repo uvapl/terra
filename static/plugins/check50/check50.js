@@ -191,7 +191,7 @@ export default class Check50Plugin extends TerraPlugin {
 
       // Add close button handler.
       $('.check50-close-btn').click(() => {
-        clearInterval(Terra.v.check50PollingIntervalId);
+        clearInterval(this.check50PollingIntervalId);
         this.enableCheck50Button();
         this.rightSidebarPlugin.destroy();
       });
@@ -212,12 +212,12 @@ export default class Check50Plugin extends TerraPlugin {
   }
 
   pollCheck50Results = (id) => {
-    Terra.v.check50PollingIntervalId = setInterval(() => {
+    this.check50PollingIntervalId = setInterval(() => {
       fetch(`${BASE_URL}/get/${id}`)
         .then((response) => response.json())
         .then((response) => {
           if (response.status === 'finished') {
-            clearInterval(Terra.v.check50PollingIntervalId);
+            clearInterval(this.check50PollingIntervalId);
             this.enableCheck50Button();
             this.showCheck50Results(response.result.check50);
           }

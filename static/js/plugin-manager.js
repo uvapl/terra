@@ -15,6 +15,9 @@ import {
  */
 const plugins = {};
 
+let storageName = null;
+let prevStorageName = null;
+
 // Base plugin class that all plugins should extend.
 export class TerraPlugin {
   /**
@@ -327,13 +330,10 @@ export function loadPlugins(pluginNames) {
  * @param {string} pluginName - The name of the plugin to trigger the event for.
  * @param {string} storageName - The new storage name.
  */
-function triggerStorageChange(pluginName, storageName) {
-  Terra.v.prevStorageName = Terra.v.storageName;
-  Terra.v.storageName = storageName;
-  plugins[pluginName]['onStorageChange'](
-    Terra.v.storageName,
-    Terra.v.prevStorageName
-  );
+function triggerStorageChange(pluginName, newStorageName) {
+  prevStorageName = storageName;
+  storageName = newStorageName;
+  plugins[pluginName]['onStorageChange'](storageName, prevStorageName);
 }
 
 /**
