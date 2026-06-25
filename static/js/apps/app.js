@@ -285,7 +285,7 @@ export default class App extends BaseApp {
       /**
        * A custom config button's command has finished executing.
        */
-      onRunButtonCommandDone: () => {
+      onRunSnippetDone: () => {
         this.view.invalidateActions();
       },
 
@@ -441,91 +441,50 @@ export default class App extends BaseApp {
   }
 
   /**
-   * Runs the code inside the worker by sending all files to the worker along with
-   * the current active tab name. If the `options.filepath` is set, then solely
-   * that file will be run.
+   * Run a file from the VFS. Returns a Promise that resolves when the run ends
+   * (normally or aborted). Fire-and-forget callers (e.g. the run button via
+   * runActiveTab) simply do not await it.
    *
    * @async
-   * @param {object} options - Options for running the code.
-   * @param {string} options.filepath - Run a specific file.
-   * @param {boolean} options.clearTerm Whether to clear the terminal before
-   * printing the output.
-   * @param {boolean} options.runAs - Whether the runAs config should be used.
+   * @param {string} filepath - The (VFS-absolute) file to run.
+   * @param {object} [options]
+   * @param {boolean} [options.clearTerm] - Clear the terminal before running.
+   * @param {boolean} [options.runAs] - Use the runAs config.
+   * @returns {Promise<void>} Resolves when the run has ended.
    */
-  async runCode(options = {}) {
+  async runFile(filepath, options = {}) {
+    if (!this.langWorkerClient.supports(getFileExtension(filepath))) {
+      throw new Error(`cannot run '${filepath}': unsupported file type`);
+    }
+    if (this.langWorkerClient.isRunningCode) {
+      throw new Error('a program is already running');
+    }
     if (options.clearTerm) this.term.clear();
-    if (this.langWorkerClient.isRunningCode) return;
-
-    // Run a given file path, or otherwise the active file.
-    const filepath = options.filepath || this.view.getActiveEditor().getPath();
-    await this._startRun({ filepath, runAs: options.runAs });
-  }
-
-  /**
-   * Start running a single file in the language worker. Shared by runCode (the
-   * run button) and runFile (the shell). Collects all files, spawns the worker
-   * for the file's language if needed, and either runs immediately or queues
-   * the command until the worker is ready.
-   *
-   * @async
-   * @param {object} options
-   * @param {string} options.filepath - The file to run.
-   * @param {boolean} [options.runAs] - Whether the runAs config should be used.
-   */
-  async _startRun({ filepath, runAs = false }) {
-    // Immediately find out language based on extension, and bail if
-    // indeterminate.
-    const proglang = getFileExtension(filepath);
-    if (!proglang) return;
 
     // Notify plugins that a run is starting (e.g. the shell, to yield the
     // terminal and start program output on a fresh line).
     triggerPluginEvent('onRunStart');
-
     this.term.focus();
 
     let files = await this.vfs.getAllFiles();
-
-    // Append hidden files if present.
     files = files.concat(this.getHiddenFiles());
 
     // Only resolve the runAs config when actually running "as", because
     // getRunAsConfig() reads the active editor's path and throws when there is
     // no runnable active tab (e.g. when the shell launches a program).
-    const runAsConfig = runAs ? this.getRunAsConfig() || undefined : undefined;
+    const runAsConfig = options.runAs ? this.getRunAsConfig() || undefined : undefined;
 
-    this.langWorkerClient.start(proglang, filepath, files, runAsConfig);
+    // Set up the completion promise before starting the run so onRunEnded can
+    // resolve it regardless of how quickly the worker responds.
+    const runEnded = new Promise(resolve => { this._runEndResolver = resolve; });
+    await this.langWorkerClient.runFile(getFileExtension(filepath), filepath, files, runAsConfig);
+    return runEnded;
   }
 
-  /**
-   * Run a single file and resolve once the run has ended (whether it completed
-   * normally or was aborted). This is the stable entry point the shell uses to
-   * launch a program: the shell yields terminal input, awaits this, then takes
-   * input back. It deliberately goes through the app rather than reaching into
-   * the language worker client.
-   *
-   * @param {string} filepath - The (VFS-absolute) file to run.
-   * @returns {Promise<void>} Resolves when the run has ended.
-   */
-  runFile(filepath) {
-    return new Promise((resolve, reject) => {
-      if (!this.langWorkerClient.supports(getFileExtension(filepath))) {
-        reject(new Error(`cannot run '${filepath}': unsupported file type`));
-        return;
-      }
-
-      if (this.langWorkerClient.isRunningCode) {
-        reject(new Error('a program is already running'));
-        return;
-      }
-
-      // onRunEnded resolves this once the worker reports the run has finished.
-      this._runEndResolver = resolve;
-      this._startRun({ filepath }).catch((err) => {
-        this._runEndResolver = null;
-        reject(err);
-      });
-    });
+  /** Run the active editor tab. A no-op when code is already running. */
+  runActiveTab(options = {}) {
+    if (this.langWorkerClient.isRunningCode) return;
+    return this.runFile(this.view.getActiveEditor().getPath(), options);
   }
 
   /**
@@ -535,21 +494,18 @@ export default class App extends BaseApp {
    * it when running and disable it when it's done running.
    * @param {array} cmd - List of commands to execute.
    */
-  async runButtonCommand(selector, cmd) {
+  async runSnippet(selector, cmd) {
     const $button = $(selector);
     if ($button.prop('disabled')) return;
 
     this.term.clear();
 
-    const proglang = getFileExtension(this.view.getActiveEditor().getFilename());
-    const activeTabName = this.view.getActiveEditor().getFilename();
+    const filename = this.view.getActiveEditor().getFilename();
+    const proglang = getFileExtension(filename);
     let files = await this.vfs.getAllFiles();
     files = files.concat(this.getHiddenFiles());
 
-    this.langWorkerClient.load(
-      proglang,
-      () => this.langWorkerClient.runButtonCommand(selector, activeTabName, cmd, files)
-    );
+    this.langWorkerClient.runSnippet(proglang, selector, filename, cmd, files);
   }
 
   /**

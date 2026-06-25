@@ -13,7 +13,7 @@ class API extends BaseAPI {
     this.sharedMem = options.sharedMem;
     this.newOrModifiedFilesCallback = options.newOrModifiedFilesCallback;
     this.deletedFilesCallback = options.deletedFilesCallback;
-    this.runButtonCommandCallback = options.runButtonCommandCallback;
+    this.runSnippetCallback = options.runSnippetCallback;
     this.restartCallback = options.restartCallback;
 
     this.initPyodide();
@@ -377,7 +377,7 @@ class API extends BaseAPI {
    * @param {array} data.files - List of objects, each containing the filename
    * and content of the corresponding editor tab.
    */
-  runButtonCommand({ selector, activeTabName, cmd, files }) {
+  runSnippet({ selector, activeTabName, cmd, files }) {
     try {
       this.writeFilesToVirtualFS(files);
 
@@ -390,7 +390,7 @@ class API extends BaseAPI {
         this.hostWrite(error);
       }
     } finally {
-      this.runButtonCommandCallback(selector);
+      this.runSnippetCallback(selector);
       this.restartCallback();
     }
   }
@@ -549,8 +549,8 @@ const onAnyMessage = async event => {
           port.postMessage({ id: 'runUserCodeCallback' });
         },
 
-        runButtonCommandCallback(selector) {
-          port.postMessage({ id: 'runButtonCommandCallback', selector });
+        runSnippetCallback(selector) {
+          port.postMessage({ id: 'runSnippetCallback', selector });
         },
 
         restartCallback() {
@@ -559,8 +559,8 @@ const onAnyMessage = async event => {
       });
       break;
 
-    case 'runButtonCommand':
-      api.runButtonCommand(event.data.data);
+    case 'runSnippet':
+      api.runSnippet(event.data.data);
       break;
 
     case 'runUserCode':
