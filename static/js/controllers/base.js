@@ -41,9 +41,8 @@ export default class BaseController {
    */
   constructor({ delegate, commandRegistry, ...layoutOptions }) {
     this.delegate = delegate;
-    this.commandRegistry = commandRegistry;
 
-    this.surfaces = new CommandSurfaces(this.commandRegistry);
+    this.surfaces = new CommandSurfaces(commandRegistry);
     this.setupCommandSurfaces();
     this.createLayout(layoutOptions);
   }
@@ -54,17 +53,6 @@ export default class BaseController {
    * no surfaces is valid.
    */
   setupCommandSurfaces() {}
-
-  /**
-   * The command registry (owned by the app). Exposed here so the layout — whose
-   * delegate is this controller — can register commands without reaching past
-   * the controller to the app.
-   *
-   * @returns {CommandRegistry}
-   */
-  get commands() {
-    return this.commands;
-  }
 
   /**
    * Build the layout, wire it to this controller, and expose it as
@@ -263,16 +251,16 @@ export default class BaseController {
     this.delegate.onEditorTextChanged?.(tabComponent);
   }
 
-  onEditorSwitchedTo(tabComponent) {
-    this.delegate.onEditorSwitchedTo?.(tabComponent);
+  onSwitchToEditorTab(tabComponent) {
+    this.delegate.onSwitchToEditorTab?.(tabComponent);
   }
 
   onEditorReloadRequested(tabComponent) {
     this.delegate.onEditorReloadRequested?.(tabComponent);
   }
 
-  onImageSwitchedTo(tabComponent) {
-    this.delegate.onImageSwitchedTo?.(tabComponent);
+  onSwitchToImageTab(tabComponent) {
+    this.delegate.onSwitchToImageTab?.(tabComponent);
   }
 
   onImageReloadRequested(tabComponent) {
@@ -285,50 +273,6 @@ export default class BaseController {
   // the transitions that change availability; nothing pushes button state.
   invalidateActions() {
     this.surfaces.invalidate();
-  }
-
-  // ── Run-button lifecycle ──
-  // Steady-state enablement is predicate-driven (invalidateActions). The
-  // run/stop *transition* below is imperative: a run is starting/in-flight/ended
-  // is a transient state the predicates do not model. The layout exposes only
-  // the mechanical button primitives (setRunButtonMode / setRunButtonEnabled /
-  // setConfigButtonsEnabled).
-
-  /**
-   * A run is being kicked off: disable the run and config buttons until the
-   * run-started timer flips the run button into its stop affordance.
-   */
-  runStarting() {
-    this.layout.setRunButtonEnabled(false);
-    this.layout.setConfigButtonsEnabled(false);
-  }
-
-  /**
-   * The program has started running. If it does not finish quickly (potential
-   * infinite loop), turn the run button into a stop button so the user can
-   * abort it.
-   */
-  runStarted() {
-    this.showStopCodeButtonTimeoutId = setTimeout(() => {
-      this.layout.setRunButtonMode('stop');
-      this.layout.setRunButtonEnabled(true);
-    }, seconds(0.2));
-  }
-
-  /**
-   * The run has finished (or was aborted). Reset the button back to its run
-   * presentation, cancel the pending stop-button timer, and hand enablement
-   * back to the predicates via invalidate().
-   */
-  runEnded() {
-    this.layout.setRunButtonMode('run');
-
-    if (this.showStopCodeButtonTimeoutId) {
-      clearTimeout(this.showStopCodeButtonTimeoutId);
-      this.showStopCodeButtonTimeoutId = null;
-    }
-
-    this.invalidateActions();
   }
 
   /**

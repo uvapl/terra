@@ -261,7 +261,7 @@ export default class Layout extends GoldenLayout {
     // key = local component event name
     // value = delegate method the controller forwards to the app
     const events = {
-      'show': 'onImageSwitchedTo',
+      'show': 'onSwitchToImageTab',
       'vfsChanged': 'onImageReloadRequested',
     }
 
@@ -297,7 +297,7 @@ export default class Layout extends GoldenLayout {
       'startEditing': 'onEditorEditingStarted',
       'stopEditing': 'onEditorEditingStopped',
       'change': 'onEditorTextChanged',
-      'show': 'onEditorSwitchedTo',
+      'show': 'onSwitchToEditorTab',
       'vfsChanged': 'onEditorReloadRequested',
     }
 
@@ -622,40 +622,6 @@ export default class Layout extends GoldenLayout {
    */
   getActiveEditor() {
     return this.activeEditor;
-  }
-
-  /**
-   * Set the run button to 'run' or 'stop' presentation. Mechanical primitive:
-   * the layout owns the button DOM but knows nothing about run lifecycle — the
-   * controller decides when to switch modes.
-   *
-   * @param {'run'|'stop'} mode
-   */
-  setRunButtonMode(mode) {
-    const $button = $('#run-code');
-    if (mode === 'stop') {
-      $button.text('Stop').removeClass('primary-btn').addClass('danger-btn');
-    } else {
-      $button.text('Run').removeClass('danger-btn').addClass('primary-btn');
-    }
-  }
-
-  /**
-   * Enable or disable the run button.
-   *
-   * @param {boolean} enabled
-   */
-  setRunButtonEnabled(enabled) {
-    $('#run-code').prop('disabled', !enabled);
-  }
-
-  /**
-   * Enable or disable the app-config buttons (Exam/Embed extra run buttons).
-   *
-   * @param {boolean} enabled
-   */
-  setConfigButtonsEnabled(enabled) {
-    $('.config-btn').prop('disabled', !enabled);
   }
 
   /**

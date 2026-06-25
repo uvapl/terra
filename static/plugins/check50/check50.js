@@ -42,23 +42,12 @@ export default class Check50Plugin extends TerraPlugin {
       id: 'run-check50-btn',
       class: 'primary-btn',
       onClick: this.onButtonClick,
-      disabled: true,
+      isAvailable: ({ app, editor }) => {
+        if (app.getRunStatus() != "running") {
+          return editor?.proglang === 'c'
+        }
+      },
     });
-  }
-
-  onImageSwitchedTo = (imageComponent) => {
-    if (!this.$button) return;
-    this.$button.prop('disabled', true);
-  }
-
-  onEditorFocus = (editorComponent) => {
-    if (!this.$button) return;
-
-    if (editorComponent.proglang === 'c' && !this.$button.is(':disabled.loading')) {
-      this.$button.prop('disabled', false);
-    } else {
-      this.$button.prop('disabled', true);
-    }
   }
 
   onStorageChange = (storageName, prevStorageName) => {

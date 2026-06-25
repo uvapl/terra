@@ -126,7 +126,7 @@ export default class ImageTab extends BaseTab {
   bindContainerEvents = () => {
     this.container.on('show', () => {
       this.onShow();
-      triggerPluginEvent('onImageSwitchedTo', this);
+      triggerPluginEvent('onSwitchToImageTab', this);
     });
 
     this.container.on('hide', () => {

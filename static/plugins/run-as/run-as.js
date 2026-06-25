@@ -24,11 +24,11 @@ export default class RunAsPlugin extends TerraPlugin {
       class: '',
       onClick: this.onButtonClick,
       disabled: true,
-      // "Run as" only applies to C files. The button's enabled state is pulled
-      // by the command surfaces' invalidate() pass (on tab switches etc.), so
-      // the plugin no longer pushes enable/disable on focus/image events. The
-      // registry injects the active editor into the predicate's context.
-      isAvailable: ({ editor }) => editor?.proglang === 'c',
+      isAvailable: ({ app, editor }) => {
+        if (app.getRunStatus() != "running") {
+          return editor?.proglang === 'c'
+        }
+      },
     });
   }
 

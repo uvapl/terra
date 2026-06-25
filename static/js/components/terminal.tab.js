@@ -99,7 +99,7 @@ export default class TerminalTab {
    * @param {string} msg - The message to write.
    */
   write = (msg) => {
-    this.lastWriteNotTerminated = typeof msg !== 'string' || !msg.endsWith('\n');
+    this.lastWriteNotTerminated = !(typeof msg === 'string' && msg.endsWith("\n"));
 
     try {
       this.terminalInstance.write(msg);
@@ -116,6 +116,12 @@ export default class TerminalTab {
    * @param {string} msg - The message to write.
    */
   writeln = (msg) => {
+    this.terminalInstance.writeln(msg);
+  }
+
+  cleanWriteln = (msg) => {
+    if (this.lastWriteNotTerminated) msg = "\n" + msg;
+    this.lastWriteNotTerminated = false;
     this.terminalInstance.writeln(msg);
   }
 

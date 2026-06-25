@@ -3,6 +3,9 @@
 `root`
 : main apps
 
+`commands`
+: command layer for menus and toolbars
+
 `components`
 : user interface components with internal operations
 

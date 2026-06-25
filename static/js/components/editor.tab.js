@@ -594,7 +594,7 @@ export default class EditorTab extends BaseTab {
     this.container.on('show', () => {
       this.onShow();
       this.dispatchEvent(new Event('show'));
-      triggerPluginEvent('onEditorSwitchedTo', this);
+      triggerPluginEvent('onSwitchToEditorTab', this);
     });
 
     this.container.on('hide', () => {

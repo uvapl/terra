@@ -37,12 +37,12 @@ export default class App extends BaseApp {
   /**
    * Callback function when an editor instance becomes visible/active.
    *
-   * This is default functionality and super.onEditorSwitchedTo() must be
+   * This is default functionality and super.onSwitchToEditorTab() must be
    * called first in child classes before any additional functionality.
    *
    * @param {EditorTab} editorComponent - The editor component instance.
    */
-  async onEditorSwitchedTo(editorComponent) {
+  async onSwitchToEditorTab(editorComponent) {
     if (editorComponent.ready) {
       this.createLangWorker(editorComponent.proglang);
     }
@@ -67,9 +67,15 @@ export default class App extends BaseApp {
 
   // ─────────────────────────── Image handlers ────────────────────────────
 
-  onImageSwitchedTo(imageComponent) {
-    this.terminateLangWorker();
+  onSwitchToImageTab(imageComponent) {
+    // Do not terminate the language worker, because a switch back
+    // to an editor tab may require loading of the same worker anyway.
+    // this.terminateLangWorker();
+
+    // Allow menus and buttons to consider state.
     this.view.invalidateActions();
+
+    // Load file, currently regardless of whether it has changed.
     this.setImageFileContent(imageComponent);
   }
 
@@ -237,7 +243,7 @@ export default class App extends BaseApp {
        * turn the run button into a stop button so the user can abort it.
        */
       onRunStarted: () => {
-        this.view.runStarted();
+        this.view.invalidateActions();
       },
 
       /**
@@ -253,12 +259,14 @@ export default class App extends BaseApp {
         this.term?.disposeUserInput();
 
         // Set focus to the active editor.
-        this.view.getActiveEditor().focus();
+        this.view.getActiveEditor().focus?.();
 
         // Reset the run/stop button and re-pull availability. The run button's
         // predicate handles the case where the active tab is not runnable (e.g.
         // code was launched via the file-tree context menu in the IDE).
-        this.view.runEnded();
+        // this.view.runEnded();
+
+        this.view.invalidateActions();
 
         // If a run was started through runFile (e.g. by the shell), resolve its
         // promise now so the caller can resume.
@@ -364,6 +372,19 @@ export default class App extends BaseApp {
 
   // ──────────────────────────── Running code ─────────────────────────────
 
+  getRunStatus() {
+    if (this.langWorkerClient.isRunningCode) {
+      return "running";
+    }
+    else if (this.langWorkerClient.isReady) {
+      return "passive";
+    }
+    else
+    {
+      return "loading";
+    }
+  }
+
   /**
    * Runs the code inside the worker by sending all files to the worker along with
    * the current active tab name. If the `options.filepath` is set, then solely
@@ -412,7 +433,7 @@ export default class App extends BaseApp {
 
     this.term.focus();
 
-    this.view.runStarting();
+    // this.view.runStarting();
 
     let files = await this.vfs.getAllFiles();
 
@@ -476,7 +497,7 @@ export default class App extends BaseApp {
   async runButtonCommand(selector, cmd) {
     const $button = $(selector);
     if ($button.prop('disabled')) return;
-    this.view.runStarting();
+    // this.view.runStarting();
 
     this.term.clear();
 
@@ -501,9 +522,9 @@ export default class App extends BaseApp {
    * notice. The restart triggers onRunEnded, which resets the UI and terminal.
    */
   stopRunningProgramManually() {
-    this.langWorkerClient.restart();
     this.term?.clearTermWriteBuffer();
-    this.term?.writeln('\x1b[1;31mProcess terminated\x1b[0m');
+    this.term?.cleanWriteln('\x1b[1;31mProcess terminated\x1b[0m');
+    this.langWorkerClient.restart();
   }
 
   /**
