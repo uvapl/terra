@@ -280,15 +280,6 @@ export default class IDEApp extends App {
   }
 
   /**
-   * Close all files inside a folder, including nested files in subfolders.
-   *
-   * @param {string} path - The absolute folderpath to close all files from.
-   */
-  closeFilesFromFolder(path) {
-    this.view.closeFilesFromFolder(path);
-  }
-
-  /**
    * Retrieve the file object of the active editor.
    *
    * @async
@@ -303,5 +294,4 @@ export default class IDEApp extends App {
       content,
     };
   }
-
 }

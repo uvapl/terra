@@ -1,6 +1,5 @@
 import { getFileExtension } from '../../lib/helpers.js';
 import BaseTab from './base.tab.js';
-import { triggerPluginEvent } from '../../lib/plugin-manager.js';
 
 /**
  * Image component for GoldenLayout.
@@ -126,21 +125,16 @@ export default class ImageTab extends BaseTab {
   bindContainerEvents = () => {
     this.container.on('show', () => {
       this.onShow();
-      triggerPluginEvent('onSwitchToImageTab', this);
     });
 
     this.container.on('hide', () => {
       this.onHide();
-      triggerPluginEvent('onImageHide', this);
+      this.dispatchEvent(new Event('hide'));
     });
 
     this.container.on('destroy', () => {
       this.onDestroy();
-      triggerPluginEvent('onImageDestroy', this);
     });
 
-    this.container.on('vfsChanged', () => {
-      this.dispatchEvent(new Event('vfsChanged'));
-    });
   }
 }

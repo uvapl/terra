@@ -109,7 +109,7 @@ export function useFileTree(app) {
     /** A node deletion was confirmed by the user. */
     async onNodeDeleted(key, isFolder) {
       if (isFolder) {
-        await this.closeFilesFromFolder(key);
+        await this.view.closeFilesFromFolder(key);
       } else {
         this.closeFile(key);
       }

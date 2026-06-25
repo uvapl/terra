@@ -1,8 +1,6 @@
 import { BASE_FONT_SIZE } from '../../constants.js';
 import { getFileExtension, seconds } from '../../lib/helpers.js';
-import { triggerPluginEvent } from '../../lib/plugin-manager.js';
 import { getLocalStorageItem } from '../../lib/local-storage-manager.js';
-import Terra from '../../terra.js';
 import BaseTab from './base.tab.js';
 
 /**
@@ -183,9 +181,6 @@ export default class EditorTab extends BaseTab {
    */
   onEditorFocus = () => {
     this.dispatchEvent(new Event('focus'));
-
-    // Spawn a new worker if necessary.
-    Terra.app.createLangWorker(this.proglang);
   }
 
   /**
@@ -570,13 +565,11 @@ export default class EditorTab extends BaseTab {
       // This excludes the first time the content is loaded when the tab opened.
       if (!this.firstTimeLoadingContent) {
         this.onEditorChange();
-        triggerPluginEvent('onEditorTextChanged', this);
       }
     });
 
     this.editor.on('focus', () => {
       this.onEditorFocus();
-      triggerPluginEvent('onEditorFocus', this);
     });
   }
 
@@ -588,28 +581,27 @@ export default class EditorTab extends BaseTab {
     this.container.on('afterFirstRender', this.onContainerAfterFirstRender);
 
     this.container.on('onTabDragStop', ({ event, tab }) => {
-      triggerPluginEvent('onTabDragStop', event, tab);
+      this.dispatchEvent(new CustomEvent('tabDragStop', { detail: { event, tab } }));
     });
 
     this.container.on('show', () => {
       this.onShow();
       this.dispatchEvent(new Event('show'));
-      triggerPluginEvent('onSwitchToEditorTab', this);
     });
 
     this.container.on('hide', () => {
       this.onHide();
-      triggerPluginEvent('onEditorHide', this);
+      this.dispatchEvent(new Event('hide'));
     });
 
     this.container.on('lock', () => {
       this.lock();
-      triggerPluginEvent('onEditorLock', this);
+      this.dispatchEvent(new Event('lock'));
     });
 
     this.container.on('unlock', () => {
       this.unlock();
-      triggerPluginEvent('onEditorUnlock', this);
+      this.dispatchEvent(new Event('unlock'));
     });
 
     this.container.on('setCustomAutocompleter', (completions) => {
@@ -627,17 +619,12 @@ export default class EditorTab extends BaseTab {
 
     this.container.on('resize', () => {
       this.onContainerResize();
-      triggerPluginEvent('onEditorContainerResize', this);
+      this.dispatchEvent(new Event('resize'));
     });
 
     this.container.on('destroy', () => {
       this.onDestroy();
-      triggerPluginEvent('onEditorDestroy', this);
     });
 
-    this.container.on('vfsChanged', () => {
-      this.dispatchEvent(new Event('vfsChanged'));
-      triggerPluginEvent('onEditorContentChanged', this);
-    });
   }
 }

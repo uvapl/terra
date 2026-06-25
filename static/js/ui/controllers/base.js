@@ -239,32 +239,68 @@ export default class BaseController {
     }
   }
 
+  // Plugin-event-carrying callbacks — app always defines these.
+
+  onLayoutLoaded() {
+    this.delegate.onLayoutLoaded();
+  }
+
+  onEditorTextChanged(tabComponent) {
+    this.delegate.onEditorTextChanged(tabComponent);
+  }
+
+  onSwitchToEditorTab(tabComponent) {
+    this.delegate.onSwitchToEditorTab(tabComponent);
+  }
+
+  onEditorFocused(tabComponent) {
+    this.delegate.onEditorFocused(tabComponent);
+  }
+
+  onEditorHidden(tabComponent) {
+    this.delegate.onEditorHidden(tabComponent);
+  }
+
+  onEditorLocked(tabComponent) {
+    this.delegate.onEditorLocked(tabComponent);
+  }
+
+  onEditorUnlocked(tabComponent) {
+    this.delegate.onEditorUnlocked(tabComponent);
+  }
+
+  onEditorResized(tabComponent) {
+    this.delegate.onEditorResized(tabComponent);
+  }
+
+  onEditorDestroyed(tabComponent) {
+    this.delegate.onEditorDestroyed(tabComponent);
+  }
+
+  onTabDragStopped(event, tab) {
+    this.delegate.onTabDragStopped(event, tab);
+  }
+
+  onSwitchToImageTab(tabComponent) {
+    this.delegate.onSwitchToImageTab(tabComponent);
+  }
+
+  onImageHidden(tabComponent) {
+    this.delegate.onImageHidden(tabComponent);
+  }
+
+  onImageDestroyed(tabComponent) {
+    this.delegate.onImageDestroyed(tabComponent);
+  }
+
+  // Optional callbacks — not all app variants implement these.
+
   onEditorEditingStarted(tabComponent) {
     this.delegate.onEditorEditingStarted?.(tabComponent);
   }
 
   onEditorEditingStopped(tabComponent) {
     this.delegate.onEditorEditingStopped?.(tabComponent);
-  }
-
-  onEditorTextChanged(tabComponent) {
-    this.delegate.onEditorTextChanged?.(tabComponent);
-  }
-
-  onSwitchToEditorTab(tabComponent) {
-    this.delegate.onSwitchToEditorTab?.(tabComponent);
-  }
-
-  onEditorReloadRequested(tabComponent) {
-    this.delegate.onEditorReloadRequested?.(tabComponent);
-  }
-
-  onSwitchToImageTab(tabComponent) {
-    this.delegate.onSwitchToImageTab?.(tabComponent);
-  }
-
-  onImageReloadRequested(tabComponent) {
-    this.delegate.onImageReloadRequested?.(tabComponent);
   }
 
   // ── Action availability ──

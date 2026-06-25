@@ -32,6 +32,7 @@ export default class App extends BaseApp {
   async onEditorTextChanged(editorComponent) {
     const path = editorComponent.getPath();
     await this.vfs.updateFile(path, editorComponent.getContent());
+    triggerPluginEvent('onEditorTextChanged', editorComponent);
   }
 
   /**
@@ -50,6 +51,7 @@ export default class App extends BaseApp {
     this.view.invalidateActions();
 
     await this.setEditorFileContent(editorComponent);
+    triggerPluginEvent('onSwitchToEditorTab', editorComponent);
   }
 
   /**
@@ -63,6 +65,7 @@ export default class App extends BaseApp {
     if (!this.isFSReloadSuspended()) {
       await this.setEditorFileContent(editorComponent, { clearUndoStack: true });
     }
+    triggerPluginEvent('onEditorContentChanged', editorComponent);
   }
 
   // ─────────────────────────── Image handlers ────────────────────────────
@@ -77,12 +80,58 @@ export default class App extends BaseApp {
 
     // Load file, currently regardless of whether it has changed.
     this.setImageFileContent(imageComponent);
+    triggerPluginEvent('onSwitchToImageTab', imageComponent);
   }
 
   onImageReloadRequested(imageComponent) {
     if (!this.isFSReloadSuspended()) {
       this.setImageFileContent(imageComponent);
     }
+  }
+
+  onImageHidden(imageComponent) {
+    triggerPluginEvent('onImageHide', imageComponent);
+  }
+
+  onImageDestroyed(imageComponent) {
+    triggerPluginEvent('onImageDestroy', imageComponent);
+  }
+
+  // ─────────────────────────── Layout handlers ───────────────────────────
+
+  onLayoutLoaded() {
+    triggerPluginEvent('onLayoutLoaded');
+  }
+
+  // ─────────────────────────── Editor handlers (plugin events) ───────────
+
+  onEditorFocused(editorComponent) {
+    this.createLangWorker(editorComponent.proglang);
+    triggerPluginEvent('onEditorFocus', editorComponent);
+  }
+
+  onEditorHidden(editorComponent) {
+    triggerPluginEvent('onEditorHide', editorComponent);
+  }
+
+  onEditorLocked(editorComponent) {
+    triggerPluginEvent('onEditorLock', editorComponent);
+  }
+
+  onEditorUnlocked(editorComponent) {
+    triggerPluginEvent('onEditorUnlock', editorComponent);
+  }
+
+  onEditorResized(editorComponent) {
+    triggerPluginEvent('onEditorContainerResize', editorComponent);
+  }
+
+  onEditorDestroyed(editorComponent) {
+    triggerPluginEvent('onEditorDestroy', editorComponent);
+  }
+
+  onTabDragStopped(event, tab) {
+    triggerPluginEvent('onTabDragStop', event, tab);
   }
 
   // ───────────────────────── Terminal key handlers ───────────────────────
@@ -101,7 +150,6 @@ export default class App extends BaseApp {
    */
   clearTerminal() {
     this.term?.clear();
-    triggerPluginEvent('onTerminalCleared');
   }
 
   /**
@@ -561,6 +609,7 @@ export default class App extends BaseApp {
     // constructed (the toolbar's initial build evaluates this predicate before
     // the controller is assigned); treat that as not-runnable until onReady's
     // invalidate re-evaluates.
+    if (this.getRunStatus() === "running") return false;
     const editor = this.view?.getActiveEditor?.();
     return !!editor && this.langWorkerClient.supports(getFileExtension(editor.getFilename()));
   }
@@ -626,7 +675,13 @@ export default class App extends BaseApp {
    * Tell all open components to reload their content from the VFS. Called by the
    * Git backend after it rewrites files.
    */
-  reloadComponentsFromVFS() {
-    this.view.emitToAllComponents('vfsChanged');
+  reloadOpenFiles() {
+    for (const component of this.view.getTabComponents()) {
+      if (component.getComponentName() === 'editor') {
+        this.onEditorReloadRequested(component);
+      } else if (component.getComponentName() === 'image') {
+        this.onImageReloadRequested(component);
+      }
+    }
   }
 }

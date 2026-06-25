@@ -7,7 +7,6 @@ import {
 import ImageTab from '../components/image.tab.js';
 import EditorTab from '../components/editor.tab.js';
 import TerminalTab from '../components/terminal.tab.js';
-import { triggerPluginEvent } from '../../lib/plugin-manager.js';
 
 /**
  * Default layout config that is used when the layout is created for the first
@@ -193,7 +192,7 @@ export default class Layout extends GoldenLayout {
     this.addActiveStates();
     this.addButtonEventListeners();
     this.showTermStartupMessage();
-    triggerPluginEvent('onLayoutLoaded');
+    this.delegate.onLayoutLoaded();
 
     if (Array.isArray(options.autocomplete) && options.autocomplete.every(isObject)) {
       this.emitToTabComponents('setCustomAutocompleter', options.autocomplete);
@@ -257,21 +256,20 @@ export default class Layout extends GoldenLayout {
     // triggers an availability re-pull that reads the active tab.
     imageComponent.addEventListener('show', () => this.setActiveEditor(imageComponent));
 
-    // Forward custom image component events to the controller delegate.
-    // key = local component event name
-    // value = delegate method the controller forwards to the app
-    const events = {
+    // Forward component events to the controller delegate.
+    const imageEvents = {
       'show': 'onSwitchToImageTab',
-      'vfsChanged': 'onImageReloadRequested',
+      'hide': 'onImageHidden',
+    };
+
+    for (const [event, method] of Object.entries(imageEvents)) {
+      imageComponent.addEventListener(event, () => this.delegate[method](imageComponent));
     }
 
-    for (const [internalEventName, delegateMethod] of Object.entries(events)) {
-      imageComponent.addEventListener(internalEventName, () => {
-        this.delegate?.[delegateMethod]?.(imageComponent);
-      });
-    }
-
-    imageComponent.addEventListener('destroy', () => this.onTabDestroy());
+    imageComponent.addEventListener('destroy', () => {
+      this.onTabDestroy();
+      this.delegate.onImageDestroyed(imageComponent);
+    });
   }
 
   /**
@@ -290,25 +288,40 @@ export default class Layout extends GoldenLayout {
     // tab — otherwise the re-pull would see the previously active tab.
     editorComponent.addEventListener('show', () => this.setActiveEditor(editorComponent));
 
-    // Forward custom editor component events to the controller delegate.
-    // key = local component event name
-    // value = delegate method the controller forwards to the app
-    const events = {
-      'startEditing': 'onEditorEditingStarted',
-      'stopEditing': 'onEditorEditingStopped',
+    // Forward component events to the controller delegate.
+    // Required events: app always implements these (they carry plugin events).
+    const requiredEvents = {
       'change': 'onEditorTextChanged',
       'show': 'onSwitchToEditorTab',
-      'vfsChanged': 'onEditorReloadRequested',
+      'hide': 'onEditorHidden',
+      'lock': 'onEditorLocked',
+      'unlock': 'onEditorUnlocked',
+      'resize': 'onEditorResized',
+    };
+
+    for (const [event, method] of Object.entries(requiredEvents)) {
+      editorComponent.addEventListener(event, () => this.delegate[method](editorComponent));
     }
 
-    for (const [internalEventName, delegateMethod] of Object.entries(events)) {
-      editorComponent.addEventListener(internalEventName, () => {
-        this.delegate?.[delegateMethod]?.(editorComponent);
-      });
+    // Optional events: only some app variants react to these.
+    const optionalEvents = {
+      'startEditing': 'onEditorEditingStarted',
+      'stopEditing': 'onEditorEditingStopped',
+    };
+
+    for (const [event, method] of Object.entries(optionalEvents)) {
+      editorComponent.addEventListener(event, () => this.delegate?.[method]?.(editorComponent));
     }
+
+    editorComponent.addEventListener('tabDragStop', (e) => {
+      this.delegate.onTabDragStopped(e.detail.event, e.detail.tab);
+    });
 
     editorComponent.addEventListener('focus', () => this.onEditorFocus(editorComponent));
-    editorComponent.addEventListener('destroy', () => this.onTabDestroy());
+    editorComponent.addEventListener('destroy', () => {
+      this.onTabDestroy();
+      this.delegate.onEditorDestroyed(editorComponent);
+    });
   }
 
   /**
@@ -368,6 +381,7 @@ export default class Layout extends GoldenLayout {
    */
   onEditorFocus(editorComponent) {
     this.setActiveEditor(editorComponent);
+    this.delegate.onEditorFocused(editorComponent);
   }
 
   /**
