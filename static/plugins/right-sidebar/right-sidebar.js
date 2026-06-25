@@ -1,4 +1,4 @@
-import { TerraPlugin } from '../../js/plugin-manager.js';
+import { TerraPlugin } from '../../js/lib/plugin-manager.js';
 
 export default class RightSidebarPlugin extends TerraPlugin {
   name = 'rightSidebar';

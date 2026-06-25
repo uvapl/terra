@@ -1,4 +1,4 @@
-import { createModal, hideModal, showModal } from '../components/modal.js';
+import { createModal, hideModal, showModal } from '../ui/components/modal.js';
 import Terra from '../terra.js';
 import {
   setLocalStorageItem,

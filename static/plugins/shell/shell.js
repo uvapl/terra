@@ -1,4 +1,4 @@
-import { TerraPlugin } from '../../js/plugin-manager.js';
+import { TerraPlugin } from '../../js/lib/plugin-manager.js';
 import Terra from '../../js/terra.js';
 import { FileNotFoundError, FileTooLargeError } from '../../js/fs/vfs.js';
 

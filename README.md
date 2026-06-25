@@ -152,7 +152,7 @@ rm sysroot.tar && tar -cvf sysroot.tar include lib share
 ```
 
 Go into your browser settings, clear the cached web content and then finally you
-can go into the `./static/js/workers/clang.worker.js` and add `-lfoo` to the
+can go into the `./static/js/platforms/clang.worker.js` and add `-lfoo` to the
 `this.ldflags` inside the constructor:
 
 ```javascript

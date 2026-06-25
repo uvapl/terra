@@ -1,5 +1,5 @@
-import { TerraPlugin } from '../../js/plugin-manager.js';
-import { createModal, hideModal, showModal } from '../../js/components/modal.js';
+import { TerraPlugin } from '../../js/lib/plugin-manager.js';
+import { createModal, hideModal, showModal } from '../../js/ui/components/modal.js';
 import Terra from '../../js/terra.js';
 
 export default class RunAsPlugin extends TerraPlugin {
