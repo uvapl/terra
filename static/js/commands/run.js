@@ -17,7 +17,7 @@
  * terminal is cleared before each run (the embed variant clears; the rest do
  * not), so that is parameterised here.
  *
- * @param {object} [runOptions] - Options forwarded to app.runCode().
+ * @param {object} [runOptions] - Options forwarded to app.runActiveTab().
  * @returns {object} A command with a `button` surface.
  */
 export const makeRunButtonCommand = (runOptions = {}) => ({
@@ -33,7 +33,7 @@ export const makeRunButtonCommand = (runOptions = {}) => ({
     }
     return app.canRunActiveTab();
   },
-  exec: ({ app }) => app.runCode(runOptions),
+  exec: ({ app }) => app.getRunStatus() === "running" ? app.stopProgram() : app.runActiveTab(runOptions),
 });
 
 /** The default run-button command (no terminal clear), used by most variants. */
@@ -57,7 +57,7 @@ export const ideRunCommands = [
     // falls through so editor/terminal copy keeps working.
     name: 'killProcess', scope: 'global', bindKey: 'ctrl-c',
     menuItem: { path: 'Run/Kill Process', position: 110 },
-    isAvailable: ({ app }) => app.langWorkerClient.isRunningCode,
-    exec: ({ app }) => app.terminateWorker(),
+    isAvailable: ({ app }) => app.getRunStatus() === "running",
+    exec: ({ app }) => app.stopProgram(),
   },
 ];

@@ -46,11 +46,25 @@ export default class LangWorkerClient {
   worker = null;
 
   /**
-   * A command to execute immediately once the worker signals ready.
-   * Set when a button is clicked while the worker is still (re)loading.
+   * Resolves _loadingPromise once the worker signals ready.
    * @type {Function|null}
    */
-  pendingCommand = null;
+  _readyResolver = null;
+
+  /**
+   * Promise that resolves when the current worker is ready. Created by
+   * _createWorker so restart() sets it up too. Shared by all load() callers
+   * waiting on the same worker.
+   * @type {Promise<void>|null}
+   */
+  _loadingPromise = null;
+
+  /**
+   * True while a runFile or runSnippet call is awaiting the worker. Drives
+   * hasPendingCommand() so getRunStatus() reports "loading".
+   * @type {boolean}
+   */
+  _runQueued = false;
 
   /**
    * App-side reaction callbacks. See App.getLangWorkerHandlers() for the shape.
@@ -63,7 +77,7 @@ export default class LangWorkerClient {
    * not spawn a worker until load() is called for a supported language.
    *
    * @param {object} handlers - App-side reaction callbacks. Required keys:
-   * onReady, onWrite, onWriteError, onRequestStdin, onRunButtonCommandDone,
+   * onReady, onWrite, onWriteError, onRequestStdin, onRunSnippetDone,
    * onRunStarted, onRunEnded, onNewOrModifiedFiles, onDeletedFiles.
    */
   constructor(handlers) {
@@ -89,6 +103,10 @@ export default class LangWorkerClient {
     return !!this.worker;
   }
 
+  hasPendingCommand() {
+    return this._runQueued;
+  }
+
   /**
    * Spawn, switch, or tear down the worker thread for a given language. This is
    * the single entry point the app uses to keep the worker in sync with the
@@ -96,11 +114,11 @@ export default class LangWorkerClient {
    *
    * @param {string} proglang - The programming language to load a worker for.
    */
-  load(proglang, pendingCommand = null) {
+  load(proglang) {
     // Unsupported language: make sure no worker keeps running.
     if (!this.supports(proglang)) {
       this.terminate();
-      return;
+      return Promise.resolve();
     }
 
     // Switching languages: tear down the current worker first, while
@@ -109,29 +127,18 @@ export default class LangWorkerClient {
       this.terminate();
     }
 
-    if (this.worker) {
-      // Worker already exists for this proglang. Run the command now if it has
-      // finished initialising, otherwise queue it so the 'ready' handler runs
-      // it once the (re)loading worker signals ready.
-      if (pendingCommand) {
-        if (this.isReady) {
-          pendingCommand();
-        } else {
-          this.pendingCommand = pendingCommand;
-          this.handlers.onLoad(true);
-        }
-      }
-      return;
+    // Worker already exists and is ready: resolve immediately.
+    if (this.worker && this.isReady) {
+      return Promise.resolve();
     }
 
-    this.pendingCommand = pendingCommand;
-    this.handlers.onLoad(!!pendingCommand);
-    this.proglang = proglang;
-    this._createWorker();
-  }
-
-  start(proglang, runArgs) {
-    this.load(proglang, () => this.runUserCode(...runArgs))
+    // Worker is loading or needs to be spawned: notify and wait for ready.
+    this.handlers.onLoad(this._runQueued);
+    if (!this.worker) {
+      this.proglang = proglang;
+      this._createWorker();
+    }
+    return this._loadingPromise;
   }
 
   /**
@@ -185,6 +192,8 @@ export default class LangWorkerClient {
 
     this.isRunningCode = false;
     this.isReady = false;
+    this._readyResolver = null;
+    this._loadingPromise = null;
     this.worker.terminate();
     this.worker = null;
   }
@@ -195,6 +204,9 @@ export default class LangWorkerClient {
    */
   _createWorker() {
     this.isReady = false;
+    this._loadingPromise = new Promise(resolve => {
+      this._readyResolver = resolve;
+    });
 
     console.log(`Spawning new ${this.proglang} worker`);
 
@@ -220,41 +232,25 @@ export default class LangWorkerClient {
     }, [remotePort]);
   }
 
-  /**
-   * Triggers the `runUserCode` event in the currently active worker.
-   *
-   * @param {string} activeTabPath - The active tab's absolute file path.
-   * @param {array} vfsFiles - List of objects, each containing the filename
-   * and content of the corresponding editor tab.
-   * @param {array} runAsConfig - Configuration object for the run-as command.
-   */
-  runUserCode(activeTabPath, vfsFiles, runAsConfig) {
+  async runFile(proglang, filepath, files, runAsConfig) {
+    this._runQueued = true;
+    await this.load(proglang);
+    this._runQueued = false;
     this.isRunningCode = true;
-
-    // Single funnel for a user-code run (immediate or queued via pendingCommand),
-    // so the app can flip the run button into a stop button from one place.
     this.handlers.onRunStarted();
-
     this.port.postMessage({
       id: 'runUserCode',
-      data: { activeTabPath, vfsFiles, runAsConfig },
+      data: { activeTabPath: filepath, vfsFiles: files, runAsConfig },
     });
   }
 
-  /**
-   * Triggers the `runButtonCommand` event in the currently active worker.
-   *
-   * @param {string} selector - Unique selector for the button, used to disable
-   * it when running and disable it when it's done running.
-   * @param {string} activeTabName - The name of the currently active tab.
-   * @param {array} cmd - List of commands to execute.
-   * @param {array} files - List of objects, each containing the filename and
-   * content of the corresponding editor tab.
-   */
-  runButtonCommand(selector, activeTabName, cmd, files) {
+  async runSnippet(proglang, selector, filename, command, files) {
+    this._runQueued = true;
+    await this.load(proglang);
+    this._runQueued = false;
     this.port.postMessage({
-      id: 'runButtonCommand',
-      data: { selector, activeTabName, cmd, files },
+      id: 'runSnippet',
+      data: { selector, activeTabName: filename, cmd: command, files },
     });
   }
 
@@ -326,12 +322,12 @@ export default class LangWorkerClient {
       // everything has been initialised and ready to run some code.
       case 'ready': {
         this.isReady = true;
-        const hasPendingCommand = !!this.pendingCommand;
-        this.handlers.onReady(hasPendingCommand);
-        if (hasPendingCommand) {
-          const cmd = this.pendingCommand;
-          this.pendingCommand = null;
-          cmd();
+        this.handlers.onReady(this._runQueued);
+        if (this._readyResolver) {
+          const resolve = this._readyResolver;
+          this._readyResolver = null;
+          this._loadingPromise = null;
+          resolve();
         }
         break;
       }
@@ -361,8 +357,8 @@ export default class LangWorkerClient {
       // Run custom config button callback from the worker instance.
       // This event will be triggered after a custom config button's command has
       // been executed.
-      case 'runButtonCommandCallback':
-        this.handlers.onRunButtonCommandDone();
+      case 'runSnippetCallback':
+        this.handlers.onRunSnippetDone();
         break;
 
       case 'restartWorker':

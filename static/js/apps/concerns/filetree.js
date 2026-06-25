@@ -136,7 +136,7 @@ export function useFileTree(app) {
 
     /** A run was requested from the context menu. */
     onRunRequested(key) {
-      this.runCode({ filepath: key });
+      this.runFile(key);
     },
 
     /** @returns {boolean} Whether download is offered (only on temporary storage). */

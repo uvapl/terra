@@ -18,6 +18,9 @@ export default class App extends BaseApp {
    */
   _runEndResolver = null;
 
+  /** Timer ID for the delayed run-button → stop-button flip, or null. */
+  _runButtonTimer = null;
+
   // ─────────────────────────── Editor handlers ───────────────────────────
 
   /**
@@ -73,7 +76,7 @@ export default class App extends BaseApp {
   onSwitchToImageTab(imageComponent) {
     // Do not terminate the language worker, because a switch back
     // to an editor tab may require loading of the same worker anyway.
-    // this.terminateLangWorker();
+    // this.terminateWorker();
 
     // Allow menus and buttons to consider state.
     this.view.invalidateActions();
@@ -137,7 +140,7 @@ export default class App extends BaseApp {
   // ───────────────────────── Terminal key handlers ───────────────────────
 
   /** Stop the program currently running. A no-op when nothing is running. */
-  terminateWorker() {
+  stopProgram() {
     if (this.langWorkerClient.isRunningCode) {
       this.stopRunningProgramManually();
     }
@@ -213,7 +216,7 @@ export default class App extends BaseApp {
   /**
   * Terminate the current language worker if it exists.
    */
-  terminateLangWorker() {
+  terminateWorker() {
     if (this.langWorkerClient.hasActiveWorker()) {
       this.langWorkerClient.terminate();
     }
@@ -282,7 +285,7 @@ export default class App extends BaseApp {
       /**
        * A custom config button's command has finished executing.
        */
-      onRunButtonCommandDone: () => {
+      onRunSnippetDone: () => {
         this.view.invalidateActions();
       },
 
@@ -291,7 +294,10 @@ export default class App extends BaseApp {
        * turn the run button into a stop button so the user can abort it.
        */
       onRunStarted: () => {
-        this.view.invalidateActions();
+        this._runButtonTimer = setTimeout(() => {
+          this._runButtonTimer = null;
+          this.view.invalidateActions();
+        }, 200);
       },
 
       /**
@@ -300,6 +306,13 @@ export default class App extends BaseApp {
        * is nothing pending to dispose and the cursor is already hidden.
        */
       onRunEnded: () => {
+        // If the run finished before the stop-button delay elapsed, cancel it
+        // so the button never flips — avoiding a flash for very short runs.
+        if (this._runButtonTimer) {
+          clearTimeout(this._runButtonTimer);
+          this._runButtonTimer = null;
+        }
+
         // Print inverted `%` to terminal if last line of output was not terminated by a `\n`.
         this.term?.printForgotNewline();
 
@@ -421,118 +434,57 @@ export default class App extends BaseApp {
   // ──────────────────────────── Running code ─────────────────────────────
 
   getRunStatus() {
-    if (this.langWorkerClient.isRunningCode) {
-      return "running";
-    }
-    else if (this.langWorkerClient.isReady) {
-      return "passive";
-    }
-    else
-    {
-      return "loading";
-    }
+    if (this.langWorkerClient.isRunningCode) return "running";
+    if (this.langWorkerClient.hasPendingCommand()) return "loading";
+    // The worker could still be loading, but is ready to receive a pending command.
+    if (this.langWorkerClient.isReady) return "ready";
   }
 
   /**
-   * Runs the code inside the worker by sending all files to the worker along with
-   * the current active tab name. If the `options.filepath` is set, then solely
-   * that file will be run.
+   * Run a file from the VFS. Returns a Promise that resolves when the run ends
+   * (normally or aborted). Fire-and-forget callers (e.g. the run button via
+   * runActiveTab) simply do not await it.
    *
    * @async
-   * @param {object} options - Options for running the code.
-   * @param {string} options.filepath - Run a specific file.
-   * @param {boolean} options.clearTerm Whether to clear the terminal before
-   * printing the output.
-   * @param {boolean} options.runAs - Whether the runAs config should be used.
+   * @param {string} filepath - The (VFS-absolute) file to run.
+   * @param {object} [options]
+   * @param {boolean} [options.clearTerm] - Clear the terminal before running.
+   * @param {boolean} [options.runAs] - Use the runAs config.
+   * @returns {Promise<void>} Resolves when the run has ended.
    */
-  async runCode(options = {}) {
+  async runFile(filepath, options = {}) {
+    if (!this.langWorkerClient.supports(getFileExtension(filepath))) {
+      throw new Error(`cannot run '${filepath}': unsupported file type`);
+    }
+    if (this.langWorkerClient.isRunningCode) {
+      throw new Error('a program is already running');
+    }
     if (options.clearTerm) this.term.clear();
-
-    if (this.langWorkerClient.isRunningCode) {
-      // Act as stop button: abort the running program (e.g. an infinite loop).
-      return this.stopRunningProgramManually();
-    }
-
-    // Run a given file path, or otherwise the active file.
-    const filepath = options.filepath || this.view.getActiveEditor().getPath();
-    await this._startRun({ filepath, runAs: options.runAs });
-  }
-
-  /**
-   * Start running a single file in the language worker. Shared by runCode (the
-   * run button) and runFile (the shell). Collects all files, spawns the worker
-   * for the file's language if needed, and either runs immediately or queues
-   * the command until the worker is ready.
-   *
-   * @async
-   * @param {object} options
-   * @param {string} options.filepath - The file to run.
-   * @param {boolean} [options.runAs] - Whether the runAs config should be used.
-   */
-  async _startRun({ filepath, runAs = false }) {
-    // Immediately find out language based on extension, and bail if
-    // indeterminate.
-    const proglang = getFileExtension(filepath);
-    if (!proglang) return;
 
     // Notify plugins that a run is starting (e.g. the shell, to yield the
     // terminal and start program output on a fresh line).
     triggerPluginEvent('onRunStart');
-
     this.term.focus();
 
-    // this.view.runStarting();
-
     let files = await this.vfs.getAllFiles();
-
-    // Append hidden files if present.
     files = files.concat(this.getHiddenFiles());
-
-    // Build args to send to the worker's runUserCode function.
-    const runUserCodeArgs = [filepath, files];
 
     // Only resolve the runAs config when actually running "as", because
     // getRunAsConfig() reads the active editor's path and throws when there is
     // no runnable active tab (e.g. when the shell launches a program).
-    if (runAs) {
-      const runAsConfig = this.getRunAsConfig();
-      if (runAsConfig) {
-        runUserCodeArgs.push(runAsConfig);
-      }
-    }
+    const runAsConfig = options.runAs ? this.getRunAsConfig() || undefined : undefined;
 
-    this.langWorkerClient.start(proglang, runUserCodeArgs);
+    // Set up the completion promise before starting the run so onRunEnded can
+    // resolve it regardless of how quickly the worker responds.
+    const runEnded = new Promise(resolve => { this._runEndResolver = resolve; });
+    await this.langWorkerClient.runFile(getFileExtension(filepath), filepath, files, runAsConfig);
+    return runEnded;
   }
 
-  /**
-   * Run a single file and resolve once the run has ended (whether it completed
-   * normally or was aborted). This is the stable entry point the shell uses to
-   * launch a program: the shell yields terminal input, awaits this, then takes
-   * input back. It deliberately goes through the app rather than reaching into
-   * the language worker client.
-   *
-   * @param {string} filepath - The (VFS-absolute) file to run.
-   * @returns {Promise<void>} Resolves when the run has ended.
-   */
-  runFile(filepath) {
-    return new Promise((resolve, reject) => {
-      if (!this.langWorkerClient.supports(getFileExtension(filepath))) {
-        reject(new Error(`cannot run '${filepath}': unsupported file type`));
-        return;
-      }
-
-      if (this.langWorkerClient.isRunningCode) {
-        reject(new Error('a program is already running'));
-        return;
-      }
-
-      // onRunEnded resolves this once the worker reports the run has finished.
-      this._runEndResolver = resolve;
-      this._startRun({ filepath }).catch((err) => {
-        this._runEndResolver = null;
-        reject(err);
-      });
-    });
+  /** Run the active editor tab. A no-op when code is already running. */
+  runActiveTab(options = {}) {
+    if (this.langWorkerClient.isRunningCode) return;
+    return this.runFile(this.view.getActiveEditor().getPath(), options);
   }
 
   /**
@@ -542,26 +494,18 @@ export default class App extends BaseApp {
    * it when running and disable it when it's done running.
    * @param {array} cmd - List of commands to execute.
    */
-  async runButtonCommand(selector, cmd) {
+  async runSnippet(selector, cmd) {
     const $button = $(selector);
     if ($button.prop('disabled')) return;
-    // this.view.runStarting();
 
     this.term.clear();
 
-    const activeTabName = this.view.getActiveEditor().getFilename();
+    const filename = this.view.getActiveEditor().getFilename();
+    const proglang = getFileExtension(filename);
     let files = await this.vfs.getAllFiles();
     files = files.concat(this.getHiddenFiles());
 
-    const run = () => this.langWorkerClient.runButtonCommand(selector, activeTabName, cmd, files);
-
-    if (this.langWorkerClient.hasActiveWorker() && !this.langWorkerClient.isReady) {
-      // Worker is still loading — queue the command to run once it's ready.
-      this.langWorkerClient.pendingCommand = run;
-      this.term?.write('\x1b[2mWaiting for runtime to fully load, just a sec...\x1b[0m');
-    } else if (this.langWorkerClient.isReady) {
-      run();
-    }
+    this.langWorkerClient.runSnippet(proglang, selector, filename, cmd, files);
   }
 
   /**
@@ -609,7 +553,8 @@ export default class App extends BaseApp {
     // constructed (the toolbar's initial build evaluates this predicate before
     // the controller is assigned); treat that as not-runnable until onReady's
     // invalidate re-evaluates.
-    if (this.getRunStatus() === "running") return false;
+    const status = this.getRunStatus();
+    if (status === "running" || status === "loading") return false;
     const editor = this.view?.getActiveEditor?.();
     return !!editor && this.langWorkerClient.supports(getFileExtension(editor.getFilename()));
   }

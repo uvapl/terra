@@ -250,7 +250,7 @@ export default class ExamApp extends App {
         name: `config-${id}`,
         button: { id, label: name, class: `config-btn ${id}-btn`, position: 300 + index * 10 },
         isAvailable: ({ app }) => app.canRunActiveTab(),
-        exec: ({ app }) => app.runButtonCommand(selector, cmd),
+        exec: ({ app }) => app.runSnippet(selector, cmd),
       }]);
 
       this.view.surfaces.renderButton(`config-${id}`, $('#toolbar'));
@@ -264,7 +264,7 @@ export default class ExamApp extends App {
     notify('Your code is now locked and cannot be edited anymore.');
 
     // Disable language worker.
-    this.terminateLangWorker();
+    this.terminateWorker();
 
     // Make the entire UI read-only.
     this.view.showLockedState({ prevAutoSaveTime: this.prevAutoSaveTime });
