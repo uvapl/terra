@@ -264,7 +264,7 @@ export default class ExamApp extends App {
     notify('Your code is now locked and cannot be edited anymore.');
 
     // Disable language worker.
-    this.terminateLangWorker();
+    this.terminateWorker();
 
     // Make the entire UI read-only.
     this.view.showLockedState({ prevAutoSaveTime: this.prevAutoSaveTime });

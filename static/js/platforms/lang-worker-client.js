@@ -89,6 +89,10 @@ export default class LangWorkerClient {
     return !!this.worker;
   }
 
+  hasPendingCommand() {
+    return !!this.pendingCommand;
+  }
+
   /**
    * Spawn, switch, or tear down the worker thread for a given language. This is
    * the single entry point the app uses to keep the worker in sync with the
@@ -130,8 +134,8 @@ export default class LangWorkerClient {
     this._createWorker();
   }
 
-  start(proglang, runArgs) {
-    this.load(proglang, () => this.runUserCode(...runArgs))
+  start(proglang, filepath, files, runAsConfig) {
+    this.load(proglang, () => this.runUserCode(filepath, files, runAsConfig));
   }
 
   /**

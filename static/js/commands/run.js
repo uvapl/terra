@@ -33,7 +33,7 @@ export const makeRunButtonCommand = (runOptions = {}) => ({
     }
     return app.canRunActiveTab();
   },
-  exec: ({ app }) => app.runCode(runOptions),
+  exec: ({ app }) => app.getRunStatus() === "running" ? app.stopProgram() : app.runCode(runOptions),
 });
 
 /** The default run-button command (no terminal clear), used by most variants. */
@@ -57,7 +57,7 @@ export const ideRunCommands = [
     // falls through so editor/terminal copy keeps working.
     name: 'killProcess', scope: 'global', bindKey: 'ctrl-c',
     menuItem: { path: 'Run/Kill Process', position: 110 },
-    isAvailable: ({ app }) => app.langWorkerClient.isRunningCode,
-    exec: ({ app }) => app.terminateWorker(),
+    isAvailable: ({ app }) => app.getRunStatus() === "running",
+    exec: ({ app }) => app.stopProgram(),
   },
 ];
