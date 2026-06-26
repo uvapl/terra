@@ -1,0 +1,7 @@
+.canvas-component-container {
+  overflow: hidden;
+}
+
+.canvas-component-container canvas {
+  display: block;
+}

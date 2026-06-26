@@ -7,6 +7,7 @@ import {
 import ImageTab from '../components/image.tab.js';
 import EditorTab from '../components/editor.tab.js';
 import TerminalTab from '../components/terminal.tab.js';
+import CanvasTab from '../components/canvas.tab.js';
 
 /**
  * Default layout config that is used when the layout is created for the first
@@ -173,6 +174,7 @@ export default class Layout extends GoldenLayout {
 
     this.registerComponent('image', ImageTab);
     this.registerComponent('editor', EditorTab);
+    this.registerComponent('canvas', CanvasTab);
 
     // A plain function is used (not an arrow) so GoldenLayout can `new` it;
     // returning an object makes `new` yield it.
@@ -382,6 +384,10 @@ export default class Layout extends GoldenLayout {
     } else if (tab.contentItem.isEditor) {
       this.registerTab(tab);
       this.onEditorTabCreated(tab);
+    } else if (tab.contentItem.isCanvas) {
+      // Canvas tabs emit no events, so there is no delegate hook; just track
+      // them so they show up in getTabComponents() (used to find/reuse a canvas).
+      this.registerTab(tab);
     } else {
       console.warn('Unknown tab type:', tab.contentItem);
     }
@@ -728,6 +734,45 @@ export default class Layout extends GoldenLayout {
         componentName: isImageExtension(filename) ? 'image' : 'editor',
         isClosable: this.tabsClosable,
       })
+    );
+  }
+
+  /**
+   * Open a canvas output tab, or reuse the existing one with the same synthetic
+   * path. The path is not a real file; it only identifies the canvas so repeated
+   * calls reuse the same tab instead of stacking up duplicates. The canvas opens
+   * next to the terminal (falling back to the editor stack if there is no
+   * terminal).
+   *
+   * @param {object} opts
+   * @param {string} opts.title - The tab title.
+   * @param {string} opts.path - Synthetic identifier, e.g. '/.canvas/karel'.
+   * @returns {CanvasTab} The (new or reused) canvas component instance.
+   */
+  addCanvasTab({ title, path }) {
+    // Reuse an existing canvas with the same synthetic path.
+    const existing = this.getTabComponents().find(
+      (component) => component.getPath() === path
+    );
+    if (existing) {
+      existing.setActive();
+      return existing;
+    }
+
+    console.log(this.outputStack)
+    const stack = this.outputStack || this.editorStack;
+    stack.addChild({
+      type: 'component',
+      componentName: 'canvas',
+      title,
+      componentState: { path },
+      isClosable: this.tabsClosable,
+    });
+
+    // GoldenLayout creates the component synchronously during addChild, so the
+    // instance is now retrievable from the tracked tab list.
+    return this.getTabComponents().find(
+      (component) => component.getPath() === path
     );
   }
 }

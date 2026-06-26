@@ -168,6 +168,10 @@ export default class BaseController {
     this.layout.addFileTab(filepath);
   }
 
+  addCanvasTab(opts) {
+    return this.layout.addCanvasTab(opts);
+  }
+
   repointTab(tabComponent, filepath, proglang) {
     return this.layout.repointTab(tabComponent, filepath, proglang);
   }
