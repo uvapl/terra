@@ -17,36 +17,36 @@ const COLORS = {
   messageError: '#c0392b',
 };
 
-// Karel's body sketched in a local unit frame as the upright east-facing pose
-// (screen axes: +x right, +y down). The whole sprite is rotated to face the
-// robot's direction. A small upward offset keeps the feet-heavy figure centred.
+// Karel's body, recovered from Stanford's drawFancyKarel (KarelWorld.class).
+// Coordinates are in cell-size units in the east-facing pose (+x forward/right,
+// +y up) — the same frame KarelRegion builds before rotating it by the robot's
+// direction, with the y axis flipped from AWT to match this renderer's canvas.
+// The whole sprite is rotated here to face Karel's direction; a small offset
+// keeps the figure centred in its cell.
 const KAREL = {
-  offsetY: -0.10,
-  // Body outline: a portrait rectangle with the top-right and bottom-left
-  // corners chamfered (top-right cut a little longer).
+  offsetY: 0.02,
+  // Body: a square with the front-top and back-bottom corners chamfered.
   body: [
-    [-0.45, -0.62],
-    [0.05, -0.62],
-    [0.45, -0.22],
-    [0.45, 0.62],
-    [-0.21, 0.62],
-    [-0.45, 0.38],
+    [-0.20, 0.23],
+    [-0.20, -0.47],
+    [0.25, -0.47],
+    [0.40, -0.32],
+    [0.40, 0.33],
+    [-0.10, 0.33],
   ],
-  // Inner panel, same chamfered style, in the upper half.
+  // Inner "screen" panel.
   inner: [
-    [-0.26, -0.40],
-    [-0.08, -0.40],
-    [0.26, -0.06],
-    [0.26, 0.16],
-    [-0.15, 0.16],
-    [-0.26, 0.05],
+    [-0.07, 0.05],
+    [0.23, 0.05],
+    [0.23, -0.35],
+    [-0.07, -0.35],
   ],
-  // "Disk drive" slot below the panel.
-  disk: [[-0.28, 0.32], [0.28, 0.32]],
-  // Two L-shaped feet: out from the body, then a 90° left turn.
+  // Mouth slot near the front of the panel.
+  mouth: [[0.23, 0.19], [0.08, 0.19]],
+  // Two bracket feet, sticking out the back and bottom.
   feet: [
-    [[-0.45, 0.20], [-0.69, 0.20], [-0.69, 0.44]], // left side, above the corner
-    [[0.00, 0.62], [0.00, 0.86], [0.24, 0.86]],    // bottom, from the middle
+    [[-0.20, 0.05], [-0.36, 0.05], [-0.36, 0.25], [-0.28, 0.25], [-0.28, 0.13], [-0.20, 0.13]],
+    [[0.08, 0.33], [0.08, 0.49], [0.28, 0.49], [0.28, 0.41], [0.16, 0.41], [0.16, 0.33]],
   ],
 };
 
@@ -219,10 +219,10 @@ export default class KarelRenderer {
     const r = cellRect(x, y);
     const cx = (r.left + r.right) / 2;
     const cy = (r.top + r.bottom) / 2;
-    const s = cell * 0.42;
+    const s = cell;
 
-    // The sketch is drawn upright as the east-facing pose (feet to the left and
-    // bottom). Each turnLeft rotates the whole sprite a quarter turn
+    // The sketch is drawn in the east-facing pose (front to the right, feet out
+    // the back and top). Each turnLeft rotates the whole sprite a quarter turn
     // counter-clockwise: east -> north -> west -> south.
     const angles = { east: 0, south: Math.PI / 2, west: Math.PI, north: 3 * Math.PI / 2 };
     const cos = Math.cos(angles[dir]);
@@ -243,19 +243,19 @@ export default class KarelRenderer {
 
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(1, cell * 0.02);
 
     // Feet first, so the body sits on top of where they attach.
-    ctx.strokeStyle = COLORS.karel;
-    ctx.lineWidth = s * 0.18;
+    ctx.fillStyle = COLORS.karel;
+    ctx.strokeStyle = COLORS.karelOutline;
     for (const foot of KAREL.feet) {
-      trace(foot, false);
+      trace(foot, true);
+      ctx.fill();
       ctx.stroke();
     }
 
     // Body.
     ctx.fillStyle = COLORS.karel;
-    ctx.strokeStyle = COLORS.karelOutline;
-    ctx.lineWidth = Math.max(1, s * 0.05);
     trace(KAREL.body, true);
     ctx.fill();
     ctx.stroke();
@@ -266,9 +266,8 @@ export default class KarelRenderer {
     ctx.fill();
     ctx.stroke();
 
-    // Disk-drive slot.
-    ctx.lineWidth = s * 0.08;
-    trace(KAREL.disk, false);
+    // Mouth slot.
+    trace(KAREL.mouth, false);
     ctx.stroke();
   }
 }
