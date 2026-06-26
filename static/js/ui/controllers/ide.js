@@ -47,6 +47,29 @@ export default class IDEController extends BaseController {
     this.init();
   }
 
+  /**
+   * Replace the current layout with an explicit GoldenLayout config (e.g. a
+   * plugin loading a custom layout). Mirrors recreate(), but uses the provided
+   * config verbatim instead of rebuilding the default. Open tabs are preserved
+   * only if the caller embedded them in the config.
+   *
+   * @param {object} restoredConfig - A full GoldenLayout config.
+   */
+  loadLayout(restoredConfig) {
+    this.layout.resetLayout = true;
+    this.layout.destroy();
+
+    this.createLayout({ restoredConfig });
+
+    this._pendingReset = true;
+    this.init();
+  }
+
+  /** Rebuild the menubar DOM from the (possibly newly extended) command set. */
+  refreshMenu() {
+    this.surfaces.buildMenu('.menubar');
+  }
+
   // ── Layout API (IDE-specific) ──
 
   setProjectMenuState(state) {

@@ -127,7 +127,7 @@ export const commands = [
   // View ---------------------------------------------------------------------
   {
     name: 'resetLayout', scope: 'global',
-    menuItem: { path: 'View/Reset Layout', position: 100 }, exec: ({ app }) => app.resetLayout(),
+    menuItem: { path: 'View/Reset Layout', position: 180 }, exec: ({ app }) => app.resetLayout(),
   },
   {
     name: 'increaseFontSize', scope: 'global', bindKey: 'ctrl-=',

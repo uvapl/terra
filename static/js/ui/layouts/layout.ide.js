@@ -48,12 +48,17 @@ export default class IDELayout extends Layout {
               ],
             },
             {
-              type: 'component',
-              componentName: 'terminal',
-              title: 'Terminal',
-              componentState: { fontSize: BASE_FONT_SIZE },
-              isClosable: false,
-              reorderEnabled: true,
+              type: 'stack',
+              id: 'outputStack',
+              content: [
+                {
+                  type: 'component',
+                  componentName: 'terminal',
+                  title: 'Terminal',
+                  componentState: { fontSize: BASE_FONT_SIZE },
+                  isClosable: false,
+                }
+              ]
             }
           ]
         }
@@ -280,14 +285,19 @@ export default class IDELayout extends Layout {
    * @returns {Array<object>} The content configuration for the open tabs.
    */
   serializeTabs() {
-    return this.getTabComponents().map((component) => ({
-      title: component.getFilename(),
-      componentName: component.getComponentName(),
-      componentState: {
-        path: component.getPath(),
-        value: component.getContent(),
-      },
-    }));
+    return this.getTabComponents()
+      // Only file-backed tabs (editors/images) are serialized. Output-only tabs
+      // like the canvas have no content to capture (and no getContent), so they
+      // are skipped — they are recreated by their owner as needed.
+      .filter((component) => typeof component.getContent === 'function')
+      .map((component) => ({
+        title: component.getFilename(),
+        componentName: component.getComponentName(),
+        componentState: {
+          path: component.getPath(),
+          value: component.getContent(),
+        },
+      }));
   }
 
   closeAllTabs() {

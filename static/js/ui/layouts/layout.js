@@ -35,11 +35,17 @@ const DEFAULT_LAYOUT_CONFIG = {
           isClosable: false,
         },
         {
-          type: 'component',
-          componentName: 'terminal',
-          title: 'Terminal',
-          componentState: { fontSize: BASE_FONT_SIZE },
-          isClosable: false,
+          type: 'stack',
+          id: 'outputStack',
+          content: [
+            {
+              type: 'component',
+              componentName: 'terminal',
+              title: 'Terminal',
+              componentState: { fontSize: BASE_FONT_SIZE },
+              isClosable: false,
+            }
+          ]
         }
       ]
     }
@@ -102,6 +108,13 @@ export default class Layout extends GoldenLayout {
    * @type {GoldenLayout.Stack}
    */
   editorStack = null;
+
+  /**
+   * Reference to the Stack the terminal lives in, used to open output panes
+   * (e.g. a canvas tab) next to the terminal.
+   * @type {GoldenLayout.Stack}
+   */
+  outputStack = null;
 
   /**
    * Reference to all hidden files which will *never* be shown in the UI, but
@@ -441,6 +454,10 @@ export default class Layout extends GoldenLayout {
           this.setActiveEditor(param.container.getComponent());
         }
       });
+    }
+    // Save a reference to the output stack (terminal, canvas)
+    if (stack.config.id === 'outputStack') {
+      this.outputStack = stack;
     }
   }
 
