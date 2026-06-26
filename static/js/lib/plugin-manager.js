@@ -354,6 +354,22 @@ export function triggerPluginEvent(eventName, ...args) {
   });
 }
 
+/**
+ * Trigger an event on a single named plugin. Used when an event has a known
+ * recipient (e.g. a worker message belongs to the plugin that registered that
+ * language) and fanning it out to every plugin would be wrong.
+ *
+ * @param {string} pluginName - The name of the plugin to trigger the event on.
+ * @param {string} eventName - The name of the event.
+ * @param {array} ...args - The arguments to pass to the event handler.
+ */
+export function triggerPluginEventFor(pluginName, eventName, ...args) {
+  const plugin = plugins[pluginName];
+  if (plugin && typeof plugin[eventName] === 'function') {
+    plugin[eventName](...args);
+  }
+}
+
 
 /**
  * Get a plugin by name.

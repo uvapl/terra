@@ -1,7 +1,7 @@
 import { getFileExtension, isImageExtension } from '../lib/helpers.js'
 import { FileNotFoundError, FileTooLargeError } from '../fs/vfs.js';
 import BaseApp from './app.base.js';
-import { triggerPluginEvent } from '../lib/plugin-manager.js';
+import { triggerPluginEvent, triggerPluginEventFor } from '../lib/plugin-manager.js';
 import { MAX_FILE_SIZE } from '../constants.js';
 
 /**
@@ -214,6 +214,19 @@ export default class App extends BaseApp {
   }
 
   /**
+   * Register a worker script for a programming language. Used by plugins to add
+   * a language (e.g. Karel) to the same run pipeline as the built-in languages.
+   *
+   * @param {string} proglang - The programming language (= file extension).
+   * @param {string} workerPath - Path to the worker script.
+   * @param {string} pluginName - Name of the registering plugin; receives this
+   *   language's custom worker messages via onWorkerMessage.
+   */
+  registerLangWorker(proglang, workerPath, pluginName) {
+    this.langWorkerClient.registerLang(proglang, workerPath, pluginName);
+  }
+
+  /**
   * Terminate the current language worker if it exists.
    */
   terminateWorker() {
@@ -275,6 +288,18 @@ export default class App extends BaseApp {
        */
       onWriteError: (text) => {
         this.term?.write(`\x1b[1;31m${text}\x1b[0m`);
+      },
+
+      /**
+       * A custom message from the worker that the core transport does not
+       * recognise (e.g. a plugin language's draw commands). Route it to the
+       * plugin that registered this proglang's worker; no other plugin sees it.
+       *
+       * @param {object} msg - The raw message posted by the worker.
+       * @param {?string} owner - Name of the plugin that owns this language.
+       */
+      onWorkerMessage: (msg, owner) => {
+        triggerPluginEventFor(owner, 'onWorkerMessage', msg);
       },
 
       /**
