@@ -66,8 +66,11 @@ export default class BaseController {
    */
   createLayout(layoutOptions) {
     // Resolve persisted state up front so the layout can receive it as plain
-    // constructor parameters (it never reads storage itself).
-    const restoredConfig = this.resolveRestoredConfig(layoutOptions.forceDefaultLayout);
+    // constructor parameters (it never reads storage itself). An explicit
+    // restoredConfig (e.g. a plugin loading a custom layout) is used verbatim.
+    const restoredConfig = layoutOptions.restoredConfig !== undefined
+      ? layoutOptions.restoredConfig
+      : this.resolveRestoredConfig(layoutOptions.forceDefaultLayout);
 
     this.layout = this.buildLayout({
       ...layoutOptions,
@@ -163,6 +166,10 @@ export default class BaseController {
 
   addFileTab(filepath) {
     this.layout.addFileTab(filepath);
+  }
+
+  addCanvasTab(opts) {
+    return this.layout.addCanvasTab(opts);
   }
 
   repointTab(tabComponent, filepath, proglang) {

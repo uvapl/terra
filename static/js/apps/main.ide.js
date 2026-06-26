@@ -7,6 +7,7 @@ const plugins = [
   'check50',
   'right-sidebar',
   'shell',
+  'karel',
   // 'editor-unlink-killer',
 ];
 

@@ -1,8 +1,16 @@
 /**
- * List of supported programming languages that have a corresponding worker.
- * @type {string[]}
+ * Registry mapping a programming language to its worker script and, for
+ * plugin-provided languages, the plugin that owns it. Built-in languages are
+ * registered here (owner `null`); plugins add more via registerLang(), which is
+ * how a plugin-provided language (e.g. Karel) joins the same run pipeline as C
+ * and Python without any other core change. The owner lets a worker's custom
+ * messages be routed back to just that plugin instead of every plugin.
+ * @type {Object<string, { path: string, owner: ?string }>}
  */
-const supportedLangs = ['c', 'py'];
+const workers = {
+  c: { path: 'static/js/platforms/clang.worker.js', owner: null },
+  py: { path: 'static/js/platforms/py.worker.js', owner: null },
+};
 
 
 /**
@@ -91,7 +99,30 @@ export default class LangWorkerClient {
    * @returns {boolean} True if proglang is supported, false otherwise.
    */
   supports(proglang) {
-    return supportedLangs.some((lang) => proglang === lang);
+    return Object.prototype.hasOwnProperty.call(workers, proglang);
+  }
+
+  /**
+   * Register a worker script for a programming language. Used by plugins to add
+   * a language to the run pipeline.
+   *
+   * @param {string} proglang - The programming language (= file extension).
+   * @param {string} workerPath - Path to the worker script.
+   * @param {?string} owner - Name of the plugin registering the language; it
+   *   receives this language's custom worker messages (see onWorkerMessage).
+   */
+  registerLang(proglang, workerPath, owner = null) {
+    workers[proglang] = { path: workerPath, owner };
+  }
+
+  /**
+   * Get the plugin that owns a programming language, or null for built-ins.
+   *
+   * @param {string} proglang - The programming language.
+   * @returns {?string} The owning plugin's name, or null.
+   */
+  getLangOwner(proglang) {
+    return workers[proglang]?.owner ?? null;
   }
 
   /**
@@ -261,13 +292,7 @@ export default class LangWorkerClient {
    * @returns {string} Path to the worker file.
    */
   getWorkerPath(proglang) {
-    let name = proglang;
-
-    if (proglang === 'c') {
-      name = 'clang';
-    }
-
-    return `static/js/platforms/${name}.worker.js`;
+    return workers[proglang]?.path;
   }
 
   /**
@@ -382,6 +407,14 @@ export default class LangWorkerClient {
 
       case 'deletedFilesCallback':
         this.handlers.onDeletedFiles(event.data.deletedPaths);
+        break;
+
+      default:
+        // Custom messages a worker may post that the core does not recognise
+        // (e.g. a plugin language's draw commands). Forwarded verbatim, tagged
+        // with the plugin that owns this language, so the app can route it to
+        // that plugin without the transport layer knowing its shape.
+        this.handlers.onWorkerMessage?.(event.data, this.getLangOwner(this.proglang));
         break;
     }
   }
