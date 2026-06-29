@@ -1044,45 +1044,76 @@ export default class Layout extends GoldenLayout {
    * collapses the output tabs into one stack; 'split' gives each its own stack
    * laid out perpendicular to the main orientation (a row when the layout is
    * vertical, a column when horizontal — perpendicular nesting survives
-   * GoldenLayout's same-axis flattening). Rebuilt from the full config and
-   * reloaded through the controller, so it works from any current arrangement.
+   * GoldenLayout's same-axis flattening).
+   *
+   * Mutates only the output subtree in place: the live output components
+   * (terminal/canvas/image) are *relocated* between stacks, never recreated, so
+   * the terminal keeps its scrollback and worker connection and — crucially —
+   * the editors are never reloaded. This relies on GoldenLayout's
+   * `Stack.addChild(liveItem)` reparenting the item's DOM element, the same
+   * mechanism its drag-and-drop uses; `removeChild(item, true)` detaches without
+   * destroying.
    *
    * @param {string} mode - 'stacked' | 'split'.
    */
   arrangeOutput(mode) {
-    const config = this.toConfig();
-    const root = config.content[0];
-    if (!root?.content) return;
+    const main = this.getMainContainer();
+    if (!main) return;
 
-    // Each root child is "pure" (only editors or only output), so classify the
-    // children, keep the editor ones verbatim, and rebuild a single output node.
-    const containsOutput = (node) => {
-      if (!node) return false;
-      if (node.type === 'component') return node.componentName !== 'editor';
-      return (node.content || []).some(containsOutput);
+    // The output area is the single main child whose subtree holds output tabs
+    // (editors and output never share a stack, and the output is always
+    // consolidated into one child). Collect its live components in visual order.
+    const isOutput = (item) => item.isComponent
+      ? item.config.componentName !== 'editor'
+      : (item.contentItems || []).some(isOutput);
+    const oldContainer = main.contentItems.find(isOutput);
+    if (!oldContainer) return;
+
+    const comps = [];
+    const walk = (item) => {
+      if (item.isComponent) comps.push(item);
+      else (item.contentItems || []).forEach(walk);
     };
-    const collectOutputs = (node, out) => {
-      if (!node) return;
-      if (node.type === 'component') { if (node.componentName !== 'editor') out.push(node); return; }
-      (node.content || []).forEach((child) => collectOutputs(child, out));
+    walk(oldContainer);
+    if (comps.length === 0) return;
+
+    const split = mode === 'split' && comps.length > 1;
+    if (split === this.isOutputSplit()) return; // already in the requested arrangement
+
+    // Build the new (empty) output container appended after the old one; removing
+    // the old one afterwards leaves it last (editors stay first).
+    main.addChild(
+      split
+        ? { type: this.vertical ? 'row' : 'column', id: 'outputStack' }
+        : { type: 'stack', id: 'outputStack', isClosable: false },
+      main.contentItems.length
+    );
+    const newContainer = main.contentItems[main.contentItems.length - 1];
+
+    // Relocate (not recreate) each live component into the new structure. Split
+    // gives each its own stack; stacked drops them all into the one stack.
+    const relocate = (stack, comp) => {
+      comp.parent.removeChild(comp, true);
+      stack.addChild(comp);
     };
+    if (split) {
+      comps.forEach((comp) => {
+        newContainer.addChild({ type: 'stack' });
+        relocate(newContainer.contentItems[newContainer.contentItems.length - 1], comp);
+      });
+    } else {
+      comps.forEach((comp) => relocate(newContainer, comp));
+    }
 
-    const outputs = [];
-    root.content.filter(containsOutput).forEach((child) => collectOutputs(child, outputs));
-    if (outputs.length === 0) return;
+    // Drop the emptied old container. A non-closable stack won't self-remove when
+    // emptied (closable split stacks already did), so remove it explicitly if it
+    // is still attached.
+    if (main.contentItems.indexOf(oldContainer) !== -1) {
+      main.removeChild(oldContainer);
+    }
 
-    const outputNode = (mode === 'split' && outputs.length > 1)
-      ? {
-          type: this.vertical ? 'row' : 'column',
-          id: 'outputStack',
-          content: outputs.map((component) => ({ type: 'stack', content: [component] })),
-        }
-      : { type: 'stack', id: 'outputStack', content: outputs };
-
-    // Editor children first (left/top), the rebuilt output node last (right/bottom).
-    root.content = [...root.content.filter((child) => !containsOutput(child)), outputNode];
-
-    this.delegate.loadLayout(config);
+    this.outputStack = newContainer.isStack ? newContainer : newContainer.contentItems[0];
+    this._scheduleOutputControlsRefresh();
   }
 
   /**
