@@ -37,10 +37,12 @@ const DEFAULT_LAYOUT_CONFIG = {
           // onTabDestroy, which inserts an Untitled when the last editor closes.
           type: 'stack',
           id: 'editorStack',
+          isClosable: false,
         },
         {
           type: 'stack',
           id: 'outputStack',
+          isClosable: false,
           content: [
             {
               type: 'component',
@@ -836,13 +838,9 @@ export default class Layout extends GoldenLayout {
     const filename = filepath.split('/').pop();
     const isImage = isImageExtension(filename);
 
-    // Opening a real editor file replaces a lone empty Untitled editor. Images
-    // open in the output stack, so they leave the editor stack untouched.
-    if (!isImage && this.onlyHasEmptyUntitled?.()) {
-      this.resetLayout = true;
-      tabComponents[0].close();
-      this.resetLayout = false;
-    }
+    // Opening a real editor file replaces the active empty Untitled editor (if
+    // any). Images open in the output stack, so they leave the editor untouched.
+    const untitled = isImage ? null : this.getReplaceableUntitledEditor?.();
 
     // Editors open in the editor stack with the most recently active editor;
     // images open in the output stack (alongside the terminal/canvas).
@@ -855,6 +853,15 @@ export default class Layout extends GoldenLayout {
         isClosable: this.tabsClosable,
       })
     );
+
+    // Close the replaced Untitled *after* adding the new tab, so its stack never
+    // momentarily empties (which would auto-remove it). resetLayout suppresses
+    // the onTabDestroy Untitled-replacement during this close.
+    if (untitled) {
+      this.resetLayout = true;
+      untitled.close();
+      this.resetLayout = false;
+    }
   }
 
   /**

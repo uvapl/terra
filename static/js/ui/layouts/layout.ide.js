@@ -241,19 +241,26 @@ export default class IDELayout extends Layout {
   }
 
   /**
-   * Checks if an Untitled tab is the only one open in the editor,
-   * and that no content has been added to it (and thus unsaved).
+   * The active editor when it is an empty, unsaved Untitled tab — the one that
+   * should be replaced when a real file is opened. Returns null otherwise (saved
+   * file, edited Untitled, or a non-editor active tab). Unlike the old "only tab"
+   * check, this works regardless of other open tabs (images in the output stack,
+   * split editor stacks, …).
    *
-   * @returns {boolean}
+   * @returns {?EditorTab}
    */
-  onlyHasEmptyUntitled() {
-    let tabComponents = this.getTabComponents();
-    return (
-      tabComponents.length === 1 &&
-      tabComponents[0].getFilename() === 'Untitled' &&
-      !tabComponents[0].getPath() &&
-      tabComponents[0].getContent() === ''
-    );
+  getReplaceableUntitledEditor() {
+    const active = this.getActiveEditor();
+    if (
+      active &&
+      active.getComponentName?.() === 'editor' &&
+      active.getFilename() === 'Untitled' &&
+      !active.getPath() &&
+      active.getContent() === ''
+    ) {
+      return active;
+    }
+    return null;
   }
 
   /**
