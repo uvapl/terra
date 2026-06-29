@@ -32,9 +32,10 @@ const DEFAULT_LAYOUT_CONFIG = {
       isClosable: false,
       content: [
         {
-          // Closable so an editor stack emptied after a split is auto-removed
-          // (merging the split back). At least one editor is still guaranteed by
-          // onTabDestroy, which inserts an Untitled when the last editor closes.
+          // Starts non-closable as the sole editor stack; closability is then
+          // managed at runtime by _syncEditorStacksClosable() — false while a
+          // single stack (so the editor area can't collapse), true once split
+          // (so an emptied split-off stack is auto-removed, merging back).
           type: 'stack',
           id: 'editorStack',
           isClosable: false,
@@ -567,6 +568,10 @@ export default class Layout extends GoldenLayout {
         this.setActiveEditor(param.container.getComponent());
       }
     });
+
+    // Keep editor-stack closability in sync as stacks appear (initial load and
+    // splits): non-closable while a single editor stack, closable once split.
+    this._syncEditorStacksClosable();
   }
 
   /**
@@ -960,6 +965,19 @@ export default class Layout extends GoldenLayout {
   }
 
   /**
+   * Editor stacks must be closable for GoldenLayout to auto-remove one that is
+   * emptied — e.g. closing the last file in a split-off stack should merge the
+   * split back. But the *sole* editor stack must stay non-closable so the editor
+   * area can never collapse to nothing (onTabDestroy already guarantees an
+   * Untitled in that single-stack case). So: closable iff editors span >1 stack.
+   */
+  _syncEditorStacksClosable() {
+    const editorStacks = this._allStacks().filter((stack) => this._isEditorStack(stack));
+    const closable = editorStacks.length > 1;
+    editorStacks.forEach((stack) => { stack.config.isClosable = closable; });
+  }
+
+  /**
    * The stack new editor tabs should open in: the most recently active editor's
    * stack when it is still attached, else the first editor stack.
    *
@@ -1080,6 +1098,7 @@ export default class Layout extends GoldenLayout {
     setTimeout(() => {
       this._outputRefreshScheduled = false;
       this._tagAreas();
+      this._syncEditorStacksClosable();
 
       const { sig, firstEl } = this._outputSignature();
       if (sig === this._outputSig && firstEl === this._outputFirstEl) return;
