@@ -257,6 +257,16 @@ export default class TerminalTab {
   }
 
   /**
+   * Bring the terminal to the front of its tab strip. A no-op when it is
+   * already the active tab (or alone in its stack). Mirrors BaseTab.setActive so
+   * callers can surface the terminal the same way they surface a canvas/editor.
+   */
+  setActive = () => {
+    const item = this.container.parent;
+    item.parent.setActiveContentItem(item);
+  }
+
+  /**
    * Acquire keyboard input for a given owner. Any subsequent keystroke or
    * paste is routed to the supplied handlers until the same owner releases it.
    * The cursor is shown and the terminal focused so the user can start typing.

@@ -87,7 +87,46 @@ export default class KarelPlugin extends TerraPlugin {
    */
   onSwitchToEditorTab = (editorComponent) => {
     this._installCompleter(editorComponent);
-    this._previewWorld(editorComponent);
+    this._surfaceOutput(editorComponent);
+  }
+
+  /**
+   * Keep the output stack showing the tab that belongs to the active editor:
+   * the Karel canvas (with a fresh world preview) for a Karel file, the terminal
+   * for anything else. The terminal is only nudged once a canvas exists, so a
+   * project that never touches Karel is left alone. setActive is a no-op when the
+   * target is already frontmost or sits in its own stack, so a user who split the
+   * canvas and terminal apart keeps their arrangement.
+   *
+   * @param {EditorTab} editorComponent - The newly active editor.
+   */
+  _surfaceOutput = (editorComponent) => {
+    if (editorComponent?.proglang === 'karel') {
+      this._previewWorld(editorComponent);
+    } else if (this.canvasTab) {
+      Terra.app.term?.setActive();
+    }
+  }
+
+  /**
+   * When the last Karel source file is closed, retire the canvas with it — its
+   * world preview no longer has an owner. Counting the survivors (rather than the
+   * tab being closed) makes this independent of teardown ordering.
+   *
+   * @param {EditorTab} editorComponent - The editor being destroyed.
+   */
+  onEditorDestroy = (editorComponent) => {
+    if (editorComponent?.proglang !== 'karel' || !this.canvasTab) return;
+
+    const karelTabsLeft = Terra.app.view.getEditorComponents().some(
+      (component) => component !== editorComponent && component.proglang === 'karel'
+    );
+    if (!karelTabsLeft) {
+      this.canvasTab.close();
+      this.canvasTab = null;
+      this.renderer = null;
+      this._latestWorld = null;
+    }
   }
 
   /**
