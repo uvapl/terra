@@ -6,7 +6,8 @@ import ExamLayout from '../layouts/layout.exam.js';
  */
 export default class ExamController extends BaseController {
   buildLayout(options) {
-    return new ExamLayout(options);
+    // Exam defaults to a horizontal layout (editor and terminal side-by-side).
+    return new ExamLayout({ orientation: 'horizontal', ...options });
   }
 
   setupCommandSurfaces() {

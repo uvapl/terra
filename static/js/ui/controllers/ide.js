@@ -7,7 +7,9 @@ import { initMenubar } from '../components/menubar.js';
  */
 export default class IDEController extends BaseController {
   buildLayout(options) {
-    return new IDELayout(options);
+    // The IDE defaults to a vertical layout (editor on top, output below);
+    // a restored config or an explicit option overrides this.
+    return new IDELayout({ orientation: 'vertical', ...options });
   }
 
   /**
@@ -44,24 +46,6 @@ export default class IDEController extends BaseController {
     this._pendingReset = true;
 
     // return this.layout;
-    this.init();
-  }
-
-  /**
-   * Replace the current layout with an explicit GoldenLayout config (e.g. a
-   * plugin loading a custom layout). Mirrors recreate(), but uses the provided
-   * config verbatim instead of rebuilding the default. Open tabs are preserved
-   * only if the caller embedded them in the config.
-   *
-   * @param {object} restoredConfig - A full GoldenLayout config.
-   */
-  loadLayout(restoredConfig) {
-    this.layout.resetLayout = true;
-    this.layout.destroy();
-
-    this.createLayout({ restoredConfig });
-
-    this._pendingReset = true;
     this.init();
   }
 

@@ -22,6 +22,7 @@ export const submenus = {
   'Run': { position: 500 },
   'Git': { position: 600 },
   'Edit/Find': { position: 200 },
+  'View/Orientation': { position: 170 },
   'View/Theme': { position: 200, id: 'editor-theme-menu' },
   'View/Font size': { position: 210, id: 'font-size-menu' },
 };
@@ -125,6 +126,16 @@ export const commands = [
   },
 
   // View ---------------------------------------------------------------------
+  {
+    name: 'orientationHorizontal', scope: 'global',
+    menuItem: { path: 'View/Orientation/Horizontal', position: 100 },
+    exec: ({ app }) => app.setLayoutOrientation('horizontal'),
+  },
+  {
+    name: 'orientationVertical', scope: 'global',
+    menuItem: { path: 'View/Orientation/Vertical', position: 110 },
+    exec: ({ app }) => app.setLayoutOrientation('vertical'),
+  },
   {
     name: 'resetLayout', scope: 'global',
     menuItem: { path: 'View/Reset Layout', position: 180 }, exec: ({ app }) => app.resetLayout(),

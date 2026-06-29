@@ -8,6 +8,7 @@ import ImageTab from '../components/image.tab.js';
 import EditorTab from '../components/editor.tab.js';
 import TerminalTab from '../components/terminal.tab.js';
 import CanvasTab from '../components/canvas.tab.js';
+import { applyDragConstraints } from './drag-constraints.js';
 
 /**
  * Default layout config that is used when the layout is created for the first
@@ -31,9 +32,11 @@ const DEFAULT_LAYOUT_CONFIG = {
       isClosable: false,
       content: [
         {
+          // Closable so an editor stack emptied after a split is auto-removed
+          // (merging the split back). At least one editor is still guaranteed by
+          // onTabDestroy, which inserts an Untitled when the last editor closes.
           type: 'stack',
           id: 'editorStack',
-          isClosable: false,
         },
         {
           type: 'stack',
@@ -69,11 +72,20 @@ export default class Layout extends GoldenLayout {
   tabsClosable = true;
 
   /**
-   * Wether to show a vertical layout where the terminal is below the editor
-   * instead of the horizontal layout where the terminal is on the right.
+   * The layout orientation: 'vertical' puts the output stack below the editor
+   * stack, 'horizontal' puts it to the right. This is the single source of truth
+   * for orientation; the root content item's type (column/row) is derived from
+   * it. Read via the `orientation` / `vertical` getters.
+   * @type {string}
+   */
+  _orientation = 'horizontal';
+
+  /**
+   * Whether cross-stack dragging (an editor into the output stack or vice-versa)
+   * is blocked. Flip to false to restore GoldenLayout's default free dragging.
    * @type {boolean}
    */
-  vertical = false;
+  static constrainDrag = true;
 
   /**
    * Reference to the default layout config.
@@ -156,12 +168,27 @@ export default class Layout extends GoldenLayout {
    * @param {string} [options.theme] - The persisted theme to apply on render.
    */
   constructor(additionalLayoutConfig, options = {}) {
-    const layoutConfig = options.restoredConfig
-      || mergeObjects(DEFAULT_LAYOUT_CONFIG, additionalLayoutConfig);
+    const orientation = Layout.resolveOrientation(options);
+
+    let layoutConfig;
+    if (options.restoredConfig) {
+      layoutConfig = options.restoredConfig;
+    } else {
+      // Clone the shared default before merging so the module constant is never
+      // mutated, and stamp the root type from the resolved orientation so the
+      // base owns the editor/output skeleton (variants no longer hand-roll it).
+      const base = JSON.parse(JSON.stringify(DEFAULT_LAYOUT_CONFIG));
+      base.content[0].type = orientation === 'vertical' ? 'column' : 'row';
+      layoutConfig = mergeObjects(base, additionalLayoutConfig);
+    }
 
     super(layoutConfig, $('#layout'));
 
-    this.vertical = options.vertical;
+    if (Layout.constrainDrag) {
+      applyDragConstraints(GoldenLayout);
+    }
+
+    this._orientation = orientation;
     this.theme = options.theme || 'light';
 
     if (isObject(options.hiddenFiles)) {
@@ -185,6 +212,55 @@ export default class Layout extends GoldenLayout {
     $(window).on('resize', () => {
       this.updateSize(window.innerWidth, window.innerHeight);
     });
+  }
+
+  /**
+   * Resolve the layout orientation from the controller-supplied options, in
+   * precedence order: a restored config's root type, then an explicit
+   * `orientation` option, then the legacy `vertical` boolean, then horizontal.
+   *
+   * @param {object} options - Controller-supplied options.
+   * @returns {string} 'horizontal' | 'vertical'.
+   */
+  static resolveOrientation(options) {
+    const restoredType = options.restoredConfig?.content?.[0]?.type;
+    if (restoredType) {
+      return restoredType === 'column' ? 'vertical' : 'horizontal';
+    }
+    if (options.orientation) {
+      return options.orientation;
+    }
+    if (typeof options.vertical === 'boolean') {
+      return options.vertical ? 'vertical' : 'horizontal';
+    }
+    return 'horizontal';
+  }
+
+  /** @returns {string} The current orientation ('horizontal' | 'vertical'). */
+  get orientation() {
+    return this._orientation;
+  }
+
+  /** @returns {boolean} Whether the layout is vertical (output below editor). */
+  get vertical() {
+    return this._orientation === 'vertical';
+  }
+
+  /**
+   * Switch the layout orientation at runtime. Captures the full current layout
+   * (open editors, terminal, canvas, images — toConfig() keeps the whole tree),
+   * flips the root row/column, and reloads through the controller. A no-op when
+   * already in the requested orientation.
+   *
+   * @param {string} orientation - 'horizontal' | 'vertical'.
+   */
+  setOrientation(orientation) {
+    if (orientation !== 'horizontal' && orientation !== 'vertical') return;
+    if (this._orientation === orientation) return;
+
+    const config = this.toConfig();
+    config.content[0].type = orientation === 'vertical' ? 'column' : 'row';
+    this.delegate.loadLayout(config);
   }
 
   /**
@@ -213,9 +289,16 @@ export default class Layout extends GoldenLayout {
       this.emitToTabComponents('setCustomAutocompleter', options.autocomplete);
     }
 
-    if (this.vertical) {
-      this.emitToAllComponents('verticalLayout');
+    this._tagAreas();
+    if (this.renderOutputArrangeControls()) {
+      const { sig, firstEl } = this._outputSignature();
+      this._outputSig = sig;
+      this._outputFirstEl = firstEl;
     }
+
+    // Keep the area tags and the output controls in sync with any structural
+    // change (tab add/remove/move, manual split/merge via drag).
+    this.on('stateChanged', () => this._scheduleOutputControlsRefresh());
   }
 
   /**
@@ -282,7 +365,7 @@ export default class Layout extends GoldenLayout {
     }
 
     imageComponent.addEventListener('destroy', () => {
-      this.onTabDestroy();
+      this.onTabDestroy(imageComponent);
       this.delegate.onImageDestroyed(imageComponent);
     });
   }
@@ -334,7 +417,7 @@ export default class Layout extends GoldenLayout {
 
     editorComponent.addEventListener('focus', () => this.onEditorFocus(editorComponent));
     editorComponent.addEventListener('destroy', () => {
-      this.onTabDestroy();
+      this.onTabDestroy(editorComponent);
       this.delegate.onEditorDestroyed(editorComponent);
     });
   }
@@ -391,6 +474,8 @@ export default class Layout extends GoldenLayout {
     } else {
       console.warn('Unknown tab type:', tab.contentItem);
     }
+
+    this._scheduleOutputControlsRefresh();
   }
 
   /**
@@ -404,17 +489,31 @@ export default class Layout extends GoldenLayout {
   }
 
   /**
-   * Callback when a tab is about to be destroyed.
+   * Callback when a tab is destroyed. Guarantees at least one editor remains
+   * *anywhere* in the layout: an Untitled replacement is inserted only when the
+   * editor being closed is the last editor across all (possibly split) editor
+   * stacks. Closing one editor of several — even in a separate split stack —
+   * just closes it. Output tabs (terminal, canvas, images) never spawn one.
+   *
+   * Runs synchronously while the closing component's stack is still attached, so
+   * the replacement keeps that stack (and thus the editor area) from collapsing.
+   *
+   * @param {BaseTab} closedComponent - The tab component being closed.
    */
-  onTabDestroy() {
-    // If it's the last tab being closed, then we insert another 'Untitled' tab,
-    // because we always need at least one tab open.
-    const tabComponents = this.getTabComponents();
+  onTabDestroy(closedComponent) {
+    if (this.resetLayout) return;
 
-    if (tabComponents.length === 1 && !this.resetLayout) {
-      tabComponents[0].container.parent.parent.addChild(
-        this._createEditorTab()
-      );
+    // Editors that will remain after this one is gone (filtering by identity
+    // works whether or not the closing tab has left the tracked list yet).
+    const remainingEditors = this.getEditorComponents()
+      .filter((component) => component !== closedComponent);
+
+    if (remainingEditors.length === 0) {
+      // Add the replacement to the closing editor's own stack when possible, so
+      // that stack survives instead of being removed for being empty.
+      const stack = closedComponent?.container?.parent?.parent;
+      const target = stack?.isStack ? stack : this.getEditorStack();
+      target?.addChild(this._createEditorTab());
     }
   }
 
@@ -448,23 +547,24 @@ export default class Layout extends GoldenLayout {
    * @param {object} options - Options passed to the layout.
    */
   onStackCreated(stack, options) {
-    // When we find a newly made code editor stack, register it locally
-    // and use it to keep track of the currently selected tab.
+    // Seed the initial stack references from the default config's ids. These are
+    // only the *initial* single stacks; once either area is split they may go
+    // stale, so runtime logic uses the dynamic area getters / `_terraArea` tags
+    // instead. They remain handy fallbacks for the common unsplit case.
     if (stack.config.id === 'editorStack') {
       this.editorStack = stack;
-
-      // This partially duplicates what happens in onEditorFocus, but
-      // it's needed to be able to close image tabs, which do not get focus.
-      this.editorStack.on('activeContentItemChanged', (param) => {
-        if (typeof param.container.getComponent === 'function') {
-          this.setActiveEditor(param.container.getComponent());
-        }
-      });
     }
-    // Save a reference to the output stack (terminal, canvas)
     if (stack.config.id === 'outputStack') {
       this.outputStack = stack;
     }
+
+    // Track the active tab for every stack (the editor area may be split into
+    // several stacks). This also marks images active, which do not get focus.
+    stack.on('activeContentItemChanged', (param) => {
+      if (typeof param?.container?.getComponent === 'function') {
+        this.setActiveEditor(param.container.getComponent());
+      }
+    });
   }
 
   /**
@@ -480,6 +580,11 @@ export default class Layout extends GoldenLayout {
     const currentTheme = this.theme;
     const $editorThemeMenu = $('#editor-theme-menu');
     $editorThemeMenu.find(`li[data-val=${currentTheme}]`).addClass('active');
+
+    // Reflect the current orientation in the View ▸ Orientation menu (IDE only;
+    // a no-op where those menu items don't exist).
+    $('#menu-item--orientation-horizontal').toggleClass('active', !this.vertical);
+    $('#menu-item--orientation-vertical').toggleClass('active', this.vertical);
   }
 
   /**
@@ -487,10 +592,10 @@ export default class Layout extends GoldenLayout {
    */
   showTermStartupMessage() {
     for (const line of this.termStartupMessage) {
-      this.term.write(line + '\n');
+      this.term?.write(line + '\n');
     }
 
-    this.term.write('\n');
+    this.term?.write('\n');
   }
 
   /**
@@ -501,7 +606,7 @@ export default class Layout extends GoldenLayout {
    */
   emitToAllComponents(event, data) {
     this.emitToTabComponents(event, data);
-    this.term.emit(event, data);
+    this.term?.emit(event, data);
   }
 
   /**
@@ -644,12 +749,22 @@ export default class Layout extends GoldenLayout {
   };
 
   /**
-   * Set the active editor component.
+   * Set the active editor component. When it is a (text) editor, also remember
+   * the stack it lives in, so newly opened files open next to the most recently
+   * active editor — important when the editor area has been split into several
+   * stacks.
    *
    * @param {EditorTab} editorComponent - The editor component to set as active.
    */
   setActiveEditor(editorComponent) {
     this.activeEditor = editorComponent;
+
+    if (editorComponent instanceof EditorTab) {
+      const stack = editorComponent.container?.parent?.parent;
+      if (stack?.isStack) {
+        this._lastEditorStack = stack;
+      }
+    }
   }
 
   /**
@@ -718,20 +833,25 @@ export default class Layout extends GoldenLayout {
       return;
     }
 
-    // An empty Untitled tab will be removed before adding the new tab.
-    if (this.onlyHasEmptyUntitled?.()) {
+    const filename = filepath.split('/').pop();
+    const isImage = isImageExtension(filename);
+
+    // Opening a real editor file replaces a lone empty Untitled editor. Images
+    // open in the output stack, so they leave the editor stack untouched.
+    if (!isImage && this.onlyHasEmptyUntitled?.()) {
       this.resetLayout = true;
       tabComponents[0].close();
       this.resetLayout = false;
     }
 
-    // Add new tab.
-    const filename = filepath.split('/').pop();
-    this.editorStack.addChild(
+    // Editors open in the editor stack with the most recently active editor;
+    // images open in the output stack (alongside the terminal/canvas).
+    const stack = isImage ? this.getOutputStack() : this.getEditorStack();
+    stack.addChild(
       this._createEditorTab({
         title: filename,
         componentState: { path: filepath },
-        componentName: isImageExtension(filename) ? 'image' : 'editor',
+        componentName: isImage ? 'image' : 'editor',
         isClosable: this.tabsClosable,
       })
     );
@@ -759,9 +879,7 @@ export default class Layout extends GoldenLayout {
       return existing;
     }
 
-    console.log(this.outputStack)
-    const stack = this.outputStack || this.editorStack;
-    stack.addChild({
+    this.getOutputStack().addChild({
       type: 'component',
       componentName: 'canvas',
       title,
@@ -774,5 +892,267 @@ export default class Layout extends GoldenLayout {
     return this.getTabComponents().find(
       (component) => component.getPath() === path
     );
+  }
+
+  // ── Layout areas (content-based) ──
+  // The editor and output "areas" cannot be identified by tree position:
+  // GoldenLayout flattens a same-axis split into the parent, so splitting the
+  // editors horizontally in a horizontal layout makes the root row hold
+  // [editor, editor, output] with no editor/output subtree boundary. Instead we
+  // classify each stack by what it contains — a stack holds either editors or
+  // output tabs (terminal/canvas/image), never a mix (the drag constraint keeps
+  // them apart) — and drive everything off that.
+
+  /** @returns {?GoldenLayout.ContentItem} The root row/column holding the stacks. */
+  getMainContainer() {
+    return this.root?.contentItems?.[0] ?? null;
+  }
+
+  /**
+   * Every leaf stack in the layout, in tree (visual) order.
+   *
+   * @returns {GoldenLayout.Stack[]}
+   */
+  _allStacks() {
+    const stacks = [];
+    const walk = (item) => {
+      if (!item) return;
+      if (item.isStack) { stacks.push(item); return; }
+      (item.contentItems || []).forEach(walk);
+    };
+    walk(this.getMainContainer());
+    return stacks;
+  }
+
+  /** @returns {boolean} Whether the stack holds editor tab(s). */
+  _isEditorStack(stack) {
+    return stack.contentItems.some((item) => item.config.componentName === 'editor');
+  }
+
+  /** @returns {boolean} Whether the stack holds output tab(s) (terminal/canvas/image). */
+  _isOutputStack(stack) {
+    return stack.contentItems.some((item) => item.config.componentName !== 'editor');
+  }
+
+  /** @returns {?GoldenLayout.Stack} The first (topmost/leftmost) output stack. */
+  _firstOutputStack() {
+    return this._allStacks().find((stack) => this._isOutputStack(stack)) ?? null;
+  }
+
+  /**
+   * Stamp every stack with a `_terraArea` marker ('editor' | 'output') based on
+   * its content, so the drag constraint can tell which area a drop target
+   * belongs to regardless of how the tree is split or flattened. Empty stacks
+   * (transient mid-drag) keep their previous tag.
+   */
+  _tagAreas() {
+    this._allStacks().forEach((stack) => {
+      if (this._isEditorStack(stack)) stack._terraArea = 'editor';
+      else if (stack.contentItems.length > 0) stack._terraArea = 'output';
+    });
+  }
+
+  /**
+   * The stack new editor tabs should open in: the most recently active editor's
+   * stack when it is still attached, else the first editor stack.
+   *
+   * @returns {?GoldenLayout.Stack}
+   */
+  getEditorStack() {
+    const stacks = this._allStacks();
+    if (this._lastEditorStack && stacks.includes(this._lastEditorStack)) {
+      return this._lastEditorStack;
+    }
+    return stacks.find((stack) => this._isEditorStack(stack)) || this.editorStack;
+  }
+
+  /**
+   * The stack new output tabs (canvas, images) should open in: next to the
+   * terminal, falling back to the first output stack.
+   *
+   * @returns {?GoldenLayout.Stack}
+   */
+  getOutputStack() {
+    if (this.term) return this.term.container.parent.parent;
+    return this._firstOutputStack() || this.outputStack || this.editorStack;
+  }
+
+  /** @returns {boolean} Whether the output tabs are spread across multiple stacks. */
+  isOutputSplit() {
+    return this._allStacks().filter((stack) => this._isOutputStack(stack)).length > 1;
+  }
+
+  /**
+   * Resolve a live stack to drop a dragged tab into when it was released with no
+   * valid target (the drag constraint's safety net). Returns null to leave
+   * GoldenLayout's normal revert in place when the tab's original stack is still
+   * alive; otherwise returns a stack of the tab's kind (creating a fresh one in
+   * the main container if its area was emptied and removed mid-drag), so the tab
+   * is never lost.
+   *
+   * @param {GoldenLayout.ContentItem} contentItem - The dragged tab.
+   * @param {?GoldenLayout.Stack} originalParent - The tab's stack at drag start.
+   * @returns {?GoldenLayout.Stack}
+   */
+  ensureDropHome(contentItem, originalParent) {
+    const stacks = this._allStacks();
+
+    // Original stack still in the tree: let GoldenLayout revert there as usual.
+    if (originalParent && stacks.includes(originalParent)) return null;
+
+    const isEditor = contentItem?.config?.componentName === 'editor';
+    const home = stacks.find((stack) => isEditor ? this._isEditorStack(stack) : this._isOutputStack(stack));
+    if (home) return home;
+
+    // No stack of this kind remains: add a fresh non-closable stack to the main
+    // container (editors first, output last) for the tab to land in.
+    const main = this.getMainContainer();
+    if (!main) return null;
+
+    const index = isEditor ? 0 : main.contentItems.length;
+    main.addChild({ type: 'stack', isClosable: false }, index);
+    return main.contentItems[index] ?? null;
+  }
+
+  /**
+   * Rearrange the output tabs, leaving the editor stacks untouched. 'stacked'
+   * collapses the output tabs into one stack; 'split' gives each its own stack
+   * laid out perpendicular to the main orientation (a row when the layout is
+   * vertical, a column when horizontal — perpendicular nesting survives
+   * GoldenLayout's same-axis flattening). Rebuilt from the full config and
+   * reloaded through the controller, so it works from any current arrangement.
+   *
+   * @param {string} mode - 'stacked' | 'split'.
+   */
+  arrangeOutput(mode) {
+    const config = this.toConfig();
+    const root = config.content[0];
+    if (!root?.content) return;
+
+    // Each root child is "pure" (only editors or only output), so classify the
+    // children, keep the editor ones verbatim, and rebuild a single output node.
+    const containsOutput = (node) => {
+      if (!node) return false;
+      if (node.type === 'component') return node.componentName !== 'editor';
+      return (node.content || []).some(containsOutput);
+    };
+    const collectOutputs = (node, out) => {
+      if (!node) return;
+      if (node.type === 'component') { if (node.componentName !== 'editor') out.push(node); return; }
+      (node.content || []).forEach((child) => collectOutputs(child, out));
+    };
+
+    const outputs = [];
+    root.content.filter(containsOutput).forEach((child) => collectOutputs(child, outputs));
+    if (outputs.length === 0) return;
+
+    const outputNode = (mode === 'split' && outputs.length > 1)
+      ? {
+          type: this.vertical ? 'row' : 'column',
+          id: 'outputStack',
+          content: outputs.map((component) => ({ type: 'stack', content: [component] })),
+        }
+      : { type: 'stack', id: 'outputStack', content: outputs };
+
+    // Editor children first (left/top), the rebuilt output node last (right/bottom).
+    root.content = [...root.content.filter((child) => !containsOutput(child)), outputNode];
+
+    this.delegate.loadLayout(config);
+  }
+
+  /**
+   * Re-tag the areas and, when the output structure actually changed, re-render
+   * the output controls. Coalesced to once per tick so bursts of GoldenLayout
+   * `stateChanged` events (e.g. typing, or dragging a splitter) collapse to one
+   * pass — and the signature guard skips the DOM work entirely when only
+   * content changed.
+   */
+  _scheduleOutputControlsRefresh() {
+    if (this._outputRefreshScheduled) return;
+    this._outputRefreshScheduled = true;
+    setTimeout(() => {
+      this._outputRefreshScheduled = false;
+      this._tagAreas();
+
+      const { sig, firstEl } = this._outputSignature();
+      if (sig === this._outputSig && firstEl === this._outputFirstEl) return;
+
+      // Cache only on a successful render, so a transient miss (controls not yet
+      // in the DOM) is retried on the next structural change rather than poisoning
+      // the cache and leaving the toggle permanently missing.
+      if (this.renderOutputArrangeControls()) {
+        this._outputSig = sig;
+        this._outputFirstEl = firstEl;
+      }
+    });
+  }
+
+  /**
+   * A signature of what determines the output toggle: whether the output is
+   * split, the number of extra output tabs (visibility), and the first output
+   * stack element (where the toggle is anchored).
+   *
+   * @returns {{ sig: string, firstEl: ?Element }}
+   */
+  _outputSignature() {
+    const firstStack = this._firstOutputStack();
+    const firstEl = firstStack?.element?.[0] ?? null;
+    const extra = this.getTabComponents().filter(
+      (c) => c instanceof ImageTab || c instanceof CanvasTab
+    ).length;
+    return { sig: `${this.isOutputSplit()}|${extra}`, firstEl };
+  }
+
+  /**
+   * Render the single split/merge toggle into the controls of the topmost or
+   * leftmost output stack. The button reflects the current state: it splits the
+   * output when it is a single stack, and merges it back when it is split. Shown
+   * only when the output area holds more than one tab. Idempotent.
+   *
+   * Returns false (without disturbing any existing button) when the target
+   * controls element is not in the DOM yet, so a transient miss never destroys a
+   * good toggle.
+   *
+   * @returns {boolean} Whether the toggle was (re)rendered.
+   */
+  renderOutputArrangeControls() {
+    const firstStack = this._firstOutputStack();
+    const $controls = firstStack
+      ? $(firstStack.element).children('.lm_header').children('.lm_controls').first()
+      : $();
+    if ($controls.length === 0) return false;
+
+    $('.output-arrange').remove();
+
+    const split = this.isOutputSplit();
+    const action = split ? 'stacked' : 'split';
+    const icon = split ? '▤' : (this.vertical ? '▥' : '⬓');
+    const title = split ? 'Merge the output tabs into one stack' : 'Split the output tabs';
+
+    const $group = $(`
+      <span class="output-arrange">
+        <button type="button" class="output-arrange-btn" data-arrange="${action}"
+          title="${title}">${icon}</button>
+      </span>
+    `);
+
+    $group.on('click', '.output-arrange-btn', (event) => {
+      this.arrangeOutput($(event.currentTarget).data('arrange'));
+    });
+
+    $controls.prepend($group);
+    this.updateOutputControlsVisibility();
+    return true;
+  }
+
+  /**
+   * Show the output split/merge toggle only when the output area holds more than
+   * one tab (i.e. the terminal plus at least one canvas/image).
+   */
+  updateOutputControlsVisibility() {
+    const hasExtraOutput = this.getTabComponents().some(
+      (component) => component instanceof ImageTab || component instanceof CanvasTab
+    );
+    $('.output-arrange').toggleClass('hidden', !hasExtraOutput);
   }
 }

@@ -35,7 +35,8 @@ export default class EmbedLayout extends Layout {
       },
       content: [
         {
-          type: options.vertical ? 'column' : 'row',
+          // Root type (column/row) is stamped by the base Layout from the
+          // resolved orientation (Embed derives it from options.vertical).
           content: [
             {
               content,

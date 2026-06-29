@@ -221,13 +221,6 @@ export default class TerminalTab {
   }
 
   /**
-   * Callback to set the editor into a vertical layout.
-   */
-  onVerticalLayout = () => {
-    this.container.tab.header.position(false);
-  }
-
-  /**
    * Callback when the container is destroyed.
    */
   onContainerDestroy = () => {
@@ -410,7 +403,6 @@ export default class TerminalTab {
    */
   bindContainerEvents = () => {
     this.container.on('open', this.onShow);
-    this.container.on('verticalLayout', this.onVerticalLayout);
     this.container.on('fontSizeChanged', this.setFontSize);
     this.container.on('resize', this.onContainerResize);
     this.container.on('destroy', this.onContainerDestroy);

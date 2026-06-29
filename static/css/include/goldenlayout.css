@@ -41,6 +41,35 @@
   align-items: center;
 }
 
+/* Output-stack arrange buttons (stacked / split). Hidden until the output area
+   holds more than one tab. */
+.output-arrange {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 4px;
+}
+
+.output-arrange.hidden {
+  display: none;
+}
+
+.output-arrange-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tab-fg-color);
+  opacity: 0.5;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.output-arrange-btn:hover {
+  opacity: 1;
+}
+
 .lm_content,
 .lm_header .lm_tab {
   border-color: var(--border-color);

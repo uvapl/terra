@@ -14,7 +14,7 @@ export default class IDELayout extends Layout {
   constructor(options = {}) {
     const { contentConfig = [] } = options;
 
-    const defaultContentConfig = contentConfig.map((tab) => ({
+    const toTabConfig = (tab) => ({
       type: 'component',
       componentName: 'editor',
       reorderEnabled: true,
@@ -24,7 +24,13 @@ export default class IDELayout extends Layout {
       },
       title: 'Untitled',
       ...tab,
-    }))
+    });
+
+    // Editors stay in the editor stack; images live in the output stack (next to
+    // the terminal). Keeps the editors-only rule intact when recreate() rebuilds
+    // the layout from serialized tabs.
+    const editorTabs = contentConfig.filter((tab) => tab.componentName !== 'image').map(toTabConfig);
+    const imageTabs = contentConfig.filter((tab) => tab.componentName === 'image').map(toTabConfig);
 
     const defaultLayoutConfig = {
       settings: {
@@ -32,11 +38,12 @@ export default class IDELayout extends Layout {
       },
       content: [
         {
-          type: 'column',
+          // The root type (column = vertical, row = horizontal) is stamped by the
+          // base Layout from the resolved orientation; do not hard-code it here.
           content: [
             {
               type: 'stack',
-              content: defaultContentConfig.length > 0 ? defaultContentConfig : [
+              content: editorTabs.length > 0 ? editorTabs : [
                 {
                   type: 'component',
                   componentName: 'editor',
@@ -57,7 +64,8 @@ export default class IDELayout extends Layout {
                   title: 'Terminal',
                   componentState: { fontSize: BASE_FONT_SIZE },
                   isClosable: false,
-                }
+                },
+                ...imageTabs,
               ]
             }
           ]
@@ -301,20 +309,8 @@ export default class IDELayout extends Layout {
   }
 
   closeAllTabs() {
-    const stack = this.editorStack;
-    const originalSetActive = stack.setActiveContentItem;
-    const tabs = [...stack.contentItems];
-
-    // Temporarily disable activation of next tab by switching off a function.
-    stack.setActiveContentItem = () => {};
-
-    for (let i = 0; i < tabs.length; i++) {
-      // If this is the last tab, restore the original activation logic,
-      // so it will be nicely replaced by an active Untitled tab.
-      if (i === tabs.length - 1) {
-        stack.setActiveContentItem = originalSetActive;
-      }
-      tabs[i].remove();
-    }
+    // Close every editor across all (possibly split) editor stacks. Closing the
+    // last one re-inserts an Untitled editor via the base onTabDestroy.
+    this.getEditorComponents().forEach((component) => component.close());
   }
 }

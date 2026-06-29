@@ -200,6 +200,15 @@ export default class App extends BaseApp {
     this.view.setFontSizeDemo();
   }
 
+  /**
+   * Switch the layout between horizontal and vertical orientation.
+   *
+   * @param {string} orientation - 'horizontal' | 'vertical'.
+   */
+  setLayoutOrientation(orientation) {
+    this.view.setOrientation(orientation);
+  }
+
   // ─────────────────────────── Language worker ───────────────────────────
 
   /**
