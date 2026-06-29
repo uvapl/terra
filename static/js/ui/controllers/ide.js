@@ -34,13 +34,16 @@ export default class IDEController extends BaseController {
   recreate() {
     this.setFontSizeDefault();
     const contentConfig = this.layout.serializeTabs();
+    // Preserve the current orientation across a reset — more intuitive than
+    // snapping back to the IDE default.
+    const orientation = this.layout.orientation;
 
     // Prevent the dying layout from auto-inserting an Untitled tab as its tabs
     // are torn down.
     this.layout.resetLayout = true;
     this.layout.destroy();
 
-    this.createLayout({ forceDefaultLayout: true, contentConfig });
+    this.createLayout({ forceDefaultLayout: true, contentConfig, orientation });
 
     // The next init() is a reset: tell onReady() to fire afterLayoutReset.
     this._pendingReset = true;
