@@ -896,7 +896,7 @@ export default class Layout extends GoldenLayout {
       componentName: 'canvas',
       title,
       componentState: { path },
-      isClosable: this.tabsClosable,
+      isClosable: false, // Like a terminal tab.
     });
 
     // GoldenLayout creates the component synchronously during addChild, so the
