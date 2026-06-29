@@ -27,7 +27,6 @@ export default class CanvasTab extends BaseTab {
 
   init = () => {
     this.container.parent.isCanvas = true;
-    this.container.getComponent = () => this;
 
     this.bindContainerEvents();
     this.initCanvasElement();

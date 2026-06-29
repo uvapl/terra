@@ -564,8 +564,12 @@ export default class Layout extends GoldenLayout {
     // Track the active tab for every stack (the editor area may be split into
     // several stacks). This also marks images active, which do not get focus.
     stack.on('activeContentItemChanged', (param) => {
-      if (typeof param?.container?.getComponent === 'function') {
-        this.setActiveEditor(param.container.getComponent());
+      // Only editors and images become the "active editor"; the terminal and
+      // the (pure output) canvas must not, or activating one would leave the
+      // run button reading a non-runnable tab.
+      const component = param?.container?.getComponent?.();
+      if (['editor', 'image'].includes(component?.getComponentName?.())) {
+        this.setActiveEditor(component);
       }
     });
 

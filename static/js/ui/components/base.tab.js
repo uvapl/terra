@@ -21,6 +21,10 @@ export default class BaseTab extends EventTarget {
     super();
     this.container = container;
     this.state = state;
+
+    // Let GoldenLayout hand back this component instance from its container
+    // (e.g. when a stack reports its active item changed).
+    this.container.getComponent = () => this;
   }
 
   /**

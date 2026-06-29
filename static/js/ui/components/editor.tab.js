@@ -41,7 +41,6 @@ export default class EditorTab extends BaseTab {
 
   init = () => {
     this.container.parent.isEditor = true;
-    this.container.getComponent = () => this;
 
     this.bindContainerEvents();
     this.initEditor();
