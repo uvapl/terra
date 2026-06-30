@@ -380,10 +380,9 @@ export default class Layout extends GoldenLayout {
 
     // Layout-internal wiring, registered *before* the component is announced so
     // the layout's own state settles before the controller (and app) react:
-    // 'show' marks the tab active (the controller's 'show' forward re-pulls
-    // availability, which reads the active tab) and 'destroy' runs the
-    // last-editor bookkeeping.
-    imageComponent.addEventListener('show', () => this.setActiveEditor(imageComponent));
+    // 'destroy' runs the last-editor bookkeeping. An image is never the "active
+    // editor" — like the terminal and canvas it is pure output, so showing it
+    // must leave the active code editor (and the run button) untouched.
     imageComponent.addEventListener('destroy', () => this.onTabDestroy(imageComponent));
 
     // Announce the component; the controller subscribes to its events and
@@ -426,12 +425,15 @@ export default class Layout extends GoldenLayout {
    * @param {GoldenLayout.Tab} tab - The tab instance to register.
    */
   registerTab(tab) {
-    // If the current active tab is not set, set it to the current tab.
-    // When the layout is loaded from local storage, the first tab that will be
-    // created by GoldenLayout is the one the user has opened. Additionally, the
-    // active tab will be overridden when another editor becomes active.
-    if (!this.getActiveEditor()) {
-      this.setActiveEditor(tab.contentItem.instance);
+    // If there is no active editor yet, set it to the current tab — but only
+    // when that tab is an editor. Images and the canvas are pure output and must
+    // never be the "active editor" (see activeContentItemChanged above). When the
+    // layout is loaded from local storage the open tabs are created in order, so
+    // the first editor encountered becomes active; a later 'show'/'focus' or
+    // activeContentItemChanged overrides it as the user switches editors.
+    const instance = tab.contentItem.instance;
+    if (!this.getActiveEditor() && instance.getComponentName?.() === 'editor') {
+      this.setActiveEditor(instance);
     }
 
     // The onTabCreated is *also* triggered when a user is dragging tabs around,
@@ -546,13 +548,13 @@ export default class Layout extends GoldenLayout {
     }
 
     // Track the active tab for every stack (the editor area may be split into
-    // several stacks). This also marks images active, which do not get focus.
+    // several stacks).
     stack.on('activeContentItemChanged', (param) => {
-      // Only editors and images become the "active editor"; the terminal and
-      // the (pure output) canvas must not, or activating one would leave the
-      // run button reading a non-runnable tab.
+      // Only editors become the "active editor"; the terminal, canvas and images
+      // must not, or activating one of these (non-runnable) output tabs would
+      // leave the run button reading a non-runnable tab.
       const component = param?.container?.getComponent?.();
-      if (['editor', 'image'].includes(component?.getComponentName?.())) {
+      if (component?.getComponentName?.() === 'editor') {
         this.setActiveEditor(component);
       }
     });
