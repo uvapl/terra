@@ -2,10 +2,21 @@ import { TerraPlugin } from '../../js/lib/plugin-manager.js';
 import Terra from '../../js/terra.js';
 import KarelRenderer from './karel-renderer.js';
 import KarelWorld from './karel-world.js';
+import { tokenize } from './runner/karel-lexer.js';
+import { parse } from './runner/karel-parser.js';
 import './mode-karel.js';
 
 // Matches the `WORLD "name"` directive at the start of a statement line.
 const WORLD_DIRECTIVE = /^[ \t]*WORLD\s+"([^"]*)"/im;
+
+// Matches a line whose cursor sits inside the open quote of a WORLD directive,
+// capturing what has been typed so far (the world-name prefix). Used to switch
+// completion from keywords to world filenames.
+const WORLD_NAME_CONTEXT = /^[ \t]*WORLD\s+"([^"]*)$/i;
+
+// Bundled worlds shipped under static/plugins/karel/worlds/. A fetch can't list
+// a directory, so the names we offer for completion are listed here explicitly.
+const BUNDLED_WORLDS = ['test'];
 
 const completions = (words, meta) =>
   words.map((value) => ({ caption: value, value, meta, score: 1000 }));
@@ -30,14 +41,64 @@ const KAREL_COMPLETIONS = [
   ], 'test'),
 ];
 
-// A single shared Ace completer for Karel keywords. It only contributes inside
-// `ace/mode/karel`, and declares hyphens as identifier characters so prefixes
-// like "front-is-" complete correctly (Ace's default word regex stops at "-").
+/**
+ * List the world names (without the `.w` extension) that the `WORLD` directive
+ * could resolve to: every `.w` file in the VFS, by basename, plus the bundled
+ * worlds. Mirrors what `_loadWorldText` resolves against, so a completed name is
+ * one a run can actually load.
+ *
+ * @returns {Promise<string[]>} Sorted, de-duplicated world names.
+ */
+const listWorldNames = async () => {
+  const files = await Terra.app.vfs.getAllFiles();
+  const fromVfs = files
+    .map((file) => file.path.split('/').pop())
+    .filter((name) => name.endsWith('.w'))
+    .map((name) => name.slice(0, -'.w'.length));
+  return [...new Set([...fromVfs, ...BUNDLED_WORLDS])].sort();
+};
+
+// A single shared Ace completer for Karel. Inside the `WORLD "…"` directive it
+// offers the available world filenames; everywhere else it offers the keyword
+// vocabulary. It only contributes inside `ace/mode/karel`, and declares hyphens
+// as identifier characters so prefixes like "front-is-" complete correctly
+// (Ace's default word regex stops at "-").
 const KAREL_COMPLETER = {
   identifierRegexps: [/[a-zA-Z0-9\-]/],
   getCompletions: (editor, session, pos, prefix, callback) => {
     const modeId = session.$modeId || session.getMode?.().$id;
-    callback(null, modeId === 'ace/mode/karel' ? KAREL_COMPLETIONS : []);
+    if (modeId !== 'ace/mode/karel') {
+      callback(null, []);
+      return;
+    }
+
+    // Inside the open quote of a WORLD directive: offer world filenames. Ace's
+    // identifier regex stops at the quote and at "." so we filter on the name
+    // typed so far ourselves rather than relying on `prefix`.
+    const fullLine = session.getLine(pos.row);
+    const line = fullLine.slice(0, pos.column);
+    const worldContext = line.match(WORLD_NAME_CONTEXT);
+    if (worldContext) {
+      const typed = worldContext[1].toLowerCase();
+      // Close the string ourselves unless the directive already has a closing
+      // quote right after the cursor. The quote rides along in `value`, so Ace's
+      // own insert path adds it (and leaves the caret past it) when a name is
+      // chosen.
+      const closing = fullLine.slice(pos.column).startsWith('"') ? '' : '"';
+      listWorldNames().then((names) => {
+        callback(null, names
+          .filter((name) => name.toLowerCase().startsWith(typed))
+          .map((name) => ({
+            caption: name,
+            value: name + closing,
+            meta: 'world',
+            score: 1000,
+          })));
+      }).catch(() => callback(null, []));
+      return;
+    }
+
+    callback(null, KAREL_COMPLETIONS);
   },
 };
 
@@ -93,6 +154,8 @@ export default class KarelPlugin extends TerraPlugin {
     // re-previews when the directive actually changes.
     this._worldDirectiveChanged(editorComponent);
     this._previewWorld(editorComponent);
+    // Show any syntax error immediately on open, without waiting for an edit.
+    this._lintKarel(editorComponent);
   }
 
   /**
@@ -110,8 +173,88 @@ export default class KarelPlugin extends TerraPlugin {
     const proglang = editorComponent?.proglang;
     if (proglang === 'w') {
       this._previewWorld(editorComponent);
-    } else if (proglang === 'karel' && this._worldDirectiveChanged(editorComponent)) {
-      this._previewWorld(editorComponent);
+    } else if (proglang === 'karel') {
+      if (this._worldDirectiveChanged(editorComponent)) {
+        this._previewWorld(editorComponent);
+      }
+      this._maybePopupWorldCompletion(editorComponent);
+      this._scheduleLint(editorComponent);
+    }
+  }
+
+  /**
+   * Debounce timer for the linter, so markers settle after typing pauses rather
+   * than flashing on every keystroke.
+   * @type {?number}
+   */
+  _lintTimer = null;
+
+  /**
+   * Re-lint shortly after the latest edit. A single shared timer is fine because
+   * only the active editor receives text-change events.
+   *
+   * @param {EditorTab} editorComponent
+   */
+  _scheduleLint = (editorComponent) => {
+    clearTimeout(this._lintTimer);
+    this._lintTimer = setTimeout(() => this._lintKarel(editorComponent), 250);
+  }
+
+  /**
+   * Parse the Karel source and surface the first syntax error as an Ace gutter
+   * annotation (red marker + hover message) on the matching line; clear the
+   * gutter when the program parses. Same lexer/parser the run pipeline uses, so
+   * the editor flags exactly what a run would reject. No-op for non-Karel tabs.
+   *
+   * @param {EditorTab} editorComponent
+   */
+  _lintKarel = (editorComponent) => {
+    if (editorComponent?.proglang !== 'karel') return;
+
+    const aceEditor = editorComponent.editor;
+    const session = aceEditor?.session || aceEditor?.getSession?.();
+    if (!session) return;
+
+    const content = editorComponent.getContent ? editorComponent.getContent() : '';
+
+    let annotations = [];
+    try {
+      parse(tokenize(content));
+    } catch (err) {
+      // Prefer the structured line the error carries; fall back to the message.
+      let line = Number.isInteger(err?.line) ? err.line : null;
+      if (line === null) {
+        const match = /line (\d+)/i.exec(err?.message || '');
+        line = match ? parseInt(match[1], 10) : 1;
+      }
+      annotations = [{
+        row: Math.max(0, line - 1),
+        column: 0,
+        text: err.message,
+        type: 'error',
+      }];
+    }
+    session.setAnnotations(annotations);
+  }
+
+  /**
+   * Pop the autocomplete list open when an edit leaves the cursor inside the
+   * open quote of a WORLD directive (e.g. just after typing the `"`, or after
+   * clearing the name). Ace won't trigger live-autocomplete there itself because
+   * the quote and an empty string aren't identifier characters, so we start it
+   * explicitly. No-op while the list is already showing — Ace keeps it filtered
+   * as you type.
+   *
+   * @param {EditorTab} editorComponent
+   */
+  _maybePopupWorldCompletion = (editorComponent) => {
+    const aceEditor = editorComponent?.editor;
+    if (!aceEditor || aceEditor.completer?.activated) return;
+
+    const pos = aceEditor.getCursorPosition();
+    const line = aceEditor.session.getLine(pos.row).slice(0, pos.column);
+    if (WORLD_NAME_CONTEXT.test(line)) {
+      aceEditor.execCommand('startAutocomplete');
     }
   }
 

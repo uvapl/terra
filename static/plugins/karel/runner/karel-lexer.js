@@ -15,7 +15,15 @@ export const TokenType = {
   EOF: 'EOF',
 };
 
-export class KarelSyntaxError extends Error {}
+export class KarelSyntaxError extends Error {
+  constructor(message, line = null) {
+    super(message);
+    this.name = 'KarelSyntaxError';
+    // 1-based source line the error points at, when known. Used by the editor
+    // to place a gutter annotation; the message also spells it out for output.
+    this.line = line;
+  }
+}
 
 export function tokenize(source) {
   const tokens = [];
@@ -63,7 +71,7 @@ export function tokenize(source) {
         if (source[i] === '\n') line++;
         str += source[i++];
       }
-      if (i >= n) throw new KarelSyntaxError(`Unterminated string on line ${line}.`);
+      if (i >= n) throw new KarelSyntaxError(`Unterminated string on line ${line}.`, line);
       i++; // consume closing quote
       tokens.push({ type: TokenType.STRING, value: str, line });
       continue;
@@ -83,7 +91,7 @@ export function tokenize(source) {
       continue;
     }
 
-    throw new KarelSyntaxError(`Unexpected character '${c}' on line ${line}.`);
+    throw new KarelSyntaxError(`Unexpected character '${c}' on line ${line}.`, line);
   }
 
   tokens.push({ type: TokenType.EOF, value: null, line });
