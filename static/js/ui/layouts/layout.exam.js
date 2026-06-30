@@ -66,14 +66,6 @@ export default class ExamLayout extends Layout {
   }
 
   /**
-   * Remove the right navbar, used when the application failed to initialise.
-   * Static because no layout instance exists yet at that point.
-   */
-  static removeNavbar() {
-    $('.navbar-right').remove();
-  }
-
-  /**
    * Render the course and exam name in the page title.
    *
    * @param {string} courseName - The name of the course.
@@ -89,12 +81,11 @@ export default class ExamLayout extends Layout {
   }
 
   /**
-   * Make the right navbar visible and add the click event listener to the
-   * submit button.
+   * Reveal the submit button and add its click event listener.
    *
    * @param {function} onSubmitClick - Callback for the submit button.
    */
-  showNavbar(onSubmitClick) {
+  showSubmitButton(onSubmitClick) {
     $('.navbar-right')
       .removeClass('hidden')
       .find('#submit-btn')

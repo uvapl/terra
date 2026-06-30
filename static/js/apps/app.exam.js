@@ -46,14 +46,9 @@ export default class ExamApp extends App {
   }
 
   async setupLayout() {
-    let isNewExam;
-    try {
-      isNewExam = await this.loadConfig();
-    } catch (err) {
-      // Remove the right navbar when the application failed to initialise.
-      ExamController.removeNavbar();
-      throw err;
-    }
+    // The submit button starts hidden (see exam.html) and is only revealed on
+    // a successful init, so a throw here correctly leaves it hidden.
+    const isNewExam = await this.loadConfig();
 
     // Files for a specific exam are hosted in a subdirectory of the VFS.
     const slug = examSlug(this.config.configUrl);
@@ -112,9 +107,8 @@ export default class ExamApp extends App {
       }
     }, startTimeout);
 
-    // Make the right navbar visible and add the click event listener to the
-    // submit button.
-    this.view.showNavbar(this.onSubmitButtonClicked);
+    // Reveal the submit button and add its click event listener.
+    this.view.showSubmitButton(this.onSubmitButtonClicked);
 
     // Immediately lock everything if this exam is configured as being locked.
     if (this.config.locked === true) {

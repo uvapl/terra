@@ -15,14 +15,6 @@ export default class ExamController extends BaseController {
     this.surfaces.installGlobalKeyboard();
   }
 
-  /**
-   * Remove the right navbar when the app failed to initialise. Static because no
-   * controller/layout instance exists yet at that point.
-   */
-  static removeNavbar() {
-    ExamLayout.removeNavbar();
-  }
-
   // ── Layout API (exam-specific) ──
 
   /** @returns {object<string, string>} The hidden (never-shown) files. */
@@ -34,8 +26,8 @@ export default class ExamController extends BaseController {
     this.layout.setPageTitle(courseName, examName);
   }
 
-  showNavbar(onSubmitClick) {
-    this.layout.showNavbar(onSubmitClick);
+  showSubmitButton(onSubmitClick) {
+    this.layout.showSubmitButton(onSubmitClick);
   }
 
   showLockedState(options) {
