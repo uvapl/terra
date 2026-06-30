@@ -378,25 +378,17 @@ export default class Layout extends GoldenLayout {
   onImageTabCreated(tab) {
     const imageComponent = tab.contentItem.instance;
 
-    // Mark this tab active as soon as it is shown, before the delegate reacts.
-    // Registered first so it runs before the 'show' forwarding below, which
-    // triggers an availability re-pull that reads the active tab.
+    // Layout-internal wiring, registered *before* the component is announced so
+    // the layout's own state settles before the controller (and app) react:
+    // 'show' marks the tab active (the controller's 'show' forward re-pulls
+    // availability, which reads the active tab) and 'destroy' runs the
+    // last-editor bookkeeping.
     imageComponent.addEventListener('show', () => this.setActiveEditor(imageComponent));
+    imageComponent.addEventListener('destroy', () => this.onTabDestroy(imageComponent));
 
-    // Forward component events to the controller delegate.
-    const imageEvents = {
-      'show': 'onSwitchToImageTab',
-      'hide': 'onImageHidden',
-    };
-
-    for (const [event, method] of Object.entries(imageEvents)) {
-      imageComponent.addEventListener(event, () => this.delegate[method](imageComponent));
-    }
-
-    imageComponent.addEventListener('destroy', () => {
-      this.onTabDestroy(imageComponent);
-      this.delegate.onImageDestroyed(imageComponent);
-    });
+    // Announce the component; the controller subscribes to its events and
+    // forwards them to the app. Emitted last so the listeners above are set.
+    this.delegate.onImageCreated(imageComponent);
   }
 
   /**
@@ -407,52 +399,24 @@ export default class Layout extends GoldenLayout {
   onEditorTabCreated(tab) {
     const editorComponent = tab.contentItem.instance;
 
-    // Signal upward so the controller can bind the registry's editor-scope
-    // shortcuts onto the new editor (it owns the command surfaces), then run any
-    // layout-owned per-editor wiring (no-op in base; the IDE adds a size guard).
-    this.delegate.onEditorCreated(editorComponent);
+    // Layout-internal wiring, registered *before* the component is announced so
+    // the layout's own state settles before the controller (and app) react:
+    //  - 'show'/'focus' set the active editor. The controller's 'show' forward
+    //    re-pulls run availability (canRunActiveTab), which must read the new
+    //    active tab, so this has to run first.
+    //  - 'destroy' inserts an Untitled replacement while the stack is still
+    //    attached, before the app hears onEditorDestroyed.
+    editorComponent.addEventListener('show', () => this.setActiveEditor(editorComponent));
+    editorComponent.addEventListener('focus', () => this.setActiveEditor(editorComponent));
+    editorComponent.addEventListener('destroy', () => this.onTabDestroy(editorComponent));
+
+    // Layout-owned per-editor wiring (no-op in base; the IDE adds a size guard).
     this._setupEditorComponent(editorComponent);
 
-    // Mark this tab active as soon as it is shown, before the delegate reacts.
-    // Registered first so it runs before the 'show' forwarding below, which
-    // triggers an availability re-pull (canRunActiveTab) that reads the active
-    // tab — otherwise the re-pull would see the previously active tab.
-    editorComponent.addEventListener('show', () => this.setActiveEditor(editorComponent));
-
-    // Forward component events to the controller delegate.
-    // Required events: app always implements these (they carry plugin events).
-    const requiredEvents = {
-      'change': 'onEditorTextChanged',
-      'show': 'onSwitchToEditorTab',
-      'hide': 'onEditorHidden',
-      'lock': 'onEditorLocked',
-      'unlock': 'onEditorUnlocked',
-      'resize': 'onEditorResized',
-    };
-
-    for (const [event, method] of Object.entries(requiredEvents)) {
-      editorComponent.addEventListener(event, () => this.delegate[method](editorComponent));
-    }
-
-    // Optional events: only some app variants react to these.
-    const optionalEvents = {
-      'startEditing': 'onEditorEditingStarted',
-      'stopEditing': 'onEditorEditingStopped',
-    };
-
-    for (const [event, method] of Object.entries(optionalEvents)) {
-      editorComponent.addEventListener(event, () => this.delegate?.[method]?.(editorComponent));
-    }
-
-    editorComponent.addEventListener('tabDragStop', (e) => {
-      this.delegate.onTabDragStopped(e.detail.event, e.detail.tab);
-    });
-
-    editorComponent.addEventListener('focus', () => this.onEditorFocus(editorComponent));
-    editorComponent.addEventListener('destroy', () => {
-      this.onTabDestroy(editorComponent);
-      this.delegate.onEditorDestroyed(editorComponent);
-    });
+    // Announce the component. The controller binds the registry's editor-scope
+    // shortcuts and subscribes to the component's events, forwarding them to the
+    // app. Emitted last so all layout-internal listeners above are in place.
+    this.delegate.onEditorCreated(editorComponent);
   }
 
   /**
@@ -508,16 +472,6 @@ export default class Layout extends GoldenLayout {
     }
 
     this._scheduleOutputControlsRefresh();
-  }
-
-  /**
-   * Callback when an editor is focused.
-   *
-   * @param {EditorTab} editorComponent
-   */
-  onEditorFocus(editorComponent) {
-    this.setActiveEditor(editorComponent);
-    this.delegate.onEditorFocused(editorComponent);
   }
 
   /**

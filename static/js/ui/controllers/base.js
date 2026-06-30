@@ -318,69 +318,39 @@ export default class BaseController {
     this.delegate.onLayoutLoaded();
   }
 
-  // Bind the registry's editor-scope shortcuts onto a freshly created editor.
-  // Terminates here (not re-forwarded to the app): the controller owns the
-  // command surfaces, so command registration is its own responsibility.
-  onEditorCreated(editorComponent) {
-    this.surfaces.registerEditorCommands(editorComponent);
+  // ── Component lifecycle ──
+  // The layout announces each freshly created editor/image component and leaves
+  // event subscription to us: it has already wired its own internal listeners
+  // (active-tab tracking, last-editor replacement) before emitting these, so any
+  // forward below runs *after* the layout's state has settled. We bind the
+  // registry's editor-scope shortcuts and relay the component's events to the
+  // app delegate (which fans them out to plugins).
+
+  onEditorCreated(c) {
+    // Editor-scope shortcuts. Terminates here (not forwarded): the controller
+    // owns the command surfaces, so command registration is its own job.
+    this.surfaces.registerEditorCommands(c);
+
+    // Required events: the app always implements these (they carry plugin events).
+    c.addEventListener('change',  () => this.delegate.onEditorTextChanged(c));
+    c.addEventListener('show',    () => this.delegate.onSwitchToEditorTab(c));
+    c.addEventListener('hide',    () => this.delegate.onEditorHidden(c));
+    c.addEventListener('lock',    () => this.delegate.onEditorLocked(c));
+    c.addEventListener('unlock',  () => this.delegate.onEditorUnlocked(c));
+    c.addEventListener('resize',  () => this.delegate.onEditorResized(c));
+    c.addEventListener('focus',   () => this.delegate.onEditorFocused(c));
+    c.addEventListener('destroy', () => this.delegate.onEditorDestroyed(c));
+    c.addEventListener('tabDragStop', (e) => this.delegate.onTabDragStopped(e.detail.event, e.detail.tab));
+
+    // Optional events: only some app variants react to these.
+    c.addEventListener('startEditing', () => this.delegate.onEditorEditingStarted?.(c));
+    c.addEventListener('stopEditing',  () => this.delegate.onEditorEditingStopped?.(c));
   }
 
-  onEditorTextChanged(tabComponent) {
-    this.delegate.onEditorTextChanged(tabComponent);
-  }
-
-  onSwitchToEditorTab(tabComponent) {
-    this.delegate.onSwitchToEditorTab(tabComponent);
-  }
-
-  onEditorFocused(tabComponent) {
-    this.delegate.onEditorFocused(tabComponent);
-  }
-
-  onEditorHidden(tabComponent) {
-    this.delegate.onEditorHidden(tabComponent);
-  }
-
-  onEditorLocked(tabComponent) {
-    this.delegate.onEditorLocked(tabComponent);
-  }
-
-  onEditorUnlocked(tabComponent) {
-    this.delegate.onEditorUnlocked(tabComponent);
-  }
-
-  onEditorResized(tabComponent) {
-    this.delegate.onEditorResized(tabComponent);
-  }
-
-  onEditorDestroyed(tabComponent) {
-    this.delegate.onEditorDestroyed(tabComponent);
-  }
-
-  onTabDragStopped(event, tab) {
-    this.delegate.onTabDragStopped(event, tab);
-  }
-
-  onSwitchToImageTab(tabComponent) {
-    this.delegate.onSwitchToImageTab(tabComponent);
-  }
-
-  onImageHidden(tabComponent) {
-    this.delegate.onImageHidden(tabComponent);
-  }
-
-  onImageDestroyed(tabComponent) {
-    this.delegate.onImageDestroyed(tabComponent);
-  }
-
-  // Optional callbacks — not all app variants implement these.
-
-  onEditorEditingStarted(tabComponent) {
-    this.delegate.onEditorEditingStarted?.(tabComponent);
-  }
-
-  onEditorEditingStopped(tabComponent) {
-    this.delegate.onEditorEditingStopped?.(tabComponent);
+  onImageCreated(c) {
+    c.addEventListener('show',    () => this.delegate.onSwitchToImageTab(c));
+    c.addEventListener('hide',    () => this.delegate.onImageHidden(c));
+    c.addEventListener('destroy', () => this.delegate.onImageDestroyed(c));
   }
 
   // ── Action availability ──
