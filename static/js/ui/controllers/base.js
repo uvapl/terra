@@ -3,7 +3,7 @@ import {
   getLocalStorageItem,
   setLocalStorageItem,
 } from '../../lib/local-storage-manager.js';
-import { BASE_FONT_SIZE } from '../../constants.js';
+import { BASE_FONT_SIZE, DEMO_FONT_SIZE } from '../../constants.js';
 import CommandSurfaces from '../../commands/surfaces.js';
 
 /**
@@ -152,6 +152,16 @@ export default class BaseController {
     return this.layout?.term ?? null;
   }
 
+  /** @returns {?CanvasTab} The canvas component, or null when none is open. */
+  get canvas() {
+    return this.layout?.canvas ?? null;
+  }
+
+  /** Close the canvas output tab if one is open. */
+  closeCanvas() {
+    this.layout.closeCanvas();
+  }
+
   getActiveEditor() {
     return this.layout.getActiveEditor();
   }
@@ -184,24 +194,89 @@ export default class BaseController {
     this.layout.emitToAllComponents(event, data);
   }
 
+  // ── Font size & theme: storage authority + initiator ──
+  // The controller is the single owner of these persisted settings. A change
+  // signal (menu click, keybinding) reaches the app, which forwards here; this
+  // is where the value is clamped and stored, and only then handed to the layout
+  // to apply as a pure view update. The layout never reads or writes storage for
+  // these — it holds the current value purely to seed new tabs.
+
+  /**
+   * Set the font size to an absolute value: clamp, persist, then apply to the
+   * view. The single sink every font-size change flows through.
+   *
+   * @param {number} size - The requested font size in px.
+   */
+  setFontSize(size) {
+    size = Math.max(8, Math.min(72, size));
+    this.setStoredFontSize(size);
+    this.layout.applyFontSize(size);
+  }
+
   increaseFontSize() {
-    this.layout.increaseFontSize();
+    this.setFontSize(this.getStoredFontSize() + 1);
   }
 
   decreaseFontSize() {
-    this.layout.decreaseFontSize();
+    this.setFontSize(this.getStoredFontSize() - 1);
   }
 
   setFontSizeDefault() {
-    this.layout.setFontSizeDefault();
+    this.setFontSize(BASE_FONT_SIZE);
   }
 
   setFontSizeDemo() {
-    this.layout.setFontSizeDemo();
+    this.setFontSize(DEMO_FONT_SIZE);
+  }
+
+  /**
+   * Set the editor theme: persist, then apply to the view.
+   *
+   * @param {string} theme - 'light' | 'dark'.
+   */
+  setTheme(theme) {
+    this.setStoredTheme(theme);
+    this.layout.applyTheme(theme);
+  }
+
+  /**
+   * Wire the font-size and theme menu clicks to the app entry points. These
+   * value lists (`<li data-val>`) render into two different surfaces depending on
+   * the variant — the IDE menubar and the hand-rolled gear settings menu — but
+   * both use the same `#font-size-menu` / `#editor-theme-menu` ids, so a single
+   * id-based binding here covers every variant. Routing through the app mirrors
+   * how the menubar's other commands reach it (e.g. setLayoutOrientation); the
+   * app forwards back to setFontSize/setTheme above.
+   *
+   * The menus may live in chrome that survives a layout reset, so the handlers
+   * are namespaced and rebound (off-then-on) on every init.
+   */
+  wireSettingsControls() {
+    $('#font-size-menu').find('li[data-val]').off('click.settings').on('click.settings', (event) => {
+      this.delegate.setFontSize(parseInt($(event.currentTarget).data('val'), 10));
+    });
+
+    $('#editor-theme-menu').find('li[data-val]').off('click.settings').on('click.settings', (event) => {
+      this.delegate.setTheme($(event.currentTarget).data('val'));
+    });
   }
 
   refresh() {
     this.layout.refresh();
+  }
+
+  /**
+   * Switch the layout orientation at runtime (horizontal ⇄ vertical).
+   *
+   * @param {string} orientation - 'horizontal' | 'vertical'.
+   */
+  setOrientation(orientation) {
+    this.layout.setOrientation(orientation);
+  }
+
+  /** @returns {string} The current orientation ('horizontal' | 'vertical'). */
+  get orientation() {
+    return this.layout.orientation;
   }
 
   /**
@@ -233,6 +308,7 @@ export default class BaseController {
    */
   onLayoutInitialised() {
     this.surfaces.buildToolbar('#toolbar');
+    this.wireSettingsControls();
     this.delegate.onReady?.();
 
     if (!this._afterSetupDone) {
@@ -252,62 +328,39 @@ export default class BaseController {
     this.delegate.onLayoutLoaded();
   }
 
-  onEditorTextChanged(tabComponent) {
-    this.delegate.onEditorTextChanged(tabComponent);
+  // ── Component lifecycle ──
+  // The layout announces each freshly created editor/image component and leaves
+  // event subscription to us: it has already wired its own internal listeners
+  // (active-tab tracking, last-editor replacement) before emitting these, so any
+  // forward below runs *after* the layout's state has settled. We bind the
+  // registry's editor-scope shortcuts and relay the component's events to the
+  // app delegate (which fans them out to plugins).
+
+  onEditorCreated(c) {
+    // Editor-scope shortcuts. Terminates here (not forwarded): the controller
+    // owns the command surfaces, so command registration is its own job.
+    this.surfaces.registerEditorCommands(c);
+
+    // Required events: the app always implements these (they carry plugin events).
+    c.addEventListener('change',  () => this.delegate.onEditorTextChanged(c));
+    c.addEventListener('show',    () => this.delegate.onSwitchToEditorTab(c));
+    c.addEventListener('hide',    () => this.delegate.onEditorHidden(c));
+    c.addEventListener('lock',    () => this.delegate.onEditorLocked(c));
+    c.addEventListener('unlock',  () => this.delegate.onEditorUnlocked(c));
+    c.addEventListener('resize',  () => this.delegate.onEditorResized(c));
+    c.addEventListener('focus',   () => this.delegate.onEditorFocused(c));
+    c.addEventListener('destroy', () => this.delegate.onEditorDestroyed(c));
+    c.addEventListener('tabDragStop', (e) => this.delegate.onTabDragStopped(e.detail.event, e.detail.tab));
+
+    // Optional events: only some app variants react to these.
+    c.addEventListener('startEditing', () => this.delegate.onEditorEditingStarted?.(c));
+    c.addEventListener('stopEditing',  () => this.delegate.onEditorEditingStopped?.(c));
   }
 
-  onSwitchToEditorTab(tabComponent) {
-    this.delegate.onSwitchToEditorTab(tabComponent);
-  }
-
-  onEditorFocused(tabComponent) {
-    this.delegate.onEditorFocused(tabComponent);
-  }
-
-  onEditorHidden(tabComponent) {
-    this.delegate.onEditorHidden(tabComponent);
-  }
-
-  onEditorLocked(tabComponent) {
-    this.delegate.onEditorLocked(tabComponent);
-  }
-
-  onEditorUnlocked(tabComponent) {
-    this.delegate.onEditorUnlocked(tabComponent);
-  }
-
-  onEditorResized(tabComponent) {
-    this.delegate.onEditorResized(tabComponent);
-  }
-
-  onEditorDestroyed(tabComponent) {
-    this.delegate.onEditorDestroyed(tabComponent);
-  }
-
-  onTabDragStopped(event, tab) {
-    this.delegate.onTabDragStopped(event, tab);
-  }
-
-  onSwitchToImageTab(tabComponent) {
-    this.delegate.onSwitchToImageTab(tabComponent);
-  }
-
-  onImageHidden(tabComponent) {
-    this.delegate.onImageHidden(tabComponent);
-  }
-
-  onImageDestroyed(tabComponent) {
-    this.delegate.onImageDestroyed(tabComponent);
-  }
-
-  // Optional callbacks — not all app variants implement these.
-
-  onEditorEditingStarted(tabComponent) {
-    this.delegate.onEditorEditingStarted?.(tabComponent);
-  }
-
-  onEditorEditingStopped(tabComponent) {
-    this.delegate.onEditorEditingStopped?.(tabComponent);
+  onImageCreated(c) {
+    c.addEventListener('show',    () => this.delegate.onSwitchToImageTab(c));
+    c.addEventListener('hide',    () => this.delegate.onImageHidden(c));
+    c.addEventListener('destroy', () => this.delegate.onImageDestroyed(c));
   }
 
   // ── Action availability ──

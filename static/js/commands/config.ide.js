@@ -22,6 +22,7 @@ export const submenus = {
   'Run': { position: 500 },
   'Git': { position: 600 },
   'Edit/Find': { position: 200 },
+  'View/Orientation': { position: 170 },
   'View/Theme': { position: 200, id: 'editor-theme-menu' },
   'View/Font size': { position: 210, id: 'font-size-menu' },
 };
@@ -126,28 +127,38 @@ export const commands = [
 
   // View ---------------------------------------------------------------------
   {
+    name: 'orientationHorizontal', scope: 'global',
+    menuItem: { path: 'View/Orientation/Horizontal', position: 100 },
+    exec: ({ app }) => app.setLayoutOrientation('horizontal'),
+  },
+  {
+    name: 'orientationVertical', scope: 'global',
+    menuItem: { path: 'View/Orientation/Vertical', position: 110 },
+    exec: ({ app }) => app.setLayoutOrientation('vertical'),
+  },
+  {
     name: 'resetLayout', scope: 'global',
     menuItem: { path: 'View/Reset Layout', position: 180 }, exec: ({ app }) => app.resetLayout(),
   },
   {
     name: 'increaseFontSize', scope: 'global', bindKey: 'ctrl-=',
     menuItem: { path: 'View/Font size/Increase', position: 100 },
-    exec: ({ app }) => app.view.increaseFontSize(),
+    exec: ({ app }) => app.increaseFontSize(),
   },
   {
     name: 'decreaseFontSize', scope: 'global', bindKey: 'ctrl--',
     menuItem: { path: 'View/Font size/Decrease', position: 110 },
-    exec: ({ app }) => app.view.decreaseFontSize(),
+    exec: ({ app }) => app.decreaseFontSize(),
   },
   {
     name: 'defaultFontSize', scope: 'global', bindKey: 'ctrl-0',
     menuItem: { path: 'View/Font size/Default', position: 120 },
-    exec: ({ app }) => app.view.setFontSizeDefault(),
+    exec: ({ app }) => app.setFontSizeDefault(),
   },
   {
     name: 'demoFontSize', scope: 'global', bindKey: 'ctrl-9',
     menuItem: { path: 'View/Font size/Demo Mode', position: 130 },
-    exec: ({ app }) => app.view.setFontSizeDemo(),
+    exec: ({ app }) => app.setFontSizeDemo(),
   },
   {
     ...clearTerminalCommand,

@@ -19,15 +19,14 @@ export default class CanvasTab extends BaseTab {
 
   _redrawScheduled = false;
 
-  constructor(container, state) {
-    super(container, state);
+  constructor(container) {
+    super(container);
 
     this.init();
   }
 
   init = () => {
     this.container.parent.isCanvas = true;
-    this.container.getComponent = () => this;
 
     this.bindContainerEvents();
     this.initCanvasElement();

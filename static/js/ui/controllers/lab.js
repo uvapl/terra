@@ -6,7 +6,8 @@ import LabLayout from '../layouts/layout.lab.js';
  */
 export default class LabController extends BaseController {
   buildLayout(options) {
-    return new LabLayout(options);
+    // Lab defaults to a vertical layout (editor on top, terminal below).
+    return new LabLayout({ orientation: 'vertical', ...options });
   }
 
   setupCommandSurfaces() {

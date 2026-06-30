@@ -1,19 +1,18 @@
 import { getFileExtension } from '../../lib/helpers.js';
-import BaseTab from './base.tab.js';
+import FileTab from './file.tab.js';
 
 /**
  * Image component for GoldenLayout.
  */
-export default class ImageTab extends BaseTab {
-  constructor(container, state) {
-    super(container, state);
+export default class ImageTab extends FileTab {
+  constructor(container) {
+    super(container);
 
     this.init();
   }
 
   init = () => {
     this.container.parent.isImage = true;
-    this.container.getComponent = () => this;
 
     this.bindContainerEvents();
     this.initImageElement();
@@ -86,15 +85,6 @@ export default class ImageTab extends BaseTab {
     if (!this.img.src) return '';
 
     return this.img.src.split(',')[1];
-  }
-
-  /**
-   * Get the current state of the editor.
-   *
-   * @returns {object} The state of the editor.
-   */
-  getState = () => {
-    return this.container.getState();
   }
 
   /**

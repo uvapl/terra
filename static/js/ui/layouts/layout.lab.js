@@ -50,7 +50,8 @@ export default class LabLayout extends Layout {
       },
       content: [
         {
-          type: 'column',
+          // Root type (column/row) is stamped by the base Layout from the
+          // resolved orientation (Lab defaults to vertical).
           content: [
             { content },
             {

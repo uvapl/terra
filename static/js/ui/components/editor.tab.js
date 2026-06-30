@@ -1,12 +1,11 @@
 import { BASE_FONT_SIZE } from '../../constants.js';
 import { getFileExtension, seconds } from '../../lib/helpers.js';
-import { getLocalStorageItem } from '../../lib/local-storage-manager.js';
-import BaseTab from './base.tab.js';
+import FileTab from './file.tab.js';
 
 /**
  * Editor component for GoldenLayout, based on the Ace editor.
  */
-export default class EditorTab extends BaseTab {
+export default class EditorTab extends FileTab {
   /**
    * Whether the editor has been rendered.
    * @type {boolean}
@@ -33,22 +32,21 @@ export default class EditorTab extends BaseTab {
    */
   firstTimeLoadingContent = true;
 
-  constructor(container, state) {
-    super(container, state);
+  constructor(container) {
+    super(container);
 
     this.init();
   }
 
   init = () => {
     this.container.parent.isEditor = true;
-    this.container.getComponent = () => this;
 
     this.bindContainerEvents();
     this.initEditor();
     this.bindEditorEvents();
 
-    this.setTheme(getLocalStorageItem('theme') || 'light');
-    this.setFontSize(this.state.fontSize || BASE_FONT_SIZE);
+    this.setTheme(this.container.getState().theme || 'light');
+    this.setFontSize(this.container.getState().fontSize || BASE_FONT_SIZE);
 
     this.setProgLang();
 
@@ -79,7 +77,7 @@ export default class EditorTab extends BaseTab {
     this.editor.setOption('enableSnippets', false);
     this.editor.setOption('enableBasicAutocompletion', true);
     this.editor.setOption('enableLiveAutocompletion', true);
-    this.editor.setValue(this.state.value || '');
+    this.editor.setValue(this.container.getState().value || '');
     this.editor.clearSelection();
     this.editor.completers = this.getAceCompleters();
   }
@@ -536,6 +534,7 @@ export default class EditorTab extends BaseTab {
 
       case 'txt':
       case 'untitled':
+      case 'w': // Karel world files: plain text, previewed on the canvas.
         mode = 'text';
         break;
 

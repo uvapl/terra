@@ -1,9 +1,9 @@
-import Layout from './layout.js';
+import FlexibleLayout from './layout.flexible.js';
 import { BASE_FONT_SIZE, MAX_FILE_SIZE } from '../../constants.js';
 import { createModal, hideModal, showModal } from '../components/modal.js';
 import { createTooltip, destroyTooltip } from '../components/tooltip.js';
 
-export default class IDELayout extends Layout {
+export default class IDELayout extends FlexibleLayout {
   /**
    * Create the layout.
    *
@@ -14,7 +14,7 @@ export default class IDELayout extends Layout {
   constructor(options = {}) {
     const { contentConfig = [] } = options;
 
-    const defaultContentConfig = contentConfig.map((tab) => ({
+    const toTabConfig = (tab) => ({
       type: 'component',
       componentName: 'editor',
       reorderEnabled: true,
@@ -24,7 +24,13 @@ export default class IDELayout extends Layout {
       },
       title: 'Untitled',
       ...tab,
-    }))
+    });
+
+    // Editors stay in the editor stack; images live in the output stack (next to
+    // the terminal). Keeps the editors-only rule intact when recreate() rebuilds
+    // the layout from serialized tabs.
+    const editorTabs = contentConfig.filter((tab) => tab.componentName !== 'image').map(toTabConfig);
+    const imageTabs = contentConfig.filter((tab) => tab.componentName === 'image').map(toTabConfig);
 
     const defaultLayoutConfig = {
       settings: {
@@ -32,11 +38,12 @@ export default class IDELayout extends Layout {
       },
       content: [
         {
-          type: 'column',
+          // The root type (column = vertical, row = horizontal) is stamped by the
+          // base Layout from the resolved orientation; do not hard-code it here.
           content: [
             {
               type: 'stack',
-              content: defaultContentConfig.length > 0 ? defaultContentConfig : [
+              content: editorTabs.length > 0 ? editorTabs : [
                 {
                   type: 'component',
                   componentName: 'editor',
@@ -57,7 +64,8 @@ export default class IDELayout extends Layout {
                   title: 'Terminal',
                   componentState: { fontSize: BASE_FONT_SIZE },
                   isClosable: false,
-                }
+                },
+                ...imageTabs,
               ]
             }
           ]
@@ -92,15 +100,13 @@ export default class IDELayout extends Layout {
   }
 
   /**
-   * Keyboard shortcuts for editor tabs specific to the IDE.
+   * IDE-specific per-editor wiring: guard against oversized edits on each
+   * keystroke. Editor-scope shortcut binding is handled by the controller
+   * (via the onEditorCreated signal), not here.
    *
    * @param {*} editorComponent
    */
-  registerEditorCommands(editorComponent) {
-    super.registerEditorCommands(editorComponent);
-    // 'save' (mod-s) and 'closeFile' (option-w) are now global commands in the
-    // registry (commands/config.ide.js), so they fire from the terminal too and
-    // are not registered as editor-scope Ace commands here.
+  _setupEditorComponent(editorComponent) {
     editorComponent.onCommandExec((event) => this._validateFileSizeLimit(event, editorComponent));
   }
 
@@ -233,19 +239,26 @@ export default class IDELayout extends Layout {
   }
 
   /**
-   * Checks if an Untitled tab is the only one open in the editor,
-   * and that no content has been added to it (and thus unsaved).
+   * The active editor when it is an empty, unsaved Untitled tab — the one that
+   * should be replaced when a real file is opened. Returns null otherwise (saved
+   * file, edited Untitled, or a non-editor active tab). Unlike the old "only tab"
+   * check, this works regardless of other open tabs (images in the output stack,
+   * split editor stacks, …).
    *
-   * @returns {boolean}
+   * @returns {?EditorTab}
    */
-  onlyHasEmptyUntitled() {
-    let tabComponents = this.getTabComponents();
-    return (
-      tabComponents.length === 1 &&
-      tabComponents[0].getFilename() === 'Untitled' &&
-      !tabComponents[0].getPath() &&
-      tabComponents[0].getContent() === ''
-    );
+  getReplaceableUntitledEditor() {
+    const active = this.getActiveEditor();
+    if (
+      active &&
+      active.getComponentName?.() === 'editor' &&
+      active.getFilename() === 'Untitled' &&
+      !active.getPath() &&
+      active.getContent() === ''
+    ) {
+      return active;
+    }
+    return null;
   }
 
   /**
@@ -255,7 +268,7 @@ export default class IDELayout extends Layout {
    */
   closeFile(filepath) {
     const component = filepath
-      ? this.getTabComponents().find((component) => component.getPath() === filepath)
+      ? this.getFileTabComponents().find((component) => component.getPath() === filepath)
       : this.getActiveEditor();
 
     if (component) {
@@ -270,7 +283,7 @@ export default class IDELayout extends Layout {
    * @param {string} path - The absolute folderpath to close all files from.
    */
   closeFilesFromFolder(path) {
-    this.getTabComponents().forEach((component) => {
+    this.getFileTabComponents().forEach((component) => {
       const subfilepath = component.getPath();
       if (subfilepath?.startsWith(path)) {
         this.closeFile(subfilepath);
@@ -301,20 +314,8 @@ export default class IDELayout extends Layout {
   }
 
   closeAllTabs() {
-    const stack = this.editorStack;
-    const originalSetActive = stack.setActiveContentItem;
-    const tabs = [...stack.contentItems];
-
-    // Temporarily disable activation of next tab by switching off a function.
-    stack.setActiveContentItem = () => {};
-
-    for (let i = 0; i < tabs.length; i++) {
-      // If this is the last tab, restore the original activation logic,
-      // so it will be nicely replaced by an active Untitled tab.
-      if (i === tabs.length - 1) {
-        stack.setActiveContentItem = originalSetActive;
-      }
-      tabs[i].remove();
-    }
+    // Close every editor across all (possibly split) editor stacks. Closing the
+    // last one re-inserts an Untitled editor via the base onTabDestroy.
+    this.getEditorComponents().forEach((component) => component.close());
   }
 }

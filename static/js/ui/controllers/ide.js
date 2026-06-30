@@ -7,7 +7,9 @@ import { initMenubar } from '../components/menubar.js';
  */
 export default class IDEController extends BaseController {
   buildLayout(options) {
-    return new IDELayout(options);
+    // The IDE defaults to a vertical layout (editor on top, output below);
+    // a restored config or an explicit option overrides this.
+    return new IDELayout({ orientation: 'vertical', ...options });
   }
 
   /**
@@ -32,36 +34,21 @@ export default class IDEController extends BaseController {
   recreate() {
     this.setFontSizeDefault();
     const contentConfig = this.layout.serializeTabs();
+    // Preserve the current orientation across a reset — more intuitive than
+    // snapping back to the IDE default.
+    const orientation = this.layout.orientation;
 
     // Prevent the dying layout from auto-inserting an Untitled tab as its tabs
     // are torn down.
     this.layout.resetLayout = true;
     this.layout.destroy();
 
-    this.createLayout({ forceDefaultLayout: true, contentConfig });
+    this.createLayout({ forceDefaultLayout: true, contentConfig, orientation });
 
     // The next init() is a reset: tell onReady() to fire afterLayoutReset.
     this._pendingReset = true;
 
     // return this.layout;
-    this.init();
-  }
-
-  /**
-   * Replace the current layout with an explicit GoldenLayout config (e.g. a
-   * plugin loading a custom layout). Mirrors recreate(), but uses the provided
-   * config verbatim instead of rebuilding the default. Open tabs are preserved
-   * only if the caller embedded them in the config.
-   *
-   * @param {object} restoredConfig - A full GoldenLayout config.
-   */
-  loadLayout(restoredConfig) {
-    this.layout.resetLayout = true;
-    this.layout.destroy();
-
-    this.createLayout({ restoredConfig });
-
-    this._pendingReset = true;
     this.init();
   }
 
@@ -109,8 +96,9 @@ export default class IDEController extends BaseController {
       config.content.forEach((item) => {
         if (item.type === 'component') {
           // Keep the value of pathless (Untitled) tabs, because those cannot
-          // be reloaded from the VFS.
-          if (item.componentState.path) {
+          // be reloaded from the VFS. Output components (e.g. canvas) carry no
+          // componentState at all, so guard before reading `path`.
+          if (item.componentState?.path) {
             item.componentState.value = '';
           }
         } else {

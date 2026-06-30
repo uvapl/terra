@@ -73,7 +73,7 @@ class Parser {
   expectWord(kw) {
     if (!this.matchWord(kw)) {
       const t = this.peek();
-      throw new KarelSyntaxError(`Expected '${kw}' but found '${t.value}' on line ${t.line}.`);
+      throw new KarelSyntaxError(`Expected '${kw}' but found '${t.value}' on line ${t.line}.`, t.line);
     }
   }
 
@@ -93,7 +93,7 @@ class Parser {
       if (this.matchWord('world')) {
         const t = this.next();
         if (t.type !== TokenType.STRING) {
-          throw new KarelSyntaxError(`Expected a quoted world filename after WORLD on line ${t.line}.`);
+          throw new KarelSyntaxError(`Expected a quoted world filename after WORLD on line ${t.line}.`, t.line);
         }
         worldFile = t.value;
       } else {
@@ -101,7 +101,7 @@ class Parser {
         const t = this.next();
         const mode = t.type === TokenType.WORD ? t.value.toLowerCase() : null;
         if (!['slow', 'slower', 'slowest', 'fast'].includes(mode)) {
-          throw new KarelSyntaxError(`Expected SLOW or FAST after SPEED on line ${t.line}.`);
+          throw new KarelSyntaxError(`Expected SLOW or FAST after SPEED on line ${t.line}.`, t.line);
         }
         speedOverride = mode;
       }
@@ -131,7 +131,7 @@ class Parser {
     this.next(); // 'define' or 'define-new-instruction'
     const nameToken = this.next();
     if (nameToken.type !== TokenType.WORD) {
-      throw new KarelSyntaxError(`Expected an instruction name on line ${nameToken.line}.`);
+      throw new KarelSyntaxError(`Expected an instruction name on line ${nameToken.line}.`, nameToken.line);
     }
     this.expectWord('as');
     const body = this.parseStatement();
@@ -160,7 +160,7 @@ class Parser {
     // Otherwise it is a primitive or user-defined instruction call.
     const t = this.next();
     if (t.type !== TokenType.WORD) {
-      throw new KarelSyntaxError(`Expected an instruction but found '${t.value}' on line ${t.line}.`);
+      throw new KarelSyntaxError(`Expected an instruction but found '${t.value}' on line ${t.line}.`, t.line);
     }
     return { type: 'call', name: t.value.toLowerCase(), line: t.line };
   }
@@ -176,7 +176,7 @@ class Parser {
     this.expectWord('iterate');
     const countToken = this.next();
     if (countToken.type !== TokenType.NUMBER) {
-      throw new KarelSyntaxError(`Expected a number after ITERATE on line ${countToken.line}.`);
+      throw new KarelSyntaxError(`Expected a number after ITERATE on line ${countToken.line}.`, countToken.line);
     }
     this.expectWord('times');
     const body = this.parseStatement();
@@ -209,11 +209,11 @@ class Parser {
 
     const t = this.next();
     if (t.type !== TokenType.WORD) {
-      throw new KarelSyntaxError(`Expected a condition on line ${t.line}.`);
+      throw new KarelSyntaxError(`Expected a condition on line ${t.line}.`, t.line);
     }
     const spec = TESTS[t.value.toLowerCase()];
     if (!spec) {
-      throw new KarelSyntaxError(`Unknown condition '${t.value}' on line ${t.line}.`);
+      throw new KarelSyntaxError(`Unknown condition '${t.value}' on line ${t.line}.`, t.line);
     }
     return { fn: spec.fn, negate: spec.negate !== negate };
   }

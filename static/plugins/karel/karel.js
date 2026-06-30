@@ -2,12 +2,21 @@ import { TerraPlugin } from '../../js/lib/plugin-manager.js';
 import Terra from '../../js/terra.js';
 import KarelRenderer from './karel-renderer.js';
 import KarelWorld from './karel-world.js';
+import { tokenize } from './runner/karel-lexer.js';
+import { parse } from './runner/karel-parser.js';
 import './mode-karel.js';
-
-const KAREL_CANVAS_PATH = '/.canvas/karel';
 
 // Matches the `WORLD "name"` directive at the start of a statement line.
 const WORLD_DIRECTIVE = /^[ \t]*WORLD\s+"([^"]*)"/im;
+
+// Matches a line whose cursor sits inside the open quote of a WORLD directive,
+// capturing what has been typed so far (the world-name prefix). Used to switch
+// completion from keywords to world filenames.
+const WORLD_NAME_CONTEXT = /^[ \t]*WORLD\s+"([^"]*)$/i;
+
+// Bundled worlds shipped under static/plugins/karel/worlds/. A fetch can't list
+// a directory, so the names we offer for completion are listed here explicitly.
+const BUNDLED_WORLDS = ['test'];
 
 const completions = (words, meta) =>
   words.map((value) => ({ caption: value, value, meta, score: 1000 }));
@@ -32,14 +41,64 @@ const KAREL_COMPLETIONS = [
   ], 'test'),
 ];
 
-// A single shared Ace completer for Karel keywords. It only contributes inside
-// `ace/mode/karel`, and declares hyphens as identifier characters so prefixes
-// like "front-is-" complete correctly (Ace's default word regex stops at "-").
+/**
+ * List the world names (without the `.w` extension) that the `WORLD` directive
+ * could resolve to: every `.w` file in the VFS, by basename, plus the bundled
+ * worlds. Mirrors what `_loadWorldText` resolves against, so a completed name is
+ * one a run can actually load.
+ *
+ * @returns {Promise<string[]>} Sorted, de-duplicated world names.
+ */
+const listWorldNames = async () => {
+  const files = await Terra.app.vfs.getAllFiles();
+  const fromVfs = files
+    .map((file) => file.path.split('/').pop())
+    .filter((name) => name.endsWith('.w'))
+    .map((name) => name.slice(0, -'.w'.length));
+  return [...new Set([...fromVfs, ...BUNDLED_WORLDS])].sort();
+};
+
+// A single shared Ace completer for Karel. Inside the `WORLD "…"` directive it
+// offers the available world filenames; everywhere else it offers the keyword
+// vocabulary. It only contributes inside `ace/mode/karel`, and declares hyphens
+// as identifier characters so prefixes like "front-is-" complete correctly
+// (Ace's default word regex stops at "-").
 const KAREL_COMPLETER = {
   identifierRegexps: [/[a-zA-Z0-9\-]/],
   getCompletions: (editor, session, pos, prefix, callback) => {
     const modeId = session.$modeId || session.getMode?.().$id;
-    callback(null, modeId === 'ace/mode/karel' ? KAREL_COMPLETIONS : []);
+    if (modeId !== 'ace/mode/karel') {
+      callback(null, []);
+      return;
+    }
+
+    // Inside the open quote of a WORLD directive: offer world filenames. Ace's
+    // identifier regex stops at the quote and at "." so we filter on the name
+    // typed so far ourselves rather than relying on `prefix`.
+    const fullLine = session.getLine(pos.row);
+    const line = fullLine.slice(0, pos.column);
+    const worldContext = line.match(WORLD_NAME_CONTEXT);
+    if (worldContext) {
+      const typed = worldContext[1].toLowerCase();
+      // Close the string ourselves unless the directive already has a closing
+      // quote right after the cursor. The quote rides along in `value`, so Ace's
+      // own insert path adds it (and leaves the caret past it) when a name is
+      // chosen.
+      const closing = fullLine.slice(pos.column).startsWith('"') ? '' : '"';
+      listWorldNames().then((names) => {
+        callback(null, names
+          .filter((name) => name.toLowerCase().startsWith(typed))
+          .map((name) => ({
+            caption: name,
+            value: name + closing,
+            meta: 'world',
+            score: 1000,
+          })));
+      }).catch(() => callback(null, []));
+      return;
+    }
+
+    callback(null, KAREL_COMPLETIONS);
   },
 };
 
@@ -78,92 +137,147 @@ export default class KarelPlugin extends TerraPlugin {
     // Join the run pipeline. Idempotent, so re-firing on a layout reset is fine.
     Terra.app.registerLangWorker('karel', 'static/plugins/karel/runner/karel.worker.js', this.name);
 
-    // Contribute a "Load Karel Layout" item to the View menu. The menubar is
-    // already built by the time this fires, so register the command and rebuild
-    // it. addCommands is keyed by name, so re-firing on a reset is harmless.
-    Terra.app.commands.addCommands([{
-      name: 'loadKarelLayout',
-      scope: 'global',
-      menuItem: { path: 'View/Load Karel Layout', position: 100 },
-      exec: () => this._loadKarelLayout(),
-    }]);
-    Terra.app.view.refreshMenu?.();
+    Terra.app.registerSurface('karel', 'canvas');
+    Terra.app.registerSurface('w', 'canvas');
   }
 
   /**
-   * Switch to a Karel-friendly layout: code tabs on the left, and on the right a
-   * column with the Karel canvas on top (2/3) and the terminal below (1/3). Open
-   * code tabs are preserved, and the active file's world is drawn immediately.
-   */
-  _loadKarelLayout = () => {
-    const view = Terra.app.view;
-    const fontSize = view.getStoredFontSize?.();
-
-    // Preserve the open code tabs (serializeTabs already skips the canvas).
-    const openTabs = view.layout.serializeTabs();
-    const editorTabs = (openTabs.length ? openTabs : [
-      { title: 'Untitled', componentName: 'editor', componentState: {} },
-    ]).map((tab) => ({
-      type: 'component',
-      componentName: tab.componentName || 'editor',
-      title: tab.title,
-      componentState: { fontSize, ...tab.componentState },
-      isClosable: true,
-      reorderEnabled: true,
-    }));
-
-    const config = {
-      settings: {
-        showPopoutIcon: false,
-        showMaximiseIcon: false,
-        showCloseIcon: false,
-        reorderEnabled: true,
-      },
-      dimensions: { headerHeight: 30, borderWidth: 10 },
-      content: [{
-        type: 'row',
-        content: [
-          // Code tabs on the left.
-          {
-            type: 'stack', id: 'editorStack', width: 50,
-            isClosable: false, content: editorTabs,
-          },
-          // Right column: Karel canvas (top ~2/3) over the terminal (lower ~1/3).
-          {
-            type: 'stack', width: 50,
-            id: 'outputStack',
-            content: [
-              {
-                type: 'component', componentName: 'canvas', title: 'Karel',
-                componentState: { path: KAREL_CANVAS_PATH },
-                height: 67, isClosable: true, reorderEnabled: true,
-              },
-              {
-                type: 'component', componentName: 'terminal', title: 'Terminal',
-                componentState: { fontSize },
-                height: 33, isClosable: false, reorderEnabled: true,
-              },
-            ],
-          },
-        ],
-      }],
-    };
-
-    view.loadLayout(config);
-
-    // Draw the active file's world into the freshly created canvas.
-    this._previewWorld(view.getActiveEditor());
-  }
-
-  /**
-   * When a Karel source file becomes the active tab (on open or switch), launch
-   * the canvas and show the world it declares — immediately, without running.
+   * When a Karel source or world file becomes the active tab (on open or
+   * switch), show the world it declares on the canvas the core has already
+   * opened — immediately, without running.
    *
    * @param {EditorTab} editorComponent - The newly active editor.
    */
   onSwitchToEditorTab = (editorComponent) => {
     this._installCompleter(editorComponent);
+    // Seed the remembered WORLD directive so the first edit after a switch only
+    // re-previews when the directive actually changes.
+    this._worldDirectiveChanged(editorComponent);
     this._previewWorld(editorComponent);
+    // Show any syntax error immediately on open, without waiting for an edit.
+    this._lintKarel(editorComponent);
+  }
+
+  /**
+   * Live-update the canvas while a Karel or world file is being edited.
+   *
+   * For a `.w` file the whole file is the world, so every change re-renders.
+   * For a `.karel` program only its WORLD directive selects what is shown, so we
+   * re-preview just when that directive changes — pointing it at a different
+   * (valid) world file immediately shows that world, while ordinary code edits
+   * leave the canvas alone.
+   *
+   * @param {EditorTab} editorComponent - The editor whose text changed.
+   */
+  onEditorTextChanged = (editorComponent) => {
+    const proglang = editorComponent?.proglang;
+    if (proglang === 'w') {
+      this._previewWorld(editorComponent);
+    } else if (proglang === 'karel') {
+      if (this._worldDirectiveChanged(editorComponent)) {
+        this._previewWorld(editorComponent);
+      }
+      this._maybePopupWorldCompletion(editorComponent);
+      this._scheduleLint(editorComponent);
+    }
+  }
+
+  /**
+   * Debounce timer for the linter, so markers settle after typing pauses rather
+   * than flashing on every keystroke.
+   * @type {?number}
+   */
+  _lintTimer = null;
+
+  /**
+   * Re-lint shortly after the latest edit. A single shared timer is fine because
+   * only the active editor receives text-change events.
+   *
+   * @param {EditorTab} editorComponent
+   */
+  _scheduleLint = (editorComponent) => {
+    clearTimeout(this._lintTimer);
+    this._lintTimer = setTimeout(() => this._lintKarel(editorComponent), 250);
+  }
+
+  /**
+   * Parse the Karel source and surface the first syntax error as an Ace gutter
+   * annotation (red marker + hover message) on the matching line; clear the
+   * gutter when the program parses. Same lexer/parser the run pipeline uses, so
+   * the editor flags exactly what a run would reject. No-op for non-Karel tabs.
+   *
+   * @param {EditorTab} editorComponent
+   */
+  _lintKarel = (editorComponent) => {
+    if (editorComponent?.proglang !== 'karel') return;
+
+    const aceEditor = editorComponent.editor;
+    const session = aceEditor?.session || aceEditor?.getSession?.();
+    if (!session) return;
+
+    const content = editorComponent.getContent ? editorComponent.getContent() : '';
+
+    let annotations = [];
+    try {
+      parse(tokenize(content));
+    } catch (err) {
+      // Prefer the structured line the error carries; fall back to the message.
+      let line = Number.isInteger(err?.line) ? err.line : null;
+      if (line === null) {
+        const match = /line (\d+)/i.exec(err?.message || '');
+        line = match ? parseInt(match[1], 10) : 1;
+      }
+      annotations = [{
+        row: Math.max(0, line - 1),
+        column: 0,
+        text: err.message,
+        type: 'error',
+      }];
+    }
+    session.setAnnotations(annotations);
+  }
+
+  /**
+   * Pop the autocomplete list open when an edit leaves the cursor inside the
+   * open quote of a WORLD directive (e.g. just after typing the `"`, or after
+   * clearing the name). Ace won't trigger live-autocomplete there itself because
+   * the quote and an empty string aren't identifier characters, so we start it
+   * explicitly. No-op while the list is already showing — Ace keeps it filtered
+   * as you type.
+   *
+   * @param {EditorTab} editorComponent
+   */
+  _maybePopupWorldCompletion = (editorComponent) => {
+    const aceEditor = editorComponent?.editor;
+    if (!aceEditor || aceEditor.completer?.activated) return;
+
+    const pos = aceEditor.getCursorPosition();
+    const line = aceEditor.session.getLine(pos.row).slice(0, pos.column);
+    if (WORLD_NAME_CONTEXT.test(line)) {
+      aceEditor.execCommand('startAutocomplete');
+    }
+  }
+
+  /**
+   * Report whether a Karel source file's WORLD directive now names a different
+   * world than the last time we looked, remembering the value on the editor
+   * itself. Returns false for non-Karel editors. This keeps the live preview
+   * limited to changes that affect which world is shown, rather than firing on
+   * every keystroke.
+   *
+   * @param {EditorTab} editorComponent
+   * @returns {boolean} True when the declared world name changed.
+   */
+  _worldDirectiveChanged = (editorComponent) => {
+    if (editorComponent?.proglang !== 'karel') return false;
+
+    const content = editorComponent.getContent ? editorComponent.getContent() : '';
+    const match = content.match(WORLD_DIRECTIVE);
+    const name = match ? match[1] : null;
+    if (name === editorComponent._karelWorldName) return false;
+
+    editorComponent._karelWorldName = name;
+    return true;
   }
 
   /**
@@ -193,7 +307,7 @@ export default class KarelPlugin extends TerraPlugin {
    */
   onWorkerMessage = (msg) => {
     if (msg.id === 'karelInit') {
-      this._ensureCanvas();
+      if (!this._ensureRenderer()) return;
       // A fresh run starts with no message; the previous result is cleared.
       this.renderer.setMessage(null);
       this._scheduleDraw(msg.data);
@@ -207,37 +321,45 @@ export default class KarelPlugin extends TerraPlugin {
   }
 
   /**
-   * Show the world declared in a Karel source file on the canvas. No-op for
-   * non-Karel tabs, and skipped while a program is running so a live animation
-   * is never interrupted.
+   * Show a world on the canvas: the one a Karel source file declares via its
+   * WORLD directive, or — for a `.w` world file — the world the file itself
+   * spells out. No-op for unrelated tabs, and skipped while a program is running
+   * so a live animation is never interrupted.
    *
-   * @param {EditorTab} editorComponent - The editor to read the WORLD from.
+   * @param {EditorTab} editorComponent - The Karel or world editor to read from.
    */
   _previewWorld = async (editorComponent) => {
-    if (!editorComponent || editorComponent.proglang !== 'karel') return;
+    const proglang = editorComponent?.proglang;
+    if (proglang !== 'karel' && proglang !== 'w') return;
 
     const status = Terra.app.getRunStatus();
     if (status === 'running' || status === 'loading') return;
 
     const seq = ++this._previewSeq;
     const content = editorComponent.getContent ? editorComponent.getContent() : '';
-    const match = content.match(WORLD_DIRECTIVE);
 
     let world;
     try {
-      world = match && match[1]
-        ? KarelWorld.parse(await this._loadWorldText(match[1]))
-        : new KarelWorld();
+      if (proglang === 'w') {
+        // The file is the world.
+        world = KarelWorld.parse(content);
+      } else {
+        const match = content.match(WORLD_DIRECTIVE);
+        world = match && match[1]
+          ? KarelWorld.parse(await this._loadWorldText(match[1]))
+          : new KarelWorld();
+      }
     } catch (err) {
-      // World file missing/invalid: fall back to a blank world rather than
-      // surfacing an error for a passive preview. A run will report the problem.
+      // World missing/invalid: fall back to a blank world rather than surfacing
+      // an error for a passive preview. A run will report the problem.
       world = new KarelWorld();
     }
 
     // A newer tab switch superseded this async preview; drop this stale frame.
     if (seq !== this._previewSeq) return;
 
-    this._ensureCanvas();
+    // The core opens the canvas for Karel/world tabs; bail if it is somehow gone.
+    if (!this._ensureRenderer()) return;
     // A passive preview carries no run result.
     this.renderer.setMessage(null);
     this._scheduleDraw(world.snapshot());
@@ -275,14 +397,18 @@ export default class KarelPlugin extends TerraPlugin {
   }
 
   /**
-   * Open (or reuse) the Karel canvas tab and bind a renderer + resize hook to
-   * it. The renderer is recreated if the tab was closed and reopened (a fresh
-   * instance), e.g. after a layout restore.
+   * Bind a renderer + resize hook to the core-owned canvas. The core opens the
+   * canvas whenever a Karel or world file is active, so this only adopts whatever
+   * canvas is currently open — it never creates one. The renderer is recreated
+   * when the canvas is a fresh instance (e.g. closed and reopened, or after a
+   * layout restore).
    *
-   * @returns {CanvasTab} The canvas tab.
+   * @returns {?KarelRenderer} The bound renderer, or null when no canvas is open.
    */
-  _ensureCanvas = () => {
-    const tab = Terra.app.view.addCanvasTab({ title: 'Karel', path: KAREL_CANVAS_PATH });
+  _ensureRenderer = () => {
+    const tab = Terra.app.view.canvas;
+    if (!tab) return null;
+
     if (tab !== this.canvasTab) {
       this.canvasTab = tab;
       this.renderer = new KarelRenderer(tab);
@@ -293,7 +419,7 @@ export default class KarelPlugin extends TerraPlugin {
         }
       };
     }
-    return tab;
+    return this.renderer;
   }
 
   /**

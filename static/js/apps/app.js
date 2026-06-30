@@ -21,6 +21,16 @@ export default class App extends BaseApp {
   /** Timer ID for the delayed run-button → stop-button flip, or null. */
   _runButtonTimer = null;
 
+  /**
+   * Maps a proglang to the output surface kind it pairs with (currently only
+   * 'canvas'). A plugin links its languages here via registerSurface(); the core
+   * then opens that surface on demand when such an editor is active and closes it
+   * again once no linked editor remains. The terminal is the default surface for
+   * any proglang not listed.
+   * @type {Object<string, string>}
+   */
+  _surfaces = {};
+
   // ─────────────────────────── Editor handlers ───────────────────────────
 
   /**
@@ -54,6 +64,12 @@ export default class App extends BaseApp {
     this.view.invalidateActions();
 
     await this.setEditorFileContent(editorComponent);
+
+    // Front the surface this editor pairs with (opening it if needed) before
+    // plugins react, so a plugin's onSwitchToEditorTab can paint into a canvas
+    // that is already present.
+    this._showSurface(editorComponent);
+
     triggerPluginEvent('onSwitchToEditorTab', editorComponent);
   }
 
@@ -131,6 +147,8 @@ export default class App extends BaseApp {
 
   onEditorDestroyed(editorComponent) {
     triggerPluginEvent('onEditorDestroy', editorComponent);
+    // Retire any surface that just lost its last linked editor.
+    this._pruneSurfaces(editorComponent);
   }
 
   onTabDragStopped(event, tab) {
@@ -180,24 +198,53 @@ export default class App extends BaseApp {
 
   // ───────────────────── View handlers ────────────────────
 
-  /** Increase the font size by one step. */
-  zoomIn() {
+  /**
+   * Set the editor/terminal font size to an absolute value (e.g. picked from the
+   * font-size menu). Named for the editor font specifically — this is unrelated
+   * to browser zoom, which scales the page without going through this path.
+   *
+   * @param {number} size - The new font size in px.
+   */
+  setFontSize(size) {
+    this.view.setFontSize(size);
+  }
+
+  /** Increase the editor font size by one step. */
+  increaseFontSize() {
     this.view.increaseFontSize();
   }
 
-  /** Decrease the font size by one step. */
-  zoomOut() {
+  /** Decrease the editor font size by one step. */
+  decreaseFontSize() {
     this.view.decreaseFontSize();
   }
 
-  /** Reset the font size to the default. */
-  resetZoom() {
+  /** Reset the editor font size to the default. */
+  setFontSizeDefault() {
     this.view.setFontSizeDefault();
   }
 
-  /** Set the font size to the larger "demo" size. */
-  zoomDemo() {
+  /** Set the editor font size to the larger "demo" size. */
+  setFontSizeDemo() {
     this.view.setFontSizeDemo();
+  }
+
+  /**
+   * Set the editor theme.
+   *
+   * @param {string} theme - 'light' | 'dark'.
+   */
+  setTheme(theme) {
+    this.view.setTheme(theme);
+  }
+
+  /**
+   * Switch the layout between horizontal and vertical orientation.
+   *
+   * @param {string} orientation - 'horizontal' | 'vertical'.
+   */
+  setLayoutOrientation(orientation) {
+    this.view.setOrientation(orientation);
   }
 
   // ─────────────────────────── Language worker ───────────────────────────
@@ -224,6 +271,55 @@ export default class App extends BaseApp {
    */
   registerLangWorker(proglang, workerPath, pluginName) {
     this.langWorkerClient.registerLang(proglang, workerPath, pluginName);
+  }
+
+  // ─────────────────────────── Output surfaces ───────────────────────────
+
+  /**
+   * Link a proglang to an output surface. While an editor of that proglang is
+   * active, the core keeps the surface open and frontmost; it is closed again
+   * once no open editor links to it. Used by plugins (e.g. Karel links its
+   * `karel` and `w` files to the canvas).
+   *
+   * @param {string} proglang - The programming language (= file extension).
+   * @param {string} kind - The surface kind to open. Only 'canvas' is supported.
+   */
+  registerSurface(proglang, kind) {
+    this._surfaces[proglang] = kind;
+  }
+
+  /**
+   * Bring the surface paired with an editor to the front, opening it on demand;
+   * for an unlinked editor, fall back to the terminal — but only once a canvas
+   * exists, so a project that never uses one is left untouched. Activating an
+   * already-frontmost tab (or one the user dragged into its own stack) is a
+   * no-op, so a custom arrangement is preserved.
+   *
+   * @param {EditorTab} editorComponent - The newly active editor.
+   */
+  _showSurface(editorComponent) {
+    if (this._surfaces[editorComponent?.proglang] === 'canvas') {
+      this.view.addCanvasTab({ title: 'Canvas' });
+    } else if (this.view.canvas) {
+      this.term?.setActive();
+    }
+  }
+
+  /**
+   * Close the canvas once it has no linked editor left to serve. Counting the
+   * survivors (rather than the editor being closed) makes this independent of
+   * teardown ordering.
+   *
+   * @param {EditorTab} [closingEditor] - An editor being destroyed, excluded
+   *   from the survivor count.
+   */
+  _pruneSurfaces(closingEditor = null) {
+    if (!this.view.canvas) return;
+
+    const stillLinked = this.view.getEditorComponents().some(
+      (component) => component !== closingEditor && this._surfaces[component.proglang] === 'canvas'
+    );
+    if (!stillLinked) this.view.closeCanvas();
   }
 
   /**
@@ -388,7 +484,7 @@ export default class App extends BaseApp {
             // tabs build a blob URL from the bytes). This must happen before the
             // updateFile() below, which transfers the content's ArrayBuffer to
             // the VFS worker and would leave it detached here.
-            const tabComponent = this.view.getTabComponents().find((component) => {
+            const tabComponent = this.view.getFileTabComponents().find((component) => {
               const path = component.getPath();
               return path == file.path;
             });
@@ -445,7 +541,7 @@ export default class App extends BaseApp {
         for (const path of deletedPaths) {
           await this.vfs.deleteFile(path, false);
 
-          const tabComponent = this.view.getTabComponents().find(
+          const tabComponent = this.view.getFileTabComponents().find(
             (component) => component.getPath() === path
           );
           if (tabComponent) {
