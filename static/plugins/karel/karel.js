@@ -89,20 +89,52 @@ export default class KarelPlugin extends TerraPlugin {
    */
   onSwitchToEditorTab = (editorComponent) => {
     this._installCompleter(editorComponent);
+    // Seed the remembered WORLD directive so the first edit after a switch only
+    // re-previews when the directive actually changes.
+    this._worldDirectiveChanged(editorComponent);
     this._previewWorld(editorComponent);
   }
 
   /**
-   * Live-update the canvas while a world file is being edited, so the world you
-   * are writing renders as you type. Limited to `.w` files: a Karel program's
-   * canvas keeps showing its last result until you switch tabs.
+   * Live-update the canvas while a Karel or world file is being edited.
+   *
+   * For a `.w` file the whole file is the world, so every change re-renders.
+   * For a `.karel` program only its WORLD directive selects what is shown, so we
+   * re-preview just when that directive changes — pointing it at a different
+   * (valid) world file immediately shows that world, while ordinary code edits
+   * leave the canvas alone.
    *
    * @param {EditorTab} editorComponent - The editor whose text changed.
    */
   onEditorTextChanged = (editorComponent) => {
-    if (editorComponent?.proglang === 'w') {
+    const proglang = editorComponent?.proglang;
+    if (proglang === 'w') {
+      this._previewWorld(editorComponent);
+    } else if (proglang === 'karel' && this._worldDirectiveChanged(editorComponent)) {
       this._previewWorld(editorComponent);
     }
+  }
+
+  /**
+   * Report whether a Karel source file's WORLD directive now names a different
+   * world than the last time we looked, remembering the value on the editor
+   * itself. Returns false for non-Karel editors. This keeps the live preview
+   * limited to changes that affect which world is shown, rather than firing on
+   * every keystroke.
+   *
+   * @param {EditorTab} editorComponent
+   * @returns {boolean} True when the declared world name changed.
+   */
+  _worldDirectiveChanged = (editorComponent) => {
+    if (editorComponent?.proglang !== 'karel') return false;
+
+    const content = editorComponent.getContent ? editorComponent.getContent() : '';
+    const match = content.match(WORLD_DIRECTIVE);
+    const name = match ? match[1] : null;
+    if (name === editorComponent._karelWorldName) return false;
+
+    editorComponent._karelWorldName = name;
+    return true;
   }
 
   /**
