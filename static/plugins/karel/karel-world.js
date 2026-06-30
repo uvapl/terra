@@ -53,7 +53,7 @@ export default class KarelWorld {
   static parse(text) {
     const world = new KarelWorld();
 
-    for (let raw of text.split('\n')) {
+    for (let raw of text.split(/\r\n|\r|\n/)) {
       const line = raw.trim();
       if (!line || line.startsWith('#') || line.startsWith('//')) continue;
 
