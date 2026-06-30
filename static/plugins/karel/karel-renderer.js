@@ -52,6 +52,10 @@ const KAREL = {
 
 const PADDING = 16;
 
+// Render Karel a touch smaller than its cell, so the sprite doesn't crowd the
+// grid lines. The world itself still fills its cells.
+const KAREL_SCALE = 0.9;
+
 // Message band (below the world): font size and the gap separating it from the
 // world above and the canvas edge below. The band is always reserved so the
 // world keeps its position whether or not a message is shown.
@@ -219,7 +223,7 @@ export default class KarelRenderer {
     const r = cellRect(x, y);
     const cx = (r.left + r.right) / 2;
     const cy = (r.top + r.bottom) / 2;
-    const s = cell;
+    const s = cell * KAREL_SCALE;
 
     // The sketch is drawn in the east-facing pose (front to the right, feet out
     // the back and top). Each turnLeft rotates the whole sprite a quarter turn
