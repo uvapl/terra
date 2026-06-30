@@ -534,6 +534,7 @@ export default class EditorTab extends FileTab {
 
       case 'txt':
       case 'untitled':
+      case 'w': // Karel world files: plain text, previewed on the canvas.
         mode = 'text';
         break;
 

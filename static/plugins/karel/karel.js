@@ -75,55 +75,33 @@ export default class KarelPlugin extends TerraPlugin {
   onLayoutLoaded = () => {
     // Join the run pipeline. Idempotent, so re-firing on a layout reset is fine.
     Terra.app.registerLangWorker('karel', 'static/plugins/karel/runner/karel.worker.js', this.name);
+
+    Terra.app.registerSurface('karel', 'canvas');
+    Terra.app.registerSurface('w', 'canvas');
   }
 
   /**
-   * When a Karel source file becomes the active tab (on open or switch), launch
-   * the canvas and show the world it declares — immediately, without running.
+   * When a Karel source or world file becomes the active tab (on open or
+   * switch), show the world it declares on the canvas the core has already
+   * opened — immediately, without running.
    *
    * @param {EditorTab} editorComponent - The newly active editor.
    */
   onSwitchToEditorTab = (editorComponent) => {
     this._installCompleter(editorComponent);
-    this._surfaceOutput(editorComponent);
+    this._previewWorld(editorComponent);
   }
 
   /**
-   * Keep the output stack showing the tab that belongs to the active editor:
-   * the Karel canvas (with a fresh world preview) for a Karel file, the terminal
-   * for anything else. The terminal is only nudged once a canvas exists, so a
-   * project that never touches Karel is left alone. setActive is a no-op when the
-   * target is already frontmost or sits in its own stack, so a user who split the
-   * canvas and terminal apart keeps their arrangement.
+   * Live-update the canvas while a world file is being edited, so the world you
+   * are writing renders as you type. Limited to `.w` files: a Karel program's
+   * canvas keeps showing its last result until you switch tabs.
    *
-   * @param {EditorTab} editorComponent - The newly active editor.
+   * @param {EditorTab} editorComponent - The editor whose text changed.
    */
-  _surfaceOutput = (editorComponent) => {
-    if (editorComponent?.proglang === 'karel') {
+  onEditorTextChanged = (editorComponent) => {
+    if (editorComponent?.proglang === 'w') {
       this._previewWorld(editorComponent);
-    } else if (this.canvasTab) {
-      Terra.app.term?.setActive();
-    }
-  }
-
-  /**
-   * When the last Karel source file is closed, retire the canvas with it — its
-   * world preview no longer has an owner. Counting the survivors (rather than the
-   * tab being closed) makes this independent of teardown ordering.
-   *
-   * @param {EditorTab} editorComponent - The editor being destroyed.
-   */
-  onEditorDestroy = (editorComponent) => {
-    if (editorComponent?.proglang !== 'karel' || !this.canvasTab) return;
-
-    const karelTabsLeft = Terra.app.view.getEditorComponents().some(
-      (component) => component !== editorComponent && component.proglang === 'karel'
-    );
-    if (!karelTabsLeft) {
-      this.canvasTab.close();
-      this.canvasTab = null;
-      this.renderer = null;
-      this._latestWorld = null;
     }
   }
 
@@ -154,7 +132,7 @@ export default class KarelPlugin extends TerraPlugin {
    */
   onWorkerMessage = (msg) => {
     if (msg.id === 'karelInit') {
-      this._ensureCanvas();
+      if (!this._ensureRenderer()) return;
       // A fresh run starts with no message; the previous result is cleared.
       this.renderer.setMessage(null);
       this._scheduleDraw(msg.data);
@@ -168,37 +146,45 @@ export default class KarelPlugin extends TerraPlugin {
   }
 
   /**
-   * Show the world declared in a Karel source file on the canvas. No-op for
-   * non-Karel tabs, and skipped while a program is running so a live animation
-   * is never interrupted.
+   * Show a world on the canvas: the one a Karel source file declares via its
+   * WORLD directive, or — for a `.w` world file — the world the file itself
+   * spells out. No-op for unrelated tabs, and skipped while a program is running
+   * so a live animation is never interrupted.
    *
-   * @param {EditorTab} editorComponent - The editor to read the WORLD from.
+   * @param {EditorTab} editorComponent - The Karel or world editor to read from.
    */
   _previewWorld = async (editorComponent) => {
-    if (!editorComponent || editorComponent.proglang !== 'karel') return;
+    const proglang = editorComponent?.proglang;
+    if (proglang !== 'karel' && proglang !== 'w') return;
 
     const status = Terra.app.getRunStatus();
     if (status === 'running' || status === 'loading') return;
 
     const seq = ++this._previewSeq;
     const content = editorComponent.getContent ? editorComponent.getContent() : '';
-    const match = content.match(WORLD_DIRECTIVE);
 
     let world;
     try {
-      world = match && match[1]
-        ? KarelWorld.parse(await this._loadWorldText(match[1]))
-        : new KarelWorld();
+      if (proglang === 'w') {
+        // The file is the world.
+        world = KarelWorld.parse(content);
+      } else {
+        const match = content.match(WORLD_DIRECTIVE);
+        world = match && match[1]
+          ? KarelWorld.parse(await this._loadWorldText(match[1]))
+          : new KarelWorld();
+      }
     } catch (err) {
-      // World file missing/invalid: fall back to a blank world rather than
-      // surfacing an error for a passive preview. A run will report the problem.
+      // World missing/invalid: fall back to a blank world rather than surfacing
+      // an error for a passive preview. A run will report the problem.
       world = new KarelWorld();
     }
 
     // A newer tab switch superseded this async preview; drop this stale frame.
     if (seq !== this._previewSeq) return;
 
-    this._ensureCanvas();
+    // The core opens the canvas for Karel/world tabs; bail if it is somehow gone.
+    if (!this._ensureRenderer()) return;
     // A passive preview carries no run result.
     this.renderer.setMessage(null);
     this._scheduleDraw(world.snapshot());
@@ -236,14 +222,18 @@ export default class KarelPlugin extends TerraPlugin {
   }
 
   /**
-   * Open (or reuse) the Karel canvas tab and bind a renderer + resize hook to
-   * it. The renderer is recreated if the tab was closed and reopened (a fresh
-   * instance), e.g. after a layout restore.
+   * Bind a renderer + resize hook to the core-owned canvas. The core opens the
+   * canvas whenever a Karel or world file is active, so this only adopts whatever
+   * canvas is currently open — it never creates one. The renderer is recreated
+   * when the canvas is a fresh instance (e.g. closed and reopened, or after a
+   * layout restore).
    *
-   * @returns {CanvasTab} The canvas tab.
+   * @returns {?KarelRenderer} The bound renderer, or null when no canvas is open.
    */
-  _ensureCanvas = () => {
-    const tab = Terra.app.view.addCanvasTab({ title: 'Karel' });
+  _ensureRenderer = () => {
+    const tab = Terra.app.view.canvas;
+    if (!tab) return null;
+
     if (tab !== this.canvasTab) {
       this.canvasTab = tab;
       this.renderer = new KarelRenderer(tab);
@@ -254,7 +244,7 @@ export default class KarelPlugin extends TerraPlugin {
         }
       };
     }
-    return tab;
+    return this.renderer;
   }
 
   /**

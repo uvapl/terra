@@ -152,6 +152,16 @@ export default class BaseController {
     return this.layout?.term ?? null;
   }
 
+  /** @returns {?CanvasTab} The canvas component, or null when none is open. */
+  get canvas() {
+    return this.layout?.canvas ?? null;
+  }
+
+  /** Close the canvas output tab if one is open. */
+  closeCanvas() {
+    this.layout.closeCanvas();
+  }
+
   getActiveEditor() {
     return this.layout.getActiveEditor();
   }

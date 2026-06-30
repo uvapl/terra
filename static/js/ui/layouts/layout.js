@@ -868,6 +868,14 @@ export default class Layout extends GoldenLayout {
     return this.canvas;
   }
 
+  /**
+   * Close the canvas output tab. Its 'destroy' handler (see onCanvasTabCreated)
+   * clears this.canvas. No-op when no canvas is open.
+   */
+  closeCanvas() {
+    this.canvas?.close();
+  }
+
   // ── Layout areas (content-based) ──
   // The editor and output "areas" cannot be identified by tree position:
   // GoldenLayout flattens a same-axis split into the parent, so splitting the
