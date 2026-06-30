@@ -1,5 +1,3 @@
-import { getPartsFromPath } from '../../lib/helpers.js';
-
 /**
  * A component for Golden Layout to host an editor or a terminal.
  * This base class contains some default plumbing.
@@ -11,16 +9,9 @@ export default class BaseTab extends EventTarget {
    */
   container = null;
 
-  /**
-   * Initialization state.
-   * @type {object}
-   */
-  state = null;
-
-  constructor(container, state) {
+  constructor(container) {
     super();
     this.container = container;
-    this.state = state;
 
     // Let GoldenLayout hand back this component instance from its container
     // (e.g. when a stack reports its active item changed).
@@ -42,65 +33,6 @@ export default class BaseTab extends EventTarget {
    */
   getComponentName = () => {
     return this.getComponentItem().config.componentName;
-  }
-
-  /**
-   * Get the state object from the component.
-   *
-   * @returns {object} The container state.
-   */
-  getState = () => {
-    return this.container.getState();
-  }
-
-  /**
-   * Get tab's corresponding filepath.
-   *
-   * @returns {string} The path of the tab.
-   */
-  getPath = () => {
-    return this.getState().path;
-  }
-
-  /**
-   * Set the path of the tab. This also updates the tab's filename.
-   *
-   * @param {string} path - The absolute file path of the tab.
-   */
-  setPath = (path) => {
-    // Update the tab's filename.
-    const newFilename = getPartsFromPath(path).name;
-    this.setFilename(newFilename);
-
-    // Update the state with the new path.
-    this.extendState({ path });
-  }
-
-  /**
-   * Extend the curent state of the editor.
-   *
-   * @param {object} state - Additional values to overwrite or set.
-   */
-  extendState = (state) => {
-    this.container.extendState(state);
-  }
-
-  /**
-   * Get the filename of the corresponding tab.
-   *
-   * @returns {string} The name of the tab.
-   */
-  getFilename = () => {
-    return this.getComponentItem().config.title;
-  }
-
-  /**
-   * Set the filename of the corresponding tab.
-   *
-   * @param {string} filename - The new name of the tab.
-   */
-  setFilename = (filename) => {
-    this.getComponentItem().setTitle(filename);
   }
 
   // Basic tab manipulation

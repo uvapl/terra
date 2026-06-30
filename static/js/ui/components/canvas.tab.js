@@ -19,8 +19,8 @@ export default class CanvasTab extends BaseTab {
 
   _redrawScheduled = false;
 
-  constructor(container, state) {
-    super(container, state);
+  constructor(container) {
+    super(container);
 
     this.init();
   }

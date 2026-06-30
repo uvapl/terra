@@ -1,9 +1,10 @@
 import { BASE_FONT_SIZE } from '../../constants.js';
+import BaseTab from './base.tab.js';
 
 /**
  * Terminal component for GoldenLayout.
  */
-export default class TerminalTab {
+export default class TerminalTab extends BaseTab {
   /**
    * An addon for xterm.js that enables fitting the terminal's dimensions to a
    * containing element. This addon requires xterm.js v4+.
@@ -12,18 +13,6 @@ export default class TerminalTab {
    * @type {FitAddon}
    */
   fitAddon = new FitAddon.FitAddon();
-
-  /**
-   * Component container object.
-   * @type {GoldenLayout.ItemContainer}
-   */
-  container = null;
-
-  /**
-   * Initialization state.
-   * @type {object}
-   */
-  state = null;
 
   /**
    * Reference to the xterm.js component.
@@ -71,9 +60,8 @@ export default class TerminalTab {
     '\r',     // Enter
   ]
 
-  constructor(container, state) {
-    this.container = container;
-    this.state = state;
+  constructor(container) {
+    super(container);
 
     this.init();
   }
@@ -185,7 +173,7 @@ export default class TerminalTab {
     this.getParentComponentElement().classList.add('component-container', 'terminal-component-container');
 
     const fontFamily = "12px/normal 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Source Code Pro', 'source-code-pro', monospace";
-    const fontSize = this.state.fontSize || BASE_FONT_SIZE;
+    const fontSize = this.container.getState().fontSize || BASE_FONT_SIZE;
 
     this.terminalInstance = new Terminal({
       convertEol: true,
@@ -248,23 +236,6 @@ export default class TerminalTab {
     this.terminalInstance.options.fontSize = fontSize;
     this.fitAddon.fit();
   };
-
-  /**
-   * Get the parent component element.
-   */
-  getParentComponentElement = () => {
-    return this.container.parent.parent.element[0];
-  }
-
-  /**
-   * Bring the terminal to the front of its tab strip. A no-op when it is
-   * already the active tab (or alone in its stack). Mirrors BaseTab.setActive so
-   * callers can surface the terminal the same way they surface a canvas/editor.
-   */
-  setActive = () => {
-    const item = this.container.parent;
-    item.parent.setActiveContentItem(item);
-  }
 
   /**
    * Acquire keyboard input for a given owner. Any subsequent keystroke or

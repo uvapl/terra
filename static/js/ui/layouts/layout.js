@@ -4,6 +4,7 @@ import {
   isObject,
   mergeObjects,
 } from '../../lib/helpers.js';
+import FileTab from '../components/file.tab.js';
 import ImageTab from '../components/image.tab.js';
 import EditorTab from '../components/editor.tab.js';
 import TerminalTab from '../components/terminal.tab.js';
@@ -102,6 +103,13 @@ export default class Layout extends GoldenLayout {
    * @type {Terminal}
    */
   term = null;
+
+  /**
+   * Reference to the canvas component.
+   * Like the terminal, there can only be one canvas component inside an app.
+   * @type {?CanvasTab}
+   */
+  canvas = null;
 
   /**
    * Default terminal startup message.
@@ -205,12 +213,7 @@ export default class Layout extends GoldenLayout {
     this.registerComponent('image', ImageTab);
     this.registerComponent('editor', EditorTab);
     this.registerComponent('canvas', CanvasTab);
-
-    // A plain function is used (not an arrow) so GoldenLayout can `new` it;
-    // returning an object makes `new` yield it.
-    this.registerComponent('terminal', function (container, state) {
-      return new TerminalTab(container, state);
-    });
+    this.registerComponent('terminal', TerminalTab);
 
     $(window).on('resize', () => {
       this.updateSize(window.innerWidth, window.innerHeight);
@@ -333,6 +336,16 @@ export default class Layout extends GoldenLayout {
   }
 
   /**
+   * Retrieve all file-backed components (editors and images) from the layout.
+   * These are the tabs that carry a file path; canvas and terminal tabs do not.
+   *
+   * @returns {FileTab[]} List containing all open file-backed tabs' components.
+   */
+  getFileTabComponents() {
+    return this.getTabComponents().filter((component) => component instanceof FileTab);
+  }
+
+  /**
    * Invoked when the terminal tab is created for the first time.
    *
    * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
@@ -341,6 +354,20 @@ export default class Layout extends GoldenLayout {
     this.term = tab.contentItem.instance;
     tab.contentItem.container.on('destroy', () => {
       this.term = null;
+    });
+  }
+
+  /**
+   * Invoked when the canvas tab is created. Like the terminal, the canvas is a
+   * singleton, so we keep a reference to reuse rather than identifying it by a
+   * path.
+   *
+   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
+   */
+  onCanvasTabCreated(tab) {
+    this.canvas = tab.contentItem.instance;
+    tab.contentItem.container.on('destroy', () => {
+      this.canvas = null;
     });
   }
 
@@ -471,9 +498,8 @@ export default class Layout extends GoldenLayout {
       this.registerTab(tab);
       this.onEditorTabCreated(tab);
     } else if (tab.contentItem.isCanvas) {
-      // Canvas tabs emit no events, so there is no delegate hook; just track
-      // them so they show up in getTabComponents() (used to find/reuse a canvas).
       this.registerTab(tab);
+      this.onCanvasTabCreated(tab);
     } else {
       console.warn('Unknown tab type:', tab.contentItem);
     }
@@ -816,7 +842,7 @@ export default class Layout extends GoldenLayout {
    * @returns {?BaseTab} The repointed tab, or null when no tab matched.
    */
   repointTabByPath(srcPath, destPath) {
-    const tabComponent = this.getTabComponents().find(
+    const tabComponent = this.getFileTabComponents().find(
       (component) => component.getPath() === srcPath
     );
     if (!tabComponent) return null;
@@ -833,7 +859,7 @@ export default class Layout extends GoldenLayout {
    * @param {string} filepath - The path of the file to open.
    */
   addFileTab(filepath) {
-    let tabComponents = this.getTabComponents();
+    let tabComponents = this.getFileTabComponents();
 
     // Switch to the selected file if that is already open.
     const tabComponent = tabComponents.find(
@@ -874,40 +900,32 @@ export default class Layout extends GoldenLayout {
   }
 
   /**
-   * Open a canvas output tab, or reuse the existing one with the same synthetic
-   * path. The path is not a real file; it only identifies the canvas so repeated
-   * calls reuse the same tab instead of stacking up duplicates. The canvas opens
-   * next to the terminal (falling back to the editor stack if there is no
-   * terminal).
+   * Open the canvas output tab, or reuse the existing one. The canvas is a
+   * singleton (like the terminal): there is only ever one, so repeated calls
+   * return the same instance instead of stacking up duplicates. It opens next to
+   * the terminal (falling back to the editor stack if there is no terminal).
    *
    * @param {object} opts
    * @param {string} opts.title - The tab title.
-   * @param {string} opts.path - Synthetic identifier, e.g. '/.canvas/karel'.
    * @returns {CanvasTab} The (new or reused) canvas component instance.
    */
-  addCanvasTab({ title, path }) {
-    // Reuse an existing canvas with the same synthetic path.
-    const existing = this.getTabComponents().find(
-      (component) => component.getPath() === path
-    );
-    if (existing) {
-      existing.setActive();
-      return existing;
+  addCanvasTab({ title }) {
+    // Reuse the existing canvas if there is one.
+    if (this.canvas) {
+      this.canvas.setActive();
+      return this.canvas;
     }
 
     this.getOutputStack().addChild({
       type: 'component',
       componentName: 'canvas',
       title,
-      componentState: { path },
       isClosable: false, // Like a terminal tab.
     });
 
-    // GoldenLayout creates the component synchronously during addChild, so the
-    // instance is now retrievable from the tracked tab list.
-    return this.getTabComponents().find(
-      (component) => component.getPath() === path
-    );
+    // GoldenLayout creates the component synchronously during addChild, so
+    // onCanvasTabCreated has already set this.canvas.
+    return this.canvas;
   }
 
   // ── Layout areas (content-based) ──

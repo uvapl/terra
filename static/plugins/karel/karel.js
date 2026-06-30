@@ -4,8 +4,6 @@ import KarelRenderer from './karel-renderer.js';
 import KarelWorld from './karel-world.js';
 import './mode-karel.js';
 
-const KAREL_CANVAS_PATH = '/.canvas/karel';
-
 // Matches the `WORLD "name"` directive at the start of a statement line.
 const WORLD_DIRECTIVE = /^[ \t]*WORLD\s+"([^"]*)"/im;
 
@@ -245,7 +243,7 @@ export default class KarelPlugin extends TerraPlugin {
    * @returns {CanvasTab} The canvas tab.
    */
   _ensureCanvas = () => {
-    const tab = Terra.app.view.addCanvasTab({ title: 'Karel', path: KAREL_CANVAS_PATH });
+    const tab = Terra.app.view.addCanvasTab({ title: 'Karel' });
     if (tab !== this.canvasTab) {
       this.canvasTab = tab;
       this.renderer = new KarelRenderer(tab);

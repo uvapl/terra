@@ -270,7 +270,7 @@ export default class IDELayout extends Layout {
    */
   closeFile(filepath) {
     const component = filepath
-      ? this.getTabComponents().find((component) => component.getPath() === filepath)
+      ? this.getFileTabComponents().find((component) => component.getPath() === filepath)
       : this.getActiveEditor();
 
     if (component) {
@@ -285,7 +285,7 @@ export default class IDELayout extends Layout {
    * @param {string} path - The absolute folderpath to close all files from.
    */
   closeFilesFromFolder(path) {
-    this.getTabComponents().forEach((component) => {
+    this.getFileTabComponents().forEach((component) => {
       const subfilepath = component.getPath();
       if (subfilepath?.startsWith(path)) {
         this.closeFile(subfilepath);
