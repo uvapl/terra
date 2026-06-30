@@ -1,9 +1,9 @@
-import Layout from './layout.js';
+import FlexibleLayout from './layout.flexible.js';
 import { BASE_FONT_SIZE, MAX_FILE_SIZE } from '../../constants.js';
 import { createModal, hideModal, showModal } from '../components/modal.js';
 import { createTooltip, destroyTooltip } from '../components/tooltip.js';
 
-export default class IDELayout extends Layout {
+export default class IDELayout extends FlexibleLayout {
   /**
    * Create the layout.
    *
