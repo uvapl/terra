@@ -1,4 +1,4 @@
-import { BASE_FONT_SIZE, DEMO_FONT_SIZE } from '../../constants.js';
+import { BASE_FONT_SIZE } from '../../constants.js';
 import {
   isImageExtension,
   isObject,
@@ -163,11 +163,19 @@ export default class Layout extends GoldenLayout {
 
   /**
    * The current theme ('light' | 'dark'). Seeded from the controller-supplied
-   * value and kept in sync by setTheme(); the layout never reads it from
+   * value and kept in sync by applyTheme(); the layout never reads it from
    * storage itself.
    * @type {string}
    */
   theme = 'light';
+
+  /**
+   * The current font size in px. Seeded from the controller-supplied value and
+   * kept in sync by applyFontSize(); the layout never reads it from storage
+   * itself, but holds it to seed newly created tabs.
+   * @type {number}
+   */
+  fontSize = BASE_FONT_SIZE;
 
   /**
    * @param {object} additionalLayoutConfig - The variant's default layout config,
@@ -201,6 +209,7 @@ export default class Layout extends GoldenLayout {
 
     this._orientation = orientation;
     this.theme = options.theme || 'light';
+    this.fontSize = options.fontSize || BASE_FONT_SIZE;
 
     if (isObject(options.hiddenFiles)) {
       this.hiddenFiles = options.hiddenFiles;
@@ -284,7 +293,7 @@ export default class Layout extends GoldenLayout {
   onInitialised(options) {
     this.initCustomContent();
     this.emitToAllComponents('afterFirstRender');
-    this.setTheme(this.theme);
+    this.applyTheme(this.theme);
     this.addActiveStates();
     this.addButtonEventListeners();
     this.showTermStartupMessage();
@@ -300,14 +309,12 @@ export default class Layout extends GoldenLayout {
   }
 
   /**
-   * Keyboard shortcuts for editor tabs, for all variants of the app.
+   * Hook: variant-specific per-editor wiring, run once per freshly created
+   * editor. No-op in base; the IDE attaches its file-size guard here.
    *
    * @param {EditorTab} editorComponent
    */
-  registerEditorCommands(editorComponent) {
-    // Apply editor-scope commands declared in the registry (core + plugins).
-    this.delegate.surfaces.registerEditorCommands(editorComponent);
-  }
+  _setupEditorComponent(editorComponent) {}
 
   /**
    * Retrieve components from the layout.
@@ -400,7 +407,11 @@ export default class Layout extends GoldenLayout {
   onEditorTabCreated(tab) {
     const editorComponent = tab.contentItem.instance;
 
-    this.registerEditorCommands(editorComponent);
+    // Signal upward so the controller can bind the registry's editor-scope
+    // shortcuts onto the new editor (it owns the command surfaces), then run any
+    // layout-owned per-editor wiring (no-op in base; the IDE adds a size guard).
+    this.delegate.onEditorCreated(editorComponent);
+    this._setupEditorComponent(editorComponent);
 
     // Mark this tab active as soon as it is shown, before the delegate reacts.
     // Registered first so it runs before the 'show' forwarding below, which
@@ -552,7 +563,8 @@ export default class Layout extends GoldenLayout {
       title: 'Untitled',
       ...rest,
       componentState: {
-        fontSize: this.getCurrentFontSize(),
+        fontSize: this.fontSize,
+        theme: this.theme,
         ...componentState
       },
     };
@@ -602,7 +614,7 @@ export default class Layout extends GoldenLayout {
   addActiveStates() {
     // Add active state to font-size dropdown.
     const $fontSizeMenu = $('#font-size-menu');
-    const currentFontSize = this.getCurrentFontSize()
+    const currentFontSize = this.fontSize
     $fontSizeMenu.find(`li[data-val=${currentFontSize}]`).addClass('active');
 
     // Add active state to theme dropdown.
@@ -651,12 +663,14 @@ export default class Layout extends GoldenLayout {
   }
 
   /**
-   * Callback function when the user selects a new theme, which consequently
-   * changes the theme of the layout and all components.
+   * Apply a theme to the layout and all components: toggle the page's dark-mode
+   * class, broadcast the change to components, remember it, and reflect it in the
+   * theme menu's active state. A pure view update — the controller has already
+   * persisted the value before calling this.
    *
    * @param {string} theme - Either 'dark' or 'light'.
    */
-  setTheme(theme) {
+  applyTheme(theme) {
     const isDarkMode = (theme === 'dark');
 
     if (isDarkMode) {
@@ -669,7 +683,10 @@ export default class Layout extends GoldenLayout {
 
     this.emitToAllComponents('themeChanged', theme);
     this.theme = theme;
-    this.delegate?.setStoredTheme(theme);
+
+    const $items = $('#editor-theme-menu').find('li[data-val]');
+    $items.removeClass('active');
+    $items.filter(`[data-val="${theme}"]`).addClass('active');
   }
 
   /**
@@ -715,33 +732,20 @@ export default class Layout extends GoldenLayout {
     console.info('initCustomContent() is not implemented');
   }
 
-  getCurrentFontSize() {
-    return this.delegate.getStoredFontSize();
-  }
-
-  changeFontSize(newSize) {
-    newSize = Math.max(8, Math.min(72, newSize));
-    this.emitToAllComponents('fontSizeChanged', newSize);
-    this.delegate.setStoredFontSize(newSize);
+  /**
+   * Apply a font size to all components: remember it (so new tabs are seeded
+   * with it), broadcast the change, and reflect it in the font-size menu's active
+   * state. A pure view update — the controller has already clamped and persisted
+   * the value before calling this.
+   *
+   * @param {number} size - The new font size in px.
+   */
+  applyFontSize(size) {
+    this.fontSize = size;
+    this.emitToAllComponents('fontSizeChanged', size);
     const $items = $('#font-size-menu').find('li[data-val]');
     $items.removeClass('active');
-    $items.filter(`[data-val="${newSize}"]`).addClass('active');
-  }
-
-  increaseFontSize() {
-    this.changeFontSize(this.getCurrentFontSize() + 1);
-  }
-
-  decreaseFontSize() {
-    this.changeFontSize(this.getCurrentFontSize() - 1);
-  }
-
-  setFontSizeDefault() {
-    this.changeFontSize(BASE_FONT_SIZE);
-  }
-
-  setFontSizeDemo() {
-    this.changeFontSize(DEMO_FONT_SIZE);
+    $items.filter(`[data-val="${size}"]`).addClass('active');
   }
 
   /**
@@ -754,19 +758,9 @@ export default class Layout extends GoldenLayout {
     // Namespaced off-then-on rebinds the handlers to the current instance
     // instead of stacking a new handler on top of the old (destroyed) one.
     // The run and clear buttons' clicks are wired by the command surfaces
-    // (buildToolbar / renderButton), not here.
-
-    // Update font-size for all components on change.
-    $('#font-size-menu').find('li[data-val]').off('click.layout').on('click.layout', (event) => {
-      this.changeFontSize(parseInt($(event.target).data('val')));
-    });
-
-    // Update theme on change.
-    $('#editor-theme-menu').find('li').off('click.layout').on('click.layout', (event) => {
-      const $element = $(event.target);
-      this.setTheme($element.data('val'));
-      $element.addClass('active').siblings().removeClass('active');
-    });
+    // (buildToolbar / renderButton), not here. The font-size and theme value
+    // lists are wired by the controller (wireSettingsControls), which owns the
+    // persisted settings these change.
 
     // Add event listeners for setttings menu.
     $('.settings-menu').off('click.layout').on('click.layout', (event) => $(event.target).toggleClass('open'));

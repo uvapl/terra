@@ -3,7 +3,7 @@ import {
   getLocalStorageItem,
   setLocalStorageItem,
 } from '../../lib/local-storage-manager.js';
-import { BASE_FONT_SIZE } from '../../constants.js';
+import { BASE_FONT_SIZE, DEMO_FONT_SIZE } from '../../constants.js';
 import CommandSurfaces from '../../commands/surfaces.js';
 
 /**
@@ -184,20 +184,71 @@ export default class BaseController {
     this.layout.emitToAllComponents(event, data);
   }
 
+  // ── Font size & theme: storage authority + initiator ──
+  // The controller is the single owner of these persisted settings. A change
+  // signal (menu click, keybinding) reaches the app, which forwards here; this
+  // is where the value is clamped and stored, and only then handed to the layout
+  // to apply as a pure view update. The layout never reads or writes storage for
+  // these — it holds the current value purely to seed new tabs.
+
+  /**
+   * Set the font size to an absolute value: clamp, persist, then apply to the
+   * view. The single sink every font-size change flows through.
+   *
+   * @param {number} size - The requested font size in px.
+   */
+  setFontSize(size) {
+    size = Math.max(8, Math.min(72, size));
+    this.setStoredFontSize(size);
+    this.layout.applyFontSize(size);
+  }
+
   increaseFontSize() {
-    this.layout.increaseFontSize();
+    this.setFontSize(this.getStoredFontSize() + 1);
   }
 
   decreaseFontSize() {
-    this.layout.decreaseFontSize();
+    this.setFontSize(this.getStoredFontSize() - 1);
   }
 
   setFontSizeDefault() {
-    this.layout.setFontSizeDefault();
+    this.setFontSize(BASE_FONT_SIZE);
   }
 
   setFontSizeDemo() {
-    this.layout.setFontSizeDemo();
+    this.setFontSize(DEMO_FONT_SIZE);
+  }
+
+  /**
+   * Set the editor theme: persist, then apply to the view.
+   *
+   * @param {string} theme - 'light' | 'dark'.
+   */
+  setTheme(theme) {
+    this.setStoredTheme(theme);
+    this.layout.applyTheme(theme);
+  }
+
+  /**
+   * Wire the font-size and theme menu clicks to the app entry points. These
+   * value lists (`<li data-val>`) render into two different surfaces depending on
+   * the variant — the IDE menubar and the hand-rolled gear settings menu — but
+   * both use the same `#font-size-menu` / `#editor-theme-menu` ids, so a single
+   * id-based binding here covers every variant. Routing through the app mirrors
+   * how the menubar's other commands reach it (e.g. setLayoutOrientation); the
+   * app forwards back to setFontSize/setTheme above.
+   *
+   * The menus may live in chrome that survives a layout reset, so the handlers
+   * are namespaced and rebound (off-then-on) on every init.
+   */
+  wireSettingsControls() {
+    $('#font-size-menu').find('li[data-val]').off('click.settings').on('click.settings', (event) => {
+      this.delegate.setFontSize(parseInt($(event.currentTarget).data('val'), 10));
+    });
+
+    $('#editor-theme-menu').find('li[data-val]').off('click.settings').on('click.settings', (event) => {
+      this.delegate.setTheme($(event.currentTarget).data('val'));
+    });
   }
 
   refresh() {
@@ -247,6 +298,7 @@ export default class BaseController {
    */
   onLayoutInitialised() {
     this.surfaces.buildToolbar('#toolbar');
+    this.wireSettingsControls();
     this.delegate.onReady?.();
 
     if (!this._afterSetupDone) {
@@ -264,6 +316,13 @@ export default class BaseController {
 
   onLayoutLoaded() {
     this.delegate.onLayoutLoaded();
+  }
+
+  // Bind the registry's editor-scope shortcuts onto a freshly created editor.
+  // Terminates here (not re-forwarded to the app): the controller owns the
+  // command surfaces, so command registration is its own responsibility.
+  onEditorCreated(editorComponent) {
+    this.surfaces.registerEditorCommands(editorComponent);
   }
 
   onEditorTextChanged(tabComponent) {

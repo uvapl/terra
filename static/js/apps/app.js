@@ -180,24 +180,44 @@ export default class App extends BaseApp {
 
   // ───────────────────── View handlers ────────────────────
 
-  /** Increase the font size by one step. */
-  zoomIn() {
+  /**
+   * Set the editor/terminal font size to an absolute value (e.g. picked from the
+   * font-size menu). Named for the editor font specifically — this is unrelated
+   * to browser zoom, which scales the page without going through this path.
+   *
+   * @param {number} size - The new font size in px.
+   */
+  setFontSize(size) {
+    this.view.setFontSize(size);
+  }
+
+  /** Increase the editor font size by one step. */
+  increaseFontSize() {
     this.view.increaseFontSize();
   }
 
-  /** Decrease the font size by one step. */
-  zoomOut() {
+  /** Decrease the editor font size by one step. */
+  decreaseFontSize() {
     this.view.decreaseFontSize();
   }
 
-  /** Reset the font size to the default. */
-  resetZoom() {
+  /** Reset the editor font size to the default. */
+  setFontSizeDefault() {
     this.view.setFontSizeDefault();
   }
 
-  /** Set the font size to the larger "demo" size. */
-  zoomDemo() {
+  /** Set the editor font size to the larger "demo" size. */
+  setFontSizeDemo() {
     this.view.setFontSizeDemo();
+  }
+
+  /**
+   * Set the editor theme.
+   *
+   * @param {string} theme - 'light' | 'dark'.
+   */
+  setTheme(theme) {
+    this.view.setTheme(theme);
   }
 
   /**

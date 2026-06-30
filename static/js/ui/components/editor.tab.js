@@ -1,6 +1,5 @@
 import { BASE_FONT_SIZE } from '../../constants.js';
 import { getFileExtension, seconds } from '../../lib/helpers.js';
-import { getLocalStorageItem } from '../../lib/local-storage-manager.js';
 import FileTab from './file.tab.js';
 
 /**
@@ -46,7 +45,7 @@ export default class EditorTab extends FileTab {
     this.initEditor();
     this.bindEditorEvents();
 
-    this.setTheme(getLocalStorageItem('theme') || 'light');
+    this.setTheme(this.container.getState().theme || 'light');
     this.setFontSize(this.container.getState().fontSize || BASE_FONT_SIZE);
 
     this.setProgLang();

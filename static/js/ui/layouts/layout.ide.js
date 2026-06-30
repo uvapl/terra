@@ -100,15 +100,13 @@ export default class IDELayout extends FlexibleLayout {
   }
 
   /**
-   * Keyboard shortcuts for editor tabs specific to the IDE.
+   * IDE-specific per-editor wiring: guard against oversized edits on each
+   * keystroke. Editor-scope shortcut binding is handled by the controller
+   * (via the onEditorCreated signal), not here.
    *
    * @param {*} editorComponent
    */
-  registerEditorCommands(editorComponent) {
-    super.registerEditorCommands(editorComponent);
-    // 'save' (mod-s) and 'closeFile' (option-w) are now global commands in the
-    // registry (commands/config.ide.js), so they fire from the terminal too and
-    // are not registered as editor-scope Ace commands here.
+  _setupEditorComponent(editorComponent) {
     editorComponent.onCommandExec((event) => this._validateFileSizeLimit(event, editorComponent));
   }
 

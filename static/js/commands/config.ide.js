@@ -143,22 +143,22 @@ export const commands = [
   {
     name: 'increaseFontSize', scope: 'global', bindKey: 'ctrl-=',
     menuItem: { path: 'View/Font size/Increase', position: 100 },
-    exec: ({ app }) => app.view.increaseFontSize(),
+    exec: ({ app }) => app.increaseFontSize(),
   },
   {
     name: 'decreaseFontSize', scope: 'global', bindKey: 'ctrl--',
     menuItem: { path: 'View/Font size/Decrease', position: 110 },
-    exec: ({ app }) => app.view.decreaseFontSize(),
+    exec: ({ app }) => app.decreaseFontSize(),
   },
   {
     name: 'defaultFontSize', scope: 'global', bindKey: 'ctrl-0',
     menuItem: { path: 'View/Font size/Default', position: 120 },
-    exec: ({ app }) => app.view.setFontSizeDefault(),
+    exec: ({ app }) => app.setFontSizeDefault(),
   },
   {
     name: 'demoFontSize', scope: 'global', bindKey: 'ctrl-9',
     menuItem: { path: 'View/Font size/Demo Mode', position: 130 },
-    exec: ({ app }) => app.view.setFontSizeDemo(),
+    exec: ({ app }) => app.setFontSizeDemo(),
   },
   {
     ...clearTerminalCommand,

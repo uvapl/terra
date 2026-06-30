@@ -96,8 +96,9 @@ export default class IDEController extends BaseController {
       config.content.forEach((item) => {
         if (item.type === 'component') {
           // Keep the value of pathless (Untitled) tabs, because those cannot
-          // be reloaded from the VFS.
-          if (item.componentState.path) {
+          // be reloaded from the VFS. Output components (e.g. canvas) carry no
+          // componentState at all, so guard before reading `path`.
+          if (item.componentState?.path) {
             item.componentState.value = '';
           }
         } else {

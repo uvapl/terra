@@ -8,8 +8,9 @@ export default {
   commands: [
     // Run: the toolbar button plus Cmd/Ctrl-Enter while an editor is focused
     // (editor-scope, dispatched through Ace — matches the IDE). Editor-scope
-    // shortcuts bind via the layout's registerEditorCommands in every variant,
-    // so no global keyboard install is needed for this one.
+    // shortcuts bind via the controller's onEditorCreated (surfaces
+    // .registerEditorCommands) in every variant, so no global keyboard install
+    // is needed for this one.
     { ...makeRunButtonCommand(), scope: 'editor', bindKey: 'mod-enter' },
 
     // Clear: the toolbar button plus a global Cmd/Ctrl-K shortcut (so it fires
