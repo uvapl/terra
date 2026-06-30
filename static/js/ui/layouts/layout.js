@@ -253,10 +253,13 @@ export default class Layout extends GoldenLayout {
   }
 
   /**
-   * Switch the layout orientation at runtime. Captures the full current layout
-   * (open editors, terminal, canvas, images — toConfig() keeps the whole tree),
-   * flips the root row/column, and reloads through the controller. A no-op when
-   * already in the requested orientation.
+   * Switch the layout orientation at runtime, in place and without recreating any
+   * component (editors keep their undo history, the terminal its scrollback and
+   * worker). Builds a fresh root container of the opposite axis and *relocates*
+   * the live stacks into it — the same reparent-don't-recreate idiom as
+   * arrangeOutput(). When the output area is split, its container is rebuilt
+   * perpendicular to the new main axis (row when vertical, column when
+   * horizontal). A no-op when already in the requested orientation.
    *
    * @param {string} orientation - 'horizontal' | 'vertical'.
    */
@@ -264,9 +267,63 @@ export default class Layout extends GoldenLayout {
     if (orientation !== 'horizontal' && orientation !== 'vertical') return;
     if (this._orientation === orientation) return;
 
-    const config = this.toConfig();
-    config.content[0].type = orientation === 'vertical' ? 'column' : 'row';
-    this.delegate.loadLayout(config);
+    const oldMain = this.getMainContainer();
+    if (!oldMain) { this._orientation = orientation; return; }
+
+    const mainType = orientation === 'vertical' ? 'column' : 'row';
+    // Split output stays perpendicular to the main axis.
+    const outputType = orientation === 'vertical' ? 'row' : 'column';
+
+    // Snapshot the live top-level children before any reparenting.
+    const children = [...oldMain.contentItems];
+
+    // Identify the output sub-tree (the one main child whose subtree holds output
+    // components) so only it is rebuilt perpendicular; editor stacks move as-is.
+    const isOutput = (item) => item.isComponent
+      ? item.config.componentName !== 'editor'
+      : (item.contentItems || []).some(isOutput);
+
+    // Empty container of the new axis, swapped into the root in place of oldMain.
+    // No 3rd arg => oldMain (still holding the live stacks) is detached from the
+    // DOM but NOT destroyed, so its stacks survive for relocation. It is left
+    // unreferenced afterwards (destroying it would destroy the moved stacks) and
+    // is garbage-collected.
+    const newMain = this.createContentItem(
+      { type: mainType, content: [], isClosable: false }, this.root
+    );
+    this.root.replaceChild(oldMain, newMain);
+
+    // Relocate each live top-level item into newMain (moving DOM, not recreating).
+    for (const child of children) {
+      if (!child.isStack && isOutput(child)) {
+        // Split output: rebuild perpendicular and move its stacks across.
+        const perp = this.createContentItem(
+          { type: outputType, content: [], id: child.config.id }, newMain
+        );
+        newMain.addChild(perp);
+        [...child.contentItems].forEach((stack) => perp.addChild(stack));
+      } else {
+        newMain.addChild(child); // editor stack(s) / single output stack
+      }
+    }
+
+    this._orientation = orientation;
+    this._afterOrientationChanged();
+  }
+
+  /**
+   * Re-apply the orientation-dependent side effects after an in-place flip —
+   * those the destroy/recreate path used to get for free, minus anything that
+   * touches components. Updates the View ▸ Orientation menu state, re-tags the
+   * areas and re-renders the output split/merge toggle (its icon depends on
+   * orientation), and relays out so Ace/xterm recompute against the new geometry.
+   */
+  _afterOrientationChanged() {
+    $('#menu-item--orientation-horizontal').toggleClass('active', !this.vertical);
+    $('#menu-item--orientation-vertical').toggleClass('active', this.vertical);
+
+    this._scheduleOutputControlsRefresh();
+    this.refresh();
   }
 
   /**
@@ -974,6 +1031,21 @@ export default class Layout extends GoldenLayout {
   }
 
   /**
+   * The output stack the split/merge toggle is anchored to. The toggle lives in
+   * a stack header's top-right controls, so it should sit in the corner of the
+   * whole output area: the first (topmost) stack when the split output is stacked
+   * vertically (horizontal main layout → output column), but the last (rightmost)
+   * stack when it is laid out horizontally (vertical main layout → output row).
+   *
+   * @returns {?GoldenLayout.Stack}
+   */
+  _anchorOutputStack() {
+    const outputStacks = this._allStacks().filter((stack) => this._isOutputStack(stack));
+    if (outputStacks.length === 0) return null;
+    return this.vertical ? outputStacks[outputStacks.length - 1] : outputStacks[0];
+  }
+
+  /**
    * Stamp every stack with a `_terraArea` marker ('editor' | 'output') based on
    * its content, so the drag constraint can tell which area a drop target
    * belongs to regardless of how the tree is split or flattened. Empty stacks
@@ -1168,13 +1240,14 @@ export default class Layout extends GoldenLayout {
 
   /**
    * A signature of what determines the output toggle: whether the output is
-   * split, the number of extra output tabs (visibility), and the first output
-   * stack element (where the toggle is anchored).
+   * split, the number of extra output tabs (visibility), and the anchor output
+   * stack element (where the toggle is rendered — which itself moves with the
+   * orientation, so a flip re-renders the toggle).
    *
    * @returns {{ sig: string, firstEl: ?Element }}
    */
   _outputSignature() {
-    const firstStack = this._firstOutputStack();
+    const firstStack = this._anchorOutputStack();
     const firstEl = firstStack?.element?.[0] ?? null;
     const extra = this.getTabComponents().filter(
       (c) => c instanceof ImageTab || c instanceof CanvasTab
@@ -1183,8 +1256,9 @@ export default class Layout extends GoldenLayout {
   }
 
   /**
-   * Render the single split/merge toggle into the controls of the topmost or
-   * leftmost output stack. The button reflects the current state: it splits the
+   * Render the single split/merge toggle into the controls of the anchor output
+   * stack (topmost when the split output is a column, rightmost when it is a row;
+   * see _anchorOutputStack). The button reflects the current state: it splits the
    * output when it is a single stack, and merges it back when it is split. Shown
    * only when the output area holds more than one tab. Idempotent.
    *
@@ -1195,7 +1269,7 @@ export default class Layout extends GoldenLayout {
    * @returns {boolean} Whether the toggle was (re)rendered.
    */
   renderOutputArrangeControls() {
-    const firstStack = this._firstOutputStack();
+    const firstStack = this._anchorOutputStack();
     const $controls = firstStack
       ? $(firstStack.element).children('.lm_header').children('.lm_controls').first()
       : $();

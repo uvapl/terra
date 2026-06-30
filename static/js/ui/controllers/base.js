@@ -205,25 +205,6 @@ export default class BaseController {
   }
 
   /**
-   * Replace the current layout with an explicit GoldenLayout config, preserving
-   * nothing the caller did not embed in that config. Used to reload after an
-   * orientation switch or output rearrange (where the config is derived from
-   * `layout.toConfig()`), and by plugins loading a custom layout. The controller
-   * instance persists; only `this.layout` is swapped and re-initialised.
-   *
-   * @param {object} restoredConfig - A full GoldenLayout config.
-   */
-  loadLayout(restoredConfig) {
-    this.layout.resetLayout = true;
-    this.layout.destroy();
-
-    this.createLayout({ restoredConfig });
-
-    this._pendingReset = true;
-    this.init();
-  }
-
-  /**
    * Switch the layout orientation at runtime (horizontal ⇄ vertical).
    *
    * @param {string} orientation - 'horizontal' | 'vertical'.
