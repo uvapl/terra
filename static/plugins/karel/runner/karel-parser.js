@@ -12,7 +12,15 @@
 //   if          := "IF" test "THEN" statement [ "ELSE" statement ]
 //   call        := word                         (primitive or user instruction)
 //   test        := [ "NOT" ] testword
-// Statements are separated/terminated by ';' (lenient: extra/trailing ok).
+// ';' is a strict statement separator: exactly one is required between two
+// statements in a block, and none is allowed before the block's closing
+// keyword (e.g. a trailing ';' right before END is a syntax error). Newlines
+// are insignificant whitespace throughout and never substitute for ';'.
+//
+// Exception: an ITERATE/WHILE/IF/DEFINE whose relevant branch is a single
+// bare instruction (not a BEGIN...END block) is never followed by a ';',
+// even when another statement follows it — the ';' belongs to instructions
+// and blocks, not to the control-flow/definition wrapper around them.
 
 import { TokenType, KarelSyntaxError } from './karel-lexer.js';
 
@@ -55,6 +63,40 @@ function spanLength(startToken, endToken) {
   return (endToken.column + endToken.value.length) - startToken.column;
 }
 
+/**
+ * Whether `stmt`, followed to its relevant tail, is a bare instruction call
+ * rather than a BEGIN...END block. Drills into ITERATE/WHILE bodies and the
+ * IF statement's last branch (ELSE if present, otherwise THEN). Used both for
+ * DEFINE bodies directly (a DEFINE's body occupies the same kind of
+ * single-statement slot as a loop/if branch) and, via `takesNoSeparator`,
+ * for the recursion inside iterate/while/if.
+ */
+function isBareTail(stmt) {
+  switch (stmt.type) {
+    case 'call': return true;
+    case 'iterate':
+    case 'while':
+      return isBareTail(stmt.body);
+    case 'if':
+      return isBareTail(stmt.else ?? stmt.then);
+    default: return false; // 'block'
+  }
+}
+
+/**
+ * Whether `stmt`, as an item in a statement list, is never followed by a
+ * ';' — true only for ITERATE/WHILE/IF whose relevant branch bottoms out in
+ * a bare instruction. A plain top-level 'call' or 'block' statement still
+ * follows the normal separator rule, even though `isBareTail` would call a
+ * bare 'call' true — that recursion is for what's *inside* a wrapper, not
+ * for a statement sitting directly in the list.
+ */
+function takesNoSeparator(stmt) {
+  if (stmt.type === 'iterate' || stmt.type === 'while') return isBareTail(stmt.body);
+  if (stmt.type === 'if') return isBareTail(stmt.else ?? stmt.then);
+  return false;
+}
+
 export function parse(tokens) {
   return new Parser(tokens).parseProgram();
 }
@@ -93,6 +135,15 @@ class Parser {
     while (this.peek().type === TokenType.SEMICOLON) this.next();
   }
 
+  /** Consume a single ';' separator, or throw if one isn't there. */
+  expectSemicolon() {
+    if (this.peek().type !== TokenType.SEMICOLON) {
+      const t = this.peek();
+      throw new KarelSyntaxError(`Expected ';' between statements on line ${t.line}.`, t.line);
+    }
+    return this.next();
+  }
+
   parseProgram() {
     this.skipSemicolons();
 
@@ -122,11 +173,22 @@ class Parser {
     this.expectWord('beginning-of-program');
 
     const definitions = {};
-    this.skipSemicolons();
     while (this.isWord('define') || this.isWord('define-new-instruction')) {
       const def = this.parseDefinition();
       definitions[def.name] = def.body;
-      this.skipSemicolons();
+      if (this.isWord('beginning-of-execution')) break;
+
+      if (isBareTail(def.body)) {
+        if (this.peek().type === TokenType.SEMICOLON) {
+          const t = this.peek();
+          throw new KarelSyntaxError(`Unexpected ';' after a single-instruction DEFINE on line ${t.line}.`, t.line);
+        }
+      } else {
+        const semicolon = this.expectSemicolon();
+        if (this.isWord('beginning-of-execution')) {
+          throw new KarelSyntaxError(`Unexpected ';' before the end of a block on line ${semicolon.line}.`, semicolon.line);
+        }
+      }
     }
 
     this.expectWord('beginning-of-execution');
@@ -149,13 +211,30 @@ class Parser {
     return { name: nameToken.value.toLowerCase(), body };
   }
 
-  /** Parse a ';'-separated list until a terminator keyword or EOF. */
+  /**
+   * Parse a ';'-separated list until a terminator keyword or EOF. ';' is a
+   * separator, not a terminator: exactly one is required between statements,
+   * and none is allowed before the closing keyword. A statement covered by
+   * `takesNoSeparator` never takes a ';' at all, even mid-list.
+   */
   parseStatements() {
     const list = [];
-    this.skipSemicolons();
     while (this.peek().type !== TokenType.EOF && !TERMINATORS.has(this.word())) {
-      list.push(this.parseStatement());
-      this.skipSemicolons();
+      const stmt = this.parseStatement();
+      list.push(stmt);
+      if (this.peek().type === TokenType.EOF || TERMINATORS.has(this.word())) break;
+
+      if (takesNoSeparator(stmt)) {
+        if (this.peek().type === TokenType.SEMICOLON) {
+          const t = this.peek();
+          throw new KarelSyntaxError(`Unexpected ';' after a single-instruction ITERATE/WHILE/IF on line ${t.line}.`, t.line);
+        }
+      } else {
+        const semicolon = this.expectSemicolon();
+        if (this.peek().type === TokenType.EOF || TERMINATORS.has(this.word())) {
+          throw new KarelSyntaxError(`Unexpected ';' before the end of a block on line ${semicolon.line}.`, semicolon.line);
+        }
+      }
     }
     return { type: 'block', body: list };
   }
