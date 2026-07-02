@@ -18,6 +18,11 @@ const WORLD_NAME_CONTEXT = /^[ \t]*WORLD\s+"([^"]*)$/i;
 // a directory, so the names we offer for completion are listed here explicitly.
 const BUNDLED_WORLDS = ['test'];
 
+// Highest loop iteration number the live-trace arrow shows a digit for (see
+// karel.css's ace_karel-loop-step-N classes) — past this the loop clause is
+// still highlighted, just without a number.
+const MAX_LOOP_STEP_DIGIT = 20;
+
 const completions = (words, meta) =>
   words.map((value) => ({ caption: value, value, meta, score: 1000 }));
 
@@ -111,7 +116,7 @@ const KAREL_COMPLETER = {
 export default class KarelPlugin extends TerraPlugin {
   name = 'karel';
 
-  css = [];
+  css = ['static/plugins/karel/karel.css'];
 
   /**
    * Renderer and the canvas tab it is bound to.
@@ -132,6 +137,18 @@ export default class KarelPlugin extends TerraPlugin {
    * one when the user switches tabs quickly.
    */
   _previewSeq = 0;
+
+  /**
+   * Live-tracing state for the run in progress: whether the program requested
+   * it (via `SPEED SLOWEST`), which editor to mark up, the Ace marker ids (one
+   * per active trace frame) so the previous highlights can be removed before
+   * drawing the next ones, and the frames last marked (so a later `karelRender`
+   * can settle them to the plain highlight without the worker resending them).
+   */
+  _traceEnabled = false;
+  _traceEditor = null;
+  _traceMarkerIds = [];
+  _traceFrames = null;
 
   onLayoutLoaded = () => {
     // Join the run pipeline. Idempotent, so re-firing on a layout reset is fine.
@@ -300,8 +317,10 @@ export default class KarelPlugin extends TerraPlugin {
 
   /**
    * Draw commands streamed from the Karel worker. `karelInit` opens (or reuses)
-   * the world canvas and draws the starting state; `karelRender` paints each
-   * subsequent animated step. Other worker messages are ignored.
+   * the world canvas and draws the starting state; `karelTrace` marks the next
+   * instruction before it runs; `karelRender` paints each subsequent animated
+   * step (the world after that instruction ran) and settles its highlight.
+   * Other worker messages are ignored.
    *
    * @param {object} msg - The raw worker message.
    */
@@ -311,13 +330,111 @@ export default class KarelPlugin extends TerraPlugin {
       // A fresh run starts with no message; the previous result is cleared.
       this.renderer.setMessage(null);
       this._scheduleDraw(msg.data);
+
+      // The worker only requests tracing for a SPEED SLOWEST program; bind it
+      // to whichever editor is active right now (the one that was run).
+      this._traceEnabled = !!msg.data.traceEnabled;
+      this._traceEditor = this._traceEnabled ? Terra.app.view.getActiveEditor() : null;
+      this._traceFrames = null;
+    } else if (msg.id === 'karelTrace' && this._traceEnabled) {
+      // The instruction is about to run; the world hasn't changed yet. Fires
+      // twice per step: first plain (so the highlight itself is easy to spot),
+      // then with the "about to run" arrow (msg.data.marking).
+      this._traceFrames = msg.data.trace;
+      this._highlightTrace(msg.data.trace, msg.data.marking);
     } else if (msg.id === 'karelRender' && this.renderer) {
       this._scheduleDraw(msg.data);
+      // The instruction just marked has now run; drop its "about to run" cue.
+      if (this._traceEnabled && this._traceFrames) {
+        this._highlightTrace(this._traceFrames, false);
+      }
     } else if (msg.id === 'karelOutput' && this.renderer) {
       // Normal output and errors are drawn centered below the world.
       this.renderer.setMessage(msg.data.text, msg.data.isError);
       this._scheduleDraw(this._latestWorld);
     }
+  }
+
+  /**
+   * The run finished or was aborted (e.g. via the stop button). Drop the
+   * execution highlight left in the traced editor, if any.
+   */
+  onRunEnded = () => {
+    this._clearTrace();
+  }
+
+  /**
+   * Mark the whole active chain for the current step — any enclosing
+   * ITERATE/WHILE clauses and user-instruction call sites, plus (once inside
+   * one) the primitive itself as the innermost highlight — replacing whichever
+   * frames were shown before. Scrolls the last frame's line into view if it
+   * isn't already, so the trace stays visible on programs longer than a
+   * screenful.
+   *
+   * A frame is styled by its own `kind`, not by its position in the array: a
+   * bare primitive (no `kind`) is always last when present and gets the
+   * strong "current instruction" style; a `call`/`iterate`/`while` frame gets
+   * the lighter "context" style regardless of whether something is nested
+   * inside it yet — which is what makes a call site or loop clause read the
+   * same whether it's alone (its own "entering" step) or a parent of the step
+   * currently running inside it.
+   *
+   * @param {array} frames - `{ line, column, length, kind, current }` entries,
+   *   outermost first. `kind` is 'call' | 'iterate' | 'while', absent for the
+   *   primitive itself. `current` is the 1-based loop iteration, present only
+   *   on iterate/while frames. 1-indexed line as parsed, 0-indexed column.
+   * @param {boolean} marking - True while a primitive is highlighted but
+   *   hasn't run yet (adds the "about to run" arrow cue); ignored for
+   *   call/loop frames, which get their own cues unconditionally.
+   */
+  _highlightTrace = (frames, marking) => {
+    const aceEditor = this._traceEditor?.editor;
+    const session = aceEditor?.session || aceEditor?.getSession?.();
+    if (!session) return;
+
+    for (const id of this._traceMarkerIds) {
+      session.removeMarker(id);
+    }
+
+    this._traceMarkerIds = frames.map(({ line, column, length, kind, current }) => {
+      const row = line - 1;
+      const range = new ace.Range(row, column, row, column + length);
+      let clazz;
+      if (!kind) {
+        clazz = 'ace_karel-current-instruction';
+        if (marking) clazz += ' ace_karel-marking';
+      } else {
+        clazz = 'ace_karel-current-context';
+        if (kind === 'call') {
+          clazz += ' ace_karel-call-site';
+        } else if (Number.isInteger(current) && current >= 1 && current <= MAX_LOOP_STEP_DIGIT) {
+          clazz += ` ace_karel-loop-step-${current}`;
+        }
+      }
+      return session.addMarker(range, clazz, 'text');
+    });
+
+    const innermostRow = frames[frames.length - 1].line - 1;
+    if (!aceEditor.isRowVisible(innermostRow)) {
+      aceEditor.scrollToLine(innermostRow, true, true);
+    }
+  }
+
+  /**
+   * Remove any execution highlights left over from a finished or aborted run.
+   */
+  _clearTrace = () => {
+    const aceEditor = this._traceEditor?.editor;
+    const session = aceEditor?.session || aceEditor?.getSession?.();
+    if (session) {
+      for (const id of this._traceMarkerIds) {
+        session.removeMarker(id);
+      }
+    }
+    this._traceMarkerIds = [];
+    this._traceEditor = null;
+    this._traceEnabled = false;
+    this._traceFrames = null;
   }
 
   /**

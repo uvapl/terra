@@ -44,6 +44,17 @@ const TESTS = {
 
 export const PRIMITIVES = new Set(['move', 'turnleft', 'pickbeeper', 'putbeeper', 'turnoff']);
 
+/**
+ * Character span from the start of `startToken` to the end of `endToken`, for
+ * highlighting a whole clause (e.g. "ITERATE 3 TIMES") as one execution-trace
+ * frame. Falls back to just the start token's own length if the two ended up
+ * on different lines, so unusual formatting never yields a negative span.
+ */
+function spanLength(startToken, endToken) {
+  if (startToken.line !== endToken.line) return startToken.value.length;
+  return (endToken.column + endToken.value.length) - startToken.column;
+}
+
 export function parse(tokens) {
   return new Parser(tokens).parseProgram();
 }
@@ -162,7 +173,13 @@ class Parser {
     if (t.type !== TokenType.WORD) {
       throw new KarelSyntaxError(`Expected an instruction but found '${t.value}' on line ${t.line}.`, t.line);
     }
-    return { type: 'call', name: t.value.toLowerCase(), line: t.line };
+    return {
+      type: 'call',
+      name: t.value.toLowerCase(),
+      line: t.line,
+      column: t.column,
+      length: t.value.length,
+    };
   }
 
   parseBlock() {
@@ -173,22 +190,40 @@ class Parser {
   }
 
   parseIterate() {
+    const iterateToken = this.peek();
     this.expectWord('iterate');
     const countToken = this.next();
     if (countToken.type !== TokenType.NUMBER) {
       throw new KarelSyntaxError(`Expected a number after ITERATE on line ${countToken.line}.`, countToken.line);
     }
+    const timesToken = this.peek();
     this.expectWord('times');
     const body = this.parseStatement();
-    return { type: 'iterate', count: countToken.value, body };
+    return {
+      type: 'iterate',
+      count: countToken.value,
+      body,
+      line: iterateToken.line,
+      column: iterateToken.column,
+      length: spanLength(iterateToken, timesToken),
+    };
   }
 
   parseWhile() {
+    const whileToken = this.peek();
     this.expectWord('while');
     const test = this.parseTest();
+    const doToken = this.peek();
     this.expectWord('do');
     const body = this.parseStatement();
-    return { type: 'while', test, body };
+    return {
+      type: 'while',
+      test,
+      body,
+      line: whileToken.line,
+      column: whileToken.column,
+      length: spanLength(whileToken, doToken),
+    };
   }
 
   parseIf() {
