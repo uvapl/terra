@@ -46,7 +46,7 @@ END-OF-PROGRAM
 Loads a named world file. Takes a quoted string.
 
 ```karel
-WORLD "test.w";
+WORLD "test.w"
 BEGINNING-OF-PROGRAM
   BEGINNING-OF-EXECUTION
     move;
@@ -59,8 +59,8 @@ END-OF-PROGRAM
 Sets animation speed. Allowed values: `slow`, `slower`, `slowest`, `fast`.
 
 ```karel
-SPEED fast;
-WORLD "test.w";          { WORLD and SPEED may appear in either order }
+SPEED fast
+WORLD "test.w"           { WORLD and SPEED may appear in either order }
 BEGINNING-OF-PROGRAM
   BEGINNING-OF-EXECUTION
     move;
@@ -303,8 +303,8 @@ Turn right (no primitive exists), walk to the wall picking up every beeper, and
 stop.
 
 ```karel
-WORLD "test.w";
-SPEED slow;
+WORLD "test.w"
+SPEED slow
 
 BEGINNING-OF-PROGRAM
 

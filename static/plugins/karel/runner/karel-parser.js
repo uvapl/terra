@@ -64,37 +64,21 @@ function spanLength(startToken, endToken) {
 }
 
 /**
- * Whether `stmt`, followed to its relevant tail, is a bare instruction call
- * rather than a BEGIN...END block. Drills into ITERATE/WHILE bodies and the
- * IF statement's last branch (ELSE if present, otherwise THEN). Used both for
- * DEFINE bodies directly (a DEFINE's body occupies the same kind of
- * single-statement slot as a loop/if branch) and, via `takesNoSeparator`,
- * for the recursion inside iterate/while/if.
- */
-function isBareTail(stmt) {
-  switch (stmt.type) {
-    case 'call': return true;
-    case 'iterate':
-    case 'while':
-      return isBareTail(stmt.body);
-    case 'if':
-      return isBareTail(stmt.else ?? stmt.then);
-    default: return false; // 'block'
-  }
-}
-
-/**
  * Whether `stmt`, as an item in a statement list, is never followed by a
- * ';' — true only for ITERATE/WHILE/IF whose relevant branch bottoms out in
- * a bare instruction. A plain top-level 'call' or 'block' statement still
- * follows the normal separator rule, even though `isBareTail` would call a
- * bare 'call' true — that recursion is for what's *inside* a wrapper, not
- * for a statement sitting directly in the list.
+ * ';' — true only for ITERATE/WHILE/IF whose relevant branch is a bare
+ * instruction rather than a BEGIN...END block. A plain top-level 'call' or
+ * 'block' statement still follows the normal separator rule.
+ *
+ * `stmt.isBare` (set when each node is built — see parseIterate/parseWhile/
+ * parseIf/parseStatement) already answers "does this statement's tail
+ * resolve to a bare instruction", computed for free during parsing instead
+ * of by re-walking the finished tree. A bare 'call' node is `isBare: true`
+ * too, since it's a valid bare tail *inside* a wrapper — but a 'call'
+ * sitting directly in the list is not itself a wrapper, so it's excluded
+ * here.
  */
 function takesNoSeparator(stmt) {
-  if (stmt.type === 'iterate' || stmt.type === 'while') return isBareTail(stmt.body);
-  if (stmt.type === 'if') return isBareTail(stmt.else ?? stmt.then);
-  return false;
+  return stmt.isBare && stmt.type !== 'call';
 }
 
 export function parse(tokens) {
@@ -130,11 +114,6 @@ class Parser {
     }
   }
 
-  /** Consume any run of statement separators. */
-  skipSemicolons() {
-    while (this.peek().type === TokenType.SEMICOLON) this.next();
-  }
-
   /** Consume a single ';' separator, or throw if one isn't there. */
   expectSemicolon() {
     if (this.peek().type !== TokenType.SEMICOLON) {
@@ -145,7 +124,6 @@ class Parser {
   }
 
   parseProgram() {
-    this.skipSemicolons();
 
     let worldFile = null;
     let speedOverride = null;
@@ -167,7 +145,6 @@ class Parser {
         }
         speedOverride = mode;
       }
-      this.skipSemicolons();
     }
 
     this.expectWord('beginning-of-program');
@@ -178,7 +155,7 @@ class Parser {
       definitions[def.name] = def.body;
       if (this.isWord('beginning-of-execution')) break;
 
-      if (isBareTail(def.body)) {
+      if (def.body.isBare) {
         if (this.peek().type === TokenType.SEMICOLON) {
           const t = this.peek();
           throw new KarelSyntaxError(`Unexpected ';' after a single-instruction DEFINE on line ${t.line}.`, t.line);
@@ -194,7 +171,6 @@ class Parser {
     this.expectWord('beginning-of-execution');
     const body = this.parseStatements();
     this.expectWord('end-of-execution');
-    this.skipSemicolons();
     this.expectWord('end-of-program');
 
     return { worldFile, speedOverride, definitions, body };
@@ -258,6 +234,7 @@ class Parser {
       line: t.line,
       column: t.column,
       length: t.value.length,
+      isBare: true, // a bare word is always a valid bare tail inside a wrapper
     };
   }
 
@@ -265,7 +242,7 @@ class Parser {
     this.expectWord('begin');
     const block = this.parseStatements();
     this.expectWord('end');
-    return block;
+    return block; // 'block' nodes have no isBare — falsy is correct, they're never bare
   }
 
   parseIterate() {
@@ -282,6 +259,7 @@ class Parser {
       type: 'iterate',
       count: countToken.value,
       body,
+      isBare: !!body.isBare,
       line: iterateToken.line,
       column: iterateToken.column,
       length: spanLength(iterateToken, timesToken),
@@ -299,6 +277,7 @@ class Parser {
       type: 'while',
       test,
       body,
+      isBare: !!body.isBare,
       line: whileToken.line,
       column: whileToken.column,
       length: spanLength(whileToken, doToken),
@@ -314,7 +293,8 @@ class Parser {
     if (this.matchWord('else')) {
       elseBranch = this.parseStatement();
     }
-    return { type: 'if', test, then: thenBranch, else: elseBranch };
+    const tail = elseBranch ?? thenBranch;
+    return { type: 'if', test, then: thenBranch, else: elseBranch, isBare: !!tail.isBare };
   }
 
   parseTest() {
