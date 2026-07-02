@@ -29,6 +29,10 @@ export function tokenize(source) {
   const tokens = [];
   let i = 0;
   let line = 1;
+  // Index of the current line's first character, so a token's column (0-based)
+  // is `tokenStart - lineStart`. Used to place the execution-trace marker
+  // precisely on an instruction, not just its line.
+  let lineStart = 0;
   const n = source.length;
 
   const isWordStart = (c) => /[A-Za-z_]/.test(c);
@@ -38,7 +42,7 @@ export function tokenize(source) {
     const c = source[i];
 
     // Newlines (for error line numbers) and whitespace.
-    if (c === '\n') { line++; i++; continue; }
+    if (c === '\n') { line++; i++; lineStart = i; continue; }
     if (/\s/.test(c)) { i++; continue; }
 
     // Line comment.
@@ -51,7 +55,7 @@ export function tokenize(source) {
     if (c === '{') {
       i++;
       while (i < n && source[i] !== '}') {
-        if (source[i] === '\n') line++;
+        if (source[i] === '\n') { line++; lineStart = i + 1; }
         i++;
       }
       i++; // consume closing '}'
@@ -68,7 +72,7 @@ export function tokenize(source) {
       i++;
       let str = '';
       while (i < n && source[i] !== '"') {
-        if (source[i] === '\n') line++;
+        if (source[i] === '\n') { line++; lineStart = i + 1; }
         str += source[i++];
       }
       if (i >= n) throw new KarelSyntaxError(`Unterminated string on line ${line}.`, line);
@@ -85,9 +89,10 @@ export function tokenize(source) {
     }
 
     if (isWordStart(c)) {
+      const column = i - lineStart;
       let word = '';
       while (i < n && isWordPart(source[i])) word += source[i++];
-      tokens.push({ type: TokenType.WORD, value: word, line });
+      tokens.push({ type: TokenType.WORD, value: word, line, column });
       continue;
     }
 

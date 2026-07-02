@@ -2,8 +2,16 @@
 
 The classic Pattis Karel language as implemented in `static/plugins/karel`.
 Keywords are **case-insensitive** and **hyphenated** (e.g. `BEGINNING-OF-PROGRAM`,
-`front-is-clear`). Statements are separated/terminated by `;` (extra and
-trailing semicolons are tolerated).
+`front-is-clear`). Statements are **separated** by `;`: exactly one `;` is
+required between two statements in a block, and none is allowed before the
+block's closing keyword (e.g. right before `END`). Newlines are insignificant
+whitespace and never substitute for `;`.
+
+**Exception:** an `ITERATE`/`WHILE`/`IF`/`DEFINE` whose relevant body is a
+single bare instruction (not a `BEGIN … END` block) is *never* followed by a
+`;` — not even when another statement comes right after it. The `;` belongs
+to instructions and blocks, not to the control-flow/definition keyword
+wrapped around them. See the [Control flow](#control-flow) section.
 
 ---
 
@@ -24,7 +32,7 @@ BEGINNING-OF-PROGRAM
     BEGINNING-OF-EXECUTION
         { the statements that actually run }
         move;
-        turnoff;
+        turnoff
     END-OF-EXECUTION
 
 END-OF-PROGRAM
@@ -38,11 +46,11 @@ END-OF-PROGRAM
 Loads a named world file. Takes a quoted string.
 
 ```karel
-WORLD "test.w";
+WORLD "test.w"
 BEGINNING-OF-PROGRAM
   BEGINNING-OF-EXECUTION
     move;
-    turnoff;
+    turnoff
   END-OF-EXECUTION
 END-OF-PROGRAM
 ```
@@ -51,12 +59,12 @@ END-OF-PROGRAM
 Sets animation speed. Allowed values: `slow`, `slower`, `slowest`, `fast`.
 
 ```karel
-SPEED fast;
-WORLD "test.w";          { WORLD and SPEED may appear in either order }
+SPEED fast
+WORLD "test.w"           { WORLD and SPEED may appear in either order }
 BEGINNING-OF-PROGRAM
   BEGINNING-OF-EXECUTION
     move;
-    turnoff;
+    turnoff
   END-OF-EXECUTION
 END-OF-PROGRAM
 ```
@@ -84,7 +92,7 @@ BEGINNING-OF-PROGRAM
     turnleft;
     move;
     putbeeper;
-    turnoff;
+    turnoff
   END-OF-EXECUTION
 END-OF-PROGRAM
 ```
@@ -107,19 +115,19 @@ BEGINNING-OF-PROGRAM
     BEGIN
       turnleft;
       turnleft;
-      turnleft;
+      turnleft
     END;
 
   DEFINE turnaround AS
     BEGIN
       turnleft;
-      turnleft;
-    END;
+      turnleft
+    END
 
   BEGINNING-OF-EXECUTION
     turnright;
     turnaround;
-    turnoff;
+    turnoff
   END-OF-EXECUTION
 
 END-OF-PROGRAM
@@ -131,9 +139,20 @@ A definition can call primitives or other user instructions:
   DEFINE harvest-one AS
     BEGIN
       pickbeeper;
-      move;
+      move
     END;
 ```
+
+> Note: `END;` here separates this definition from whatever follows it (the
+> next `DEFINE` or `BEGINNING-OF-EXECUTION`) — normal `;`-separator rules for
+> a `BEGIN … END` body. A `DEFINE` whose body is a single bare instruction is
+> different: like a bare `ITERATE`/`WHILE`/`IF` body, it never takes a `;`,
+> not even between it and the next `DEFINE`:
+>
+> ```karel
+> DEFINE turnaround-once AS turnleft
+> DEFINE turnaround-twice AS turnleft
+> ```
 
 ---
 
@@ -149,9 +168,9 @@ BEGINNING-OF-PROGRAM
     BEGIN
       move;
       move;
-      turnleft;
+      turnleft
     END;
-    turnoff;
+    turnoff
   END-OF-EXECUTION
 END-OF-PROGRAM
 ```
@@ -160,6 +179,12 @@ END-OF-PROGRAM
 
 ## Control flow
 
+> When an `ITERATE`/`WHILE`/`IF` body is a single bare instruction (not a
+> `BEGIN … END` block), the whole loop/if statement is never followed by a
+> `;` — even if another statement comes right after it. A block body still
+> needs the normal `;` separator when something follows it (see the "block
+> body" examples below).
+
 ### `ITERATE n TIMES` — fixed repetition
 
 Repeats a statement a fixed number of times. `n` is a literal integer.
@@ -167,14 +192,14 @@ Repeats a statement a fixed number of times. `n` is a literal integer.
 ```karel
 { Move forward 5 cells }
 ITERATE 5 TIMES
-  move;
+  move
 
 { With a block body }
 ITERATE 4 TIMES
   BEGIN
     move;
-    turnleft;
-  END;
+    turnleft
+  END
 ```
 
 ### `WHILE test DO` — conditional loop
@@ -184,14 +209,14 @@ Repeats while the test is true.
 ```karel
 { Walk to the wall }
 WHILE front-is-clear DO
-  move;
+  move
 
 { Pick up a whole row of beepers }
 WHILE next-to-a-beeper DO
   BEGIN
     pickbeeper;
-    move;
-  END;
+    move
+  END
 ```
 
 ### `IF test THEN [ELSE]` — branching
@@ -201,26 +226,27 @@ WHILE next-to-a-beeper DO
 ```karel
 { Without else }
 IF next-to-a-beeper THEN
-  pickbeeper;
+  pickbeeper
 
 { With else }
 IF front-is-clear THEN
   move
 ELSE
-  turnleft;
+  turnleft
 
 { Block branches }
 IF front-is-blocked THEN
   BEGIN
     turnleft;
-    move;
+    move
   END
 ELSE
-  move;
+  move
 ```
 
 > Note: when `THEN`/`ELSE` branches are single statements, no `;` is needed
-> directly before `ELSE`.
+> directly before `ELSE`. Likewise, a `BEGIN … END` branch must not have a
+> `;` directly before its `END`.
 
 ---
 
@@ -243,19 +269,19 @@ spelling; you may *also* prefix any of them with `NOT` (which flips it again).
 
 ```karel
 { Positive and built-in negative spellings }
-IF front-is-clear THEN move;
-IF front-is-blocked THEN turnleft;
+IF front-is-clear THEN move
+IF front-is-blocked THEN turnleft
 
 { Explicit NOT prefix — equivalent to the negative spelling }
-IF NOT front-is-clear THEN turnleft;
+IF NOT front-is-clear THEN turnleft
 
 { Orient to face north }
 WHILE not-facing-north DO
-  turnleft;
+  turnleft
 
 { Use up the whole bag }
 WHILE any-beepers-in-beeper-bag DO
-  putbeeper;
+  putbeeper
 ```
 
 ---
@@ -277,8 +303,8 @@ Turn right (no primitive exists), walk to the wall picking up every beeper, and
 stop.
 
 ```karel
-WORLD "test.w";
-SPEED slow;
+WORLD "test.w"
+SPEED slow
 
 BEGINNING-OF-PROGRAM
 
@@ -286,8 +312,8 @@ BEGINNING-OF-PROGRAM
     BEGIN
       turnleft;
       turnleft;
-      turnleft;
-    END;
+      turnleft
+    END
 
   BEGINNING-OF-EXECUTION
 
@@ -298,15 +324,15 @@ BEGINNING-OF-PROGRAM
     WHILE front-is-clear DO
       BEGIN
         IF next-to-a-beeper THEN
-          pickbeeper;
-        move;
+          pickbeeper
+        move
       END;
 
     { Grab a beeper on the final corner too }
     IF next-to-a-beeper THEN
-      pickbeeper;
+      pickbeeper
 
-    turnoff;
+    turnoff
 
   END-OF-EXECUTION
 

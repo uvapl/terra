@@ -12,7 +12,16 @@
 //   if          := "IF" test "THEN" statement [ "ELSE" statement ]
 //   call        := word                         (primitive or user instruction)
 //   test        := [ "NOT" ] testword
-// Statements are separated/terminated by ';' (lenient: extra/trailing ok).
+//
+// ';' is a strict statement separator: exactly one is required between two
+// statements in a block, and none is allowed before the block's closing
+// keyword (e.g. a trailing ';' right before END is a syntax error). Newlines
+// are insignificant whitespace throughout and never substitute for ';'.
+//
+// Exception: an ITERATE/WHILE/IF/DEFINE whose relevant branch is a single
+// bare instruction (not a BEGIN...END block) is never followed by a ';',
+// even when another statement follows it — the ';' belongs to instructions
+// and blocks, not to the control-flow/definition wrapper around them.
 
 import { TokenType, KarelSyntaxError } from './karel-lexer.js';
 
@@ -43,6 +52,35 @@ const TESTS = {
 };
 
 export const PRIMITIVES = new Set(['move', 'turnleft', 'pickbeeper', 'putbeeper', 'turnoff']);
+
+/**
+ * Character span from the start of `startToken` to the end of `endToken`, for
+ * highlighting a whole clause (e.g. "ITERATE 3 TIMES") as one execution-trace
+ * frame. Falls back to just the start token's own length if the two ended up
+ * on different lines, so unusual formatting never yields a negative span.
+ */
+function spanLength(startToken, endToken) {
+  if (startToken.line !== endToken.line) return startToken.value.length;
+  return (endToken.column + endToken.value.length) - startToken.column;
+}
+
+/**
+ * Whether `stmt`, as an item in a statement list, is never followed by a
+ * ';' — true only for ITERATE/WHILE/IF whose relevant branch is a bare
+ * instruction rather than a BEGIN...END block. A plain top-level 'call' or
+ * 'block' statement still follows the normal separator rule.
+ *
+ * `stmt.isBare` (set when each node is built — see parseIterate/parseWhile/
+ * parseIf/parseStatement) already answers "does this statement's tail
+ * resolve to a bare instruction", computed for free during parsing instead
+ * of by re-walking the finished tree. A bare 'call' node is `isBare: true`
+ * too, since it's a valid bare tail *inside* a wrapper — but a 'call'
+ * sitting directly in the list is not itself a wrapper, so it's excluded
+ * here.
+ */
+function takesNoSeparator(stmt) {
+  return stmt.isBare && stmt.type !== 'call';
+}
 
 export function parse(tokens) {
   return new Parser(tokens).parseProgram();
@@ -77,13 +115,16 @@ class Parser {
     }
   }
 
-  /** Consume any run of statement separators. */
-  skipSemicolons() {
-    while (this.peek().type === TokenType.SEMICOLON) this.next();
+  /** Consume a single ';' separator, or throw if one isn't there. */
+  expectSemicolon() {
+    if (this.peek().type !== TokenType.SEMICOLON) {
+      const t = this.peek();
+      throw new KarelSyntaxError(`Expected ';' between statements on line ${t.line}.`, t.line);
+    }
+    return this.next();
   }
 
   parseProgram() {
-    this.skipSemicolons();
 
     let worldFile = null;
     let speedOverride = null;
@@ -105,23 +146,32 @@ class Parser {
         }
         speedOverride = mode;
       }
-      this.skipSemicolons();
     }
 
     this.expectWord('beginning-of-program');
 
     const definitions = {};
-    this.skipSemicolons();
     while (this.isWord('define') || this.isWord('define-new-instruction')) {
       const def = this.parseDefinition();
       definitions[def.name] = def.body;
-      this.skipSemicolons();
+      if (this.isWord('beginning-of-execution')) break;
+
+      if (def.body.isBare) {
+        if (this.peek().type === TokenType.SEMICOLON) {
+          const t = this.peek();
+          throw new KarelSyntaxError(`Unexpected ';' after a single-instruction DEFINE on line ${t.line}.`, t.line);
+        }
+      } else {
+        const semicolon = this.expectSemicolon();
+        if (this.isWord('beginning-of-execution')) {
+          throw new KarelSyntaxError(`Unexpected ';' before the end of a block on line ${semicolon.line}.`, semicolon.line);
+        }
+      }
     }
 
     this.expectWord('beginning-of-execution');
     const body = this.parseStatements();
     this.expectWord('end-of-execution');
-    this.skipSemicolons();
     this.expectWord('end-of-program');
 
     return { worldFile, speedOverride, definitions, body };
@@ -138,13 +188,30 @@ class Parser {
     return { name: nameToken.value.toLowerCase(), body };
   }
 
-  /** Parse a ';'-separated list until a terminator keyword or EOF. */
+  /**
+   * Parse a ';'-separated list until a terminator keyword or EOF. ';' is a
+   * separator, not a terminator: exactly one is required between statements,
+   * and none is allowed before the closing keyword. A statement covered by
+   * `takesNoSeparator` never takes a ';' at all, even mid-list.
+   */
   parseStatements() {
     const list = [];
-    this.skipSemicolons();
     while (this.peek().type !== TokenType.EOF && !TERMINATORS.has(this.word())) {
-      list.push(this.parseStatement());
-      this.skipSemicolons();
+      const stmt = this.parseStatement();
+      list.push(stmt);
+      if (this.peek().type === TokenType.EOF || TERMINATORS.has(this.word())) break;
+
+      if (takesNoSeparator(stmt)) {
+        if (this.peek().type === TokenType.SEMICOLON) {
+          const t = this.peek();
+          throw new KarelSyntaxError(`Unexpected ';' after a single-instruction ITERATE/WHILE/IF on line ${t.line}.`, t.line);
+        }
+      } else {
+        const semicolon = this.expectSemicolon();
+        if (this.peek().type === TokenType.EOF || TERMINATORS.has(this.word())) {
+          throw new KarelSyntaxError(`Unexpected ';' before the end of a block on line ${semicolon.line}.`, semicolon.line);
+        }
+      }
     }
     return { type: 'block', body: list };
   }
@@ -162,33 +229,60 @@ class Parser {
     if (t.type !== TokenType.WORD) {
       throw new KarelSyntaxError(`Expected an instruction but found '${t.value}' on line ${t.line}.`, t.line);
     }
-    return { type: 'call', name: t.value.toLowerCase(), line: t.line };
+    return {
+      type: 'call',
+      name: t.value.toLowerCase(),
+      line: t.line,
+      column: t.column,
+      length: t.value.length,
+      isBare: true, // a bare word is always a valid bare tail inside a wrapper
+    };
   }
 
   parseBlock() {
     this.expectWord('begin');
     const block = this.parseStatements();
     this.expectWord('end');
-    return block;
+    return block; // 'block' nodes have no isBare — falsy is correct, they're never bare
   }
 
   parseIterate() {
+    const iterateToken = this.peek();
     this.expectWord('iterate');
     const countToken = this.next();
     if (countToken.type !== TokenType.NUMBER) {
       throw new KarelSyntaxError(`Expected a number after ITERATE on line ${countToken.line}.`, countToken.line);
     }
+    const timesToken = this.peek();
     this.expectWord('times');
     const body = this.parseStatement();
-    return { type: 'iterate', count: countToken.value, body };
+    return {
+      type: 'iterate',
+      count: countToken.value,
+      body,
+      isBare: !!body.isBare,
+      line: iterateToken.line,
+      column: iterateToken.column,
+      length: spanLength(iterateToken, timesToken),
+    };
   }
 
   parseWhile() {
+    const whileToken = this.peek();
     this.expectWord('while');
     const test = this.parseTest();
+    const doToken = this.peek();
     this.expectWord('do');
     const body = this.parseStatement();
-    return { type: 'while', test, body };
+    return {
+      type: 'while',
+      test,
+      body,
+      isBare: !!body.isBare,
+      line: whileToken.line,
+      column: whileToken.column,
+      length: spanLength(whileToken, doToken),
+    };
   }
 
   parseIf() {
@@ -200,7 +294,8 @@ class Parser {
     if (this.matchWord('else')) {
       elseBranch = this.parseStatement();
     }
-    return { type: 'if', test, then: thenBranch, else: elseBranch };
+    const tail = elseBranch ?? thenBranch;
+    return { type: 'if', test, then: thenBranch, else: elseBranch, isBare: !!tail.isBare };
   }
 
   parseTest() {

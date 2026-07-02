@@ -19,7 +19,18 @@ const MAX_STEP_DELAY = 600;
 
 // Multipliers applied to the world's step delay by the SPEED SLOW / SPEED FAST
 // directives — a quick way for students to slow down or speed up a run.
-const SPEED_FACTORS = { slow: 2.5, slower: 5, slowest: 7.5, fast: 0.35 };
+const SPEED_FACTORS = { slow: 2.5, slower: 3, slowest: 4, fast: 0.35 };
+
+// How long the traced instruction is highlighted before it actually runs, at
+// SPEED SLOWEST, split into two beats: first plain (so the highlight itself is
+// easy to spot), then with the "about to run" arrow. Both are carved out of
+// that step's own delay (see runUserCode), not added on top, so the overall
+// pace is unchanged. Their sum should stay under the minimum possible SPEED
+// SLOWEST step delay (MIN_STEP_DELAY * SPEED_FACTORS.slowest = 900ms) so the
+// "perform" phase never gets a negative remainder.
+const TRACE_LOCATE_DELAY = 500;
+const TRACE_ARROW_DELAY = 500;
+const TRACE_MARK_DELAY = TRACE_LOCATE_DELAY + TRACE_ARROW_DELAY;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -62,7 +73,10 @@ class KarelAPI extends BaseAPI {
       const program = parse(tokenize(activeTab.content));
       const world = await this.loadWorld(program.worldFile, vfsFiles);
 
-      this.postRender('karelInit', world.snapshot());
+      // Live-trace the executing instruction only at the slowest named speed —
+      // at any faster pace the highlight would lag behind or just flicker.
+      const traceEnabled = ['slowest', 'slower'].includes(program.speedOverride);
+      this.postRender('karelInit', { ...world.snapshot(), traceEnabled });
 
       let stepDelay = stepDelayForSpeed(world.speed);
       if (program.speedOverride) {
@@ -73,9 +87,32 @@ class KarelAPI extends BaseAPI {
       await sleep(stepDelay);
 
       const interpreter = new KarelInterpreter(world, program.definitions, {
-        onStep: () => {
+        // A user-instruction call, and each loop iteration, is its own step:
+        // highlight just the call site / loop clause and hold it for one full
+        // step before the steps inside it begin.
+        onEnter: traceEnabled
+          ? (trace) => {
+              this.postRender('karelTrace', { trace, marking: false });
+              return sleep(stepDelay/2);
+            }
+          : undefined,
+        // Highlight the instruction first, with the world untouched — plain at
+        // first (so the highlight itself is easy to spot), then with the
+        // "about to run" arrow — and only then let the remainder of the
+        // step's own delay play out after it actually runs. Same total pace
+        // per step, just split into "located", "armed" and "performed".
+        onMark: traceEnabled
+          ? async (trace) => {
+              this.postRender('karelTrace', { trace, marking: false });
+              await sleep(TRACE_LOCATE_DELAY);
+              this.postRender('karelTrace', { trace, marking: true });
+              await sleep(TRACE_ARROW_DELAY);
+            }
+          : undefined,
+        onStep: (trace) => {
           this.postRender('karelRender', world.snapshot());
-          return sleep(stepDelay);
+          const remaining = traceEnabled ? Math.max(0, stepDelay - TRACE_MARK_DELAY) : stepDelay;
+          return sleep(remaining);
         },
       });
 
