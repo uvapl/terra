@@ -12,6 +12,7 @@
 //   if          := "IF" test "THEN" statement [ "ELSE" statement ]
 //   call        := word                         (primitive or user instruction)
 //   test        := [ "NOT" ] testword
+//
 // ';' is a strict statement separator: exactly one is required between two
 // statements in a block, and none is allowed before the block's closing
 // keyword (e.g. a trailing ';' right before END is a syntax error). Newlines

@@ -80,6 +80,7 @@ export default class KarelInterpreter {
             frame.current = k + 1;
             await this.onEnter([...this.stack]);
             await this.exec(node.body);
+            await this.onEnter([...this.stack]);
           }
         });
         break;
@@ -91,6 +92,7 @@ export default class KarelInterpreter {
             frame.current = ++k;
             await this.onEnter([...this.stack]);
             await this.exec(node.body);
+            await this.onEnter([...this.stack]);
           }
         });
         break;
@@ -162,6 +164,7 @@ export default class KarelInterpreter {
     await this.withFrame(node, 'call', async () => {
       await this.onEnter([...this.stack]);
       await this.exec(body);
+      await this.onEnter([...this.stack]);
     });
   }
 

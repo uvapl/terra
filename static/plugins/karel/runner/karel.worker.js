@@ -93,7 +93,7 @@ class KarelAPI extends BaseAPI {
         onEnter: traceEnabled
           ? (trace) => {
               this.postRender('karelTrace', { trace, marking: false });
-              return sleep(stepDelay);
+              return sleep(stepDelay/2);
             }
           : undefined,
         // Highlight the instruction first, with the world untouched — plain at
