@@ -20,7 +20,7 @@
    marker's box (position: absolute + height: 100%), pulsing to cue that the
    instruction is about to run. */
 .ace_marker-layer .ace_karel-marking::after {
-  content: '\2192';
+  content: '\2b95';
   position: absolute;
   left: 100%;
   top: 0;
@@ -50,7 +50,7 @@
   height: 100%;
   display: flex;
   align-items: center;
-  padding-left: 4px;
+  padding-left: 10px;
   color: #997300;
   font-weight: bold;
 }
@@ -74,20 +74,20 @@
 .ace_marker-layer .ace_karel-loop-step-1::after { content: ': 1'; }
 .ace_marker-layer .ace_karel-loop-step-2::after { content: ': 2'; }
 .ace_marker-layer .ace_karel-loop-step-3::after { content: ': 3'; }
-.ace_marker-layer .ace_karel-loop-step-4::after { content: '4'; }
-.ace_marker-layer .ace_karel-loop-step-5::after { content: '5'; }
-.ace_marker-layer .ace_karel-loop-step-6::after { content: '6'; }
-.ace_marker-layer .ace_karel-loop-step-7::after { content: '7'; }
-.ace_marker-layer .ace_karel-loop-step-8::after { content: '8'; }
-.ace_marker-layer .ace_karel-loop-step-9::after { content: '9'; }
-.ace_marker-layer .ace_karel-loop-step-10::after { content: '10'; }
-.ace_marker-layer .ace_karel-loop-step-11::after { content: '11'; }
-.ace_marker-layer .ace_karel-loop-step-12::after { content: '12'; }
-.ace_marker-layer .ace_karel-loop-step-13::after { content: '13'; }
-.ace_marker-layer .ace_karel-loop-step-14::after { content: '14'; }
-.ace_marker-layer .ace_karel-loop-step-15::after { content: '15'; }
-.ace_marker-layer .ace_karel-loop-step-16::after { content: '16'; }
-.ace_marker-layer .ace_karel-loop-step-17::after { content: '17'; }
-.ace_marker-layer .ace_karel-loop-step-18::after { content: '18'; }
-.ace_marker-layer .ace_karel-loop-step-19::after { content: '19'; }
-.ace_marker-layer .ace_karel-loop-step-20::after { content: '20'; }
+.ace_marker-layer .ace_karel-loop-step-4::after { content: ': 4'; }
+.ace_marker-layer .ace_karel-loop-step-5::after { content: ': 5'; }
+.ace_marker-layer .ace_karel-loop-step-6::after { content: ': 6'; }
+.ace_marker-layer .ace_karel-loop-step-7::after { content: ': 7'; }
+.ace_marker-layer .ace_karel-loop-step-8::after { content: ': 8'; }
+.ace_marker-layer .ace_karel-loop-step-9::after { content: ': 9'; }
+.ace_marker-layer .ace_karel-loop-step-10::after { content: ': 10'; }
+.ace_marker-layer .ace_karel-loop-step-11::after { content: ': 11'; }
+.ace_marker-layer .ace_karel-loop-step-12::after { content: ': 12'; }
+.ace_marker-layer .ace_karel-loop-step-13::after { content: ': 13'; }
+.ace_marker-layer .ace_karel-loop-step-14::after { content: ': 14'; }
+.ace_marker-layer .ace_karel-loop-step-15::after { content: ': 15'; }
+.ace_marker-layer .ace_karel-loop-step-16::after { content: ': 16'; }
+.ace_marker-layer .ace_karel-loop-step-17::after { content: ': 17'; }
+.ace_marker-layer .ace_karel-loop-step-18::after { content: ': 18'; }
+.ace_marker-layer .ace_karel-loop-step-19::after { content: ': 19'; }
+.ace_marker-layer .ace_karel-loop-step-20::after { content: ': 20'; }
