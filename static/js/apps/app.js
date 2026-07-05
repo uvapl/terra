@@ -484,7 +484,7 @@ export default class App extends BaseApp {
             // tabs build a blob URL from the bytes). This must happen before the
             // updateFile() below, which transfers the content's ArrayBuffer to
             // the VFS worker and would leave it detached here.
-            const tabComponent = this.view.getFileTabComponents().find((component) => {
+            const tabComponent = this.view.layout.getFileTabComponents().find((component) => {
               const path = component.getPath();
               return path == file.path;
             });
@@ -541,7 +541,7 @@ export default class App extends BaseApp {
         for (const path of deletedPaths) {
           await this.vfs.deleteFile(path, false);
 
-          const tabComponent = this.view.getFileTabComponents().find(
+          const tabComponent = this.view.layout.getFileTabComponents().find(
             (component) => component.getPath() === path
           );
           if (tabComponent) {
