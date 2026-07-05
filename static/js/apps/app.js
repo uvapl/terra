@@ -476,54 +476,28 @@ export default class App extends BaseApp {
           return;
         }
 
+        var lastImage = null;
+
         for (const file of newOrModifiedFiles) {
-          // Check if the file already exists in the VFS.
-          if ((await this.vfs.pathExists(file.path))) {
-            // If there's an open tab for this file, update its content first.
-            // Both editor and image tabs accept the raw content directly (image
-            // tabs build a blob URL from the bytes). This must happen before the
-            // updateFile() below, which transfers the content's ArrayBuffer to
-            // the VFS worker and would leave it detached here.
-            const tabComponent = this.view.layout.getFileTabComponents().find((component) => {
-              const path = component.getPath();
-              return path == file.path;
-            });
-            if (tabComponent) {
-              tabComponent.setContent(file.content);
+          const exists = await this.vfs.pathExists(file.path);
 
-              // Bring an updated image to the front so the change is visible.
-              if (isImageExtension(file.path)) {
-                tabComponent.setActive();
-              }
-            }
-
-            // Persist the new content to the VFS. Write immediately (rather
-            // than the debounced default) so that opening a tab below reads the
-            // latest content instead of the previous version.
+          if (exists) {
             await this.vfs.updateFile(file.path, file.content, true, true);
-
-            // If an existing image isn't open yet, open it in a tab. This must
-            // run after updateFile so the tab reads the latest content from the
-            // VFS (the in-memory ArrayBuffer was transferred away above).
-            if (!tabComponent && isImageExtension(file.path)) {
-              this.view.addFileTab(file.path);
-            }
           } else {
-            // Otherwise, create a new file in the VFS.
-            await this.vfs.createFile(
-              file.path,
-              file.content,
-            );
-
-            // Automatically open new image files in a tab.
-            if (isImageExtension(file.path)) {
-              this.view.addFileTab(file.path);
-            }
+            await this.vfs.createFile(file.path, file.content);
           }
 
-          // Recreate the file tree (IDE app only).
-          await this.refreshFileTree?.();
+          if (isImageExtension(file.path)) {
+            lastImage = file;
+          }
         }
+
+        if (lastImage) {
+          this.view.addFileTab(lastImage.path);
+        }
+
+        // Recreate the file tree (IDE app only).
+        await this.refreshFileTree?.();
       },
 
       /**
