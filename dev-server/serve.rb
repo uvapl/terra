@@ -13,6 +13,14 @@ class Server < WEBrick::HTTPServer
     res['Cross-Origin-Opener-Policy'] = 'same-origin'
     res['Cross-Origin-Embedder-Policy'] = 'require-corp'
 
+    # WEBrick doesn't know the .mjs extension and serves it as
+    # application/octet-stream, which browsers reject as an ES module. Pyodide's
+    # loader (pyodide.mjs / pyodide.asm.mjs) is imported as a module, so force a
+    # JavaScript content type.
+    if File.extname(req.path) == '.mjs'
+      res['Content-Type'] = 'text/javascript'
+    end
+
     if NO_STORE_EXTENSIONS.include?(File.extname(req.path))
       res['Cache-Control'] = 'no-store'
     end

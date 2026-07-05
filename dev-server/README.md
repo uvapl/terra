@@ -15,6 +15,9 @@ headers, so code execution won't work with it.
 ruby dev-server/serve.rb
 ```
 
+On Ruby 3.4+ `webrick` is no longer bundled with Ruby; install it once with
+`gem install webrick` if you get a `cannot load such file -- webrick` error.
+
 Then open http://localhost:8000 (IDE), http://localhost:8000/embed.html, or
 the exam variant as described below.
 
