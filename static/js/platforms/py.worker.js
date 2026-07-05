@@ -279,7 +279,12 @@ class API extends BaseAPI {
           const isNewFile = !existingFile;
 
           const stat = this.pyodide.FS.stat(filepath);
-          const isModified = !isNewFile && existingFile.ctime.getTime() !== stat.mtime.getTime();
+          // `ctime` is only set for files we (re)wrote this run; empty files
+          // can't be written to Pyodide's FS so they never get one. Without a
+          // ctime we can't tell whether the file changed, so treat it as
+          // unmodified rather than crashing on `.getTime()`.
+          const isModified = !isNewFile && existingFile.ctime
+            && existingFile.ctime.getTime() !== stat.mtime.getTime();
           if (isNewFile || isModified) {
             const content = this.getFileContent(filepath);
             newFiles.push({ name: filename, path: filepath, content });
@@ -297,7 +302,10 @@ class API extends BaseAPI {
         const isNewFile = !existingFile;
 
         const stat = this.pyodide.FS.stat(filepath);
-        const isModified = !isNewFile && existingFile.ctime.getTime() !== stat.mtime.getTime();
+        // See the note above: guard against files without a ctime (e.g. empty
+        // files, which can't be written to Pyodide's FS).
+        const isModified = !isNewFile && existingFile.ctime
+          && existingFile.ctime.getTime() !== stat.mtime.getTime();
         if (isNewFile || isModified) {
           const content = this.getFileContent(filepath);
           newFiles.push({ name: filepath, path: filepath, content });
