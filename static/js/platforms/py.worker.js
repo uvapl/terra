@@ -403,16 +403,16 @@ class API extends BaseAPI {
    * @returns {str} Filtered error message.
    */
   formatErrorMsg(msg, activeTabName) {
-    // When running e.g. "print(x)" where x is undefined, the following
-    // Pyodide error message will be shown to the user:
+    // When running e.g. "print(x)" where x is undefined, Pyodide prepends its
+    // own internal frames from `_pyodide/_base.py` (which run the user's code
+    // via eval) before the user's actual frame:
     //
     //     Traceback (most recent call last):
-    //       File "/lib/python311.zip/_pyodide/_base.py", line 499, in eval_code
+    //       File "/lib/python314.zip/_pyodide/_base.py", line 523, in eval_code
     //         .run(globals, locals)
-    //          ^^^^^^^^^^^^^^^^^^^^
-    //       File "/lib/python311.zip/_pyodide/_base.py", line 340, in run
+    //          ~~~^^^^^^^^^^^^^^^^^
+    //       File "/lib/python314.zip/_pyodide/_base.py", line 357, in run
     //         coroutine = eval(self.code, globals, locals)
-    //                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     //       File "<exec>", line 1, in <module>
     //       NameError: name 'x' is not defined
     //
@@ -424,9 +424,15 @@ class API extends BaseAPI {
     //               ^
     //     NameError: name 'x' is not defined
     //
-    // Therefore, we'll remove line 2-7.
+    // The number of internal frame lines changes between Python versions, so we
+    // don't slice a fixed count. Instead we keep the "Traceback" header and
+    // everything from the user's first frame (the "<exec>" wrapper) onwards,
+    // dropping the internal `_pyodide/_base.py` frames in between.
     msg = msg.split('\n');
-    msg = [msg[0]].concat(msg.slice(7));
+    const userFrame = msg.findIndex((line, i) => i > 0 && line.includes('File "<exec>"'));
+    if (userFrame !== -1) {
+      msg = [msg[0]].concat(msg.slice(userFrame));
+    }
 
     // Furthermore, apply line postprocessing.
     msg = msg.map((line, index) => {
