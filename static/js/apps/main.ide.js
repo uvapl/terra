@@ -8,6 +8,7 @@ const plugins = [
   'right-sidebar',
   'shell',
   'karel',
+  'rover',
   // 'editor-unlink-killer',
 ];
 
