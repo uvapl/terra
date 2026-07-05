@@ -15,7 +15,7 @@ code completely offline using WebAssembly.
 - [Structure](#structure)
 - [Adding custom header files to C](#adding-custom-header-files-to-c)
 - [Create custom wasm32-wasi library](#create-custom-wasm32-wasi-library)
-- [Packaging Python files in stdlib](#packaging-python-files-in-stdlib)
+- [Python setup and packages](#python-setup-and-packages)
 - [Enable stdin](#enable-stdin)
 - [Acknowledgements](#acknowledgements)
 
@@ -166,10 +166,11 @@ class API extends BaseAPI {
 }
 ```
 
-# Packaging Python files in stdlib
+# Python setup and packages
 
-See [INSTALL_PY_PKG.md](./INSTALL_PY_PKG.md) on how to add a python package to
-the pyodide environment.
+Python runs in the browser via Pyodide, self-hosted so it works offline. See
+[doc/PYTHON.md](./doc/PYTHON.md) for how the setup works, how to update Pyodide,
+and how to add a Python package.
 
 # Enable stdin
 
