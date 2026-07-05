@@ -2,20 +2,15 @@ import { TerraPlugin } from '../../js/lib/plugin-manager.js';
 import { seconds } from '../../js/lib/helpers.js';
 import Terra from '../../js/terra.js';
 
-// CDN for the classic (global `clippy`, jQuery-based) build of clippyjs. This
-// build exposes `clippy.load(name, successCb, failCb, basePath)` and, unlike
-// the newer ESM rewrite, works with the classic JSONP agent assets below.
-const CLIPPY_JS_URL = 'https://cdn.jsdelivr.net/npm/clippyjs@0.0.3/dist/clippy.min.js';
+// clippyjs 0.1.0 — the maintained ESM rewrite. It has no global and no jQuery
+// dependency; you import initAgent() plus an agent loader and call
+// `await initAgent(Rover)`. The agent's sprite sheet and sounds are inlined as
+// base64 data URIs in these modules, so there is no separate asset host to keep
+// alive, and all styling is applied inline (no clippy.css needed).
+const CLIPPY_MODULE_URL = 'https://cdn.jsdelivr.net/npm/clippyjs@0.1.0/dist/index.mjs';
+const CLIPPY_ROVER_URL = 'https://cdn.jsdelivr.net/npm/clippyjs@0.1.0/dist/agents/rover/index.mjs';
 
-// The agent asset bundles (agent.js / map.png / sound files). clippyjs' own
-// default base path (gitcdn.xyz) is dead, so we point at the smore-inc mirror
-// which still serves the original classic JSONP agents.
-const CLIPPY_AGENTS_BASE = 'https://cdn.jsdelivr.net/gh/smore-inc/clippy.js@master/agents/';
-
-// Which character to summon. Rover is the Windows XP search dog.
-const AGENT_NAME = 'Rover';
-
-// Rover's frame size in pixels (from its agent.js "framesize"). Used to place
+// Rover's frame size in pixels (from its agent data "framesize"). Used to place
 // them so their bottom edge lines up with the top of the editor/terminal area.
 const ROVER_SIZE = 80;
 
@@ -26,7 +21,7 @@ const RIGHT_MARGIN = 20;
 const TOP_MARGIN = 40;
 
 // How often Rover does a little unprompted movement, and how much that interval
-// jitters, so the doesn't feel metronomic.
+// jitters, so they don't feel metronomic.
 const IDLE_INTERVAL = seconds(60);
 const IDLE_JITTER = seconds(30);
 
@@ -47,19 +42,17 @@ const CUTE_ANIMATIONS = [
  * top-right corner of the workspace. On its own it just fidgets sporadically;
  * other plugins can drive it through the small public API (play / speak / ask).
  *
- * Other plugins reach this via `getPlugin('rover')`, e.g.:
+ * Other plugins reach this via `Terra.assistant` (or `getPlugin('rover')`):
  *
- *   const rover = getPlugin('rover');
- *   rover.play('Congratulate');
- *   rover.speak('Nice work!');
- *   const answer = await rover.ask('Run the tests?', ['Yes', 'No']);
+ *   Terra.assistant.play('Congratulate');
+ *   Terra.assistant.speak('Nice work!');
+ *   const answer = await Terra.assistant.ask('Run the tests?', ['Yes', 'No']);
  */
 export default class RoverPlugin extends TerraPlugin {
   name = 'rover';
   css = [
-    // Base clippy styling (the .clippy / .clippy-balloon rules).
-    'https://cdn.jsdelivr.net/gh/smore-inc/clippy.js@master/build/clippy.css',
-    // Our own overrides: positioning + the custom question balloon.
+    // clippyjs 0.1.0 styles the agent + balloon inline, so we only ship the
+    // styling for the answer buttons that ask() injects into the balloon.
     'static/plugins/rover/rover.css',
   ];
 
@@ -69,7 +62,7 @@ export default class RoverPlugin extends TerraPlugin {
    *   - active:   whether Rover is currently summoned. Off by default.
    *   - position: { top, right } offsets in pixels once the user has dragged
    *               them, or null to use the default top-right anchor. Stored from
-   *               the top and right edges so they keeps their corner on resize.
+   *               the top and right edges so they keep their corner on resize.
    * @type {object}
    */
   defaultState = {
@@ -82,6 +75,13 @@ export default class RoverPlugin extends TerraPlugin {
    * @type {object|null}
    */
   agent = null;
+
+  /**
+   * Cached promise resolving to the clippyjs module exports, so we import the
+   * CDN modules at most once.
+   * @type {Promise<{initAgent: Function, Rover: object}>|null}
+   */
+  _clippyPromise = null;
 
   /**
    * Handle of the pending idle-movement timer so we can reschedule/clear it.
@@ -145,7 +145,6 @@ export default class RoverPlugin extends TerraPlugin {
     this.setState('active', active);
     this._reflectMenuState();
 
-    console.log(active)
     if (active) {
       this._enable();
     } else {
@@ -162,8 +161,8 @@ export default class RoverPlugin extends TerraPlugin {
   }
 
   /**
-   * Summon Rover (loading clippy on first use), or just re-show them if they were
-   * only hidden. Guards against overlapping loads.
+   * Summon Rover (loading clippy on first use), or just re-show them if they
+   * were only hidden. Guards against overlapping loads.
    */
   _enable() {
     if (this.agent) {
@@ -176,8 +175,8 @@ export default class RoverPlugin extends TerraPlugin {
     if (this._loading) return;
     this._loading = true;
 
-    this._loadClippyScript()
-      .then(() => this._summonRover())
+    this._loadClippy()
+      .then(({ initAgent, Rover }) => this._summonRover(initAgent, Rover))
       .catch((err) => {
         console.error('Rover: failed to load clippyjs', err);
         this._loading = false;
@@ -185,70 +184,78 @@ export default class RoverPlugin extends TerraPlugin {
   }
 
   /**
-   * Hide Rover and stop their idle fidgeting, keeping the loaded agent around so a
-   * later re-enable is instant.
+   * Hide Rover and stop their idle fidgeting, keeping the loaded agent around so
+   * a later re-enable is instant.
    */
   _disable() {
     clearTimeout(this._idleTimer);
-    this._removeQuestionBalloon();
+    this._removeQuestionButtons();
     if (this.agent) {
       this.agent.hide();
     }
   }
 
   /**
-   * Inject the clippyjs CDN script once and resolve when the global `clippy`
-   * object is available.
+   * Dynamically import the clippyjs ESM modules from the CDN (once). The browser
+   * caches modules by URL, but a single cached promise also collapses concurrent
+   * enables into one load.
    *
-   * @returns {Promise<void>}
+   * @returns {Promise<{initAgent: Function, Rover: object}>}
    */
-  _loadClippyScript() {
-    if (window.clippy) return Promise.resolve();
-
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = CLIPPY_JS_URL;
-      script.onload = () => resolve();
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
+  _loadClippy() {
+    if (!this._clippyPromise) {
+      this._clippyPromise = Promise
+        .all([import(CLIPPY_MODULE_URL), import(CLIPPY_ROVER_URL)])
+        .then(([mod, rover]) => ({ initAgent: mod.initAgent, Rover: rover.default }));
+    }
+    return this._clippyPromise;
   }
 
   /**
-   * Load the Rover agent, show it, position it and start its idle fidgeting.
+   * Load the Rover agent, position it and (if still wanted) show it and start
+   * the idle fidgeting.
+   *
+   * @param {Function} initAgent - clippyjs' initAgent().
+   * @param {object} Rover - The Rover agent loader bundle.
    */
-  _summonRover() {
-    window.clippy.load(AGENT_NAME, (agent) => {
-      this.agent = agent;
-      this._loading = false;
+  async _summonRover(initAgent, Rover) {
+    const agent = await initAgent(Rover);
+    this.agent = agent;
+    this._loading = false;
 
-      // Keep Rover glued to their corner on resize (their saved top/right offsets
-      // are re-applied, so a dragged position survives a resize too).
-      $(window).on('resize.rover', () => this._reposition());
+    // Keep Rover glued to their corner on resize (their saved top/right offsets
+    // are re-applied, so a dragged position survives a resize too).
+    $(window).on('resize.rover', () => this._reposition());
 
-      // Clippy owns the drag itself; we just record where they ended up once the
-      // mouse is released, so a dragged position persists across reloads.
-      agent._el.on('mousedown.rover', () => {
-        $(document).one('mouseup.rover', () => setTimeout(() => this._savePosition(), 0));
-      });
+    // Clippy owns the drag itself; we just record where they ended up once the
+    // mouse is released, so a dragged position persists across reloads.
+    agent._el.addEventListener('mousedown', () => {
+      window.addEventListener('mouseup', () => {
+        setTimeout(() => this._savePosition(), 0);
+      }, { once: true });
+    });
 
-      // Anchor them first so the 'Show' animation plays in the top-right corner
-      // instead of clippy's default spot down at the bottom-right.
-      this._reposition();
+    // Anchor them before showing so the 'Show' animation plays in the top-right
+    // corner instead of clippy's default spot down at the bottom-right.
+    this._reposition();
+
+    // Loading is async, so the user may have toggled Rover back off while the
+    // modules were downloading. Only reveal them if they're still wanted;
+    // otherwise leave the loaded agent hidden for an instant re-enable.
+    if (this.getState('active')) {
       agent.show();
       this._scheduleIdleMovement();
-    }, (err) => {
-      console.error('Rover: failed to load agent', err);
-      this._loading = false;
-    }, CLIPPY_AGENTS_BASE);
+    } else {
+      agent.hide(true);
+    }
   }
 
   /**
    * Position Rover. If the user has dragged them before, restore that spot
    * (measured from the top and right edges so it holds on resize); otherwise
    * anchor them overlaying the top-right of the editor/terminal area, with their
-   * bottom edge roughly aligned to the top of that area. Uses fixed positioning
-   * (via the .clippy rule) so they never takes up layout space.
+   * bottom edge roughly aligned to the top of that area. clippy positions the
+   * agent with `position: fixed`, so they never take up layout space.
    */
   _reposition = () => {
     if (!this.agent) return;
@@ -276,7 +283,7 @@ export default class RoverPlugin extends TerraPlugin {
     // move onto the agent (waking them from idle). We just place the element and
     // let clippy's own reposition() clamp them to the viewport and move their
     // speech balloon (which is where our question buttons live) along with them.
-    this.agent._el.css({ left, top });
+    Object.assign(this.agent._el.style, { left: `${left}px`, top: `${top}px` });
     this.agent.reposition();
   }
 
@@ -287,11 +294,10 @@ export default class RoverPlugin extends TerraPlugin {
   _savePosition() {
     if (!this.agent) return;
 
-    const offset = this.agent._el.offset();
-    const width = this.agent._el.outerWidth() || ROVER_SIZE;
+    const rect = this.agent._el.getBoundingClientRect();
     this.setState('position', {
-      top: Math.round(offset.top),
-      right: Math.round(window.innerWidth - offset.left - width),
+      top: Math.round(rect.top),
+      right: Math.round(window.innerWidth - rect.right),
     });
   }
 
@@ -391,16 +397,21 @@ export default class RoverPlugin extends TerraPlugin {
           .text(option)
           .on('click', () => {
             this._removeQuestionButtons();
-            // close() advances the (held) queue so Rover can idle again;
+            // close() advances the (held) queue so Rover can idle again, and
             // hide(true) drops the balloon immediately rather than after the
-            // usual close delay.
+            // usual close delay. hide(true) only sets display:none though — we
+            // also mark the balloon _hidden so it stays dismissed: otherwise
+            // clicking the figure starts a drag whose _finishDrag calls the
+            // balloon's show(), which would bring the (button-less) question
+            // balloon back.
             balloon.close();
+            balloon._hidden = true;
             balloon.hide(true);
             resolve(option);
           })
           .appendTo($buttons);
       });
-      balloon._balloon.append($buttons);
+      $(balloon._balloon).append($buttons);
       this._questionButtons = $buttons;
 
       // Speak the question and hold the balloon open until an answer is clicked.

@@ -1,15 +1,8 @@
 /*
- * Rover overlay tweaks. The base .clippy / .clippy-balloon rules come from
- * clippyjs' own stylesheet (loaded via CDN); this file only layers on the bits
- * specific to Terra: keeping Rover above the workspace chrome and styling the
- * answer buttons that ask() injects into clippy's own speech balloon.
+ * Rover styling. clippyjs 0.1.0 styles the agent and its speech balloon inline
+ * (including a high z-index), so this file only styles the answer buttons that
+ * ask() injects into clippy's own speech balloon.
  */
-
-/* Sit above golden-layout, tooltips, etc. Rover should never be clipped. */
-.clippy,
-.clippy-balloon {
-  z-index: 10000;
-}
 
 /* Answer buttons injected into clippy's balloon by RoverPlugin.ask(). They sit
  * just below the balloon's text content and inherit its pale-yellow look. */

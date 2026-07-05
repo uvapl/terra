@@ -2,10 +2,10 @@
 
 Displays **Rover** (the Windows XP search dog, via [clippyjs](https://github.com/pi0/clippyjs)) as a small, cute overlay in the top-right of the workspace.
 
-- Hidden by default. Toggle him from **View ▸ Show Rover** (the item is bold while he's on). The choice is persisted in local storage, so he comes back on reload if he was on.
-- Positioned top-right, overlaid (fixed position — never takes up layout space), with his bottom edge aligned to the top of the editor/terminal area. Follows the layout on window resize. Drag him anywhere and that position (measured from the top and right edges) is persisted too.
+- Hidden by default. Toggle it from **View ▸ Show Rover** (the item is bold while it's on). The choice is persisted in local storage, so it comes back on reload if it was on.
+- Positioned top-right, with the bottom edge aligned to the top of the editor/terminal area. Follows the layout on window resize. Drag it anywhere and that position (measured from the top and right edges) is persisted too.
 - On his own he does a little unprompted movement roughly every minute (with jitter), picked from a hand-selected set of gentle "idle fidget" animations.
-- clippyjs and the Rover agent assets are loaded from CDN (see the constants at the top of `rover.js`). The classic `clippyjs@0.0.3` global build is used; agent assets come from the `smore-inc/clippy.js` mirror because clippyjs' own default asset host is dead.
+- `clippyjs` is loaded from CDN as ESM modules via dynamic `import()` on first show (see the constants at the top of `rover.js`). The maintained `clippyjs@0.1.0` build is used; its sprite sheet and sounds are inlined as base64 data URIs and all styling is inline, so there's no separate asset host or stylesheet to keep alive.
 
 State is persisted with the base plugin's local-storage helpers (`js/lib/local-storage-manager`) under the `plugin-rover` key: `active` (shown/hidden) and `position` (`{ top, right }`, or null for the default anchor).
 
