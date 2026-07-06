@@ -1,6 +1,0 @@
-doctest
-mypy
-checkpy
-pytest
-pandas
-pycodestyle

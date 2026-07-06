@@ -1,6 +1,6 @@
 import { getPartsFromPath, isImageExtension } from '../lib/helpers.js';
 import BaseAPI from './base-api.js';
-import { loadPyodide } from '../vendor/pyodide-0.25.0.min.js';
+import { loadPyodide } from '../../wasm/py/pyodide.mjs';
 
 const HOME_DIR = '/home/pyodide';
 
@@ -52,15 +52,12 @@ class API extends BaseAPI {
 
       // Get pyodide's Python version.
       const pyVersion = this.pyodide.runPython("sys.version.split(' ')[0]");
-      const [pyMajorVersion, pyMinorVersion, _] = pyVersion.split('.');
       console.log(`Started Python v${pyVersion}`);
 
-      // Load custom libraries and extract them in the virtual filesystem.
-      let zipResponse = await fetch('../../wasm/py/custom_stdlib.zip');
-      let zipBinary = await zipResponse.arrayBuffer();
-      this.pyodide.unpackArchive(zipBinary, 'zip', {
-        extractDir: `/lib/python${pyMajorVersion}.${pyMinorVersion}/site-packages/`
-      });
+      // Packages (numpy, pandas, matplotlib, pytest, checkpy, ...) are no longer
+      // bundled into the filesystem up-front. They are self-hosted next to
+      // pyodide-lock.json and loaded on demand via loadPackagesFromImports()
+      // whenever the user's code imports them (see the run() method).
 
       this.readyCallback();
     });
@@ -279,7 +276,12 @@ class API extends BaseAPI {
           const isNewFile = !existingFile;
 
           const stat = this.pyodide.FS.stat(filepath);
-          const isModified = !isNewFile && existingFile.ctime.getTime() !== stat.mtime.getTime();
+          // `ctime` is only set for files we (re)wrote this run; empty files
+          // can't be written to Pyodide's FS so they never get one. Without a
+          // ctime we can't tell whether the file changed, so treat it as
+          // unmodified rather than crashing on `.getTime()`.
+          const isModified = !isNewFile && existingFile.ctime
+            && existingFile.ctime.getTime() !== stat.mtime.getTime();
           if (isNewFile || isModified) {
             const content = this.getFileContent(filepath);
             newFiles.push({ name: filename, path: filepath, content });
@@ -297,7 +299,10 @@ class API extends BaseAPI {
         const isNewFile = !existingFile;
 
         const stat = this.pyodide.FS.stat(filepath);
-        const isModified = !isNewFile && existingFile.ctime.getTime() !== stat.mtime.getTime();
+        // See the note above: guard against files without a ctime (e.g. empty
+        // files, which can't be written to Pyodide's FS).
+        const isModified = !isNewFile && existingFile.ctime
+          && existingFile.ctime.getTime() !== stat.mtime.getTime();
         if (isNewFile || isModified) {
           const content = this.getFileContent(filepath);
           newFiles.push({ name: filepath, path: filepath, content });
@@ -316,7 +321,7 @@ class API extends BaseAPI {
    * @param {array} data.vfsFiles - List of all file objects from the VFS, each
    * containing the filename and content of the corresponding editor tab.
    */
-  runUserCode({ activeTabPath, vfsFiles }) {
+  async runUserCode({ activeTabPath, vfsFiles }) {
     const activeTab = vfsFiles.find((file) => file.path === activeTabPath);
 
     // Resolve the filename up front (cheap string work) and write the command
@@ -339,7 +344,7 @@ class API extends BaseAPI {
         this.pyodide.FS.chdir(parentPath);
       }
 
-      const error = this.run(activeTab.content, activeTabPath);
+      const error = await this.run(activeTab.content, activeTabPath);
       if (error) {
         this.hostWrite(error);
       }
@@ -377,7 +382,7 @@ class API extends BaseAPI {
    * @param {array} data.files - List of objects, each containing the filename
    * and content of the corresponding editor tab.
    */
-  runSnippet({ selector, activeTabName, cmd, files }) {
+  async runSnippet({ selector, activeTabName, cmd, files }) {
     try {
       this.writeFilesToVirtualFS(files);
 
@@ -385,7 +390,7 @@ class API extends BaseAPI {
       const moduleName = activeTabName.replace('.py', '');
       cmd = cmd.map((line) => line.replace('<filename>', moduleName));
 
-      const error = this.run(cmd, activeTabName);
+      const error = await this.run(cmd, activeTabName);
       if (error) {
         this.hostWrite(error);
       }
@@ -403,16 +408,16 @@ class API extends BaseAPI {
    * @returns {str} Filtered error message.
    */
   formatErrorMsg(msg, activeTabName) {
-    // When running e.g. "print(x)" where x is undefined, the following
-    // Pyodide error message will be shown to the user:
+    // When running e.g. "print(x)" where x is undefined, Pyodide prepends its
+    // own internal frames from `_pyodide/_base.py` (which run the user's code
+    // via eval) before the user's actual frame:
     //
     //     Traceback (most recent call last):
-    //       File "/lib/python311.zip/_pyodide/_base.py", line 499, in eval_code
+    //       File "/lib/python314.zip/_pyodide/_base.py", line 523, in eval_code
     //         .run(globals, locals)
-    //          ^^^^^^^^^^^^^^^^^^^^
-    //       File "/lib/python311.zip/_pyodide/_base.py", line 340, in run
+    //          ~~~^^^^^^^^^^^^^^^^^
+    //       File "/lib/python314.zip/_pyodide/_base.py", line 357, in run
     //         coroutine = eval(self.code, globals, locals)
-    //                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     //       File "<exec>", line 1, in <module>
     //       NameError: name 'x' is not defined
     //
@@ -424,9 +429,15 @@ class API extends BaseAPI {
     //               ^
     //     NameError: name 'x' is not defined
     //
-    // Therefore, we'll remove line 2-7.
+    // The number of internal frame lines changes between Python versions, so we
+    // don't slice a fixed count. Instead we keep the "Traceback" header and
+    // everything from the user's first frame (the "<exec>" wrapper) onwards,
+    // dropping the internal `_pyodide/_base.py` frames in between.
     msg = msg.split('\n');
-    msg = [msg[0]].concat(msg.slice(7));
+    const userFrame = msg.findIndex((line, i) => i > 0 && line.includes('File "<exec>"'));
+    if (userFrame !== -1) {
+      msg = [msg[0]].concat(msg.slice(userFrame));
+    }
 
     // Furthermore, apply line postprocessing.
     msg = msg.map((line, index) => {
@@ -461,9 +472,9 @@ class API extends BaseAPI {
    *
    * @param {string} code - The python code to run.
    * @param {string} activeTabName - The filename of the active editor tab.
-   * @returns {string|undefined} The error message or undefined.
+   * @returns {Promise<string|undefined>} The error message or undefined.
    */
-  run(code, activeTabName) {
+  async run(code, activeTabName) {
     if (!Array.isArray(code)) {
       code = code.split('\n')
     }
@@ -477,9 +488,26 @@ class API extends BaseAPI {
     try {
       const rendered_code = code.join('\n')
 
+      // Lazy-load any packages the code imports (numpy, pandas, matplotlib,
+      // pytest, checkpy, ...) from the self-hosted lockfile before running. If a
+      // package fails to load we still run the code, letting Python raise a
+      // clean ModuleNotFoundError rather than swallowing the failure here.
+      //
+      // messageCallback is silenced so Pyodide's "Loading <pkg>..." progress
+      // lines don't clutter the user's terminal. checkIntegrity must be set
+      // explicitly here: passing an options object drops the default that would
+      // otherwise keep the wheel hash verification enabled.
+      try {
+        await this.pyodide.loadPackagesFromImports(rendered_code, {
+          messageCallback: () => {},
+          checkIntegrity: true,
+        });
+      } catch (err) {
+        console.warn('Failed to load packages from imports:', err);
+      }
+
       // Use matplotlib's Agg backend for static images.
       if (rendered_code.includes("matplotlib")) {
-        console.log("Preloading matplotlib")
         this.pyodide.runPython("import matplotlib; matplotlib.use('Agg')");
       }
 

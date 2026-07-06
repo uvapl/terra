@@ -39,6 +39,7 @@ const blacklistedPaths = [
   '.nyc_output', // code coverage reports
   '.git',  // Git directory
   'node_modules', // NodeJS projects
+  'default.profraw',
 ];
 
 /**

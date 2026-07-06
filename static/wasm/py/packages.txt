@@ -1,0 +1,21 @@
+# Top-level Python packages bundled with Terra's Pyodide runtime.
+#
+# `update.py` reads this list, resolves all dependencies, and downloads the
+# wheels into the ./wheels/ subdirectory so the IDE runs completely offline (no
+# CDN at runtime). Packages that ship with the Pyodide distribution are pulled from the
+# pinned release; packages that are not (e.g. checkpy) are fetched from PyPI and
+# injected into pyodide-lock.json. Dependencies are resolved automatically, so
+# only list the packages you actually want to `import` here.
+#
+# One package per line. Blank lines and lines starting with `#` are ignored.
+# A line may be a bare name or a pip specifier (e.g. `checkpy==2.1.2`).
+
+numpy
+pandas
+matplotlib
+pytest
+mypy
+mypy-extensions
+pathspec
+pycodestyle
+checkpy
