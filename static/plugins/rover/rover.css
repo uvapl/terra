@@ -1,0 +1,28 @@
+/*
+ * Rover styling. clippyjs 0.1.0 styles the agent and its speech balloon inline
+ * (including a high z-index), so this file only styles the answer buttons that
+ * ask() injects into clippy's own speech balloon.
+ */
+
+/* Answer buttons injected into clippy's balloon by RoverPlugin.ask(). They sit
+ * just below the balloon's text content and inherit its pale-yellow look. */
+.rover-question-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.rover-question-btn {
+  cursor: pointer;
+  padding: 3px 12px;
+  border: 1px solid #808080;
+  border-radius: 3px;
+  background: #f0f0f0;
+  font-size: 9pt;
+}
+
+.rover-question-btn:hover {
+  background: #e0e0e0;
+}
