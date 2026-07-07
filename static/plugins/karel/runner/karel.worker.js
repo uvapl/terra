@@ -19,7 +19,7 @@ const MAX_STEP_DELAY = 600;
 
 // Multipliers applied to the world's step delay by the SPEED SLOW / SPEED FAST
 // directives — a quick way for students to slow down or speed up a run.
-const SPEED_FACTORS = { slow: 2.5, slower: 3, slowest: 4, fast: 0.35 };
+const SPEED_FACTORS = { slow: 2, slower: 3, slowest: 5, fast: 0.35 };
 
 // How long the traced instruction is highlighted before it actually runs, at
 // SPEED SLOWEST, split into two beats: first plain (so the highlight itself is
