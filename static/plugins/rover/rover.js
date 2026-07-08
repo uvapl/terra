@@ -1,5 +1,4 @@
 import { TerraPlugin } from '../../js/lib/plugin-manager.js';
-import { seconds } from '../../js/lib/helpers.js';
 import Terra from '../../js/terra.js';
 
 // clippyjs 0.1.0 — the maintained ESM rewrite. It has no global and no jQuery
@@ -19,23 +18,6 @@ const RIGHT_MARGIN = 20;
 
 // Additional margin from top to Rover.
 const TOP_MARGIN = 40;
-
-// How often Rover does a little unprompted movement, and how much that interval
-// jitters, so they don't feel metronomic.
-const IDLE_INTERVAL = seconds(60);
-const IDLE_JITTER = seconds(30);
-
-// A hand-picked subset of Rover's animations that read as "cute idle fidgeting"
-// rather than something purposeful/loud. Kept short so they stay unobtrusive.
-const CUTE_ANIMATIONS = [
-  'GetAttentionMinor',
-  'LookUp',
-  'LookUpLeft',
-  'Pleased',
-  'Acknowledge',
-  'Thinking',
-  'Idle',
-];
 
 /**
  * Displays "Rover" (the clippyjs assistant) as a small, cute overlay in the
@@ -168,7 +150,6 @@ export default class RoverPlugin extends TerraPlugin {
     if (this.agent) {
       this.agent.show();
       this._reposition();
-      this._scheduleIdleMovement();
       return;
     }
 
@@ -256,7 +237,6 @@ export default class RoverPlugin extends TerraPlugin {
     // otherwise leave the loaded agent hidden for an instant re-enable.
     if (this.getState('active')) {
       agent.show();
-      this._scheduleIdleMovement();
     } else {
       agent.hide(true);
     }
@@ -311,25 +291,6 @@ export default class RoverPlugin extends TerraPlugin {
       top: Math.round(rect.top),
       right: Math.round(window.innerWidth - rect.right),
     });
-  }
-
-  /**
-   * Schedule the next little idle movement, then reschedule itself. The
-   * interval jitters so Rover doesn't fidget on a fixed metronome.
-   */
-  _scheduleIdleMovement() {
-    clearTimeout(this._idleTimer);
-    const delay = IDLE_INTERVAL + Math.random() * IDLE_JITTER;
-
-    this._idleTimer = setTimeout(() => {
-      // Only fidget when Rover is active, nothing else is going on and the tab
-      // is visible, so we don't stack animations behind a hidden tab.
-      if (this.agent && this.getState('active') && !document.hidden && !this._questionButtons) {
-        const anim = CUTE_ANIMATIONS[Math.floor(Math.random() * CUTE_ANIMATIONS.length)];
-        this.agent.play(anim);
-      }
-      this._scheduleIdleMovement();
-    }, delay);
   }
 
   // ---------------------------------------------------------------------------
