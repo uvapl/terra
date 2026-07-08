@@ -235,6 +235,18 @@ export default class RoverPlugin extends TerraPlugin {
       }, { once: true });
     });
 
+    // Workaround for a clippyjs@0.1.0 bug: when right-clicking the figure,
+    // dismissing the popup menu, the figure gets into a permanent drag state,
+    // following the mouse around. Hence, patch the event listeners to avoid
+    // action on right click, and stop drag if the contextmenu shows for any
+    // other reason.
+    agent._el.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) e.stopImmediatePropagation();
+    }, { capture: true });
+    agent._el.addEventListener('contextmenu', () => {
+      if (agent._moveHandle || agent._upHandle) agent._finishDrag();
+    });
+
     // Anchor them before showing so the 'Show' animation plays in the top-right
     // corner instead of clippy's default spot down at the bottom-right.
     this._reposition();
