@@ -129,6 +129,8 @@ export default class KarelRenderer {
 
     this._drawGrid(ctx, world, originX, originY, gridW, gridH, cell, cellCenter);
     this._drawWalls(ctx, world, cell, cellRect);
+    this._drawBorder(ctx, originX, originY, gridW, gridH, cell);
+    this._drawLabels(ctx, world, originX, originY, gridH, cellCenter);
     this._drawBeepers(ctx, world, cell, cellCenter);
     this._drawKarel(ctx, world, cell, cellRect);
     this._drawMessage(ctx, cssW, cssH);
@@ -154,13 +156,13 @@ export default class KarelRenderer {
     ctx.strokeStyle = COLORS.grid;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let x = 0; x <= world.width; x++) {
-      const px = originX + x * cell;
+    for (let x = 1; x <= world.width; x++) {
+      const px = originX + (x - 0.5) * cell;
       ctx.moveTo(px, originY);
       ctx.lineTo(px, originY + gridH);
     }
-    for (let y = 0; y <= world.height; y++) {
-      const py = originY + y * cell;
+    for (let y = 1; y <= world.height; y++) {
+      const py = originY + (world.height - y + 0.5) * cell;
       ctx.moveTo(originX, py);
       ctx.lineTo(originX + gridW, py);
     }
@@ -176,6 +178,36 @@ export default class KarelRenderer {
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.fill();
       }
+    }
+  }
+
+  _drawBorder(ctx, originX, originY, gridW, gridH, cell) {
+    ctx.strokeStyle = COLORS.grid;
+    ctx.lineWidth = Math.max(2, cell * 0.08) * 0.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeRect(originX, originY, gridW, gridH);
+  }
+
+  // Avenue numbers below the grid, street numbers to its left, using the
+  // guaranteed PADDING margin reserved when fitting the grid to the canvas.
+  _drawLabels(ctx, world, originX, originY, gridH, cellCenter) {
+    const fontSize = Math.max(6, Math.min(PADDING - 2, 12));
+    ctx.font = `${fontSize}px sans-serif`;
+    ctx.fillStyle = COLORS.corner;
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (let x = 1; x <= world.width; x++) {
+      const { cx } = cellCenter(x, 1);
+      ctx.fillText(String(x), cx, originY + gridH + 4);
+    }
+
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let y = 1; y <= world.height; y++) {
+      const { cy } = cellCenter(1, y);
+      ctx.fillText(String(y), originX - 4, cy);
     }
   }
 
