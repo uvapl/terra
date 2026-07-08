@@ -31,11 +31,11 @@ export const commands = [
   // File ---------------------------------------------------------------------
   {
     name: 'newFile', scope: 'global', bindKey: 'option-n',
-    menuItem: { path: 'File/New File', position: 100 }, exec: ({ app }) => app.createFile(),
+    menuItem: { path: 'File/New File', position: 100 }, exec: ({ app }) => app.startCreateFile(),
   },
   {
     name: 'newFolder', scope: 'global', bindKey: 'option-shift-n',
-    menuItem: { path: 'File/New Folder', position: 110 }, exec: ({ app }) => app.createFolder(),
+    menuItem: { path: 'File/New Folder', position: 110 }, exec: ({ app }) => app.startCreateFolder(),
   },
   {
     name: 'connectRepo', scope: 'global',

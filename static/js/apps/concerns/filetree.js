@@ -50,34 +50,23 @@ export function useFileTree(app) {
     },
 
     /**
-     * Create a new file in the VFS, refresh the tree, open it and start renaming.
+     * Start inline creation of a new file. Nothing is written to the VFS until
+     * the user confirms a name (see `onNodeCreated`); cancelling creates nothing.
      *
-     * @param {string|null} [path] - Path for the new file, or null for the root.
-     * @returns {Promise<void>}
+     * @param {string|null} [parentPath] - Parent folder key, or null for root.
      */
-    async createFile(path = null) {
-      const parentPath = path ? path.split("/").slice(0, -1).join("/") : null;
-      const fileName = await this.vfs.createFile(path);
-      const key = parentPath ? `${parentPath}/${fileName}` : fileName;
-
-      await this.refreshFileTree();
-      this.openFile(key);
-      this.fileTree.startInlineRename(key);
+    startCreateFile(parentPath = null) {
+      this.fileTree.startInlineCreate(parentPath, false);
     },
 
     /**
-     * Create a new folder in the VFS, refresh the tree and start renaming.
+     * Start inline creation of a new folder. Nothing is written to the VFS until
+     * the user confirms a name (see `onNodeCreated`); cancelling creates nothing.
      *
-     * @param {string|null} [path] - Path for the new folder, or null for the root.
-     * @returns {Promise<void>}
+     * @param {string|null} [parentPath] - Parent folder key, or null for root.
      */
-    async createFolder(path = null) {
-      const parentPath = path ? path.split("/").slice(0, -1).join("/") : null;
-      const folder = await this.vfs.createFolder(path);
-      const key = parentPath ? `${parentPath}/${folder.name}` : folder.name;
-
-      await this.refreshFileTree();
-      this.fileTree.startInlineRename(key);
+    startCreateFolder(parentPath = null) {
+      this.fileTree.startInlineCreate(parentPath, true);
     },
 
     // ── Component intents (the app is the component's delegate) ──
@@ -104,6 +93,29 @@ export function useFileTree(app) {
     async onNodeRenamed(srcPath, destPath, isFolder) {
       await this.onNodeMoved(srcPath, destPath, isFolder);
       this.focusActiveEditor();
+    },
+
+    /**
+     * A new file/folder name was confirmed via inline edit; persist it now,
+     * refresh the tree, and open the new file (if it's a file).
+     *
+     * @param {string|null} parentPath - Parent folder key, or null for root.
+     * @param {string} name - The confirmed (validated) name.
+     * @param {boolean} isFolder - Whether to create a folder.
+     * @returns {Promise<void>}
+     */
+    async onNodeCreated(parentPath, name, isFolder) {
+      const path = parentPath ? `${parentPath}/${name}` : name;
+
+      if (isFolder) {
+        await this.vfs.createFolder(path);
+        await this.refreshFileTree();
+      } else {
+        const fileName = await this.vfs.createFile(path, "");
+        const key = parentPath ? `${parentPath}/${fileName}` : fileName;
+        await this.refreshFileTree();
+        this.openFile(key);
+      }
     },
 
     /** A node deletion was confirmed by the user. */

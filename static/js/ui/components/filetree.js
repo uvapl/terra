@@ -181,15 +181,25 @@ export default class FileTreeComponent {
   }
 
   /**
-   * Expand ancestor folders so a node is visible, then start inline rename.
+   * Insert a transient (unsaved) child node and start inline editing on it. The
+   * node is only persisted once the user confirms a name; pressing ESC, or
+   * leaving the name empty, removes it again (FancyTree's `isNew` handling), so
+   * nothing is written to the VFS on cancel. The actual create is reported to
+   * the delegate as `onNodeCreated` from `_onAfterCloseEdit`.
    *
-   * @param {string} key - The key of the node to rename.
+   * @param {string|null} parentPath - Key of the parent folder, or null/'' for
+   *   the tree root.
+   * @param {boolean} isFolder - Whether the new node is a folder.
    */
-  startInlineRename(key) {
-    const node = this._getInstance()?.getNodeByKey(key);
-    if (!node) return;
+  startInlineCreate(parentPath, isFolder) {
+    const instance = this._getInstance();
+    if (!instance) return;
 
-    let ancestor = node.parent;
+    const parentNode = parentPath ? instance.getNodeByKey(parentPath) : instance.rootNode;
+    if (!parentNode) return;
+
+    // Expand the parent and its folder ancestors so the new row is visible.
+    let ancestor = parentNode;
     while (ancestor) {
       if (ancestor.data?.isFolder) {
         ancestor.setExpanded(true, { noAnimation: true });
@@ -197,7 +207,20 @@ export default class FileTreeComponent {
       ancestor = ancestor.parent;
     }
 
-    setTimeout(() => node.editStart(), 100);
+    // Defer so the edit input keeps focus: when triggered from the menu, the
+    // command surface refocuses the editor right after `exec` returns, which
+    // would otherwise blur (and thereby discard) a freshly-opened create box.
+    setTimeout(() => {
+      parentNode.editCreateNode('child', {
+        title: '',
+        folder: isFolder,
+        data: {
+          type: isFolder ? 'folder' : 'file',
+          isFolder,
+          isFile: !isFolder,
+        },
+      });
+    }, 100);
   }
 
   /**
@@ -268,8 +291,8 @@ export default class FileTreeComponent {
 
   /** Bind the "new file"/"new folder" toolbar buttons (persist across reloads). */
   _bindToolbarButtons() {
-    $('#file-tree--add-folder-btn').off('click').on('click', () => this.delegate.createFolder());
-    $('#file-tree--add-file-btn').off('click').on('click', () => this.delegate.createFile());
+    $('#file-tree--add-folder-btn').off('click').on('click', () => this.delegate.startCreateFolder());
+    $('#file-tree--add-file-btn').off('click').on('click', () => this.delegate.startCreateFile());
   }
 
   /** Register the right-click context menu (delegated selector, bound once). */
@@ -446,8 +469,18 @@ export default class FileTreeComponent {
       return false;
     }
 
-    const srcPath = sourceNode.key;
     const parentPath = parentNodeKey.startsWith('root') ? null : parentNodeKey;
+
+    if (data.isNew) {
+      // Stash the validated create; the node is only persisted to the VFS in
+      // `_onAfterCloseEdit`. (On cancel/empty, FancyTree removes this transient
+      // node itself and this branch is never reached, so nothing is created.)
+      this._pendingCreate = { parentPath, name: newName, isFolder: sourceNode.data.isFolder };
+      destroyTooltip('renameNode');
+      return true;
+    }
+
+    const srcPath = sourceNode.key;
     const destPath = parentPath ? `${parentPath}/${newName}` : newName;
 
     // Stash the validated rename; the actual move is performed in
@@ -463,7 +496,14 @@ export default class FileTreeComponent {
   _onAfterCloseEdit = () => {
     this._sort();
 
-    if (this._pendingRename) {
+    if (this._pendingCreate) {
+      const { parentPath, name, isFolder } = this._pendingCreate;
+      this._pendingCreate = null;
+      // Keep FS reloads suspended until the create + refresh completes, for the
+      // same reason as the rename path below.
+      Promise.resolve(this.delegate.onNodeCreated(parentPath, name, isFolder))
+        .finally(() => this.delegate.resumeFSReload());
+    } else if (this._pendingRename) {
       const { srcPath, destPath, isFolder } = this._pendingRename;
       this._pendingRename = null;
       // Keep FS reloads suspended until the move completes. The move emits a
@@ -609,7 +649,7 @@ export default class FileTreeComponent {
         name: 'New File',
         callback: () => {
           this._userClickedContextMenuItem = true;
-          this.delegate.createFile(this._childUntitledPath(node.key));
+          this.delegate.startCreateFile(node.key);
         },
       };
 
@@ -617,7 +657,7 @@ export default class FileTreeComponent {
         name: 'New Folder',
         callback: () => {
           this._userClickedContextMenuItem = true;
-          this.delegate.createFolder(this._childUntitledPath(node.key));
+          this.delegate.startCreateFolder(node.key);
         },
       };
 
@@ -716,11 +756,6 @@ export default class FileTreeComponent {
   }
 
   // ─────────────────────────── Private helpers ───────────────────────────
-
-  /** @returns {string} The path for a new "Untitled" child of `parentKey`. */
-  _childUntitledPath(parentKey) {
-    return parentKey.startsWith('root') ? 'Untitled' : `${parentKey}/Untitled`;
-  }
 
   /**
    * Extract the `FileSystemEntry` objects from a DataTransferItemList.
