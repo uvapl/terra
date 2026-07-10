@@ -1,0 +1,60 @@
+/* Host container of the editor while revision mode is active. */
+.edit-history-active {
+  position: relative;
+}
+
+/* Bottom scrubber bar overlaid on the editor. The translucent dark bar
+   is readable on both the light and dark editor themes. */
+.edit-history-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  padding: 8px 12px;
+  background: rgba(30, 30, 30, 0.92);
+  color: #eee;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edit-history-label {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.edit-history-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-history-slider {
+  flex: 1;
+  min-width: 0;
+}
+
+.edit-history-overlay .button {
+  padding: 2px 10px;
+  line-height: 1.5;
+}
+
+.edit-history-overlay .button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.edit-history-play {
+  min-width: 34px;
+}
+
+.edit-history-badge {
+  text-align: center;
+  color: #f5b942;
+}
+
+.edit-history-badge:empty {
+  display: none;
+}
