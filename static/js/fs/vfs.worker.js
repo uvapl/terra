@@ -269,8 +269,10 @@ const handlers = {
    * @returns {Promise<FileSystemFileHandle>} The updated file handle.
    */
   async updateFile(path, content, isUserInvoked = true, immediate = false) {
-    const handle = await getFileHandleByPath(path);
-    if (!handle) return;
+    // Upsert: create the file (and any missing parent folders) when it does
+    // not exist yet, writing to the exact path with no collision rename.
+    const existed = await handlers.pathExists(path);
+    const handle = await getFileHandleByPath(path, { create: true });
 
     if (immediate) {
       // Write synchronously (e.g. for program run output), so a subsequent
@@ -285,8 +287,10 @@ const handlers = {
     }
 
     if (isUserInvoked) {
+      // A freshly created file must post `fileCreated` so the file tree learns
+      // about it (see filetree.js); an existing file only changed content.
       self.postMessage({
-        type: 'fileContentChanged',
+        type: existed ? 'fileContentChanged' : 'fileCreated',
         data: { file: { path, content } },
       });
     }
@@ -683,19 +687,21 @@ async function getFolderHandleByPath(folderpath = '') {
  * @example getFileHandleByPath('folder1/folder2/myfile.txt')
  *
  * @param {string} filepath - The absolute file path.
- * @returns {Promise<FileSystemFileHandle|null>} The file handle if it exists.
+ * @param {object} [options]
+ * @param {boolean} [options.create=false] - Create the file (and any missing
+ * parent folders) if it does not exist, instead of returning null.
+ * @returns {Promise<FileSystemFileHandle|null>} The file handle, or null if it
+ * does not exist and `create` is false.
  */
-async function getFileHandleByPath(filepath) {
-  if (!(await handlers.pathExists(filepath))) {
+async function getFileHandleByPath(filepath, { create = false } = {}) {
+  if (!(await handlers.pathExists(filepath)) && !create) {
     return null;
   }
 
   const { name, parentPath } = getPartsFromPath(filepath);
 
   let parentFolderHandle = await getFolderHandleByPath(parentPath);
-  const fileHandle = await parentFolderHandle.getFileHandle(name, {
-    create: false,
-  });
+  const fileHandle = await parentFolderHandle.getFileHandle(name, { create });
 
   return fileHandle;
 }

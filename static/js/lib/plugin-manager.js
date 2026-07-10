@@ -245,23 +245,25 @@ export class TerraPlugin {
 
   // EVENT LISTENERS THAT CAN BE IMPLEMENTED FOR EACH PLUGIN.
   // ========================================================
-  // onLayoutLoaded = () => { }
-  // onEditorTextChanged = (editorComponent) => { }
-  // onEditorFocus = (editorComponent) => { }
-  // onSwitchToEditorTab = (editorComponent) => { }
-  // onEditorHide = (editorComponent) => { }
-  // onEditorLoad = (editorComponent) => { }
-  // onEditorLock = (editorComponent) => { }
-  // onEditorUnlock = (editorComponent) => { }
-  // onEditorContainerResize = (editorComponent) => { }
-  // onEditorDestroy = (editorComponent) => { }
-  // onEditorContentChanged (editorComponent) => { }
-  // onSwitchToImageTab = (imageComponent) => { }
-  // onImageHide = (imageComponent) => { }
-  // onImageDestroy = (imageComponent) => { }
-  // onImageHide = (imageComponent) => { }
-  // onStorageChange = (storageName, prevStorageName) => { }
-  // onPluginRegistered = (plugin) => { }
+  // onLayoutLoaded()
+  // onEditorTextChanged(editorComponent)
+  // onEditorFocus(editorComponent)
+  // onSwitchToEditorTab(editorComponent)
+  // onEditorHide(editorComponent)
+  // onEditorLoad(editorComponent)
+  // onEditorLock(editorComponent)
+  // onEditorUnlock(editorComponent)
+  // onEditorContainerResize(editorComponent)
+  // onEditorDestroy(editorComponent)
+  // onEditorBeforeReload(editorComponent) // just before a programmatic content reload
+  // onEditorContentChanged(editorComponent) // after any reload (incl. tab switch), but check if content actually changed
+  // onSwitchToImageTab(imageComponent)
+  // onImageHide(imageComponent)
+  // onImageDestroy(imageComponent)
+  // onImageHide(imageComponent)
+  // onStorageChange(storageName, prevStorageName)
+  // onPluginRegistered(plugin)
+  // onBeforeSubmit() // awaited; flush pending state to the VFS
 }
 
 /**

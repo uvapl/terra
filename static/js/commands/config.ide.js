@@ -39,21 +39,21 @@ export const commands = [
   },
   {
     name: 'connectRepo', scope: 'global',
-    menuItem: { path: 'File/Connect GitHub Repository', position: 200 },
+    menuItem: { path: 'File/Connect GitHub Repository...', position: 200 },
     exec: ({ app }) => app.connectRepo(),
   },
   {
     name: 'openFolder', scope: 'global', bindKey: 'ctrl-shift-o',
-    menuItem: { path: 'File/Open Local Folder', position: 210 },
+    menuItem: { path: 'File/Open Local Folder...', position: 210 },
     exec: ({ app }) => app.openLFSFolder(),
   },
   {
     name: 'closeFile', scope: 'global', bindKey: 'option-w',
-    menuItem: { path: 'File/Close File', position: 300 }, exec: ({ app }) => app.closeFile(),
+    menuItem: { path: 'File/Close File', position: 400 }, exec: ({ app }) => app.closeFile(),
   },
   {
     name: 'closeProject', scope: 'global', disabled: true,
-    menuItem: { path: 'File/Close Project', position: 310 },
+    menuItem: { path: 'File/Close Project', position: 410 },
     exec: ({ app }) => app.closeProject(),
   },
 
@@ -68,7 +68,7 @@ export const commands = [
   },
   {
     name: 'search', scope: 'editor', command: 'find', keys: 'mod-f',
-    menuItem: { path: 'Edit/Find/Find', position: 100 },
+    menuItem: { path: 'Edit/Find/Find...', position: 100 },
   },
   {
     name: 'findNext', scope: 'editor', command: 'findnext', keys: 'ctrl-g',
@@ -80,7 +80,7 @@ export const commands = [
   },
   {
     name: 'replace', scope: 'editor', command: 'replace', keys: 'mod-alt-f',
-    menuItem: { path: 'Edit/Find/Replace', position: 200 },
+    menuItem: { path: 'Edit/Find/Replace...', position: 200 },
   },
   {
     name: 'copy', scope: 'editor', keys: 'mod-c',

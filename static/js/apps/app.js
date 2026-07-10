@@ -61,13 +61,13 @@ export default class App extends BaseApp {
       this.createLangWorker(editorComponent.proglang);
     }
 
+    // Let menu and toolbar items set their enabled state
     this.view.invalidateActions();
 
-    await this.setEditorFileContent(editorComponent);
+    // Reload from VFS, which may have been changed externally
+    await this.reloadEditorFileContent(editorComponent);
 
-    // Front the surface this editor pairs with (opening it if needed) before
-    // plugins react, so a plugin's onSwitchToEditorTab can paint into a canvas
-    // that is already present.
+    // Activate the output tab this editor pairs with (opening it if needed)
     this._showSurface(editorComponent);
 
     triggerPluginEvent('onSwitchToEditorTab', editorComponent);
@@ -82,9 +82,8 @@ export default class App extends BaseApp {
    */
   async onEditorReloadRequested(editorComponent) {
     if (!this.isFSReloadSuspended()) {
-      await this.setEditorFileContent(editorComponent, { clearUndoStack: true });
+      await this.reloadEditorFileContent(editorComponent, { clearUndoStack: true });
     }
-    triggerPluginEvent('onEditorContentChanged', editorComponent);
   }
 
   // ─────────────────────────── Image handlers ────────────────────────────
@@ -667,13 +666,19 @@ export default class App extends BaseApp {
    * @param {boolean} [options.clearUndoStack=false] - Whether to clear the undo
    * stack after the content is applied.
    */
-  async setEditorFileContent(editorComponent, { clearUndoStack = false } = {}) {
+  async reloadEditorFileContent(editorComponent, { clearUndoStack = false } = {}) {
     const path = editorComponent.getPath();
     if (!path) return;
 
     try {
       const content = await this.vfs.readFile(path, MAX_FILE_SIZE);
-      editorComponent.reloadContent(content, { clearUndoStack });
+
+      triggerPluginEvent('onEditorBeforeReload', editorComponent);
+      try {
+        editorComponent.reloadContent(content, { clearUndoStack });
+      } finally {
+        triggerPluginEvent('onEditorContentChanged', editorComponent);
+      }
     } catch (err) {
       this._applyFileReadError(err, editorComponent);
     }

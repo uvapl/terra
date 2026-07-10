@@ -424,22 +424,15 @@ export default class ShellPlugin extends TerraPlugin {
   writeRedirect = async (redirect, content) => {
     const path = this.resolvePath(redirect.file);
     const data = content.endsWith('\n') || content === '' ? content : content + '\n';
-    const exists = await Terra.app.vfs.pathExists(path);
 
+    // updateFile upserts, so both `>` (truncate) and `>>` (append) just write.
+    // Append still needs to read any prior content first.
     if (redirect.op === '>>') {
+      const exists = await Terra.app.vfs.pathExists(path);
       const prev = exists ? await Terra.app.vfs.readFile(path) : '';
-      const merged = prev + data;
-      if (exists) {
-        await Terra.app.vfs.updateFile(path, merged);
-      } else {
-        await Terra.app.vfs.createFile(path, merged);
-      }
+      await Terra.app.vfs.updateFile(path, prev + data);
     } else {
-      if (exists) {
-        await Terra.app.vfs.updateFile(path, data);
-      } else {
-        await Terra.app.vfs.createFile(path, data);
-      }
+      await Terra.app.vfs.updateFile(path, data);
     }
   }
 

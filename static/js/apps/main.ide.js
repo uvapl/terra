@@ -9,7 +9,7 @@ const plugins = [
   'shell',
   'karel',
   'rover',
-  // 'editor-unlink-killer',
+  'edit_history',
 ];
 
 loadPlugins(plugins).then(() => {
