@@ -134,7 +134,7 @@ export default class RunAsPlugin extends TerraPlugin {
       this.setState('args', args);
 
       hideModal($modal);
-      Terra.app.runCode({ runAs: true });
+      Terra.app.runActiveTab({ runAs: true });
     });
   }
 }
