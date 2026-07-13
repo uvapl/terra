@@ -74,7 +74,7 @@ export default class RoverPlugin extends TerraPlugin {
   /**
    * The answer-button row injected into clippy's own speech balloon while a
    * question is on screen, or null when none is pending.
-   * @type {jQuery.Element|null}
+   * @type {HTMLElement|null}
    */
   _questionButtons = null;
 
@@ -139,7 +139,8 @@ export default class RoverPlugin extends TerraPlugin {
    * toggles) so the user can see whether Rover is on.
    */
   _reflectMenuState() {
-    $('#menu-item--toggle-rover').toggleClass('active', !!this.getState('active'));
+    document.getElementById('menu-item--toggle-rover')
+      ?.classList.toggle('active', !!this.getState('active'));
   }
 
   /**
@@ -206,7 +207,7 @@ export default class RoverPlugin extends TerraPlugin {
 
     // Keep Rover glued to their corner on resize (their saved top/right offsets
     // are re-applied, so a dragged position survives a resize too).
-    $(window).on('resize.rover', () => this._reposition());
+    window.addEventListener('resize', this._reposition);
 
     // Clippy owns the drag itself; we just record where they ended up once the
     // mouse is released, so a dragged position persists across reloads.
@@ -364,28 +365,31 @@ export default class RoverPlugin extends TerraPlugin {
       // speech balloon, below its text content. Appending them before speak()
       // means speak()'s own reposition() already accounts for their height, and
       // clippy keeps repositioning them with the balloon from then on.
-      const $buttons = $('<div class="rover-question-buttons"></div>');
+      const buttons = document.createElement('div');
+      buttons.className = 'rover-question-buttons';
       options.forEach((option) => {
-        $('<button type="button" class="rover-question-btn"></button>')
-          .text(option)
-          .on('click', () => {
-            this._removeQuestionButtons();
-            // close() advances the (held) queue so Rover can idle again, and
-            // hide(true) drops the balloon immediately rather than after the
-            // usual close delay. hide(true) only sets display:none though — we
-            // also mark the balloon _hidden so it stays dismissed: otherwise
-            // clicking the figure starts a drag whose _finishDrag calls the
-            // balloon's show(), which would bring the (button-less) question
-            // balloon back.
-            balloon.close();
-            balloon._hidden = true;
-            balloon.hide(true);
-            resolve(option);
-          })
-          .appendTo($buttons);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'rover-question-btn';
+        button.textContent = option;
+        button.addEventListener('click', () => {
+          this._removeQuestionButtons();
+          // close() advances the (held) queue so Rover can idle again, and
+          // hide(true) drops the balloon immediately rather than after the
+          // usual close delay. hide(true) only sets display:none though — we
+          // also mark the balloon _hidden so it stays dismissed: otherwise
+          // clicking the figure starts a drag whose _finishDrag calls the
+          // balloon's show(), which would bring the (button-less) question
+          // balloon back.
+          balloon.close();
+          balloon._hidden = true;
+          balloon.hide(true);
+          resolve(option);
+        });
+        buttons.appendChild(button);
       });
-      $(balloon._balloon).append($buttons);
-      this._questionButtons = $buttons;
+      balloon._balloon.appendChild(buttons);
+      this._questionButtons = buttons;
 
       // Speak the question and hold the balloon open until an answer is clicked.
       this.agent.speak(question, true);
