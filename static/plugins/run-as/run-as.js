@@ -1,5 +1,5 @@
 import { TerraPlugin } from '../../js/lib/plugin-manager.js';
-import { createModal, hideModal, showModal } from '../../js/ui/components/modal.js';
+import { createModal } from '../../js/ui/components/modal.js';
 import Terra from '../../js/terra.js';
 
 export default class RunAsPlugin extends TerraPlugin {
@@ -81,9 +81,7 @@ export default class RunAsPlugin extends TerraPlugin {
     const currentCompileSrcFiles = this.getState('compileSrcFilenames') || '';
     const currentCompileTarget = this.getState('compileTarget') || '';
 
-    // createModal/showModal/hideModal are shared jQuery-based infra; keep
-    // $modal for their calls, but drive our own DOM through modalEl below.
-    const $modal = createModal({
+    const modalEl = createModal({
       title: 'Run as...',
       body: `
         <div class="form-wrapper-full-width">
@@ -109,19 +107,23 @@ export default class RunAsPlugin extends TerraPlugin {
           <div class="code-block"></div>
         </div>
       `,
-      footer: `
-        <button type="button" class="button cancel-btn">Cancel</button>
-        <button type="button" class="button primary-btn run-btn">Run</button>
-      `,
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Run',
       attrs: {
-        id: 'terra-plugin-file-args-modal',
         class: 'modal-width-medium',
-      }
+      },
+      onConfirm: () => {
+        const args = modalEl.querySelector('#file-args-input').value.trim();
+        const srcFiles = modalEl.querySelector('#compile-src-files-input').value.trim() || null;
+        const target = modalEl.querySelector('#compile-target-input').value.replace(/^\.\//, '').trim() || null;
+
+        this.setState('compileSrcFilenames', srcFiles);
+        this.setState('compileTarget', target);
+        this.setState('args', args);
+
+        Terra.app.runActiveTab({ runAs: true });
+      },
     });
-
-    showModal($modal);
-
-    const modalEl = $modal[0];
 
     this.validateInputFields(modalEl);
 
@@ -129,20 +131,6 @@ export default class RunAsPlugin extends TerraPlugin {
     this.updateCmdPreview(modalEl, activeTabPath, defaultTarget);
     modalEl.querySelectorAll('input').forEach((input) => {
       input.addEventListener('keyup', () => this.updateCmdPreview(modalEl, activeTabPath, defaultTarget));
-    });
-
-    modalEl.querySelector('.cancel-btn').addEventListener('click', () => hideModal($modal));
-    modalEl.querySelector('.run-btn').addEventListener('click', () => {
-      const args = modalEl.querySelector('#file-args-input').value.trim();
-      const srcFiles = modalEl.querySelector('#compile-src-files-input').value.trim() || null;
-      const target = modalEl.querySelector('#compile-target-input').value.replace(/^\.\//, '').trim() || null;
-
-      this.setState('compileSrcFilenames', srcFiles);
-      this.setState('compileTarget', target);
-      this.setState('args', args);
-
-      hideModal($modal);
-      Terra.app.runActiveTab({ runAs: true });
     });
   }
 }

@@ -1,5 +1,5 @@
 import { isValidFilename } from '../../lib/helpers.js';
-import { createModal, hideModal, showModal } from './modal.js';
+import { createModal } from './modal.js';
 import { createTooltip, destroyTooltip } from './tooltip.js';
 
 /** CSS class marking the active drop target during a drag. */
@@ -728,30 +728,20 @@ export default class FileTreeComponent {
    * @param {FancytreeNode} node - The node to delete.
    */
   _confirmDelete(node) {
-    const $modal = createModal({
+    createModal({
       title: 'Confirmation required',
       body: `<p>You are about to delete the ${node.data.type} <strong>${node.title}</strong> permanently, are you sure? This action can't be undone.</p>`,
-      footer: `
-        <button type="button" class="button cancel-btn">Cancel</button>
-        <button type="button" class="button confirm-btn danger-btn">I'm sure</button>
-      `,
+      cancelLabel: 'Cancel',
+      confirmLabel: "I'm sure",
+      danger: true,
+      onConfirm: async () => {
+        await this.delegate.onNodeDeleted(node.key, node.data.isFolder);
+        this.delegate.resumeFSReload();
+      },
+      onCancel: () => this.delegate.resumeFSReload(),
       attrs: {
-        id: 'ide-delete-confirmation-modal',
         class: 'modal-width-small',
       },
-    });
-
-    showModal($modal);
-
-    $modal.find('.cancel-btn').click(() => {
-      this.delegate.resumeFSReload();
-      hideModal($modal);
-    });
-
-    $modal.find('.confirm-btn').click(async () => {
-      await this.delegate.onNodeDeleted(node.key, node.data.isFolder);
-      hideModal($modal);
-      this.delegate.resumeFSReload();
     });
   }
 

@@ -1,5 +1,5 @@
 import { formatDate, isObject } from '../../lib/helpers.js';
-import { createModal, hideModal, showModal } from '../components/modal.js';
+import { createModal } from '../components/modal.js';
 import Layout from './layout.js';
 
 export default class ExamLayout extends Layout {
@@ -116,14 +116,14 @@ export default class ExamLayout extends Layout {
     });
 
     // Check if the submit modal is open.
-    const $submitModal = $('#submit-exam-model');
-    if ($submitModal.length > 0) {
+    const submitModal = document.getElementById('submit-exam-model');
+    if (submitModal) {
       let lastSubmissionText = '';
       if (prevAutoSaveTime instanceof Date) {
         lastSubmissionText = `<br/><br/>✅ The last successful submit was at ${formatDate(prevAutoSaveTime)}.`;
       }
 
-      $submitModal.find('.modal-body').html(`❌ The submission was locked since the last submit. ${lastSubmissionText}`);
+      submitModal.querySelector('.modal-body').innerHTML = `❌ The submission was locked since the last submit. ${lastSubmissionText}`;
     }
 
     $('#submit-btn').remove();
@@ -141,16 +141,13 @@ export default class ExamLayout extends Layout {
       lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${formatDate(prevAutoSaveTime)}</span>.<br/>`;
     }
 
-    const $modal = createModal({
+    const dialog = createModal({
       title: "You're done!",
       body: '<div class="spinner"></div>',
-      footer: '<button type="button" class="button dismiss-modal-btn">Return to exam</button>',
+      confirmLabel: 'Return to exam',
       attrs: { id: 'submit-exam-model' },
+      onConfirm: () => this.cancelSubmitPendingMessage(),
     });
-
-    $modal.find('.dismiss-modal-btn').click(() => this.hideSubmitExamModal());
-
-    showModal($modal);
 
     // If for some reason the auto-save POST request takes more than 1 second,
     // we will show a message to the user.
@@ -159,28 +156,15 @@ export default class ExamLayout extends Layout {
     // time to wait for the POST request. If the submission was successful, then
     // this timeout will be cleared automatically.
     this.submitPendingMsgTimeoutId = setTimeout(() => {
-      $modal.find('.modal-body').html(`
+      dialog.querySelector('.modal-body').innerHTML = `
         <p>
           🈲 NOTE: DO NOT CLOSE THIS BROWSER WINDOW<br/><br/>
           🛄 Trying to submit your final changes to the server.<br/>
           ${lastSaveText}
         </p>
         <p>You can still return to the exam if you would like to make more changes to your code.</p>
-      `);
+      `;
     }, 1300);
-  }
-
-  /**
-   * Hide the submit exam modal by removing it completely out of the DOM, which
-   * simplifies our code a bit as we can handle a bit less.
-   */
-  hideSubmitExamModal() {
-    const $modal = $('#submit-exam-model');
-
-    if ($modal.length === 0) return;
-
-    this.cancelSubmitPendingMessage();
-    hideModal($modal);
   }
 
   /**
@@ -190,8 +174,8 @@ export default class ExamLayout extends Layout {
    * @param {string} [options.evalLink] - URL of the course evaluation form.
    */
   setSubmitModalSuccess({ evalLink } = {}) {
-    const $modal = $('#submit-exam-model');
-    if ($modal.length === 0) return;
+    const dialog = document.getElementById('submit-exam-model');
+    if (!dialog) return;
 
     this.cancelSubmitPendingMessage();
 
@@ -199,14 +183,14 @@ export default class ExamLayout extends Layout {
       ? `<br/><br/>🙏 <a href="${evalLink}" target="_blank">Fill in the evaluation form for the course</a>`
       : '';
 
-    $modal.find('.modal-body').html(`
+    dialog.querySelector('.modal-body').innerHTML = `
       <p>
         ✅ Your files have been submitted successfully<br/><br/>
         🛂 Make sure that you sign off at the desk before leaving
         ${evaluationFormLink}
       </p>
       <p>You can still return to the exam if you would like to make more changes to your code.</p>
-    `);
+    `;
   }
 
   /**

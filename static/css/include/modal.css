@@ -1,49 +1,23 @@
 /* ========================================================================== */
 /* Custom modal (because bootstrap is too overkill)                           */
 /* ========================================================================== */
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1000000; /* it should be this large to overwrite other css */
-  background: rgba(0, 0, 0, 0.7);
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition-timing-function: ease;
-  transition-property: opacity;
-  transition-duration: 0.3s;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.modal.show {
-  opacity: 1;
-  pointer-events: all;
-}
-
-.modal-content {
+dialog.modal {
   max-width: 100%;
   width: 750px;
   min-width: 400px;
+  margin: auto;
   max-height: calc(100vh - 40px);
+  border: none;
+  padding: 0;
   background-color: var(--ide-panel-bg);
   border-radius: var(--border-radius);
-  opacity: 0;
-  transition-timing-function: ease;
-  transition-property: transform, opacity;
-  transition-duration: 0.3s;
-  transform: translateY(-20px);
-  display: flex;
   flex-direction: column;
+  display: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
 }
 
-.modal.show .modal-content {
-  opacity: 1;
-  transform: translateY(0px);
+dialog.modal[open] {
+  display: flex;
 }
 
 .modal-header {
@@ -91,20 +65,21 @@
   margin: 0 auto;
 }
 
-.modal-width-small .modal-content {
+.modal-width-small.modal {
   width: 400px;
 }
 
-.modal-width-medium .modal-content {
+.modal-width-medium.modal {
   width: 550px;
 }
 
 /* ========================================================================== */
 /* Dark Mode                                                                  */
 /* ========================================================================== */
-.dark-mode .modal-content {
+.dark-mode dialog.modal {
   background: var(--dark-mode-bg);
   color: var(--dark-mode-fg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 
 .dark-mode .modal-header,
