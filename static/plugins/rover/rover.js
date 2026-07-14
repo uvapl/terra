@@ -3,11 +3,18 @@ import Terra from '../../js/terra.js';
 
 // clippyjs 0.1.0 — the maintained ESM rewrite. It has no global and no jQuery
 // dependency; you import initAgent() plus an agent loader and call
-// `await initAgent(Rover)`. The agent's sprite sheet and sounds are inlined as
-// base64 data URIs in these modules, so there is no separate asset host to keep
+// `await initAgent(Rover)`. The agent data and sounds are inlined as base64
+// data URIs in these modules, so there is no separate asset host to keep
 // alive, and all styling is applied inline (no clippy.css needed).
 const CLIPPY_MODULE_URL = 'https://cdn.jsdelivr.net/npm/clippyjs@0.1.0/dist/index.mjs';
 const CLIPPY_ROVER_URL = 'https://cdn.jsdelivr.net/npm/clippyjs@0.1.0/dist/agents/rover/index.mjs';
+
+// clippyjs's own Rover.map() loader resolves to a ~700KB base64 data URI
+// (dist/agents/rover/map.mjs), which gets written into the DOM as Rover's
+// `style.background`. That sprite sheet is static and never changes across
+// loads, so we ship it as a real file instead and override the map loader
+// below to point at it, keeping the huge base64 blob out of the DOM.
+const ROVER_SPRITE_URL = 'static/plugins/rover/rover-sprite.png';
 
 // Rover's frame size in pixels (from its agent data "framesize"). Used to place
 // them so their bottom edge lines up with the top of the editor/terminal area.
@@ -188,7 +195,14 @@ export default class RoverPlugin extends TerraPlugin {
     if (!this._clippyPromise) {
       this._clippyPromise = Promise
         .all([import(CLIPPY_MODULE_URL), import(CLIPPY_ROVER_URL)])
-        .then(([mod, rover]) => ({ initAgent: mod.initAgent, Rover: rover.default }));
+        .then(([mod, rover]) => {
+          const Rover = rover.default;
+          // Bypass clippyjs's own map.mjs (a ~700KB base64 data URI) and hand
+          // initAgent() our self-hosted sprite file instead — see
+          // ROVER_SPRITE_URL above.
+          Rover.map = () => Promise.resolve({ default: ROVER_SPRITE_URL });
+          return { initAgent: mod.initAgent, Rover };
+        });
     }
     return this._clippyPromise;
   }
