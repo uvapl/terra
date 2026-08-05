@@ -4,7 +4,7 @@
 //   program     := [ "WORLD" string ] "BEGINNING-OF-PROGRAM"
 //                    { definition } "BEGINNING-OF-EXECUTION"
 //                    statements "END-OF-EXECUTION" "END-OF-PROGRAM"
-//   definition  := ("DEFINE" | "DEFINE-NEW-INSTRUCTION") name "AS" statement
+//   definition  := "DEFINE-NEW-INSTRUCTION" name "AS" statement
 //   statement   := block | iterate | while | if | call
 //   block       := "BEGIN" statements "END"
 //   iterate     := "ITERATE" number "TIMES" statement
@@ -18,10 +18,13 @@
 // keyword (e.g. a trailing ';' right before END is a syntax error). Newlines
 // are insignificant whitespace throughout and never substitute for ';'.
 //
-// Exception: an ITERATE/WHILE/IF/DEFINE whose relevant branch is a single
-// bare instruction (not a BEGIN...END block) is never followed by a ';',
-// even when another statement follows it — the ';' belongs to instructions
-// and blocks, not to the control-flow/definition wrapper around them.
+// Exception: an ITERATE/WHILE/IF whose relevant branch is a single bare
+// instruction (not a BEGIN...END block) is never followed by a ';', even when
+// another statement follows it — the ';' belongs to instructions and blocks,
+// not to the control-flow wrapper around them.
+//
+// A definition is never followed by a ';' either, whatever its body, since
+// definitions are not a statement list.
 
 import { TokenType, KarelSyntaxError } from './karel-lexer.js';
 
@@ -151,21 +154,14 @@ class Parser {
     this.expectWord('beginning-of-program');
 
     const definitions = {};
-    while (this.isWord('define') || this.isWord('define-new-instruction')) {
+    while (this.isWord('define-new-instruction')) {
       const def = this.parseDefinition();
       definitions[def.name] = def.body;
-      if (this.isWord('beginning-of-execution')) break;
-
-      if (def.body.isBare) {
-        if (this.peek().type === TokenType.SEMICOLON) {
-          const t = this.peek();
-          throw new KarelSyntaxError(`Unexpected ';' after a single-instruction DEFINE on line ${t.line}.`, t.line);
-        }
-      } else {
-        const semicolon = this.expectSemicolon();
-        if (this.isWord('beginning-of-execution')) {
-          throw new KarelSyntaxError(`Unexpected ';' before the end of a block on line ${semicolon.line}.`, semicolon.line);
-        }
+      // Only here so a stray ';' names its own cause, rather than falling
+      // through to "expected BEGINNING-OF-EXECUTION but found ';'".
+      if (this.peek().type === TokenType.SEMICOLON) {
+        const t = this.peek();
+        throw new KarelSyntaxError(`Unexpected ';' after a definition on line ${t.line}.`, t.line);
       }
     }
 
@@ -178,7 +174,7 @@ class Parser {
   }
 
   parseDefinition() {
-    this.next(); // 'define' or 'define-new-instruction'
+    this.next(); // 'define-new-instruction'
     const nameToken = this.next();
     if (nameToken.type !== TokenType.WORD) {
       throw new KarelSyntaxError(`Expected an instruction name on line ${nameToken.line}.`, nameToken.line);

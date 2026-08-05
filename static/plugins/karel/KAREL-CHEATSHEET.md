@@ -7,11 +7,13 @@ required between two statements in a block, and none is allowed before the
 block's closing keyword (e.g. right before `END`). Newlines are insignificant
 whitespace and never substitute for `;`.
 
-**Exception:** an `ITERATE`/`WHILE`/`IF`/`DEFINE` whose relevant body is a
-single bare instruction (not a `BEGIN … END` block) is *never* followed by a
-`;` — not even when another statement comes right after it. The `;` belongs
-to instructions and blocks, not to the control-flow/definition keyword
-wrapped around them. See the [Control flow](#control-flow) section.
+**Exception:** an `ITERATE`/`WHILE`/`IF` whose relevant body is a single bare
+instruction (not a `BEGIN … END` block) is *never* followed by a `;` — not
+even when another statement comes right after it. The `;` belongs to
+instructions and blocks, not to the control-flow keyword wrapped around them.
+See the [Control flow](#control-flow) section. A definition is never followed
+by a `;` either, whatever its body — see
+[Defining new instructions](#defining-new-instructions).
 
 ---
 
@@ -104,8 +106,8 @@ END-OF-PROGRAM
 
 ## Defining new instructions
 
-`DEFINE` (or the synonym `DEFINE-NEW-INSTRUCTION`) names a single statement —
-use a `BEGIN … END` block to group several. Definitions go between
+`DEFINE-NEW-INSTRUCTION` names a single statement — use a `BEGIN … END` block
+to group several. Definitions go between
 `BEGINNING-OF-PROGRAM` and `BEGINNING-OF-EXECUTION`. Names are case-insensitive.
 
 ```karel
@@ -116,9 +118,9 @@ BEGINNING-OF-PROGRAM
       turnleft;
       turnleft;
       turnleft
-    END;
+    END
 
-  DEFINE turnaround AS
+  DEFINE-NEW-INSTRUCTION turnaround AS
     BEGIN
       turnleft;
       turnleft
@@ -136,22 +138,21 @@ END-OF-PROGRAM
 A definition can call primitives or other user instructions:
 
 ```karel
-  DEFINE harvest-one AS
+  DEFINE-NEW-INSTRUCTION harvest-one AS
     BEGIN
       pickbeeper;
       move
-    END;
+    END
 ```
 
-> Note: `END;` here separates this definition from whatever follows it (the
-> next `DEFINE` or `BEGINNING-OF-EXECUTION`) — normal `;`-separator rules for
-> a `BEGIN … END` body. A `DEFINE` whose body is a single bare instruction is
-> different: like a bare `ITERATE`/`WHILE`/`IF` body, it never takes a `;`,
-> not even between it and the next `DEFINE`:
+> Note: a definition is never followed by a `;`, whatever its body — not
+> between two definitions, and not before `BEGINNING-OF-EXECUTION`. The `;`
+> inside the block still separates the statements in it, as usual. A body
+> that is a single bare instruction works the same way:
 >
 > ```karel
-> DEFINE turnaround-once AS turnleft
-> DEFINE turnaround-twice AS turnleft
+> DEFINE-NEW-INSTRUCTION turnaround-once AS turnleft
+> DEFINE-NEW-INSTRUCTION turnaround-twice AS turnleft
 > ```
 
 ---

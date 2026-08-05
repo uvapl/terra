@@ -13,7 +13,7 @@ ace.define(
     const KarelHighlightRules = function () {
       const keywords =
         'beginning-of-program|end-of-program|beginning-of-execution|' +
-        'end-of-execution|define|define-new-instruction|as|begin|end|' +
+        'end-of-execution|define-new-instruction|as|begin|end|' +
         'iterate|times|while|do|if|then|else|world|speed|slow|fast';
 
       const primitives = 'move|turnleft|pickbeeper|putbeeper|turnoff';

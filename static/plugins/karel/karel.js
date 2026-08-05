@@ -32,7 +32,7 @@ const completions = (words, meta) =>
 const KAREL_COMPLETIONS = [
   ...completions([
     'BEGINNING-OF-PROGRAM', 'END-OF-PROGRAM', 'BEGINNING-OF-EXECUTION',
-    'END-OF-EXECUTION', 'DEFINE', 'AS', 'BEGIN', 'END', 'ITERATE', 'TIMES',
+    'END-OF-EXECUTION', 'DEFINE-NEW-INSTRUCTION', 'AS', 'BEGIN', 'END', 'ITERATE', 'TIMES',
     'WHILE', 'DO', 'IF', 'THEN', 'ELSE', 'WORLD', 'NOT',
     'SPEED', 'SLOW', 'SLOWER', 'SLOWEST', 'FAST',
   ], 'keyword'),

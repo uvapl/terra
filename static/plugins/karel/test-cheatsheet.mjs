@@ -63,20 +63,13 @@ for (const block of blocks) {
   // in so the real parser can check it.
   const chunks = block.source.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
   for (const chunk of chunks) {
-    const isDefinition = /^(\{[^}]*\}\s*)?(DEFINE|DEFINE-NEW-INSTRUCTION)\b/i.test(chunk);
+    const isDefinition = /^(\{[^}]*\}\s*)?DEFINE-NEW-INSTRUCTION\b/i.test(chunk);
     const label = chunk.split('\n').find((l) => l.trim() && !l.trim().startsWith('{'))?.slice(0, 60) ?? chunk.slice(0, 60);
     checked++;
 
     let result;
     if (isDefinition) {
-      // Ambiguous outside full-program context: the fragment could be the
-      // last DEFINE before BEGINNING-OF-EXECUTION, or followed by another
-      // one. Accept either reading; only fail if neither parses.
-      const asLast = tryParse(`BEGINNING-OF-PROGRAM\n${chunk}\nBEGINNING-OF-EXECUTION\nturnoff\nEND-OF-EXECUTION\nEND-OF-PROGRAM`);
-      const asFollowedByMore = tryParse(`BEGINNING-OF-PROGRAM\n${chunk}\nDEFINE __dummy__ AS turnleft\nBEGINNING-OF-EXECUTION\nturnoff\nEND-OF-EXECUTION\nEND-OF-PROGRAM`);
-      result = asLast.ok || asFollowedByMore.ok
-        ? { ok: true }
-        : { ok: false, message: `as last definition: ${asLast.message} | as followed by another: ${asFollowedByMore.message}` };
+      result = tryParse(`BEGINNING-OF-PROGRAM\n${chunk}\nBEGINNING-OF-EXECUTION\nturnoff\nEND-OF-EXECUTION\nEND-OF-PROGRAM`);
     } else {
       result = tryParse(`BEGINNING-OF-PROGRAM\nBEGINNING-OF-EXECUTION\n${chunk}\nEND-OF-EXECUTION\nEND-OF-PROGRAM`);
     }
