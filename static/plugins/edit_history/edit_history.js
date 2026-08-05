@@ -1,5 +1,5 @@
 import { TerraPlugin } from '../../js/lib/plugin-manager.js';
-import { createModal, hideModal, showModal } from '../../js/ui/components/modal.js';
+import { createModal } from '../../js/ui/components/modal.js';
 import { seconds } from '../../js/lib/helpers.js';
 import { IS_IDE } from '../../js/constants.js';
 import Terra from '../../js/terra.js';
@@ -715,29 +715,18 @@ export default class EditHistoryPlugin extends TerraPlugin {
     const { index, history } = overlay;
     if (index >= history.revs.length - 1) return;
 
-    const $modal = createModal({
+    createModal({
       title: 'Revert to this revision?',
       body: `
         <p>The editor will be restored to revision ${index + 1}.
         Your current content stays in the history, so nothing is lost.</p>
       `,
-      footer: `
-        <button type="button" class="button cancel-btn">Cancel</button>
-        <button type="button" class="button primary-btn danger-btn">Revert</button>
-      `,
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Revert',
+      danger: true,
+      onConfirm: () => this._revert(),
       attrs: { id: 'edit-history-revert-modal', class: 'modal-width-small' },
     });
-
-    $modal.find('.cancel-btn').click(() => {
-      hideModal($modal);
-    });
-
-    $modal.find('.primary-btn').click(async () => {
-      hideModal($modal);
-      await this._revert();
-    });
-
-    showModal($modal);
   }
 
   /**

@@ -1,6 +1,6 @@
 import { getPlugin, TerraPlugin } from '../../js/lib/plugin-manager.js';
 import { seconds, getPartsFromPath } from '../../js/lib/helpers.js';
-import { createModal, hideModal, showModal } from '../../js/ui/components/modal.js';
+import { createModal } from '../../js/ui/components/modal.js';
 import Terra from '../../js/terra.js';
 
 const BASE_URL = 'https://checkz.proglab.nl'
@@ -102,50 +102,46 @@ export default class Check50Plugin extends TerraPlugin {
         `
       }
 
-      const $modal = createModal({
+      const dialog = createModal({
         title: 'Check50 information required',
         body,
-        footer: `
-          <button type="button" class="button cancel-btn">Cancel</button>
-          <button type="button" class="button primary-btn">Run Check50</button>
-        `,
+        cancelLabel: 'Cancel',
+        confirmLabel: 'Run Check50',
         attrs: {
-          id: 'terra-plugin-run-check50-modal',
           class: 'modal-width-small',
-        }
-      });
-
-      showModal($modal);
-
-      $modal.find('.cancel-btn').click(() => hideModal($modal));
-      $modal.find('.primary-btn').click(async () => {
-        if ($modal.find('.password').length > 0) {
-          const password = $modal.find('.password').val().trim();
-          if (password) {
-            hasPassword = true;
-            this.setState('password', password);
-          } else {
-            hasPassword = false;
+        },
+        onConfirm: async () => {
+          const passwordInput = dialog.querySelector('.password');
+          if (passwordInput) {
+            const password = passwordInput.value.trim();
+            if (password) {
+              hasPassword = true;
+              this.setState('password', password);
+            } else {
+              hasPassword = false;
+            }
           }
-        }
 
-        if ($modal.find('.slug').length > 0) {
-          const slug = $modal.find('.slug').val().trim();
-          if (slug) {
-            hasSlug = true;
-            this.setState('fileslugs', {
-              ...this.getState('fileslugs'),
-              [filepath]: slug
-            });
-          } else {
-            hasSlug = false;
+          const slugInput = dialog.querySelector('.slug');
+          if (slugInput) {
+            const slug = slugInput.value.trim();
+            if (slug) {
+              hasSlug = true;
+              this.setState('fileslugs', {
+                ...this.getState('fileslugs'),
+                [filepath]: slug
+              });
+            } else {
+              hasSlug = false;
+            }
           }
-        }
 
-        if (hasPassword && hasSlug) {
-          await this.runCheck50();
-          hideModal($modal);
-        }
+          if (hasPassword && hasSlug) {
+            await this.runCheck50();
+          } else {
+            return false;
+          }
+        },
       });
     } else {
       await this.runCheck50();

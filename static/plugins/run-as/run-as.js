@@ -1,5 +1,5 @@
 import { TerraPlugin } from '../../js/lib/plugin-manager.js';
-import { createModal, hideModal, showModal } from '../../js/ui/components/modal.js';
+import { createModal } from '../../js/ui/components/modal.js';
 import Terra from '../../js/terra.js';
 
 export default class RunAsPlugin extends TerraPlugin {
@@ -7,9 +7,9 @@ export default class RunAsPlugin extends TerraPlugin {
 
   /**
    * Reference to the file args button element.
-   * @type {jQuery.Element}
+   * @type {HTMLElement|null}
    */
-  $button = jQuery.noop();
+  button = null;
 
   defaultState = {
     compileTarget: null,
@@ -18,7 +18,9 @@ export default class RunAsPlugin extends TerraPlugin {
   }
 
   onLayoutLoaded = () => {
-    this.$button = this.createTermButtonLeft({
+    // createTermButtonLeft returns a jQuery-wrapped element (shared plugin
+    // infra); unwrap it once so the rest of the plugin stays plain DOM.
+    this.button = this.createTermButtonLeft({
       text: `Run as`,
       id: 'run-as-btn',
       class: '',
@@ -29,45 +31,45 @@ export default class RunAsPlugin extends TerraPlugin {
           return editor?.proglang === 'c'
         }
       },
-    });
+    })[0];
   }
 
-  updateCmdPreview = ($modal, activeTabName, defaultTarget) => {
-    const args = $modal.find('#file-args-input').val().trim();
-    const srcFiles = $modal.find('#compile-src-files-input').val().trim() || activeTabName;
-    const target = $modal.find('#compile-target-input').val().replace(/^\.\//, '').trim() || defaultTarget;
+  updateCmdPreview = (modalEl, activeTabName, defaultTarget) => {
+    const args = modalEl.querySelector('#file-args-input').value.trim();
+    const srcFiles = modalEl.querySelector('#compile-src-files-input').value.trim() || activeTabName;
+    const target = modalEl.querySelector('#compile-target-input').value.replace(/^\.\//, '').trim() || defaultTarget;
 
-    $modal.find('.code-block').html(`
+    modalEl.querySelector('.code-block').innerHTML = `
       <div class="line cmd">make ${target}</div>
       <div class="line">clang -ggdb3 -O0 -std=c11 -Wall -Werror -o ${target} ${srcFiles} -lcs50 -lm</div>
       <div class="line cmd">./${target} ${args}</div>
-    `);
+    `;
   }
 
-  validateInputFields = ($modal) => {
+  validateInputFields = (modalEl) => {
     const whitelistedKeys = [
       'Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
       'Delete', 'Home', 'End'
     ];
 
-    $modal.find('#file-args-input').keydown((event) => {
+    modalEl.querySelector('#file-args-input').addEventListener('keydown', (event) => {
       if (whitelistedKeys.includes(event.code)) return true;
       if (!/^[a-zA-Z0-9_"'=./ -]$/.test(event.key)) return false;
     });
 
-    $modal.find('#compile-src-files-input').keydown((event) => {
+    modalEl.querySelector('#compile-src-files-input').addEventListener('keydown', (event) => {
       if (whitelistedKeys.includes(event.code)) return true;
       if (!/^[a-zA-Z0-9_./ -]$/.test(event.key)) return false;
     });
 
-    $modal.find('#compile-target-input').keydown((event) => {
+    modalEl.querySelector('#compile-target-input').addEventListener('keydown', (event) => {
       if (whitelistedKeys.includes(event.code)) return true;
       if (!/^[a-zA-Z0-9_./-]$/.test(event.key)) return false;
     });
   }
 
   onButtonClick = () => {
-    if (this.$button.is(':disabled')) return;
+    if (this.button.disabled) return;
 
     const editorComponent = Terra.app.view.getActiveEditor();
     if (!editorComponent || editorComponent.proglang !== 'c') return;
@@ -79,7 +81,7 @@ export default class RunAsPlugin extends TerraPlugin {
     const currentCompileSrcFiles = this.getState('compileSrcFilenames') || '';
     const currentCompileTarget = this.getState('compileTarget') || '';
 
-    const $modal = createModal({
+    const modalEl = createModal({
       title: 'Run as...',
       body: `
         <div class="form-wrapper-full-width">
@@ -105,36 +107,30 @@ export default class RunAsPlugin extends TerraPlugin {
           <div class="code-block"></div>
         </div>
       `,
-      footer: `
-        <button type="button" class="button cancel-btn">Cancel</button>
-        <button type="button" class="button primary-btn run-btn">Run</button>
-      `,
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Run',
       attrs: {
-        id: 'terra-plugin-file-args-modal',
         class: 'modal-width-medium',
-      }
+      },
+      onConfirm: () => {
+        const args = modalEl.querySelector('#file-args-input').value.trim();
+        const srcFiles = modalEl.querySelector('#compile-src-files-input').value.trim() || null;
+        const target = modalEl.querySelector('#compile-target-input').value.replace(/^\.\//, '').trim() || null;
+
+        this.setState('compileSrcFilenames', srcFiles);
+        this.setState('compileTarget', target);
+        this.setState('args', args);
+
+        Terra.app.runActiveTab({ runAs: true });
+      },
     });
 
-    showModal($modal);
-
-    this.validateInputFields($modal);
+    this.validateInputFields(modalEl);
 
     // Update the preview when the user types in any the input fields.
-    this.updateCmdPreview($modal, activeTabPath, defaultTarget);
-    $modal.find('input').keyup(() => this.updateCmdPreview($modal, activeTabPath, defaultTarget))
-
-    $modal.find('.cancel-btn').click(() => hideModal($modal));
-    $modal.find('.run-btn').click(() => {
-      const args = $modal.find('#file-args-input').val().trim();
-      const srcFiles = $modal.find('#compile-src-files-input').val().trim() || null;
-      const target = $modal.find('#compile-target-input').val().replace(/^\.\//, '').trim() || null;
-
-      this.setState('compileSrcFilenames', srcFiles);
-      this.setState('compileTarget', target);
-      this.setState('args', args);
-
-      hideModal($modal);
-      Terra.app.runCode({ runAs: true });
+    this.updateCmdPreview(modalEl, activeTabPath, defaultTarget);
+    modalEl.querySelectorAll('input').forEach((input) => {
+      input.addEventListener('keyup', () => this.updateCmdPreview(modalEl, activeTabPath, defaultTarget));
     });
   }
 }

@@ -5,7 +5,7 @@ import {
   removeLocalStorageItem,
 } from '../../lib/local-storage-manager.js';
 import { triggerPluginEvent } from '../../lib/plugin-manager.js';
-import { createModal, hideModal, showModal } from '../../ui/components/modal.js';
+import { createModal } from '../../ui/components/modal.js';
 import { GITHUB_URL_PATTERN } from '../../constants.js';
 import GitFS from '../../fs/git.js';
 
@@ -187,7 +187,7 @@ export function useGit(app) {
         .filter((url) => url.trim() !== '');
       const connectRepoHistoryHtml = connectRepoHistory.map((url) => `<option value="${url}"></option>`);
 
-      const $connectModal = createModal({
+      const connectModal = createModal({
         title: 'Connect GitHub repository',
         body: `
           <div class="form-wrapper-full-width">
@@ -214,61 +214,55 @@ export function useGit(app) {
         `,
         footer: `
           <button type="button" class="button cancel-btn">Cancel</button>
-          <button type="button" class="button primary-btn connect-btn" ${hasEmptyFields ? 'disabled' : ''}>Connect</button>
+          <button type="button" class="button primary-btn confirm-btn connect-btn" ${hasEmptyFields ? 'disabled' : ''}>Connect</button>
         `,
         attrs: {
-          id: 'ide-connect-repo-modal',
           class: 'modal-width-small',
-        }
-      });
+        },
+        focus: { selector: '.repo-link' },
+        onConfirm: () => {
+          // For now, we only allow GitHub-HTTPS repo links.
+          const newRepoLink = connectModal.querySelector('.repo-link').value.trim();
+          if (newRepoLink && !GITHUB_URL_PATTERN.test(newRepoLink)) {
+            alert('Invalid GitHub repository');
+            return false;
+          }
 
-      showModal($connectModal).then(() => {
-        $('#ide-connect-repo-modal .repo-link').focus();
+          const newAccessToken = connectModal.querySelector('.git-access-token').value;
+
+          console.log('Connecting to repository:', newRepoLink);
+
+          // Update connect repo history by prepending the new repo link.
+          if (connectRepoHistory.includes(newRepoLink)) {
+            connectRepoHistory.splice(connectRepoHistory.indexOf(newRepoLink), 1);
+          }
+          connectRepoHistory.unshift(newRepoLink);
+          connectRepoHistory = connectRepoHistory.slice(0, 10); // Only last 10 entries.
+          setLocalStorageItem('connect-repo-history', connectRepoHistory.join(','));
+
+          // Remove previously selected branch such that the clone will use the
+          // default branch for the new repo.
+          removeLocalStorageItem('git-branch');
+
+          setLocalStorageItem('git-access-token', newAccessToken);
+          setLocalStorageItem('git-repo', newRepoLink);
+          this.openGitFS();
+        },
       });
 
       // Disable the connect button when any of the text fields are empty.
       // The 'input' event listener is needed if a user clicks on a datalist item.
-      $connectModal.find('.text-input').on('keyup input', () => {
-        const hasEmptyFields = $connectModal.find('.text-input').toArray().some(input => !$(input).val().trim());
-        const $connectBtn = $connectModal.find('.connect-btn');
+      const textInputs = connectModal.querySelectorAll('.text-input');
+      const onTextInputChange = () => {
+        const hasEmptyFields = Array.from(textInputs).some((input) => !input.value.trim());
+        const connectBtn = connectModal.querySelector('.connect-btn');
 
-        const newRepoLink = $connectModal.find('.repo-link').val().trim();
-        if (hasEmptyFields || !GITHUB_URL_PATTERN.test(newRepoLink)) {
-          $connectBtn.attr('disabled', 'disabled');
-        } else {
-          $connectBtn.removeAttr('disabled');
-        }
-      });
-
-      $connectModal.find('.cancel-btn').click(() => hideModal($connectModal));
-      $connectModal.find('.connect-btn').click(() => {
-        // For now, we only allow GitHub-HTTPS repo links.
-        const newRepoLink = $connectModal.find('.repo-link').val().trim();
-        if (newRepoLink && !GITHUB_URL_PATTERN.test(newRepoLink)) {
-          alert('Invalid GitHub repository');
-          return;
-        }
-
-        const newAccessToken = $connectModal.find('.git-access-token').val();
-
-        hideModal($connectModal);
-        console.log('Connecting to repository:', newRepoLink);
-
-        // Update connect repo history by prepending the new repo link.
-        if (connectRepoHistory.includes(newRepoLink)) {
-          connectRepoHistory.splice(connectRepoHistory.indexOf(newRepoLink), 1);
-        }
-        connectRepoHistory.unshift(newRepoLink);
-        connectRepoHistory = connectRepoHistory.slice(0, 10); // Only last 10 entries.
-        setLocalStorageItem('connect-repo-history', connectRepoHistory.join(','));
-
-        // Remove previously selected branch such that the clone will use the
-        // default branch for the new repo.
-        removeLocalStorageItem('git-branch');
-
-        setLocalStorageItem('git-access-token', newAccessToken);
-        setLocalStorageItem('git-repo', newRepoLink);
-        this.openGitFS();
+        const newRepoLink = connectModal.querySelector('.repo-link').value.trim();
+        connectBtn.disabled = hasEmptyFields || !GITHUB_URL_PATTERN.test(newRepoLink);
+      };
+      textInputs.forEach((input) => {
+        input.addEventListener('keyup', onTextInputChange);
+        input.addEventListener('input', onTextInputChange);
       });
     },
   });

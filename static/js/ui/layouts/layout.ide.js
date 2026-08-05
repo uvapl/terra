@@ -1,6 +1,6 @@
 import FlexibleLayout from './layout.flexible.js';
 import { BASE_FONT_SIZE, MAX_FILE_SIZE } from '../../constants.js';
-import { createModal, hideModal, showModal } from '../components/modal.js';
+import { createModal } from '../components/modal.js';
 import { createTooltip, destroyTooltip } from '../components/tooltip.js';
 
 export default class IDELayout extends FlexibleLayout {
@@ -126,19 +126,14 @@ export default class IDELayout extends FlexibleLayout {
         // Prevent the event from happening.
         event.preventDefault();
 
-        const $modal = createModal({
+        createModal({
           title: 'Maximum file size reached',
           body: 'This file reached the maximum file size of 1MB.',
-          footer: ' <button type="button" class="button primary-btn confirm-btn">Go back</button>',
-          footerClass: 'flex-end',
+          confirmLabel: 'Go back',
           attrs: {
-            id: 'ide-exceeded-file-size-modal',
             class: 'modal-width-small',
           }
         });
-
-        showModal($modal);
-        $modal.find('.confirm-btn').click(() => hideModal($modal));
       }
     }
   }
@@ -172,14 +167,14 @@ export default class IDELayout extends FlexibleLayout {
   showSaveFileModal({ filename, folders, onSave }) {
     const folderOptions = this._createFolderOptionsHtml(folders);
 
-    const $modal = createModal({
+    const dialog = createModal({
       title: 'Save file',
       body: `
       <div class="form-grid">
         <div class="form-wrapper">
           <label>Enter a filename:</label>
           <div class="right-container">
-            <input class="text-input" placeholder="Enter a filename" value="${filename}" maxlength="30" />
+            <input class="text-input" placeholder="Enter a filename" value="${filename}" maxlength="30" autofocus>
           </div>
         </div>
         <div class="form-wrapper">
@@ -193,48 +188,40 @@ export default class IDELayout extends FlexibleLayout {
         </div>
       </div>
       `,
-      footer: `
-        <button type="button" class="button cancel-btn">Cancel</button>
-        <button type="button" class="button confirm-btn primary-btn">Save</button>
-      `,
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Save',
       attrs: {
-        id: 'ide-save-file-modal',
         class: 'modal-width-small'
-      }
-    });
+      },
+      focus: { selector: '.text-input', select: true },
+      onCancel: () => {
+        destroyTooltip('saveFile');
+      },
+      onConfirm: async () => {
+        const newFilename = dialog.querySelector('.text-input').value;
 
-    showModal($modal);
-    $modal.find('.text-input').focus().select();
+        let parentPath = dialog.querySelector('.select').value;
+        if (parentPath === 'root') {
+          parentPath = '';
+        }
 
-    $modal.find('.cancel-btn').click(() => {
-      destroyTooltip('saveFile');
-      hideModal($modal);
-    });
+        const errorMsg = await onSave(newFilename, parentPath);
 
-    $modal.find('.primary-btn').click(async () => {
-      const newFilename = $modal.find('.text-input').val();
+        if (errorMsg) {
+          const anchor = dialog.querySelector('input').parentElement;
+          createTooltip('saveFile', anchor, errorMsg, {
+            placement: 'top',
+            theme: 'error',
+          });
+          const input = dialog.querySelector('input');
+          input.focus();
+          input.select();
+          return false;
+        }
 
-      let parentPath = $modal.find('.select').val();
-      if (parentPath === 'root') {
-        parentPath = '';
-      }
-
-      const errorMsg = await onSave(newFilename, parentPath);
-
-      if (errorMsg) {
-        const anchor = $modal.find('input').parent()[0];
-        createTooltip('saveFile', anchor, errorMsg, {
-          placement: 'top',
-          theme: 'error',
-        });
-        $modal.find('input').focus().select();
-        return;
-      }
-
-      // Remove the tooltip if it exists.
-      destroyTooltip('saveFile');
-
-      hideModal($modal);
+        // Remove the tooltip if it exists.
+        destroyTooltip('saveFile');
+      },
     });
   }
 

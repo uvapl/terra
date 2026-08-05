@@ -38,9 +38,6 @@ export const AUTOSAVE_INTERVAL = 60 * 1000;
  */
 export const AUTOSAVE_START_OFFSET = 60 * 1000;
 
-// The modal's animation duration in milliseconds.
-export const MODAL_ANIM_DURATION = 300;
-
 // The maximum file size in bytes allowed for files.
 export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 

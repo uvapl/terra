@@ -1,4 +1,4 @@
-import { createModal, hideModal, showModal } from '../ui/components/modal.js';
+import { createModal } from '../ui/components/modal.js';
 import Terra from '../terra.js';
 import {
   setLocalStorageItem,
@@ -246,7 +246,7 @@ export default class GitFS {
         const retryAfter = Math.ceil(payload.retryAfter / 60);
         Terra.app.fileTree.showMessage('Exceeded GitHub API limit.', { error: true });
 
-        const $modal = createModal({
+        createModal({
           title: 'Exceeded GitHub API limit',
           body: `
             <p>
@@ -254,19 +254,11 @@ export default class GitFS {
               Please try again after ${retryAfter} minutes.
             </p>
           `,
-          footer: `
-            <button type="button" class="button primary-btn">Got it</button>
-          `,
-          footerClass: 'flex-end',
+          confirmLabel: 'Got it',
           attrs: {
-            id: 'ide-git-exceeded-quota-modal',
             class: 'modal-width-small',
           }
         });
-
-        showModal($modal);
-
-        $modal.find('.primary-btn').click(() => hideModal($modal));
         break;
       }
 
