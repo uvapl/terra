@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "checkJs": true,
+    "allowJs": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "noEmit": true,
+    "typeRoots": ["/Users/martijn/.local/share/js-types/node_modules/@types"],
+    "types": ["jquery"]
+  },
+  "include": ["static/js/**/*.js", "static/plugins/**/*.js"],
+  "exclude": [
+    "static/js/vendor/**",
+    "static/wasm/**",
+    "node_modules"
+  ]
+}
