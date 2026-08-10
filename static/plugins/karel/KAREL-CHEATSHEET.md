@@ -7,12 +7,14 @@ required between two statements in a block, and none is allowed before the
 block's closing keyword (e.g. right before `END`). Newlines are insignificant
 whitespace and never substitute for `;`.
 
-**Exception:** an `ITERATE`/`WHILE`/`IF` whose relevant body is a single bare
-instruction (not a `BEGIN … END` block) is *never* followed by a `;` — not
-even when another statement comes right after it. The `;` belongs to
-instructions and blocks, not to the control-flow keyword wrapped around them.
-See the [Control flow](#control-flow) section. A definition is never followed
-by a `;` either, whatever its body — see
+This holds for every kind of statement: an `ITERATE`/`WHILE`/`IF` is one
+statement, so it takes a `;` after it when another statement follows, whether
+its body is a single instruction or a `BEGIN … END` block. The keywords that
+close a list — `END`, `ELSE`, `END-OF-EXECUTION` — never have a `;` in front
+of them.
+
+The items inside `BEGINNING-OF-PROGRAM` are separated by `;` the same way, so
+every definition is followed by one — see
 [Defining new instructions](#defining-new-instructions).
 
 ---
@@ -118,13 +120,13 @@ BEGINNING-OF-PROGRAM
       turnleft;
       turnleft;
       turnleft
-    END
+    END;
 
   DEFINE-NEW-INSTRUCTION turnaround AS
     BEGIN
       turnleft;
       turnleft
-    END
+    END;
 
   BEGINNING-OF-EXECUTION
     turnright;
@@ -142,17 +144,19 @@ A definition can call primitives or other user instructions:
     BEGIN
       pickbeeper;
       move
-    END
+    END;
 ```
 
-> Note: a definition is never followed by a `;`, whatever its body — not
-> between two definitions, and not before `BEGINNING-OF-EXECUTION`. The `;`
-> inside the block still separates the statements in it, as usual. A body
-> that is a single bare instruction works the same way:
+> Note: the items inside `BEGINNING-OF-PROGRAM` — the definitions and the
+> `BEGINNING-OF-EXECUTION … END-OF-EXECUTION` block — are separated by `;` too.
+> The execution block is always the last item, so in practice every definition
+> is followed by one. The `;` inside a definition's block still separates the
+> statements in it, as usual, and the statement right before `END` has none. A
+> body that is a single bare instruction is separated the same way:
 >
 > ```karel
-> DEFINE-NEW-INSTRUCTION turnaround-once AS turnleft
-> DEFINE-NEW-INSTRUCTION turnaround-twice AS turnleft
+> DEFINE-NEW-INSTRUCTION turnaround-once AS turnleft;
+> DEFINE-NEW-INSTRUCTION turnaround-twice AS turnleft;
 > ```
 
 ---
@@ -180,11 +184,11 @@ END-OF-PROGRAM
 
 ## Control flow
 
-> When an `ITERATE`/`WHILE`/`IF` body is a single bare instruction (not a
-> `BEGIN … END` block), the whole loop/if statement is never followed by a
-> `;` — even if another statement comes right after it. A block body still
-> needs the normal `;` separator when something follows it (see the "block
-> body" examples below).
+> An `ITERATE`/`WHILE`/`IF` is a single statement, so the normal `;` separator
+> applies to it: one after it when another statement follows, none when it is
+> the last statement in its list. The shape of its body makes no difference —
+> a bare instruction and a `BEGIN … END` block behave the same. The examples
+> below each show one statement on its own, so none of them ends in a `;`.
 
 ### `ITERATE n TIMES` — fixed repetition
 
@@ -270,7 +274,7 @@ spelling; you may *also* prefix any of them with `NOT` (which flips it again).
 
 ```karel
 { Positive and built-in negative spellings }
-IF front-is-clear THEN move
+IF front-is-clear THEN move;
 IF front-is-blocked THEN turnleft
 
 { Explicit NOT prefix — equivalent to the negative spelling }
@@ -314,7 +318,7 @@ BEGINNING-OF-PROGRAM
       turnleft;
       turnleft;
       turnleft
-    END
+    END;
 
   BEGINNING-OF-EXECUTION
 
@@ -325,13 +329,13 @@ BEGINNING-OF-PROGRAM
     WHILE front-is-clear DO
       BEGIN
         IF next-to-a-beeper THEN
-          pickbeeper
+          pickbeeper;
         move
       END;
 
     { Grab a beeper on the final corner too }
     IF next-to-a-beeper THEN
-      pickbeeper
+      pickbeeper;
 
     turnoff
 
@@ -347,13 +351,13 @@ END-OF-PROGRAM
 ```
 program     := [ "WORLD" string ] [ "SPEED" speed ]   { either order, optional }
                "BEGINNING-OF-PROGRAM"
-                 { definition }
-                 "BEGINNING-OF-EXECUTION"
-                   statements
-                 "END-OF-EXECUTION"
+                 { definition ";" }
+                 execution
                "END-OF-PROGRAM"
 
-definition  := ("DEFINE" | "DEFINE-NEW-INSTRUCTION") name "AS" statement
+execution   := "BEGINNING-OF-EXECUTION" statements "END-OF-EXECUTION"
+definition  := "DEFINE-NEW-INSTRUCTION" name "AS" statement
+statements  := statement { ";" statement }
 statement   := block | iterate | while | if | call
 block       := "BEGIN" statements "END"
 iterate     := "ITERATE" number "TIMES" statement

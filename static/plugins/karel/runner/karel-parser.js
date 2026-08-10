@@ -2,9 +2,10 @@
 //
 // Grammar (case-insensitive keywords):
 //   program     := [ "WORLD" string ] "BEGINNING-OF-PROGRAM"
-//                    { definition } "BEGINNING-OF-EXECUTION"
-//                    statements "END-OF-EXECUTION" "END-OF-PROGRAM"
+//                    { definition ";" } execution "END-OF-PROGRAM"
+//   execution   := "BEGINNING-OF-EXECUTION" statements "END-OF-EXECUTION"
 //   definition  := "DEFINE-NEW-INSTRUCTION" name "AS" statement
+//   statements  := statement { ";" statement }
 //   statement   := block | iterate | while | if | call
 //   block       := "BEGIN" statements "END"
 //   iterate     := "ITERATE" number "TIMES" statement
@@ -13,18 +14,18 @@
 //   call        := word                         (primitive or user instruction)
 //   test        := [ "NOT" ] testword
 //
-// ';' is a strict statement separator: exactly one is required between two
-// statements in a block, and none is allowed before the block's closing
-// keyword (e.g. a trailing ';' right before END is a syntax error). Newlines
-// are insignificant whitespace throughout and never substitute for ';'.
+// ';' is a strict statement separator, with no exceptions for how a statement
+// is built: exactly one is required between two statements in a list, and none
+// is allowed before the keyword that closes the list (END, ELSE,
+// END-OF-EXECUTION). So an ITERATE/WHILE/IF takes a ';' after it when another
+// statement follows, whether its branch is a bare instruction or a
+// BEGIN...END block. Newlines are insignificant whitespace throughout and
+// never substitute for ';'.
 //
-// Exception: an ITERATE/WHILE/IF whose relevant branch is a single bare
-// instruction (not a BEGIN...END block) is never followed by a ';', even when
-// another statement follows it — the ';' belongs to instructions and blocks,
-// not to the control-flow wrapper around them.
-//
-// A definition is never followed by a ';' either, whatever its body, since
-// definitions are not a statement list.
+// The items inside BEGINNING-OF-PROGRAM — the definitions and the execution
+// block — are separated by ';' the same way. The ';' is not part of a
+// definition; it just happens to follow every one of them, because the
+// execution block is always the last item.
 
 import { TokenType, KarelSyntaxError } from './karel-lexer.js';
 
@@ -65,24 +66,6 @@ export const PRIMITIVES = new Set(['move', 'turnleft', 'pickbeeper', 'putbeeper'
 function spanLength(startToken, endToken) {
   if (startToken.line !== endToken.line) return startToken.value.length;
   return (endToken.column + endToken.value.length) - startToken.column;
-}
-
-/**
- * Whether `stmt`, as an item in a statement list, is never followed by a
- * ';' — true only for ITERATE/WHILE/IF whose relevant branch is a bare
- * instruction rather than a BEGIN...END block. A plain top-level 'call' or
- * 'block' statement still follows the normal separator rule.
- *
- * `stmt.isBare` (set when each node is built — see parseIterate/parseWhile/
- * parseIf/parseStatement) already answers "does this statement's tail
- * resolve to a bare instruction", computed for free during parsing instead
- * of by re-walking the finished tree. A bare 'call' node is `isBare: true`
- * too, since it's a valid bare tail *inside* a wrapper — but a 'call'
- * sitting directly in the list is not itself a wrapper, so it's excluded
- * here.
- */
-function takesNoSeparator(stmt) {
-  return stmt.isBare && stmt.type !== 'call';
 }
 
 export function parse(tokens) {
@@ -157,12 +140,15 @@ class Parser {
     while (this.isWord('define-new-instruction')) {
       const def = this.parseDefinition();
       definitions[def.name] = def.body;
-      // Only here so a stray ';' names its own cause, rather than falling
-      // through to "expected BEGINNING-OF-EXECUTION but found ';'".
-      if (this.peek().type === TokenType.SEMICOLON) {
-        const t = this.peek();
-        throw new KarelSyntaxError(`Unexpected ';' after a definition on line ${t.line}.`, t.line);
+      // The ';' separating this definition from the next item, which is either
+      // another definition or the execution block — so there is always one.
+      // Reported against the line the definition ended on, not the line of
+      // whatever follows it, so the marker lands where the ';' is missing.
+      if (this.peek().type !== TokenType.SEMICOLON) {
+        const line = this.tokens[this.pos - 1].line;
+        throw new KarelSyntaxError(`Expected ';' after the end of definition '${def.spelling}' on line ${line}.`, line);
       }
+      this.next();
     }
 
     this.expectWord('beginning-of-execution');
@@ -181,32 +167,26 @@ class Parser {
     }
     this.expectWord('as');
     const body = this.parseStatement();
-    return { name: nameToken.value.toLowerCase(), body };
+    // `spelling` keeps the name as written, for error messages; lookups use
+    // the lowercased `name` since the language is case-insensitive.
+    return { name: nameToken.value.toLowerCase(), spelling: nameToken.value, body };
   }
 
   /**
    * Parse a ';'-separated list until a terminator keyword or EOF. ';' is a
    * separator, not a terminator: exactly one is required between statements,
-   * and none is allowed before the closing keyword. A statement covered by
-   * `takesNoSeparator` never takes a ';' at all, even mid-list.
+   * and none is allowed before the closing keyword. This holds for every kind
+   * of statement, control flow included.
    */
   parseStatements() {
     const list = [];
     while (this.peek().type !== TokenType.EOF && !TERMINATORS.has(this.word())) {
-      const stmt = this.parseStatement();
-      list.push(stmt);
+      list.push(this.parseStatement());
       if (this.peek().type === TokenType.EOF || TERMINATORS.has(this.word())) break;
 
-      if (takesNoSeparator(stmt)) {
-        if (this.peek().type === TokenType.SEMICOLON) {
-          const t = this.peek();
-          throw new KarelSyntaxError(`Unexpected ';' after a single-instruction ITERATE/WHILE/IF on line ${t.line}.`, t.line);
-        }
-      } else {
-        const semicolon = this.expectSemicolon();
-        if (this.peek().type === TokenType.EOF || TERMINATORS.has(this.word())) {
-          throw new KarelSyntaxError(`Unexpected ';' before the end of a block on line ${semicolon.line}.`, semicolon.line);
-        }
+      const semicolon = this.expectSemicolon();
+      if (this.peek().type === TokenType.EOF || TERMINATORS.has(this.word())) {
+        throw new KarelSyntaxError(`Unexpected ';' before the end of a block on line ${semicolon.line}.`, semicolon.line);
       }
     }
     return { type: 'block', body: list };
@@ -231,7 +211,6 @@ class Parser {
       line: t.line,
       column: t.column,
       length: t.value.length,
-      isBare: true, // a bare word is always a valid bare tail inside a wrapper
     };
   }
 
@@ -239,7 +218,7 @@ class Parser {
     this.expectWord('begin');
     const block = this.parseStatements();
     this.expectWord('end');
-    return block; // 'block' nodes have no isBare — falsy is correct, they're never bare
+    return block;
   }
 
   parseIterate() {
@@ -256,7 +235,6 @@ class Parser {
       type: 'iterate',
       count: countToken.value,
       body,
-      isBare: !!body.isBare,
       line: iterateToken.line,
       column: iterateToken.column,
       length: spanLength(iterateToken, timesToken),
@@ -274,7 +252,6 @@ class Parser {
       type: 'while',
       test,
       body,
-      isBare: !!body.isBare,
       line: whileToken.line,
       column: whileToken.column,
       length: spanLength(whileToken, doToken),
@@ -290,8 +267,7 @@ class Parser {
     if (this.matchWord('else')) {
       elseBranch = this.parseStatement();
     }
-    const tail = elseBranch ?? thenBranch;
-    return { type: 'if', test, then: thenBranch, else: elseBranch, isBare: !!tail.isBare };
+    return { type: 'if', test, then: thenBranch, else: elseBranch };
   }
 
   parseTest() {
