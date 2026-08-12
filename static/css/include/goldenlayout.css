@@ -300,3 +300,31 @@
 .dark-mode .ace_searchbtn.next:after {
   border-color: var(--dark-mode-fg);
 }
+
+/* Hide the stack-level close button (stacks needs to be closable by other
+   means, so we do not mark stacks `header.close: false`) */
+.lm_header .lm_close {
+  display: none;
+}
+
+/* Replace the close cross mark by a unicode character and position it as
+   best we can */
+.lm_header .lm_tab .lm_close_tab {
+  background-image: none;
+
+  align-self: center;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 18px;
+  line-height: 1;
+  color: currentColor;
+  border-radius: 2px;
+}
+
+.lm_header .lm_tab .lm_close_tab::before {
+  content: '\00d7';
+}

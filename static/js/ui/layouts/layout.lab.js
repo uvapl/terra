@@ -1,4 +1,5 @@
 import Layout from './layout.js';
+import { createTabConfig } from './tab-config.js';
 
 export default class LabLayout extends Layout {
   tabsClosable = false;
@@ -18,48 +19,34 @@ export default class LabLayout extends Layout {
     // Create the content objects that represent each tab in the editor. The
     // file contents are not embedded: each editor loads them from the VFS
     // when it is shown.
-    const content = files.map((filename) => ({
-      type: 'component',
-      componentName: 'editor',
-      componentState: {
-        fontSize,
-        path: filename,
-      },
+    const content = files.map((filename) => createTabConfig({
       title: filename,
       isClosable: false,
-    }));
+      componentState: { path: filename },
+    }, { fontSize }));
 
     // A lab without files (e.g. the minimal `lab50: true` form) still needs
     // at least one tab in the editor stack.
     if (content.length === 0) {
-      content.push({
-        type: 'component',
-        componentName: 'editor',
-        componentState: { fontSize },
-        title: 'Untitled',
-        isClosable: false,
-      });
+      content.push(createTabConfig({ isClosable: false }, { fontSize }));
     }
 
     const defaultLayoutConfig = {
       settings: {
-        showPopoutIcon: false,
-        showMaximiseIcon: false,
-        showCloseIcon: false,
         reorderEnabled: false,
       },
-      content: [
-        {
-          // Root type (column/row) is stamped by the base Layout from the
-          // resolved orientation (Lab defaults to vertical).
-          content: [
-            { content },
-            {
-              componentState: { fontSize },
-            }
-          ]
-        }
-      ]
+      header: {
+        popout: false,
+        maximise: false,
+      },
+      root: {
+        content: [
+          { content },
+          {
+            componentState: { fontSize },
+          }
+        ]
+      }
     };
 
     super(defaultLayoutConfig, options);

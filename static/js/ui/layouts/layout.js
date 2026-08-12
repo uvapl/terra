@@ -9,7 +9,18 @@ import ImageTab from '../components/image.tab.js';
 import EditorTab from '../components/editor.tab.js';
 import TerminalTab from '../components/terminal.tab.js';
 import CanvasTab from '../components/canvas.tab.js';
-import { applyDragConstraints } from './drag-constraints.js';
+import { constrainDrops } from './drag-constraints.js';
+import {
+  componentTypeOf,
+  createTabConfig,
+  isEditorItem,
+  isOutputItem,
+} from './tab-config.js';
+import {
+  GoldenLayout,
+  ItemConfig,
+  LayoutConfig,
+} from '../../../vendor/golden-layout/2.6.0/golden-layout.esm.js';
 
 /**
  * Default layout config that is used when the layout is created for the first
@@ -18,46 +29,48 @@ import { applyDragConstraints } from './drag-constraints.js';
  */
 const DEFAULT_LAYOUT_CONFIG = {
   settings: {
-    showPopoutIcon: false,
-    showMaximiseIcon: false,
-    showCloseIcon: false,
     reorderEnabled: false,
+  },
+  // The stack close button is hidden in CSS rather than disabled here:
+  // `header.close: false` also makes GoldenLayout treat every stack as
+  // non-closable, which blocks dragging a tab out of a single-tab stack.
+  header: {
+    popout: false,
+    maximise: false,
   },
   dimensions: {
     headerHeight: 30,
     borderWidth: 10,
   },
-  content: [
-    {
-      type: 'row',
-      isClosable: false,
-      content: [
-        {
-          // Starts non-closable as the sole editor stack; closability is then
-          // managed at runtime by _syncEditorStacksClosable() — false while a
-          // single stack (so the editor area can't collapse), true once split
-          // (so an emptied split-off stack is auto-removed, merging back).
-          type: 'stack',
-          id: 'editorStack',
-          isClosable: false,
-        },
-        {
-          type: 'stack',
-          id: 'outputStack',
-          isClosable: false,
-          content: [
-            {
-              type: 'component',
-              componentName: 'terminal',
-              title: 'Terminal',
-              componentState: { fontSize: BASE_FONT_SIZE },
-              isClosable: false,
-            }
-          ]
-        }
-      ]
-    }
-  ]
+  root: {
+    type: 'row',
+    isClosable: false,
+    content: [
+      {
+        // Closable, for two GoldenLayout 2 reasons: a stack that is configured
+        // non-closable and holds a single tab refuses to start a drag of that
+        // tab at all, and an *empty* stack cannot be dropped into (it never
+        // computes a drop index), so keeping an emptied stack alive strands the
+        // tab being dragged. Letting it self-remove instead means the editor
+        // area disappears while its last tab is in flight;
+        // ensureDropHome() puts a fresh stack back when the tab lands.
+        type: 'stack',
+        id: 'editorStack',
+        isClosable: true,
+      },
+      {
+        type: 'stack',
+        id: 'outputStack',
+        isClosable: false,
+        content: [
+          createTabConfig(
+            { kind: 'terminal', title: 'Terminal', isClosable: false },
+            { fontSize: BASE_FONT_SIZE },
+          ),
+        ]
+      }
+    ]
+  }
 };
 
 export default class Layout extends GoldenLayout {
@@ -123,20 +136,20 @@ export default class Layout extends GoldenLayout {
 
   /**
    * References to all open tabs in the UI.
-   * @type {GoldenLayout.Tab[]}
+   * @type {Tab[]}
    */
   tabs = [];
 
   /**
    * Reference to tab Stack element in the GoldenLayout hierarchy.
-   * @type {GoldenLayout.Stack}
+   * @type {Stack}
    */
   editorStack = null;
 
   /**
    * Reference to the Stack the terminal lives in, used to open output panes
    * (e.g. a canvas tab) next to the terminal.
-   * @type {GoldenLayout.Stack}
+   * @type {Stack}
    */
   outputStack = null;
 
@@ -187,24 +200,29 @@ export default class Layout extends GoldenLayout {
    * @param {string} [options.theme] - The persisted theme to apply on render.
    */
   constructor(additionalLayoutConfig, options = {}) {
+    const containerElement = document.getElementById('layout');
+    super(containerElement);
+
+    // Distinct from GoldenLayout's own (private) _containerElement.
+    this._terraContainer = containerElement;
+
     const orientation = Layout.resolveOrientation(options);
 
-    let layoutConfig;
     if (options.restoredConfig) {
-      layoutConfig = options.restoredConfig;
+      // A stored config is a ResolvedLayoutConfig (what saveLayout() emits);
+      // loadLayout() wants the unresolved form.
+      this._layoutConfig = LayoutConfig.fromResolved(options.restoredConfig);
     } else {
       // Clone the shared default before merging so the module constant is never
       // mutated, and stamp the root type from the resolved orientation so the
       // base owns the editor/output skeleton (variants no longer hand-roll it).
       const base = JSON.parse(JSON.stringify(DEFAULT_LAYOUT_CONFIG));
-      base.content[0].type = orientation === 'vertical' ? 'column' : 'row';
-      layoutConfig = mergeObjects(base, additionalLayoutConfig);
+      base.root.type = orientation === 'vertical' ? 'column' : 'row';
+      this._layoutConfig = mergeObjects(base, additionalLayoutConfig);
     }
 
-    super(layoutConfig, $('#layout'));
-
     if (Layout.constrainDrag) {
-      applyDragConstraints(GoldenLayout);
+      constrainDrops(this);
     }
 
     this._orientation = orientation;
@@ -215,18 +233,55 @@ export default class Layout extends GoldenLayout {
       this.hiddenFiles = options.hiddenFiles;
     }
 
-    this.on('initialised', () => this.onInitialised(options));
-    this.on('stackCreated', (stack) => this.onStackCreated(stack, options));
+    // 'layoutReady' is ours, not GoldenLayout's: v2 emits 'initialised' from
+    // init(), which runs *before* loadLayout() has built the tree, so it is too
+    // early for anything that touches components. render() emits this once the
+    // layout is actually populated.
+    this.on('layoutReady', () => this.onInitialised(options));
+
+    // v2 has no 'stackCreated'; stacks arrive as bubbling 'itemCreated' events.
+    this.on('itemCreated', (event) => {
+      if (event.target.isStack) this.onStackCreated(event.target, options);
+    });
     this.on('tabCreated', (tab) => this.onTabCreated(tab));
 
-    this.registerComponent('image', ImageTab);
-    this.registerComponent('editor', EditorTab);
-    this.registerComponent('canvas', CanvasTab);
-    this.registerComponent('terminal', TerminalTab);
+    this.registerComponentConstructor('image', ImageTab);
+    this.registerComponentConstructor('editor', EditorTab);
+    this.registerComponentConstructor('canvas', CanvasTab);
+    this.registerComponentConstructor('terminal', TerminalTab);
 
-    $(window).on('resize', () => {
-      this.updateSize(window.innerWidth, window.innerHeight);
-    });
+    // Let GoldenLayout's own ResizeObserver drive sizing from the container
+    // element (v2 defaults this off). The window 'resize' that refresh() fires
+    // is left to the other listeners (Ace, xterm) that depend on it.
+    this.resizeWithContainerAutomatically = true;
+  }
+
+  /**
+   * Build and show the layout: GoldenLayout's init() creates the ground item,
+   * loadLayout() populates it, and 'layoutReady' then tells everything that
+   * needs a populated tree to run.
+   *
+   * Named render() rather than init() because init() is GoldenLayout's own
+   * method.
+   */
+  render() {
+    // The GoldenLayout 2 constructor calls init() itself; it only defers to
+    // DOMContentLoaded when the document is still loading. Calling it a second
+    // time would build a second (empty) ground item, so only force it when the
+    // deferred path has not run yet.
+    if (!this.isInitialised) {
+      this.init();
+    }
+
+    // init() ran from the constructor, when the container had not been laid out
+    // yet (the lab and embed pages size it against a sibling). Re-measure now so
+    // the first paint is already correct instead of waiting for the container's
+    // ResizeObserver to correct a collapsed layout.
+    const { width, height } = this._terraContainer.getBoundingClientRect();
+    this.setSize(width, height);
+
+    this.loadLayout(this._layoutConfig);
+    this.emit('layoutReady');
   }
 
   /**
@@ -238,7 +293,7 @@ export default class Layout extends GoldenLayout {
    * @returns {string} 'horizontal' | 'vertical'.
    */
   static resolveOrientation(options) {
-    const restoredType = options.restoredConfig?.content?.[0]?.type;
+    const restoredType = options.restoredConfig?.root?.type;
     if (restoredType) {
       return restoredType === 'column' ? 'vertical' : 'horizontal';
     }
@@ -273,9 +328,6 @@ export default class Layout extends GoldenLayout {
 
   /** Hook: re-sync the output controls after a structural change. No-op in base. */
   _scheduleOutputControlsRefresh() {}
-
-  /** Hook: keep editor-stack closability in sync as stacks appear. No-op in base. */
-  _syncEditorStacksClosable() {}
 
   /**
    * Re-apply the current window size to the layout by firing the window
@@ -322,7 +374,7 @@ export default class Layout extends GoldenLayout {
    * @returns {BaseTab[]} List containing all open tab components.
    */
   getTabComponents() {
-    return this.tabs.map((tab) => tab.contentItem.instance);
+    return this.tabs.map((tab) => tab.componentItem.component);
   }
 
   /**
@@ -347,11 +399,11 @@ export default class Layout extends GoldenLayout {
   /**
    * Invoked when the terminal tab is created for the first time.
    *
-   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
+   * @param {Tab} tab - The tab instance that has been created.
    */
   onTermTabCreated(tab) {
-    this.term = tab.contentItem.instance;
-    tab.contentItem.container.on('destroy', () => {
+    this.term = tab.componentItem.component;
+    tab.componentItem.container.on('destroy', () => {
       this.term = null;
     });
   }
@@ -361,11 +413,11 @@ export default class Layout extends GoldenLayout {
    * singleton, so we keep a reference to reuse rather than identifying it by a
    * path.
    *
-   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
+   * @param {Tab} tab - The tab instance that has been created.
    */
   onCanvasTabCreated(tab) {
-    this.canvas = tab.contentItem.instance;
-    tab.contentItem.container.on('destroy', () => {
+    this.canvas = tab.componentItem.component;
+    tab.componentItem.container.on('destroy', () => {
       this.canvas = null;
     });
   }
@@ -373,10 +425,10 @@ export default class Layout extends GoldenLayout {
   /**
    * Invoked when an image is opened.
    *
-   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
+   * @param {Tab} tab - The tab instance that has been created.
    */
   onImageTabCreated(tab) {
-    const imageComponent = tab.contentItem.instance;
+    const imageComponent = tab.componentItem.component;
 
     // Layout-internal wiring, registered *before* the component is announced so
     // the layout's own state settles before the controller (and app) react:
@@ -393,10 +445,10 @@ export default class Layout extends GoldenLayout {
   /**
    * Invoked when a text file is opened.
    *
-   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
+   * @param {Tab} tab - The tab instance that has been created.
    */
   onEditorTabCreated(tab) {
-    const editorComponent = tab.contentItem.instance;
+    const editorComponent = tab.componentItem.component;
 
     // Layout-internal wiring, registered *before* the component is announced so
     // the layout's own state settles before the controller (and app) react:
@@ -422,7 +474,7 @@ export default class Layout extends GoldenLayout {
    * Try to register a given tab instance to the internal tabs list of this
    * class instance.
    *
-   * @param {GoldenLayout.Tab} tab - The tab instance to register.
+   * @param {Tab} tab - The tab instance to register.
    */
   registerTab(tab) {
     // If there is no active editor yet, set it to the current tab — but only
@@ -431,23 +483,23 @@ export default class Layout extends GoldenLayout {
     // layout is loaded from local storage the open tabs are created in order, so
     // the first editor encountered becomes active; a later 'show'/'focus' or
     // activeContentItemChanged overrides it as the user switches editors.
-    const instance = tab.contentItem.instance;
+    const instance = tab.componentItem.component;
     if (!this.getActiveEditor() && instance.getComponentName?.() === 'editor') {
       this.setActiveEditor(instance);
     }
 
     // The onTabCreated is *also* triggered when a user is dragging tabs around,
     // thus if the tab is already in the list, we return early.
-    const newTabInstance = tab.contentItem.instance;
+    const newTabInstance = tab.componentItem.component;
     const tabExists = this.tabs.some((existingTab) => {
-      return existingTab.contentItem.instance === newTabInstance;
+      return existingTab.componentItem.component === newTabInstance;
     });
     if (tabExists) return;
 
     // Add a regular component to the tabs list.
     // Remove the tab from the list when it is destroyed.
     this.tabs.push(tab);
-    tab.contentItem.container.on('destroy', () => {
+    tab.componentItem.container.on('destroy', () => {
       this.tabs.splice(this.tabs.indexOf(tab), 1);
     });
   }
@@ -455,22 +507,31 @@ export default class Layout extends GoldenLayout {
   /**
    * Callback function when a new tab has been created in the layout.
    *
-   * @param {GoldenLayout.Tab} tab - The tab instance that has been created.
+   * @param {Tab} tab - The tab instance that has been created.
    */
   onTabCreated(tab) {
-    if (tab.contentItem.isTerminal) {
-      this.onTermTabCreated(tab);
-    } else if (tab.contentItem.isImage) {
-      this.registerTab(tab);
-      this.onImageTabCreated(tab);
-    } else if (tab.contentItem.isEditor) {
-      this.registerTab(tab);
-      this.onEditorTabCreated(tab);
-    } else if (tab.contentItem.isCanvas) {
-      this.registerTab(tab);
-      this.onCanvasTabCreated(tab);
-    } else {
-      console.warn('Unknown tab type:', tab.contentItem);
+    switch (componentTypeOf(tab.componentItem)) {
+      case 'terminal':
+        this.onTermTabCreated(tab);
+        break;
+
+      case 'image':
+        this.registerTab(tab);
+        this.onImageTabCreated(tab);
+        break;
+
+      case 'editor':
+        this.registerTab(tab);
+        this.onEditorTabCreated(tab);
+        break;
+
+      case 'canvas':
+        this.registerTab(tab);
+        this.onCanvasTabCreated(tab);
+        break;
+
+      default:
+        console.warn('Unknown tab type:', tab.contentItem);
     }
 
     this._scheduleOutputControlsRefresh();
@@ -501,29 +562,21 @@ export default class Layout extends GoldenLayout {
       // that stack survives instead of being removed for being empty.
       const stack = closedComponent?.container?.parent?.parent;
       const target = stack?.isStack ? stack : this.getEditorStack();
-      target?.addChild(this._createEditorTab());
+      target?.addItem(this._createEditorTab());
     }
   }
 
   /**
    * Create a new editor tab with provided config, or default to Untitled.
    *
-   * @param {GoldenLayout.ContentItem} config - Content item config object.
+   * @param {ContentItem} config - Content item config object.
    * @returns {object} - Fully configured object.
    */
   _createEditorTab(config = {}) {
-    const { componentState, ...rest } = config;
-    return {
-      type: 'component',
-      componentName: 'editor',
-      title: 'Untitled',
-      ...rest,
-      componentState: {
-        fontSize: this.fontSize,
-        theme: this.theme,
-        ...componentState
-      },
-    };
+    return createTabConfig(config, {
+      fontSize: this.fontSize,
+      theme: this.theme,
+    });
   }
 
   /**
@@ -532,7 +585,7 @@ export default class Layout extends GoldenLayout {
    * There are two stacks in some layouts: one for the code editors, and
    * one for the terminal. Here, we're interested in the code editor stack.
    *
-   * @param {GoldenLayout.Stack} stack - Object representing the root structure.
+   * @param {Stack} stack - Object representing the root structure.
    * @param {object} options - Options passed to the layout.
    */
   onStackCreated(stack, options) {
@@ -540,28 +593,24 @@ export default class Layout extends GoldenLayout {
     // only the *initial* single stacks; once either area is split they may go
     // stale, so runtime logic uses the dynamic area getters / `_terraArea` tags
     // instead. They remain handy fallbacks for the common unsplit case.
-    if (stack.config.id === 'editorStack') {
+    if (stack.id === 'editorStack') {
       this.editorStack = stack;
     }
-    if (stack.config.id === 'outputStack') {
+    if (stack.id === 'outputStack') {
       this.outputStack = stack;
     }
 
     // Track the active tab for every stack (the editor area may be split into
     // several stacks).
-    stack.on('activeContentItemChanged', (param) => {
+    stack.on('activeContentItemChanged', (componentItem) => {
       // Only editors become the "active editor"; the terminal, canvas and images
       // must not, or activating one of these (non-runnable) output tabs would
       // leave the run button reading a non-runnable tab.
-      const component = param?.container?.getComponent?.();
-      if (component?.getComponentName?.() === 'editor') {
-        this.setActiveEditor(component);
+      if (isEditorItem(componentItem)) {
+        this.setActiveEditor(componentItem.component);
       }
     });
 
-    // Keep editor-stack closability in sync as stacks appear (initial load and
-    // splits): non-closable while a single editor stack, closable once split.
-    this._syncEditorStacksClosable();
   }
 
   /**
@@ -614,7 +663,7 @@ export default class Layout extends GoldenLayout {
    */
   emitToTabComponents(event, data) {
     this.tabs.forEach((tab) => {
-      tab.contentItem.container.emit(event, data);
+      tab.componentItem.container.emit(event, data);
     });
   }
 
@@ -822,11 +871,11 @@ export default class Layout extends GoldenLayout {
     // Editors open in the editor stack with the most recently active editor;
     // images open in the output stack (alongside the terminal/canvas).
     const stack = isImage ? this.getOutputStack() : this.getEditorStack();
-    stack.addChild(
+    stack.addItem(
       this._createEditorTab({
         title: filename,
         componentState: { path: filepath },
-        componentName: isImage ? 'image' : 'editor',
+        kind: isImage ? 'image' : 'editor',
         isClosable: this.tabsClosable,
       })
     );
@@ -858,12 +907,11 @@ export default class Layout extends GoldenLayout {
       return this.canvas;
     }
 
-    this.getOutputStack().addChild({
-      type: 'component',
-      componentName: 'canvas',
+    this.getOutputStack().addItem(createTabConfig({
+      kind: 'canvas',
       title,
       isClosable: false, // Like a terminal tab.
-    });
+    }));
 
     // GoldenLayout creates the component synchronously during addChild, so
     // onCanvasTabCreated has already set this.canvas.
@@ -887,15 +935,32 @@ export default class Layout extends GoldenLayout {
   // output tabs (terminal/canvas/image), never a mix (the drag constraint keeps
   // them apart) — and drive everything off that.
 
-  /** @returns {?GoldenLayout.ContentItem} The root row/column holding the stacks. */
+  /** @returns {?ContentItem} The root row/column holding the stacks. */
   getMainContainer() {
-    return this.root?.contentItems?.[0] ?? null;
+    // rootItem throws before init(); the layout is queried during teardown and
+    // early setup, so treat "no tree yet" as no container.
+    if (!this.isInitialised) return null;
+    return this.rootItem ?? null;
+  }
+
+  /**
+   * Build a content item from a plain (unresolved) item config, without adding
+   * it anywhere. GoldenLayout 2 only creates items from *resolved* configs, and
+   * leaves initialisation to whoever adds the item — `addChild` inits it, which
+   * is the order the DOM setup expects.
+   *
+   * @param {object} config - A plain item config (row/column/stack/component).
+   * @param {ContentItem} parent - The item it will be added to.
+   * @returns {ContentItem} The new, uninitialised content item.
+   */
+  _createItem(config, parent) {
+    return this.createContentItem(ItemConfig.resolve(config, false), parent);
   }
 
   /**
    * Every leaf stack in the layout, in tree (visual) order.
    *
-   * @returns {GoldenLayout.Stack[]}
+   * @returns {Stack[]}
    */
   _allStacks() {
     const stacks = [];
@@ -910,15 +975,15 @@ export default class Layout extends GoldenLayout {
 
   /** @returns {boolean} Whether the stack holds editor tab(s). */
   _isEditorStack(stack) {
-    return stack.contentItems.some((item) => item.config.componentName === 'editor');
+    return stack.contentItems.some(isEditorItem);
   }
 
   /** @returns {boolean} Whether the stack holds output tab(s) (terminal/canvas/image). */
   _isOutputStack(stack) {
-    return stack.contentItems.some((item) => item.config.componentName !== 'editor');
+    return stack.contentItems.some(isOutputItem);
   }
 
-  /** @returns {?GoldenLayout.Stack} The first (topmost/leftmost) output stack. */
+  /** @returns {?Stack} The first (topmost/leftmost) output stack. */
   _firstOutputStack() {
     return this._allStacks().find((stack) => this._isOutputStack(stack)) ?? null;
   }
@@ -927,7 +992,7 @@ export default class Layout extends GoldenLayout {
    * The stack new editor tabs should open in: the most recently active editor's
    * stack when it is still attached, else the first editor stack.
    *
-   * @returns {?GoldenLayout.Stack}
+   * @returns {?Stack}
    */
   getEditorStack() {
     const stacks = this._allStacks();
@@ -941,7 +1006,7 @@ export default class Layout extends GoldenLayout {
    * The stack new output tabs (canvas, images) should open in: next to the
    * terminal, falling back to the first output stack.
    *
-   * @returns {?GoldenLayout.Stack}
+   * @returns {?Stack}
    */
   getOutputStack() {
     if (this.term) return this.term.container.parent.parent;

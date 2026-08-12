@@ -12,14 +12,12 @@ export default class ImageTab extends FileTab {
   }
 
   init = () => {
-    this.container.parent.isImage = true;
-
     this.bindContainerEvents();
     this.initImageElement();
   }
 
   initImageElement = () => {
-    const contentContainer = this.container.getElement()[0];
+    const contentContainer = this.container.element;
     this.img = document.createElement('img');
 
     contentContainer.appendChild(this.img);

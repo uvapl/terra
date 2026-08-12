@@ -1,6 +1,7 @@
 import { formatDate, isObject } from '../../lib/helpers.js';
 import { createModal } from '../components/modal.js';
 import Layout from './layout.js';
+import { createTabConfig } from './tab-config.js';
 
 export default class ExamLayout extends Layout {
   tabsClosable = false;
@@ -16,35 +17,31 @@ export default class ExamLayout extends Layout {
     const { tabs, fontSize } = options;
 
     // Create the config for each tab.
-    const content = Object.keys(tabs).map((filename) => ({
-      type: 'component',
-      componentName: 'editor',
+    const content = Object.keys(tabs).map((filename) => createTabConfig({
+      title: filename,
+      isClosable: false,
       componentState: {
-        fontSize,
         value: tabs[filename],
         path: filename,
       },
-      title: filename,
-      isClosable: false,
-    }));
+    }, { fontSize }));
 
     const defaultLayoutConfig = {
       settings: {
-        showPopoutIcon: false,
-        showMaximiseIcon: false,
-        showCloseIcon: false,
         reorderEnabled: false,
       },
-      content: [
-        {
-          content: [
-            { content },
-            {
-              componentState: { fontSize },
-            }
-          ]
-        }
-      ]
+      header: {
+        popout: false,
+        maximise: false,
+      },
+      root: {
+        content: [
+          { content },
+          {
+            componentState: { fontSize },
+          }
+        ]
+      }
     };
 
     super(defaultLayoutConfig, options);

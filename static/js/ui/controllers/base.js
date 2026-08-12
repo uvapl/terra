@@ -10,7 +10,7 @@ import CommandSurfaces from '../../commands/surfaces.js';
  * Current version of the default layout config. Bump it when a breaking change
  * requires every user to reload a fresh config instead of their stored one.
  */
-const LAYOUT_CONFIG_VERSION = 3;
+const LAYOUT_CONFIG_VERSION = 4;
 
 /**
  * BaseController is the app's single interface to the UI layer. Each app variant
@@ -95,7 +95,7 @@ export default class BaseController {
     // static `#toolbar` div in the page chrome — the mirror of the menubar, and
     // (like the menubar) built before the layout renders. Every variant has a
     // `#toolbar`, so this is shared here rather than per-variant.
-    this.layout.on('initialised', () => { this.onLayoutInitialised() });
+    this.layout.on('layoutReady', () => { this.onLayoutInitialised() });
 
     return this.layout;
   }
@@ -142,9 +142,9 @@ export default class BaseController {
   // The app talks only to the controller; these thin wrappers forward to the
   // layout (which keeps the DOM and GoldenLayout-internal implementations).
 
-  /** Render the layout (GoldenLayout init). */
+  /** Render the layout (GoldenLayout init + loadLayout). */
   init() {
-    this.layout.init();
+    this.layout.render();
   }
 
   /** @returns {?TerminalComponent} The terminal component, or null. */
@@ -377,7 +377,7 @@ export default class BaseController {
    * overriding serializeLayoutConfig().
    */
   persistLayoutConfig() {
-    const config = this.serializeLayoutConfig(this.layout.toConfig());
+    const config = this.serializeLayoutConfig(this.layout.saveLayout());
     this.setStoredLayoutConfig(config);
   }
 
@@ -386,7 +386,7 @@ export default class BaseController {
    * controller stores it as-is; subclasses may strip volatile data (e.g. editor
    * contents that are reloaded from elsewhere on restore).
    *
-   * @param {object} config - The GoldenLayout config from layout.toConfig().
+   * @param {object} config - The GoldenLayout config from layout.saveLayout().
    * @returns {object} The config to persist.
    */
   serializeLayoutConfig(config) {

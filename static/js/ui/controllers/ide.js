@@ -84,14 +84,25 @@ export default class IDEController extends BaseController {
    * the VFS on restore, so only pathless (Untitled) tabs need to keep their
    * value.
    *
-   * @param {object} config - The GoldenLayout config from layout.toConfig().
+   * @param {object} config - The GoldenLayout config from layout.saveLayout().
    * @returns {object} The config to persist, with saved editors' values removed.
    */
   serializeLayoutConfig(config) {
     return this._removeEditorValue(config);
   }
 
+  /**
+   * Recursively remove editor content.
+   *
+   * @param {object} config
+   * @returns {object}
+   */
   _removeEditorValue(config) {
+    if (config.root) {
+      this._removeEditorValue(config.root);
+      return config;
+    }
+
     if (config.content) {
       config.content.forEach((item) => {
         if (item.type === 'component') {

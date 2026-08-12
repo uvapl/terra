@@ -1,27 +1,33 @@
 import Layout from './layout.js';
-import ImageTab from '../components/image.tab.js';
-import CanvasTab from '../components/canvas.tab.js';
+import { isEditorItem, isOutputItem } from './tab-config.js';
 
 /**
- * A Layout the user can restructure at runtime: flip the orientation
- * (horizontal ⇄ vertical) and split/merge the output tabs into separate stacks,
- * plus all the bookkeeping those features need (area tagging, editor-stack
- * closability, the drag safety net, and the split/merge toggle control).
+ * Whether the component is an output tab *other* than the default terminal.
  *
- * The base Layout owns only the *initial* orientation and the read-only area
- * helpers; everything that mutates the structure after load lives here. Only the
- * IDE extends this — the lab/exam/embed variants have a fixed two-pane layout
- * (no tab reordering, no second output tab), so they stay on the plain base.
+ * @param {BaseTab} component - an open tab component
+ * @returns {boolean}
+ */
+function isExtraOutput(component) {
+  const type = component.getComponentName();
+  return type === 'image' || type === 'canvas';
+}
+
+/**
+ * A Layout the user can restructure at runtime: flip the orientation and
+ * split/merge tabs into separate stacks (while keeping a distinction between
+ * editor tabs and output tabs).
+ *
+ * We build on the base Layout that contains basic placement functionality
+ * but does not allow user customization of the layout.
  */
 export default class FlexibleLayout extends Layout {
   /**
-   * Switch the layout orientation at runtime, in place and without recreating any
-   * component (editors keep their undo history, the terminal its scrollback and
-   * worker). Builds a fresh root container of the opposite axis and *relocates*
-   * the live stacks into it — the same reparent-don't-recreate idiom as
-   * arrangeOutput(). When the output area is split, its container is rebuilt
-   * perpendicular to the new main axis (row when vertical, column when
-   * horizontal). A no-op when already in the requested orientation.
+   * Switch the layout orientation at runtime, in place, and without recreating
+   * any component (editors keep their undo history, the terminal its
+   * scrollback and worker). Creates a new root container in the requested
+   * orientation and relocates the existing stacks into it. And to make it even
+   * more elegant, when the output area is split, its container is rebuilt
+   * perpendicular to the new axis (row when vertical, column when horizontal).
    *
    * @param {string} orientation - 'horizontal' | 'vertical'.
    */
@@ -42,7 +48,7 @@ export default class FlexibleLayout extends Layout {
     // Identify the output sub-tree (the one main child whose subtree holds output
     // components) so only it is rebuilt perpendicular; editor stacks move as-is.
     const isOutput = (item) => item.isComponent
-      ? item.config.componentName !== 'editor'
+      ? isOutputItem(item)
       : (item.contentItems || []).some(isOutput);
 
     // Empty container of the new axis, swapped into the root in place of oldMain.
@@ -50,7 +56,7 @@ export default class FlexibleLayout extends Layout {
     // DOM but NOT destroyed, so its stacks survive for relocation. It is left
     // unreferenced afterwards (destroying it would destroy the moved stacks) and
     // is garbage-collected.
-    const newMain = this.createContentItem(
+    const newMain = this._createItem(
       { type: mainType, content: [], isClosable: false }, this.root
     );
     this.root.replaceChild(oldMain, newMain);
@@ -59,8 +65,8 @@ export default class FlexibleLayout extends Layout {
     for (const child of children) {
       if (!child.isStack && isOutput(child)) {
         // Split output: rebuild perpendicular and move its stacks across.
-        const perp = this.createContentItem(
-          { type: outputType, content: [], id: child.config.id }, newMain
+        const perp = this._createItem(
+          { type: outputType, content: [], id: child.id }, newMain
         );
         newMain.addChild(perp);
         [...child.contentItems].forEach((stack) => perp.addChild(stack));
@@ -112,7 +118,7 @@ export default class FlexibleLayout extends Layout {
    * vertically (horizontal main layout → output column), but the last (rightmost)
    * stack when it is laid out horizontally (vertical main layout → output row).
    *
-   * @returns {?GoldenLayout.Stack}
+   * @returns {?Stack}
    */
   _anchorOutputStack() {
     const outputStacks = this._allStacks().filter((stack) => this._isOutputStack(stack));
@@ -133,19 +139,6 @@ export default class FlexibleLayout extends Layout {
     });
   }
 
-  /**
-   * Editor stacks must be closable for GoldenLayout to auto-remove one that is
-   * emptied — e.g. closing the last file in a split-off stack should merge the
-   * split back. But the *sole* editor stack must stay non-closable so the editor
-   * area can never collapse to nothing (onTabDestroy already guarantees an
-   * Untitled in that single-stack case). So: closable iff editors span >1 stack.
-   */
-  _syncEditorStacksClosable() {
-    const editorStacks = this._allStacks().filter((stack) => this._isEditorStack(stack));
-    const closable = editorStacks.length > 1;
-    editorStacks.forEach((stack) => { stack.config.isClosable = closable; });
-  }
-
   /** @returns {boolean} Whether the output tabs are spread across multiple stacks. */
   isOutputSplit() {
     return this._allStacks().filter((stack) => this._isOutputStack(stack)).length > 1;
@@ -159,9 +152,9 @@ export default class FlexibleLayout extends Layout {
    * the main container if its area was emptied and removed mid-drag), so the tab
    * is never lost.
    *
-   * @param {GoldenLayout.ContentItem} contentItem - The dragged tab.
-   * @param {?GoldenLayout.Stack} originalParent - The tab's stack at drag start.
-   * @returns {?GoldenLayout.Stack}
+   * @param {ContentItem} contentItem - The dragged tab.
+   * @param {?Stack} originalParent - The tab's stack at drag start.
+   * @returns {?Stack}
    */
   ensureDropHome(contentItem, originalParent) {
     const stacks = this._allStacks();
@@ -169,7 +162,7 @@ export default class FlexibleLayout extends Layout {
     // Original stack still in the tree: let GoldenLayout revert there as usual.
     if (originalParent && stacks.includes(originalParent)) return null;
 
-    const isEditor = contentItem?.config?.componentName === 'editor';
+    const isEditor = isEditorItem(contentItem);
     const home = stacks.find((stack) => isEditor ? this._isEditorStack(stack) : this._isOutputStack(stack));
     if (home) return home;
 
@@ -179,7 +172,7 @@ export default class FlexibleLayout extends Layout {
     if (!main) return null;
 
     const index = isEditor ? 0 : main.contentItems.length;
-    main.addChild({ type: 'stack', isClosable: false }, index);
+    main.addChild(this._createItem({ type: 'stack', isClosable: true }, main), index);
     return main.contentItems[index] ?? null;
   }
 
@@ -208,7 +201,7 @@ export default class FlexibleLayout extends Layout {
     // (editors and output never share a stack, and the output is always
     // consolidated into one child). Collect its live components in visual order.
     const isOutput = (item) => item.isComponent
-      ? item.config.componentName !== 'editor'
+      ? isOutputItem(item)
       : (item.contentItems || []).some(isOutput);
     const oldContainer = main.contentItems.find(isOutput);
     if (!oldContainer) return;
@@ -227,9 +220,12 @@ export default class FlexibleLayout extends Layout {
     // Build the new (empty) output container appended after the old one; removing
     // the old one afterwards leaves it last (editors stay first).
     main.addChild(
-      split
-        ? { type: this.vertical ? 'row' : 'column', id: 'outputStack' }
-        : { type: 'stack', id: 'outputStack', isClosable: false },
+      this._createItem(
+        split
+          ? { type: this.vertical ? 'row' : 'column', id: 'outputStack' }
+          : { type: 'stack', id: 'outputStack', isClosable: false },
+        main,
+      ),
       main.contentItems.length
     );
     const newContainer = main.contentItems[main.contentItems.length - 1];
@@ -242,7 +238,7 @@ export default class FlexibleLayout extends Layout {
     };
     if (split) {
       comps.forEach((comp) => {
-        newContainer.addChild({ type: 'stack' });
+        newContainer.addChild(this._createItem({ type: 'stack' }, newContainer));
         relocate(newContainer.contentItems[newContainer.contentItems.length - 1], comp);
       });
     } else {
@@ -273,7 +269,6 @@ export default class FlexibleLayout extends Layout {
     setTimeout(() => {
       this._outputRefreshScheduled = false;
       this._tagAreas();
-      this._syncEditorStacksClosable();
 
       const { sig, firstEl } = this._outputSignature();
       if (sig === this._outputSig && firstEl === this._outputFirstEl) return;
@@ -298,10 +293,8 @@ export default class FlexibleLayout extends Layout {
    */
   _outputSignature() {
     const firstStack = this._anchorOutputStack();
-    const firstEl = firstStack?.element?.[0] ?? null;
-    const extra = this.getTabComponents().filter(
-      (c) => c instanceof ImageTab || c instanceof CanvasTab
-    ).length;
+    const firstEl = firstStack?.element ?? null;
+    const extra = this.getTabComponents().filter(isExtraOutput).length;
     return { sig: `${this.isOutputSplit()}|${extra}`, firstEl };
   }
 
@@ -353,9 +346,7 @@ export default class FlexibleLayout extends Layout {
    * one tab (i.e. the terminal plus at least one canvas/image).
    */
   updateOutputControlsVisibility() {
-    const hasExtraOutput = this.getTabComponents().some(
-      (component) => component instanceof ImageTab || component instanceof CanvasTab
-    );
+    const hasExtraOutput = this.getTabComponents().some(isExtraOutput);
     $('.output-arrange').toggleClass('hidden', !hasExtraOutput);
   }
 }

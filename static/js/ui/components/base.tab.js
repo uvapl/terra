@@ -5,17 +5,13 @@
 export default class BaseTab extends EventTarget {
   /**
    * The container holds the component within Golden Layout.
-   * @type {GoldenLayout.ItemContainer}
+   * @type {ComponentContainer}
    */
   container = null;
 
   constructor(container) {
     super();
     this.container = container;
-
-    // Let GoldenLayout hand back this component instance from its container
-    // (e.g. when a stack reports its active item changed).
-    this.container.getComponent = () => this;
   }
 
   /**
@@ -32,7 +28,7 @@ export default class BaseTab extends EventTarget {
    * @returns {string} Name of the component.
    */
   getComponentName = () => {
-    return this.getComponentItem().config.componentName;
+    return this.container.componentType;
   }
 
   // Basic tab manipulation
@@ -48,13 +44,13 @@ export default class BaseTab extends EventTarget {
    * Activate item within its tab strip.
    */
   setActive = () => {
-    this.getComponentItem().parent.setActiveContentItem(this.getComponentItem());
+    this.getComponentItem().parent.setActiveComponentItem(this.getComponentItem(), false);
   }
 
   /**
    * Get DOM element for the containing tab strip.
    */
   getParentComponentElement = () => {
-    return this.getComponentItem().parent.element[0];
+    return this.getComponentItem().parent.element;
   }
 }

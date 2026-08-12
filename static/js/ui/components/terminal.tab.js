@@ -67,7 +67,6 @@ export default class TerminalTab extends BaseTab {
   }
 
   init = () => {
-    this.container.parent.isTerminal = true;
     this.bindContainerEvents();
   }
 
@@ -185,7 +184,7 @@ export default class TerminalTab extends BaseTab {
       lineHeight: 1.2
     });
     this.terminalInstance.loadAddon(this.fitAddon);
-    this.terminalInstance.open(this.container.getElement()[0]);
+    this.terminalInstance.open(this.container.element);
     // show cursor immediately
     this.terminalInstance.write('\x1b[?25h');
     this.fitAddon.fit();
@@ -383,7 +382,7 @@ export default class TerminalTab extends BaseTab {
    * Bind all container events with callbacks.
    */
   bindContainerEvents = () => {
-    this.container.on('open', this.onShow);
+    this.container.on('show', this.onShow);
     this.container.on('fontSizeChanged', this.setFontSize);
     this.container.on('resize', this.onContainerResize);
     this.container.on('destroy', this.onContainerDestroy);

@@ -61,15 +61,11 @@
   background: var(--ide-panel-bg);
 }
 
-.dark-mode .lm_tab .lm_close_tab {
-  background-image: url('../img/icons/close-white.png');
-}
-
-.lm_header .lm_controls > li {
+.lm_header .lm_controls > * {
   float: none;
 }
 
-.lm_header .lm_controls > li + li {
+.lm_header .lm_controls > * + * {
   margin-left: 5px;
 }
 

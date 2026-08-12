@@ -26,14 +26,12 @@ export default class CanvasTab extends BaseTab {
   }
 
   init = () => {
-    this.container.parent.isCanvas = true;
-
     this.bindContainerEvents();
     this.initCanvasElement();
   }
 
   initCanvasElement = () => {
-    const contentContainer = this.container.getElement()[0];
+    const contentContainer = this.container.element;
     this.canvas = document.createElement('canvas');
 
     contentContainer.appendChild(this.canvas);
@@ -66,7 +64,7 @@ export default class CanvasTab extends BaseTab {
    * @returns {{ width: number, height: number }} Logical canvas size in CSS px.
    */
   resizeToContainer = () => {
-    const el = this.container.getElement()[0];
+    const el = this.container.element;
     const dpr = window.devicePixelRatio || 1;
     const width = el.clientWidth;
     const height = el.clientHeight;

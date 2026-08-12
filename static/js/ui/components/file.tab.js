@@ -36,7 +36,7 @@ export default class FileTab extends BaseTab {
    * @returns {string} The name of the tab.
    */
   getFilename = () => {
-    return this.getComponentItem().config.title;
+    return this.container.title;
   }
 
   /**
@@ -45,6 +45,6 @@ export default class FileTab extends BaseTab {
    * @param {string} filename - The new name of the tab.
    */
   setFilename = (filename) => {
-    this.getComponentItem().setTitle(filename);
+    this.container.setTitle(filename);
   }
 }

@@ -1,8 +1,13 @@
 import FlexibleLayout from './layout.flexible.js';
+import { createTabConfig } from './tab-config.js';
 import { BASE_FONT_SIZE, MAX_FILE_SIZE } from '../../constants.js';
 import { createModal } from '../components/modal.js';
 import { createTooltip, destroyTooltip } from '../components/tooltip.js';
 
+/**
+ * IDELayout: contains code for some IDE-specific file management. The ability
+ * for users to reorganize the layout is in the superclass FlexibleLayout.
+ */
 export default class IDELayout extends FlexibleLayout {
   /**
    * Create the layout.
@@ -14,63 +19,41 @@ export default class IDELayout extends FlexibleLayout {
   constructor(options = {}) {
     const { contentConfig = [] } = options;
 
-    const toTabConfig = (tab) => ({
-      type: 'component',
-      componentName: 'editor',
-      reorderEnabled: true,
-      componentState: {
-        fontSize: BASE_FONT_SIZE,
-        ...tab.componentState,
-      },
-      title: 'Untitled',
-      ...tab,
-    });
+    const toTabConfig = (tab) => createTabConfig(
+      { reorderEnabled: true, ...tab },
+      { fontSize: BASE_FONT_SIZE },
+    );
 
-    // Editors stay in the editor stack; images live in the output stack (next to
-    // the terminal). Keeps the editors-only rule intact when recreate() rebuilds
-    // the layout from serialized tabs.
-    const editorTabs = contentConfig.filter((tab) => tab.componentName !== 'image').map(toTabConfig);
-    const imageTabs = contentConfig.filter((tab) => tab.componentName === 'image').map(toTabConfig);
+    // collect editor/output tabs to place them in the right stack when
+    // recreating the layout
+    const editorTabs = contentConfig.filter((tab) => tab.kind !== 'image').map(toTabConfig);
+    const imageTabs = contentConfig.filter((tab) => tab.kind === 'image').map(toTabConfig);
 
     const defaultLayoutConfig = {
       settings: {
         reorderEnabled: true,
       },
-      content: [
-        {
-          // The root type (column = vertical, row = horizontal) is stamped by the
-          // base Layout from the resolved orientation; do not hard-code it here.
-          content: [
-            {
-              type: 'stack',
-              content: editorTabs.length > 0 ? editorTabs : [
-                {
-                  type: 'component',
-                  componentName: 'editor',
-                  componentState: {
-                    fontSize: BASE_FONT_SIZE,
-                  },
-                  title: 'Untitled',
-                },
-              ],
-            },
-            {
-              type: 'stack',
-              id: 'outputStack',
-              content: [
-                {
-                  type: 'component',
-                  componentName: 'terminal',
-                  title: 'Terminal',
-                  componentState: { fontSize: BASE_FONT_SIZE },
-                  isClosable: false,
-                },
-                ...imageTabs,
-              ]
-            }
-          ]
-        }
-      ]
+      root: {
+        content: [
+          {
+            type: 'stack',
+            content: editorTabs.length > 0 ? editorTabs : [
+              createTabConfig({}, { fontSize: BASE_FONT_SIZE }),
+            ],
+          },
+          {
+            type: 'stack',
+            id: 'outputStack',
+            content: [
+              createTabConfig(
+                { kind: 'terminal', title: 'Terminal', isClosable: false },
+                { fontSize: BASE_FONT_SIZE },
+              ),
+              ...imageTabs,
+            ]
+          }
+        ]
+      }
     };
 
     super(defaultLayoutConfig, options);
@@ -292,7 +275,7 @@ export default class IDELayout extends FlexibleLayout {
       .filter((component) => typeof component.getContent === 'function')
       .map((component) => ({
         title: component.getFilename(),
-        componentName: component.getComponentName(),
+        kind: component.getComponentName(),
         componentState: {
           path: component.getPath(),
           value: component.getContent(),

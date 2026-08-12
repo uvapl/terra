@@ -39,8 +39,6 @@ export default class EditorTab extends FileTab {
   }
 
   init = () => {
-    this.container.parent.isEditor = true;
-
     this.bindContainerEvents();
     this.initEditor();
     this.bindEditorEvents();
@@ -68,7 +66,7 @@ export default class EditorTab extends FileTab {
   initEditor = () => {
     // To make sure GoldenLayout doensn't override the editor styles, we create
     // another child container for the editor instance.
-    const contentContainer = this.container.getElement()[0];
+    const contentContainer = this.container.element;
     const editorContainer = document.createElement('div');
     editorContainer.classList.add('editor');
     contentContainer.appendChild(editorContainer);

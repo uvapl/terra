@@ -1,4 +1,5 @@
 import Layout from './layout.js';
+import { createTabConfig } from './tab-config.js';
 
 export default class EmbedLayout extends Layout {
   termStartupMessage = [
@@ -17,36 +18,29 @@ export default class EmbedLayout extends Layout {
     const { tabs, fontSize } = options;
 
     // Create the config for each tab.
-    const content = Object.keys(tabs).map((filename) => ({
-      type: 'component',
-      componentName: 'editor',
+    const content = Object.keys(tabs).map((filename) => createTabConfig({
+      title: filename,
+      isClosable: false,
       componentState: {
-        fontSize,
         value: tabs[filename],
         path: filename,
       },
-      title: filename,
-      isClosable: false,
-    }));
+    }, { fontSize }));
 
     const defaultLayoutConfig = {
       dimensions: {
         borderWidth: 0,
       },
-      content: [
-        {
-          // Root type (column/row) is stamped by the base Layout from the
-          // resolved orientation (Embed derives it from options.vertical).
-          content: [
-            {
-              content,
-            },
-            {
-              componentState: { fontSize },
-            }
-          ]
-        }
-      ]
+      root: {
+        content: [
+          {
+            content,
+          },
+          {
+            componentState: { fontSize },
+          }
+        ]
+      }
     };
 
     super(defaultLayoutConfig, options);
