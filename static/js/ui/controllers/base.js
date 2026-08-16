@@ -415,6 +415,19 @@ export default class BaseController {
     setLocalStorageItem('font-size', fontSize);
   }
 
+  /**
+   * How the user last chose to arrange the output tabs.
+   *
+   * @returns {string} 'split' | 'stacked'.
+   */
+  getStoredOutputArrangement() {
+    return getLocalStorageItem('output-arrangement') || 'stacked';
+  }
+
+  setStoredOutputArrangement(arrangement) {
+    setLocalStorageItem('output-arrangement', arrangement);
+  }
+
   getStoredLayoutConfig() {
     return getLocalStorageItem('layout');
   }

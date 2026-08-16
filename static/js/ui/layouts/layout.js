@@ -23,6 +23,13 @@ import {
 } from '../../../vendor/golden-layout/2.6.0/golden-layout.esm.js';
 
 /**
+ * Some tabs are always preserved when created programmatically. The user
+ * cannot close these.
+ * @type {string[]}
+ */
+const FIXTURE_KINDS = ['terminal', 'canvas'];
+
+/**
  * Default layout config that is used when the layout is created for the first
  * time (and thus not saved in local storage yet) or when the layout is reset.
  * @type {object}
@@ -47,13 +54,8 @@ const DEFAULT_LAYOUT_CONFIG = {
     isClosable: false,
     content: [
       {
-        // Closable, for two GoldenLayout 2 reasons: a stack that is configured
-        // non-closable and holds a single tab refuses to start a drag of that
-        // tab at all, and an *empty* stack cannot be dropped into (it never
-        // computes a drop index), so keeping an emptied stack alive strands the
-        // tab being dragged. Letting it self-remove instead means the editor
-        // area disappears while its last tab is in flight;
-        // ensureDropHome() puts a fresh stack back when the tab lands.
+        // Note that the stack is closable here to make it behave well, but we
+        // otherwise prevent it from closing
         type: 'stack',
         id: 'editorStack',
         isClosable: true,
@@ -64,7 +66,7 @@ const DEFAULT_LAYOUT_CONFIG = {
         isClosable: false,
         content: [
           createTabConfig(
-            { kind: 'terminal', title: 'Terminal', isClosable: false },
+            { kind: 'terminal', title: 'Terminal', isClosable: true },
             { fontSize: BASE_FONT_SIZE },
           ),
         ]
@@ -245,6 +247,14 @@ export default class Layout extends GoldenLayout {
     });
     this.on('tabCreated', (tab) => this.onTabCreated(tab));
 
+    // The counterpart to the refresh onTabCreated() schedules. Removing a tab or
+    // a stack reaches the layout through neither 'tabCreated' nor a layout-level
+    // 'stateChanged' (v2 does not propagate one for structural changes), so
+    // without this the area tags and editor-stack closability go stale as soon as
+    // anything is closed. Deferred, so it runs after the stack that emptied has
+    // had its chance to remove itself.
+    this.on('itemDestroyed', () => this._scheduleOutputControlsRefresh());
+
     this.registerComponentConstructor('image', ImageTab);
     this.registerComponentConstructor('editor', EditorTab);
     this.registerComponentConstructor('canvas', CanvasTab);
@@ -328,6 +338,12 @@ export default class Layout extends GoldenLayout {
 
   /** Hook: re-sync the output controls after a structural change. No-op in base. */
   _scheduleOutputControlsRefresh() {}
+
+  /**
+   * Hook: arrange a newly opened output tab according to the user's remembered
+   * split/merge choice. No-op in base; only the IDE can rearrange at runtime.
+   */
+  _applyOutputArrangementPreference() {}
 
   /**
    * Re-apply the current window size to the layout by firing the window
@@ -510,7 +526,17 @@ export default class Layout extends GoldenLayout {
    * @param {Tab} tab - The tab instance that has been created.
    */
   onTabCreated(tab) {
-    switch (componentTypeOf(tab.componentItem)) {
+    const kind = componentTypeOf(tab.componentItem);
+
+    // Fixtures are configured closable so they stay draggable (see
+    // FIXTURE_KINDS); take the close button away so they still cannot be closed.
+    // Runs on every tab creation, including the new tab made when one is dragged
+    // into another stack.
+    if (FIXTURE_KINDS.includes(kind)) {
+      tab.element.querySelector('.lm_close_tab')?.remove();
+    }
+
+    switch (kind) {
       case 'terminal':
         this.onTermTabCreated(tab);
         break;
@@ -888,6 +914,12 @@ export default class Layout extends GoldenLayout {
       untitled.close();
       this.resetLayout = false;
     }
+
+    // An image is added to the output area, where the user's remembered
+    // split/merge choice applies.
+    if (isImage) {
+      this._applyOutputArrangementPreference();
+    }
   }
 
   /**
@@ -910,8 +942,12 @@ export default class Layout extends GoldenLayout {
     this.getOutputStack().addItem(createTabConfig({
       kind: 'canvas',
       title,
-      isClosable: false, // Like a terminal tab.
+      isClosable: true, // Movable but not user-closable; see FIXTURE_KINDS.
     }));
+
+    // The output area now holds more than the terminal, so the user's remembered
+    // split/merge choice becomes meaningful again.
+    this._applyOutputArrangementPreference();
 
     // GoldenLayout creates the component synchronously during addChild, so
     // onCanvasTabCreated has already set this.canvas.

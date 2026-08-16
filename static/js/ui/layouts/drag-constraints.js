@@ -73,6 +73,12 @@ export function constrainDrops(layout) {
   const getArea = layout.getArea.bind(layout);
 
   layout.startComponentDrag = (x, y, dragListener, componentItem, stack) => {
+    // Refuse to drag the last tab out of the only editor stack
+    if (stack?.contentItems.length === 1 && layout.isSoleEditorStack?.(stack)) {
+      dragListener.cancelDrag();
+      return;
+    }
+
     layout._terraDragged = componentItem;
 
     const result = startComponentDrag(x, y, dragListener, componentItem, stack);

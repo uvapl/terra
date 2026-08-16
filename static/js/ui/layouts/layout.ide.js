@@ -46,7 +46,7 @@ export default class IDELayout extends FlexibleLayout {
             id: 'outputStack',
             content: [
               createTabConfig(
-                { kind: 'terminal', title: 'Terminal', isClosable: false },
+                { kind: 'terminal', title: 'Terminal', isClosable: true },
                 { fontSize: BASE_FONT_SIZE },
               ),
               ...imageTabs,

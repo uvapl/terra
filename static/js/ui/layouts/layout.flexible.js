@@ -139,18 +139,37 @@ export default class FlexibleLayout extends Layout {
     });
   }
 
+  /**
+   * Whether this is the only editor stack. Used by the drag constraint to refuse
+   * a drag of its last tab.
+   *
+   * @param {Stack} stack - The stack a drag is starting from.
+   * @returns {boolean}
+   */
+  isSoleEditorStack(stack) {
+    if (!stack?.isStack || !this._isEditorStack(stack)) return false;
+    return this._allStacks().filter((s) => this._isEditorStack(s)).length === 1;
+  }
+
+  /**
+   * Apply the user's remembered split/merge choice to the output area, called
+   * when a tab is added to it.
+   */
+  _applyOutputArrangementPreference() {
+    const arrangement = this.delegate?.getStoredOutputArrangement?.();
+    if (arrangement) {
+      this.arrangeOutput(arrangement);
+    }
+  }
+
   /** @returns {boolean} Whether the output tabs are spread across multiple stacks. */
   isOutputSplit() {
     return this._allStacks().filter((stack) => this._isOutputStack(stack)).length > 1;
   }
 
   /**
-   * Resolve a live stack to drop a dragged tab into when it was released with no
-   * valid target (the drag constraint's safety net). Returns null to leave
-   * GoldenLayout's normal revert in place when the tab's original stack is still
-   * alive; otherwise returns a stack of the tab's kind (creating a fresh one in
-   * the main container if its area was emptied and removed mid-drag), so the tab
-   * is never lost.
+   * Finds (or even creates a stack) where a dragged tab can be placed, just in
+   * case it is dropped at an invalid place.
    *
    * @param {ContentItem} contentItem - The dragged tab.
    * @param {?Stack} originalParent - The tab's stack at drag start.
@@ -166,8 +185,8 @@ export default class FlexibleLayout extends Layout {
     const home = stacks.find((stack) => isEditor ? this._isEditorStack(stack) : this._isOutputStack(stack));
     if (home) return home;
 
-    // No stack of this kind remains: add a fresh non-closable stack to the main
-    // container (editors first, output last) for the tab to land in.
+    // Nothing exists? Then create a new stack in main container (editors
+    // first, output last).
     const main = this.getMainContainer();
     if (!main) return null;
 
@@ -215,7 +234,10 @@ export default class FlexibleLayout extends Layout {
     if (comps.length === 0) return;
 
     const split = mode === 'split' && comps.length > 1;
-    if (split === this.isOutputSplit()) return; // already in the requested arrangement
+
+    // For 'split' every output tab has its own stack
+    const outputStackCount = this._allStacks().filter((s) => this._isOutputStack(s)).length;
+    if (split ? outputStackCount === comps.length : !this.isOutputSplit()) return;
 
     // Build the new (empty) output container appended after the old one; removing
     // the old one afterwards leaves it last (editors stay first).
@@ -258,7 +280,9 @@ export default class FlexibleLayout extends Layout {
 
   /**
    * Re-tag the areas and, when the output structure actually changed, re-render
-   * the output controls. Coalesced to once per tick so bursts of GoldenLayout
+   * the output controls.
+   *
+   * Coalesced to once per tick so bursts of GoldenLayout
    * `stateChanged` events (e.g. typing, or dragging a splitter) collapse to one
    * pass — and the signature guard skips the DOM work entirely when only
    * content changed.
@@ -333,7 +357,11 @@ export default class FlexibleLayout extends Layout {
     `);
 
     $group.on('click', '.output-arrange-btn', (event) => {
-      this.arrangeOutput($(event.currentTarget).data('arrange'));
+      const arrangement = $(event.currentTarget).data('arrange');
+
+      // Remember the choice
+      this.delegate?.setStoredOutputArrangement?.(arrangement);
+      this.arrangeOutput(arrangement);
     });
 
     $controls.prepend($group);
