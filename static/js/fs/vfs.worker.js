@@ -56,6 +56,13 @@ let _vfsRoot = null;
 let _vfsBaseFolder = '';
 
 /**
+ * Hide-patterns registered by the main thread (see vfs.js registerHidePattern).
+ * Matching files, and whole subtrees under a matching folder, are skipped by
+ * the recursive walks so their content is never read.
+ */
+let hidePatterns = [];
+
+/**
  * For polling or external changes in the FS.
  */
 let watchRootFolderInterval;
@@ -325,36 +332,57 @@ const handlers = {
   },
 
   /**
+   * Set the hide-patterns used to prune the recursive walks.
+   *
+   * @param {string[]} sources - RegExp sources, each matched against a single
+   * path segment.
+   */
+  setHidePatterns(sources) {
+    hidePatterns = sources.map((source) => new RegExp(source));
+  },
+
+  /**
    * Gathers all files from the VFS.
    * Formerly known as getAllEditorFiles.
    *
    * @returns {Promise<object[]>} List of objects, each containing the filepath
    * and content of the corresponding file.
    */
-  async getAllFiles(path) {
-    const root = (await getFolderHandleByPath(path)) || (await getRootFolderHandle());
+  async getAllFiles(path, includeHidden = false) {
     const files = [];
 
-    async function walk(folderHandle, currentPath = '') {
-      for await (const [name, handle] of folderHandle.entries()) {
-        if (blacklistedPaths.includes(name)) continue;
-        const path = currentPath ? `${currentPath}/${name}` : name;
+    await walkFiles(path, includeHidden, async (filepath, handle) => {
+      const file = await handle.getFile();
+      const content = isImageExtension(filepath)
+        ? await file.arrayBuffer()
+        : await file.text();
 
-        if (handle.kind === 'file') {
-          const file = await handle.getFile();
-          const content =  isImageExtension(path)
-            ? await file.arrayBuffer()
-            : await file.text();
+      files.push({ path: filepath, content });
+    });
 
-          files.push({ path, content });
-        } else if (handle.kind === 'directory') {
-          await walk(handle, path);
-        }
-      }
-    }
-
-    await walk(root);
     return files;
+  },
+
+  /**
+   * Lists every file in the VFS without reading any content. `size` and `mtime`
+   * come from file metadata, so this stays cheap on large projects.
+   *
+   * @returns {Promise<object[]>} List of objects, each containing the filepath,
+   * byte size and last-modified timestamp of the corresponding file.
+   */
+  async getFileList(path, includeHidden = false) {
+    const entries = [];
+
+    await walkFiles(path, includeHidden, async (filepath, handle) => {
+      const file = await handle.getFile();
+      entries.push({
+        path: filepath,
+        size: file.size,
+        mtime: file.lastModified,
+      });
+    });
+
+    return entries;
   },
 
   /**
@@ -678,6 +706,41 @@ async function getFolderHandleByPath(folderpath = '') {
   }
 
   return handle;
+}
+
+/**
+ * Recursively walk every file under a folder, calling `visit` for each one.
+ *
+ * Blacklisted names and, unless `includeHidden`, hide-pattern matches are
+ * skipped. A matching folder is skipped without being entered, so its subtree
+ * is never touched.
+ *
+ * @param {string} path - The folder to walk. Empty for the project root.
+ * @param {boolean} includeHidden - Whether to include hide-pattern matches.
+ * @param {function} visit - Called as `visit(filepath, fileHandle)`, awaited.
+ * @returns {Promise<void>}
+ */
+async function walkFiles(path, includeHidden, visit) {
+  const root =
+    (await getFolderHandleByPath(path)) || (await getRootFolderHandle());
+
+  const isHidden = (name) =>
+    !includeHidden && hidePatterns.some((re) => re.test(name));
+
+  async function walk(folderHandle, currentPath = '') {
+    for await (const [name, handle] of folderHandle.entries()) {
+      if (blacklistedPaths.includes(name) || isHidden(name)) continue;
+      const filepath = currentPath ? `${currentPath}/${name}` : name;
+
+      if (handle.kind === 'file') {
+        await visit(filepath, handle);
+      } else if (handle.kind === 'directory') {
+        await walk(handle, filepath);
+      }
+    }
+  }
+
+  await walk(root);
 }
 
 /**

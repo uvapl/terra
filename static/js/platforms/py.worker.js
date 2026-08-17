@@ -89,9 +89,20 @@ class API extends BaseAPI {
   /**
    * Writes a list of files to pyodide's virtual filesystem.
    *
+   * Returns the modification time of each file as written, which is the
+   * baseline `checkForNewFiles` compares against afterwards to see what the
+   * program touched. A per-file timestamp is used rather than one taken at the
+   * start of the run because Emscripten's timestamps have millisecond
+   * resolution: writing these files and starting the run usually land in the
+   * same millisecond, so a single start time would mark every file as modified
+   * and write the whole project back on every run.
+   *
    * @param {array} files - The files to write to the filesystem.
+   * @returns {Map<string, number>} File path to its modification time.
    */
   writeFilesToVirtualFS(files) {
+    const baseline = new Map();
+
     for (const file of files) {
       if (file.path.includes('/')) {
         // Create the parent folders.
@@ -105,20 +116,21 @@ class API extends BaseAPI {
         }
       }
 
-      // Put each file in the virtual file system. Only do this when the file
-      // content is not empty, otherwise pyodide throws an error.
-      if (file.content) {
-        if (file.content instanceof ArrayBuffer) {
-          this.pyodide.FS.writeFile(file.path, new Uint8Array(file.content));
-        } else {
-          this.pyodide.FS.writeFile(file.path, file.content, { encoding: 'utf8' });
-        }
-
-        // Keep track of when the file was created.
-        const stat = this.pyodide.FS.stat(file.path);
-        file.ctime = stat.ctime;
+      // Put each file in the virtual file system.
+      if (file.content instanceof ArrayBuffer) {
+        this.pyodide.FS.writeFile(file.path, new Uint8Array(file.content));
+      } else if (file.content) {
+        this.pyodide.FS.writeFile(file.path, file.content, { encoding: 'utf8' });
+      } else {
+        // An empty file still has to exist here.
+        // Pyodide rejects '' on the utf8 path, so write zero bytes instead.
+        this.pyodide.FS.writeFile(file.path, new Uint8Array(0));
       }
+
+      baseline.set(file.path, this.pyodide.FS.stat(file.path).mtime.getTime());
     }
+
+    return baseline;
   }
 
   /**
@@ -255,14 +267,18 @@ class API extends BaseAPI {
   }
 
   /**
-   * Check if new files have been created in the virtual filesystem, based on
-   * the files that were passed to the runUserCode function.
+   * Check which files the program created or changed, by comparing the
+   * filesystem against the baseline recorded when the files were written in.
+   *
+   * @param {array} files - The files passed to runUserCode, used to know which
+   * folders to look in.
+   * @param {Map<string, number>} baseline - From writeFilesToVirtualFS.
    */
-  checkForNewFiles(files) {
+  checkForNewFiles(files, baseline) {
     const parentFolderPaths = this.getParentFolderPaths(files);
     const newFiles = [];
 
-    // Iterate bottoms-up over the parent folders and read all filenames inside
+    // Iterate bottom-up over the parent folders and read all filenames inside
     // the coresponding folder. Then, check if any of those files exist inside
     // the `files` parameter. If not, it's a new file.
     for (const folderpath of parentFolderPaths) {
@@ -271,17 +287,11 @@ class API extends BaseAPI {
         const filepath = `${folderpath}/${filename}`;
 
         if (this.fileExists(filepath)) {
-          // Check if the file already exists in the files parameter.
-          const existingFile = files.find((f) => f.path === filepath);
-          const isNewFile = !existingFile;
-
+          const isNewFile = !baseline.has(filepath);
           const stat = this.pyodide.FS.stat(filepath);
-          // `ctime` is only set for files we (re)wrote this run; empty files
-          // can't be written to Pyodide's FS so they never get one. Without a
-          // ctime we can't tell whether the file changed, so treat it as
-          // unmodified rather than crashing on `.getTime()`.
-          const isModified = !isNewFile && existingFile.ctime
-            && existingFile.ctime.getTime() !== stat.mtime.getTime();
+          const isModified =
+            !isNewFile && baseline.get(filepath) !== stat.mtime.getTime();
+
           if (isNewFile || isModified) {
             const content = this.getFileContent(filepath);
             newFiles.push({ name: filename, path: filepath, content });
@@ -294,15 +304,11 @@ class API extends BaseAPI {
     const subFolderFilePaths = this.pyodide.FS.readdir(HOME_DIR);
     for (const filepath of subFolderFilePaths) {
       if (this.fileExists(filepath)) {
-        // Check if the file already exists in the files parameter.
-        const existingFile = files.find((f) => f.path === filepath);
-        const isNewFile = !existingFile;
-
+        const isNewFile = !baseline.has(filepath);
         const stat = this.pyodide.FS.stat(filepath);
-        // See the note above: guard against files without a ctime (e.g. empty
-        // files, which can't be written to Pyodide's FS).
-        const isModified = !isNewFile && existingFile.ctime
-          && existingFile.ctime.getTime() !== stat.mtime.getTime();
+        const isModified =
+          !isNewFile && baseline.get(filepath) !== stat.mtime.getTime();
+
         if (isNewFile || isModified) {
           const content = this.getFileContent(filepath);
           newFiles.push({ name: filepath, path: filepath, content });
@@ -333,11 +339,14 @@ class API extends BaseAPI {
     const filename = hasParent ? name : activeTab.path;
     this.hostWriteCmd(`python3 ${filename}`);
 
+    // Keep track of original file modification times.
+    let baseline = new Map();
+
     try {
       // Ensure that we always operate from the home directory as a fresh start.
       this.pyodide.FS.chdir(HOME_DIR);
 
-      this.writeFilesToVirtualFS(vfsFiles);
+      baseline = this.writeFilesToVirtualFS(vfsFiles);
 
       if (hasParent) {
         // Change directory to the folder of the active file.
@@ -353,7 +362,7 @@ class API extends BaseAPI {
       // might have changed during execution.
       this.pyodide.FS.chdir(HOME_DIR);
 
-      const newFiles = this.checkForNewFiles(vfsFiles);
+      const newFiles = this.checkForNewFiles(vfsFiles, baseline);
       const deletedPaths = this.checkForDeletedFiles(vfsFiles);
 
       this.deleteFilesFromVirtualFS(vfsFiles);

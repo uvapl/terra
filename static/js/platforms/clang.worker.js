@@ -1,8 +1,39 @@
 // This file includes code adapted from wasm-clang (https://github.com/binji/wasm-clang)
 // Licensed under the Apache License 2.0. See LICENSE.wasm-clang for details.
+//
+// MEMFS WORKAROUNDS — read this before upgrading the wasm assets.
+//
+// `static/wasm/c_cpp/{memfs,clang,lld,sysroot.tar}` are prebuilt binaries
+// vendored from wasm-clang in 2024 and never rebuilt; there is no source or
+// build pipeline for them in this repo. They target `wasi_unstable`, i.e. WASI
+// preview0. Several things below exist only to work around defects in that
+// specific memfs build, or depend on preview0 details that preview1 changed.
+// If memfs is ever rebuilt or moved to preview1/wasi-sdk, revisit each:
+//
+//  1. WHENCE_* below are preview0's ordering (CUR=0, END=1, SET=2). Preview1
+//     uses SET=0, CUR=1, END=2. Getting this wrong corrupts reads silently
+//     rather than failing, so re-verify before trusting it.
+//  2. MemFS._readProjectFile replaces memfs's own `fd_read` for project files,
+//     because this build ignores the iovec lengths it is given and copies the
+//     whole rest of the file, overrunning the caller's buffer and leaving the
+//     position at EOF. Once `fd_read` honours iovec lengths and reports the
+//     true count, that method and MemFS._withScratch can both be deleted and
+//     `fd_read` left unwrapped. The test is a read-to-EOF loop
+//     (`while ((c = fgetc(f)) != EOF)`) over a file larger than BUFSIZ.
+//  3. Nothing here fabricates a WASI errno, because preview0 and preview1
+//     number them differently; failures are signalled by letting the real call
+//     produce its own error. Keep it that way.
+//  4. MemFS._loadIfNeeded reads paths straight out of the *calling* module's
+//     memory, which assumes a single preopened root and paths relative to it —
+//     true of this build. See normalizePath for the forms actually observed.
 
 import BaseAPI from './base-api.js';
 import { getPartsFromPath } from '../lib/helpers.js';
+import {
+  FileChannelClient,
+  STATUS_OK,
+  STATUS_TOO_LARGE,
+} from './file-channel.js';
 
 const CLANG_C_FLAGS = [
   '-O0', '-std=c11', '-O0', '-Wall', '-Werror', '-Wextra',
@@ -10,6 +41,28 @@ const CLANG_C_FLAGS = [
   '-Wshadow', '-D_XOPEN_SOURCE'
 ];
 const CLANG_LD_FLAGS = ['-lc', '-lcs50'];
+
+/**
+ * Reduce a path the runtime asked for to its canonical form, so it can be
+ * matched against the project's file list.
+ *
+ * WASI paths here are always relative to the single preopened root, and the
+ * only forms observed from clang and wasi-libc are plain paths, a leading
+ * `./` on a quoted include, and `..` segments from an include like
+ * `#include "../top.h"`.
+ *
+ * @param {string} path - The raw path from the WASI call.
+ * @returns {string} The path with `.` and `..` segments resolved.
+ */
+function normalizePath(path) {
+  const segments = [];
+  for (const segment of path.split('/')) {
+    if (segment === '' || segment === '.') continue;
+    if (segment === '..') segments.pop();
+    else segments.push(segment);
+  }
+  return segments.join('/');
+}
 
 function readStr(u8, o, len = -1) {
   let str = '';
@@ -55,6 +108,13 @@ function getImportObject(obj, names) {
 }
 
 const ESUCCESS = 0;
+
+// `fd_seek` whence values, preview0 ordering — see MEMFS WORKAROUNDS (1) at the
+// top of this file. Verified against this build by logging what C's
+// SEEK_SET/CUR/END actually arrive as, not taken from a spec.
+const WHENCE_CUR = 0;
+const WHENCE_END = 1;
+const WHENCE_SET = 2;
 
 class Memory {
   constructor(memory) {
@@ -111,8 +171,20 @@ class MemFS {
     this.stdinStr = options.stdinStr || "";
     this.stdinStrPos = 0;
     this.memfsFilename = options.memfsFilename;
+    this.hostWriteError = options.hostWriteError;
+    this.fileReader = options.fileReader;
 
     this.hostMem_ = null;  // Set later when wired up to application.
+
+    // Per-run state for on-demand file loading, reset by startRun(). The worker
+    // outlives a run, so these must not persist: re-reading next run is what
+    // picks up edits the user made in between.
+    this.projectFiles = new Set();
+    this.filesRead = new Set();
+    this.dirsCreated = new Set();
+
+    // fd -> canonical path, for project files whose reads are served here.
+    this.openFiles = new Map();
 
     // Imports for memfs module.
     const env = getImportObject(
@@ -122,10 +194,235 @@ class MemFS {
       .then(module => WebAssembly.instantiate(module, { env }))
       .then(instance => {
         this.instance = instance;
-        this.exports = instance.exports;
+        this.exports = this._wrapExports(instance.exports);
         this.mem = new Memory(this.exports.memory);
         this.exports.init();
       });
+  }
+
+  /**
+   * Wrap the WASI calls that take a path, so a project file can be loaded the
+   * first time something opens it, and patch over memfs's broken reads.
+   *
+   * Wrapping here rather than where the table is spliced into the import object
+   * means clang, lld and the user's own program all pick this up unchanged.
+   * `path_open` covers `#include` and `fopen`; `path_filestat_get` covers the
+   * `stat`/`access` probes clang and libc make before opening.
+   *
+   * memfs is a prebuilt binary with no source in this repo, so its behaviour
+   * can only be corrected from here. See MEMFS WORKAROUNDS at the top of this
+   * file before changing any of it.
+   *
+   * @param {WebAssembly.Exports} raw - The instance's own exports.
+   * @returns {object} A copy with the wrapped calls replaced.
+   */
+  _wrapExports(raw) {
+    const wrapped = { ...raw };
+
+    const realOpen = raw.path_open;
+    wrapped.path_open = (...args) => {
+      const [, , pathPtr, pathLen] = args;
+      const canonical = this._loadIfNeeded(pathPtr, pathLen);
+      const result = realOpen(...args);
+
+      // Remember which fd belongs to which project file, so reads on it can be
+      // served here instead of by memfs. args[8] is where the fd is written.
+      if (result === ESUCCESS && canonical && this.hostMem_) {
+        this.hostMem_.check();
+        this.openFiles.set(this.hostMem_.read32(args[8]), canonical);
+      }
+      return result;
+    };
+
+    const realStat = raw.path_filestat_get;
+    wrapped.path_filestat_get = (...args) => {
+      this._loadIfNeeded(args[2], args[3]);
+      return realStat(...args);
+    };
+
+    const realClose = raw.fd_close;
+    wrapped.fd_close = (fd) => {
+      this.openFiles.delete(fd);
+      return realClose(fd);
+    };
+
+    const realRead = raw.fd_read;
+    const realSeek = raw.fd_seek;
+    wrapped.fd_read = (fd, iovs, iovsLen, nreadOut) => {
+      if (!this.openFiles.has(fd)) return realRead(fd, iovs, iovsLen, nreadOut);
+      return this._readProjectFile(realRead, realSeek, fd, iovs, iovsLen, nreadOut);
+    };
+
+    return wrapped;
+  }
+
+   /**
+   * Serve a read from a project file out of memfs's own storage.
+   *
+   * Workaround for a defect in the vendored memfs — see MEMFS WORKAROUNDS (2)
+   * at the top of this file, which also says how to tell when it can go. Its
+   * `fd_read` ignores the buffer lengths it is given and copies the whole rest
+   * of the file, so the copy is done here instead. Its seek and its node
+   * storage are both correct, so those are still used.
+   *
+   * Only files this class loaded are served this way; clang and lld keep the
+   * path they already use, which works for how they read. That keeps the
+   * workaround off the compile path entirely.
+   */
+  _readProjectFile(realRead, realSeek, fd, iovs, iovsLen, nreadOut) {
+    const mem = this.hostMem_;
+    if (!mem || iovsLen < 1) return realRead(fd, iovs, iovsLen, nreadOut);
+
+    mem.check();
+
+    // Copy the request out first, so the array can double as seek scratch.
+    const buffers = [];
+    for (let i = 0; i < iovsLen; i++) {
+      buffers.push({
+        at: mem.read32(iovs + i * 8),
+        length: mem.read32(iovs + i * 8 + 4),
+      });
+    }
+
+    const position = this._withScratch(iovs, () =>
+      realSeek(fd, 0n, WHENCE_CUR, iovs) === ESUCCESS ? this._readU64(iovs) : null);
+    if (position === null) return realRead(fd, iovs, iovsLen, nreadOut);
+
+    this.mem.check();
+    const data = this.getFileContents(this.openFiles.get(fd));
+
+    let written = 0;
+    for (const { at, length } of buffers) {
+      const count = Math.min(length, data.length - position - written);
+      if (count <= 0) break;
+      const from = position + written;
+      mem.write(at, data.subarray(from, from + count));
+      written += count;
+    }
+
+    mem.write32(nreadOut, written);
+    this._withScratch(iovs, () =>
+      realSeek(fd, BigInt(position + written), WHENCE_SET, iovs));
+
+    return ESUCCESS;
+  }
+
+  /**
+   * Run `fn` with the first iovec free to use as scratch, then put it back.
+   *
+   * `fd_seek` reports its result by writing 8 bytes through a pointer, so it
+   * needs writable memory in the *calling* module — which we cannot allocate.
+   * The caller's own iovec array is the one region we know is writable and
+   * whose contents we already hold, so its first entry is borrowed. Nothing
+   * runs in between, and it is restored before the caller sees it again.
+   */
+  _withScratch(iovs, fn) {
+    const mem = this.hostMem_;
+    const savedLo = mem.read32(iovs);
+    const savedHi = mem.read32(iovs + 4);
+    try {
+      return fn();
+    } finally {
+      mem.write32(iovs, savedLo);
+      mem.write32(iovs + 4, savedHi);
+    }
+  }
+
+  /** Read the u64 `fd_seek` wrote at `ptr`. */
+  _readU64(ptr) {
+    return this.hostMem_.read32(ptr) + this.hostMem_.read32(ptr + 4) * 2 ** 32;
+  }
+
+  /**
+   * Begin a run: adopt its file list and drop the previous run's state.
+   *
+   * Every directory in the list is created up front. That is content-free
+   * and cheap, and it means a file can be added mid-`path_open` without having
+   * to build its parents at that point.
+   *
+   * @param {string[]} paths - Canonical paths of every file in the project.
+   */
+  startRun(paths) {
+    this.projectFiles = new Set(paths);
+    this.filesRead.clear();
+    this.dirsCreated.clear();
+    this.openFiles.clear();
+
+    for (const path of paths) {
+      this.ensureDirs(path);
+    }
+  }
+
+  /**
+   * Record that a path is already in memfs, so the wrapper leaves it alone.
+   * Used for the sources, which are added explicitly before compiling.
+   *
+   * @param {string} path - A canonical project path.
+   */
+  markRead(path) {
+    this.filesRead.add(path);
+  }
+
+  /**
+   * Load a file into memfs if the runtime just asked for one we have not read
+   * yet. Anything not in the project's files is left alone, so the real call reports
+   * its own error for it.
+   *
+   * @param {number} pathPtr - Path offset, in the *calling* module's memory.
+   * @param {number} pathLen - Path length in bytes.
+   * @returns {?string} The canonical path when it is a project file that is now
+   * in memfs, else null.
+   */
+  _loadIfNeeded(pathPtr, pathLen) {
+    if (!this.fileReader || this.projectFiles.size === 0 || !this.hostMem_) return null;
+
+    let path;
+    try {
+      this.hostMem_.check();
+      // Decoded as UTF-8 rather than with readStr(), which is latin-1 and stops
+      // at a NUL, and so would mangle a path with non-ASCII characters.
+      path = new TextDecoder().decode(
+        this.hostMem_.u8.subarray(pathPtr, pathPtr + pathLen));
+    } catch {
+      return null;
+    }
+
+    const canonical = normalizePath(path);
+    if (!this.projectFiles.has(canonical)) return null;
+    if (this.filesRead.has(canonical)) return canonical;
+
+    // Recorded before reading, so a failure is not retried on every attempt.
+    this.filesRead.add(canonical);
+
+    const { status, bytes } = this.fileReader.read(canonical);
+    if (status === STATUS_TOO_LARGE) {
+      this.hostWriteError(
+        `Cannot open '${canonical}': file is too large to use while running.\n`);
+      return null;
+    }
+    if (status !== STATUS_OK) return null;
+
+    this.addFile(canonical, bytes);
+    return canonical;
+  }
+
+  /**
+   * Create every parent directory of a path, outermost first, since each node
+   * needs its parent to exist already.
+   *
+   * @param {string} path - A file path.
+   */
+  ensureDirs(path) {
+    const { parentPath } = getPartsFromPath(path);
+    if (!parentPath) return;
+
+    let dirPath = '';
+    for (const segment of parentPath.split('/')) {
+      dirPath = dirPath ? `${dirPath}/${segment}` : segment;
+      if (this.dirsCreated.has(dirPath)) continue;
+      this.dirsCreated.add(dirPath);
+      this.addDirectory(dirPath);
+    }
   }
 
   set hostMem(mem) {
@@ -499,11 +796,19 @@ class API extends BaseAPI {
     this.cflags = CLANG_C_FLAGS;
     this.ldflags = CLANG_LD_FLAGS;
 
+    // Lets the worker read project files from inside a synchronous WASI call.
+    // Absent when the page lacks the COOP/COEP headers.
+    this.fileReader = options.fileChannel
+      ? new FileChannelClient(options.fileChannel, options.requestFile)
+      : null;
+
     this.memfs = new MemFS({
       compileStreaming: this.compileStreaming,
       hostWrite: this.hostWrite,
+      hostWriteError: this.hostWriteError,
       hostRead: this.hostRead,
       sharedMem: this.sharedMem,
+      fileReader: this.fileReader,
       memfsFilename: options.memfs || 'memfs',
     });
 
@@ -534,6 +839,19 @@ class API extends BaseAPI {
     const result = await promise;
     this.hostWrite('done.\n');
     return result;
+  }
+
+  /**
+   * Read a project file, blocking until the main thread answers. Safe to call
+   * from inside a synchronous WASI import.
+   *
+   * @param {string} path - The (VFS-absolute) file path.
+   * @returns {?Uint8Array} The file content, or null when it could not be read.
+   */
+  readProjectFile(path) {
+    if (!this.fileReader) return null;
+    const { status, bytes } = this.fileReader.read(path);
+    return status === STATUS_OK ? bytes : null;
   }
 
   async getModule(name) {
@@ -597,11 +915,16 @@ class API extends BaseAPI {
    *
    * @param {object} data - The data object coming from the worker.
    * @param {string} data.activeTabName - The name of the active editor tab.
-   * @param {array} data.vfsFiles - List of all file objects from the VFS, each
-   * containing the filename and content of the corresponding editor tab.
+   * @param {array} data.vfsFiles - Every file in the VFS. When `lazyFiles` is
+   * set these carry no content, and the file is read on
+   * demand the first time the runtime opens it; otherwise each carries its
+   * content up front.
+   * @param {boolean} data.lazyFiles - Whether `vfsFiles` entries are stubs.
    * @param {array} data.runAsConfig - The configuration for run-code button.
    */
-  async runUserCode({ activeTabPath, vfsFiles, runAsConfig }) {
+  async runUserCode({ activeTabPath, vfsFiles, runAsConfig, lazyFiles }) {
+    await this.ready;
+
     const srcFilenames = runAsConfig
       ? runAsConfig.compileSrcFilenames
       : [activeTabPath];
@@ -609,6 +932,10 @@ class API extends BaseAPI {
     const srcFiles = runAsConfig
       ? vfsFiles.filter((file) => srcFilenames.includes(file.path))
       : vfsFiles.filter((file) => file.path === activeTabPath);
+
+    // An empty list leaves on-demand loading off, so an eager run behaves
+    // exactly as before while still getting its per-run state reset.
+    this.memfs.startRun(lazyFiles ? vfsFiles.map((file) => file.path) : []);
 
     const activeTabName = getPartsFromPath(activeTabPath).name;
     const target = runAsConfig ? runAsConfig.compileTarget : activeTabName.replace(/\.c$/, '');
@@ -639,23 +966,25 @@ class API extends BaseAPI {
 
       // Make parent dirs before creating the final file inside it. Each
       // directory node must be created individually and in order, as its
-      // parent has to exist already.
-      const { parentPath } = getPartsFromPath(file.path);
-      if (parentPath) {
-        const segments = parentPath.split('/');
-        let dirPath = '';
-        for (const segment of segments) {
-          dirPath = dirPath ? `${dirPath}/${segment}` : segment;
-          this.memfs.addDirectory(dirPath);
-        }
+      // parent has to exist already. startRun() has already done this for a
+      // lazy run, and _ensureDirs skips what it created.
+      this.memfs.ensureDirs(file.path);
+
+      // A lazy run gets stubs, so fetch the source we are about to compile.
+      const content = lazyFiles ? this.readProjectFile(file.path) : file.content;
+      if (lazyFiles && content === null) {
+        this.hostWriteError(`Error: could not read ${file.path}\n`);
+        this.runUserCodeCallback();
+        return;
       }
 
-      const basename = file.path.replace(/\.c$/, '');
-      const input = `${basename}.cc`;
-      const obj = `${basename}.o`;
-      this.memfs.addFile(input, file.content);
+      // compile() adds this to memfs itself; keep the wrapper off it.
+      this.memfs.markRead(file.path);
+
+      const input = file.path;
+      const obj = `${file.path.replace(/\.c$/, '')}.o`;
       try {
-        await this.compile({ input, content: file.content, obj });
+        await this.compile({ input, content, obj });
       }
       catch (err) {
         // Signal run-end only when compilation fails (which aborts the run).
@@ -716,10 +1045,15 @@ let currentApp = null;
 const onAnyMessage = async event => {
   switch (event.data.id) {
     case 'constructor':
-      const { port, sharedMem } = event.data.data;
+      const { port, sharedMem, fileChannel } = event.data.data;
       port.onmessage = onAnyMessage;
       api = new API({
         sharedMem,
+        fileChannel,
+
+        requestFile() {
+          port.postMessage({ id: 'readVfsFile' });
+        },
 
         async readBuffer(filename) {
           const response = await fetch(filename);

@@ -98,6 +98,9 @@ export default class VirtualFileSystem extends EventTarget {
     const re = new RegExp(source);
     if (!this._hidePatterns.some((existing) => existing.source === re.source)) {
       this._hidePatterns.push(re);
+      // The worker prunes its recursive walks with these, so hidden files are
+      // never read. Fire-and-forget: message order guarantees later walks see it.
+      this._send('setHidePatterns', [this._hidePatterns.map((p) => p.source)]);
     }
   };
 
@@ -108,15 +111,6 @@ export default class VirtualFileSystem extends EventTarget {
    * @returns {boolean}
    */
   _isHidden = (name) => this._hidePatterns.some((re) => re.test(name));
-
-  /**
-   * Whether any segment of a (possibly nested) path is hidden, so a
-   * hidden folder prunes its whole subtree.
-   *
-   * @param {string} path - A relative path.
-   * @returns {boolean}
-   */
-  _hasHiddenSegment = (path) => path.split('/').some(this._isHidden);
 
   clear = () => this._send('clear');
 
@@ -143,11 +137,20 @@ export default class VirtualFileSystem extends EventTarget {
     return names.filter((name) => !this._isHidden(name));
   };
 
-  getAllFiles = async (path = '', { includeHidden = false } = {}) => {
-    const files = await this._send('getAllFiles', [path]);
-    if (includeHidden) return files;
-    return files.filter((file) => !this._hasHiddenSegment(file.path));
-  };
+  getAllFiles = (path = '', { includeHidden = false } = {}) =>
+    this._send('getAllFiles', [path, includeHidden]);
+
+  /**
+   * List every file without reading content. Prefer this over `getAllFiles`
+   * when only paths or sizes are needed, since it does not touch file bytes.
+   *
+   * @param {string} [path] - Folder to list. Empty for the project root.
+   * @param {object} [options]
+   * @param {boolean} [options.includeHidden] - Include hide-pattern matches.
+   * @returns {Promise<object[]>} Objects of `{ path, size, mtime }`.
+   */
+  getFileList = (path = '', { includeHidden = false } = {}) =>
+    this._send('getFileList', [path, includeHidden]);
 
   pathExists = (path) => this._send('pathExists', [path]);
 
@@ -222,16 +225,22 @@ export default class VirtualFileSystem extends EventTarget {
     const zip = new JSZip();
     const rootFolderZip = zip.folder(name);
 
-    // Put all files from this folder into the zip file.
+    // Walk the file list and read one file at a time, rather than pulling the
+    // whole folder's content into an array first: that held every file twice,
+    // once in the array and once in the zip. JSZip still keeps what it is given
+    // until it generates, so this is not fully streamed — bounding that too
+    // would mean a streaming zip writer.
     // Note that empty directories will not be zipped.
-    const allFiles = await this.getAllFiles(path);
-    for (const file of allFiles) {
-      rootFolderZip.file(file.path, file.content);
+    // Listed paths are relative to the folder being downloaded, which is what
+    // the zip entries want; reading needs the full path.
+    const files = await this.getFileList(path);
+    for (const file of files) {
+      const fullPath = path ? `${path}/${file.path}` : file.path;
+      rootFolderZip.file(file.path, await this.readFile(fullPath));
     }
 
-    zip.generateAsync({ type: 'blob' }).then((content) => {
-      saveAs(content, `${name}.zip`);
-    });
+    const blob = await zip.generateAsync({ type: 'blob' });
+    saveAs(blob, `${name}.zip`);
   };
 }
 

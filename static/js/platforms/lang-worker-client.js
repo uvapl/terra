@@ -1,26 +1,27 @@
+import {
+  CHANNEL_BYTES,
+  FileChannelServer,
+  STATUS_INTERNAL,
+  STATUS_NOT_FOUND,
+  STATUS_TOO_LARGE,
+} from './file-channel.js';
+import { FileNotFoundError, FileTooLargeError } from '../fs/vfs.js';
+
 /**
- * Registry mapping a programming language to its worker script and, for
- * plugin-provided languages, the plugin that owns it. Built-in languages are
- * registered here (owner `null`); plugins add more via registerLang(), which is
- * how a plugin-provided language (e.g. Karel) joins the same run pipeline as C
- * and Python without any other core change. The owner lets a worker's custom
- * messages be routed back to just that plugin instead of every plugin.
+ * Built-in languages are registered here with owner `null`. Plugins may add
+ * more via registerLang(). The owner lets a worker's custom messages be routed
+ * back to just that plugin instead of every plugin.
  * @type {Object<string, { path: string, owner: ?string }>}
  */
 const workers = {
-  c: { path: 'static/js/platforms/clang.worker.js', owner: null },
-  py: { path: 'static/js/platforms/py.worker.js', owner: null },
+  c: { path: 'static/js/platforms/clang.worker.js', owner: null, lazyFiles: true },
+  py: { path: 'static/js/platforms/py.worker.js', owner: null, lazyFiles: false },
 };
 
 
 /**
- * Main-thread client that fronts a language worker.
- *
- * This class is a pure transport layer: it owns the `Worker` instance and its
- * shared memory, posts commands to it, routes incoming messages, and manages the
- * worker lifecycle (spawn/terminate/restart). It has no knowledge of the DOM, the
- * app, or the VFS — all UI and app-side reactions are delegated to the handlers
- * object passed to the constructor.
+ * Main-thread client that manages language workers and provides a
+ * communication channel for the currently activated language worker.
  */
 export default class LangWorkerClient {
   /**
@@ -81,8 +82,23 @@ export default class LangWorkerClient {
   handlers = null;
 
   /**
-   * The client is created once and persists for the lifetime of the app. It does
-   * not spawn a worker until load() is called for a supported language.
+   * Shared buffer the worker uses to request project files, and the server end
+   * that answers on it. Null when shared memory is unavailable.
+   * @type {?SharedArrayBuffer}
+   */
+  fileChannel = null;
+  fileChannelServer = null;
+
+  /**
+   * File content resolved during the current run, keyed by path. Cleared when
+   * the run ends so edits are picked up next time.
+   * @type {Map<string, Uint8Array>}
+   */
+  _fileCache = new Map();
+
+  /**
+   * The constructor receives references to handlers that the app provides.
+   * This client is created once during the lifetime of the app.
    *
    * @param {object} handlers - App-side reaction callbacks. Required keys:
    * onReady, onWrite, onWriteError, onRequestStdin, onRunSnippetDone,
@@ -111,8 +127,20 @@ export default class LangWorkerClient {
    * @param {?string} owner - Name of the plugin registering the language; it
    *   receives this language's custom worker messages (see onWorkerMessage).
    */
-  registerLang(proglang, workerPath, owner = null) {
-    workers[proglang] = { path: workerPath, owner };
+  registerLang(proglang, workerPath, owner = null, { lazyFiles = false } = {}) {
+    workers[proglang] = { path: workerPath, owner, lazyFiles };
+  }
+
+  /**
+   * Whether this language's worker reads project files on demand instead of
+   * being handed their content up front. Callers use this to decide what to put
+   * in the run payload.
+   *
+   * @param {string} proglang - The programming language.
+   * @returns {boolean}
+   */
+  usesLazyFiles(proglang) {
+    return !!workers[proglang]?.lazyFiles && this.hasSharedMemoryEnabled();
   }
 
   /**
@@ -139,9 +167,7 @@ export default class LangWorkerClient {
   }
 
   /**
-   * Spawn, switch, or tear down the worker thread for a given language. This is
-   * the single entry point the app uses to keep the worker in sync with the
-   * active programming language.
+   * Start, switch, or terminate the worker thread for a given language.
    *
    * @param {string} proglang - The programming language to load a worker for.
    */
@@ -152,13 +178,13 @@ export default class LangWorkerClient {
       return Promise.resolve();
     }
 
-    // Switching languages: tear down the current worker first, while
-    // this.proglang still names it (so terminate() logs the right one).
+    // Switching languages: terminate the current worker first, while
+    // this.proglang still names it.
     if (this.worker && this.proglang !== proglang) {
       this.terminate();
     }
 
-    // Worker already exists and is ready: resolve immediately.
+    // Worker already exists and is ready: nothing to be done.
     if (this.worker && this.isReady) {
       return Promise.resolve();
     }
@@ -175,7 +201,7 @@ export default class LangWorkerClient {
   /**
    * Checks whether the browser enabled support for WebAssembly.Memory object
    * usage by trying to create a new SharedArrayBuffer object. This object can
-   * only be created whenever both the Cross-Origin-Opener-Policy and
+   * only be created when both Cross-Origin-Opener-Policy and
    * Cross-Origin-Embedder-Policy headers are set.
    *
    * @returns {boolean} True if browser supports shared memory, false otherwise.
@@ -190,37 +216,32 @@ export default class LangWorkerClient {
   }
 
   /**
-   * Terminate the active worker process. Safe to call when idle. If a program
-   * was running when killed, the run-ended handler is invoked so the app can
-   * reset its UI and clean up the terminal; a clean post-run restart (where the
-   * run already reported completion) stays silent.
+   * Terminate the active worker process. If a program was running when killed,
+   * the run-ended handler is invoked so the app can reset its UI and clean up
+   * the terminal.
    */
   terminate() {
     const wasRunning = this.isRunningCode;
     this._destroyWorker();
 
-    // Only when we abort a still-running program: a normal run already reported
-    // its end via the 'runUserCodeCallback' message, so the Pyodide post-run
-    // self-restart must not fire it again.
+    // Only when we abort a still-running program:
     if (wasRunning) {
       this.handlers.onRunEnded();
     }
   }
 
   /**
-   * Pure transport teardown: kill the active worker and reset client state.
-   * Safe to call when idle. Has no app/UI side effects — callers that need to
-   * report the run as ended (terminate) or recreate the worker (restart) do so
-   * themselves.
+   * Destroy the current worker and clean up state.
    */
   _destroyWorker() {
-    // Safe to call when idle: nothing to tear down without an active worker.
+    // Safe to call when idle
     if (!this.worker) {
       return;
     }
 
     console.log(`Terminating existing ${this.proglang} worker`);
 
+    this._clearFileCache();
     this.isRunningCode = false;
     this.isReady = false;
     this._readyResolver = null;
@@ -231,7 +252,7 @@ export default class LangWorkerClient {
 
   /**
    * Spawn a new worker process for the current proglang. Callers are responsible
-   * for terminating any existing worker first (see load() and restart()).
+   * for terminating any existing worker first (load() and restart()).
    */
   _createWorker() {
     this.isReady = false;
@@ -255,6 +276,18 @@ export default class LangWorkerClient {
         shared: true,
       });
       constructorData.sharedMem = this.sharedMem;
+
+      // Separate buffer from sharedMem: that one is a 64 KiB, NUL-terminated,
+      // latin-1 stdin slot and cannot carry binary file content.
+      this.fileChannel = new SharedArrayBuffer(CHANNEL_BYTES);
+      this.fileChannelServer = new FileChannelServer(this.fileChannel);
+      constructorData.fileChannel = this.fileChannel;
+    } else {
+      // Without them the new worker has no channel, so don't leave one behind
+      // from a previous spawn pointing at memory it cannot see.
+      this.sharedMem = null;
+      this.fileChannel = null;
+      this.fileChannelServer = null;
     }
 
     this.worker.postMessage({
@@ -271,7 +304,14 @@ export default class LangWorkerClient {
     this.handlers.onRunStarted();
     this.port.postMessage({
       id: 'runUserCode',
-      data: { activeTabPath: filepath, vfsFiles: files, runAsConfig },
+      data: {
+        activeTabPath: filepath,
+        vfsFiles: files,
+        runAsConfig,
+        // Tells the worker whether `vfsFiles` entries carry content or are
+        // name-only entries that can later be lazy-loaded.
+        lazyFiles: this.usesLazyFiles(proglang),
+      },
     });
   }
 
@@ -313,6 +353,33 @@ export default class LangWorkerClient {
     if (wasRunning) {
       this.handlers.onRunEnded();
     }
+  }
+
+  /**
+   * Answer a pending file request from the worker through
+   * `handlers.onReadFile`. Results are cached.
+   */
+  async _serveVfsRead() {
+    const server = this.fileChannelServer;
+
+    // The worker is blocked until we answer, and cannot time out, so every
+    // path through here must reach exactly one respond/respondError.
+    try {
+      const path = server.requestedPath();
+      let bytes = this._fileCache.get(path);
+      if (!bytes) {
+        bytes = toBytes(await this.handlers.onReadFile(path));
+        this._fileCache.set(path, bytes);
+      }
+      server.respond(bytes);
+    } catch (err) {
+      server.respondError(fileErrorStatus(err));
+    }
+  }
+
+  /** Remove per-run file content, so the next run sees edited files. */
+  _clearFileCache() {
+    this._fileCache.clear();
   }
 
   /**
@@ -379,6 +446,12 @@ export default class LangWorkerClient {
         this.handlers.onRequestStdin().then((value) => this.provideStdin(value));
         break;
 
+      // The worker is blocked waiting on a project file. Resolve it and write
+      // the answer into the shared channel, which unblocks it.
+      case 'readVfsFile':
+        this._serveVfsRead();
+        break;
+
       // Run custom config button callback from the worker instance.
       // This event will be triggered after a custom config button's command has
       // been executed.
@@ -394,6 +467,7 @@ export default class LangWorkerClient {
         // Run user code callback invoked from the worker instance. This event
         // will be triggered after excecuting the user's code.
         this.isRunningCode = false;
+        this._clearFileCache();
         this.handlers.onRunEnded();
         break;
 
@@ -418,4 +492,30 @@ export default class LangWorkerClient {
         break;
     }
   }
+}
+
+/**
+ * Normalise file content to bytes. Text is encoded as UTF-8; the channel is
+ * byte-oriented, so nothing may be passed through as a JS string.
+ *
+ * @param {string|ArrayBuffer|Uint8Array} content
+ * @returns {Uint8Array}
+ */
+function toBytes(content) {
+  if (content instanceof Uint8Array) return content;
+  if (content instanceof ArrayBuffer) return new Uint8Array(content);
+  return new TextEncoder().encode(String(content ?? ''));
+}
+
+/**
+ * Map a file-resolution failure onto a channel status code.
+ *
+ * @param {Error} err
+ * @returns {number} One of the STATUS_* values.
+ */
+function fileErrorStatus(err) {
+  if (err instanceof FileNotFoundError) return STATUS_NOT_FOUND;
+  if (err instanceof FileTooLargeError) return STATUS_TOO_LARGE;
+  console.error('Unexpected error reading a file for the worker:', err);
+  return STATUS_INTERNAL;
 }

@@ -403,6 +403,22 @@ export default class App extends BaseApp {
       onRequestStdin: () => this.term.waitForInput(),
 
       /**
+       * The worker is requesting the content of a single project file.
+       *
+       * Exam hidden files live only in memory and are never in the VFS, so they
+       * are checked first. Throws FileNotFoundError / FileTooLargeError, which
+       * the client turns into a status for the worker.
+       *
+       * @param {string} path - The (VFS-absolute) file to read.
+       * @returns {Promise<string|ArrayBuffer>} The file content.
+       */
+      onReadFile: (path) => {
+        const hidden = this._hiddenFileMap?.get(path);
+        if (hidden !== undefined) return Promise.resolve(hidden);
+        return this.vfs.readFile(path, MAX_FILE_SIZE);
+      },
+
+      /**
        * A custom config button's command has finished executing.
        */
       onRunSnippetDone: () => {
@@ -560,8 +576,7 @@ export default class App extends BaseApp {
     triggerPluginEvent('onRunStart');
     this.term.focus();
 
-    let files = await this.vfs.getAllFiles();
-    files = files.concat(this.getHiddenFiles());
+    const files = await this.getRunFiles(getFileExtension(filepath));
 
     // Only resolve the runAs config when actually running "as", because
     // getRunAsConfig() reads the active editor's path and throws when there is
@@ -596,8 +611,7 @@ export default class App extends BaseApp {
 
     const filename = this.view.getActiveEditor().getFilename();
     const proglang = getFileExtension(filename);
-    let files = await this.vfs.getAllFiles();
-    files = files.concat(this.getHiddenFiles());
+    const files = await this.getRunFiles(proglang);
 
     this.langWorkerClient.runSnippet(proglang, selector, filename, cmd, files);
   }
@@ -632,6 +646,33 @@ export default class App extends BaseApp {
    */
   getHiddenFiles() {
     return [];
+  }
+
+  /**
+   * Build the file payload for a run.
+   *
+   * Languages whose worker reads files on demand get a list without content,
+   * so a large project costs nothing to start; the worker pulls what it opens
+   * back through `onReadFile`. Everything else still gets full content up front.
+   *
+   * Either way the hidden files are included, and their content is kept in
+   * `_hiddenFileMap` because they exist only in memory, never in the VFS.
+   *
+   * @param {string} proglang - The language about to run.
+   * @returns {Promise<object[]>} Objects with `path`, and `content` when eager.
+   */
+  async getRunFiles(proglang) {
+    const hidden = this.getHiddenFiles();
+    this._hiddenFileMap = new Map(hidden.map((f) => [f.path, f.content]));
+
+    if (!this.langWorkerClient.usesLazyFiles(proglang)) {
+      return (await this.vfs.getAllFiles()).concat(hidden);
+    }
+
+    const files = await this.vfs.getFileList();
+    return files.concat(
+      hidden.map(({ path, content }) => ({ path, size: content.length }))
+    );
   }
 
   /**

@@ -55,7 +55,7 @@ const KAREL_COMPLETIONS = [
  * @returns {Promise<string[]>} Sorted, de-duplicated world names.
  */
 const listWorldNames = async () => {
-  const files = await Terra.app.vfs.getAllFiles();
+  const files = await Terra.app.vfs.getFileList();
   const fromVfs = files
     .map((file) => file.path.split('/').pop())
     .filter((name) => name.endsWith('.w'))
@@ -493,13 +493,17 @@ export default class KarelPlugin extends TerraPlugin {
     // The ".w" extension is optional in the WORLD directive.
     const candidates = name.endsWith('.w') ? [name] : [`${name}.w`, name];
 
-    const files = await Terra.app.vfs.getAllFiles();
+    // Match against the file list first, so only the world file itself is read.
+    const files = await Terra.app.vfs.getFileList();
     for (const candidate of candidates) {
       const fromVfs = files.find(
         (file) => file.path === candidate || file.path.split('/').pop() === candidate
       );
-      if (fromVfs && typeof fromVfs.content === 'string') {
-        return fromVfs.content;
+      if (fromVfs) {
+        const content = await Terra.app.vfs.readFile(fromVfs.path);
+        if (typeof content === 'string') {
+          return content;
+        }
       }
     }
 
