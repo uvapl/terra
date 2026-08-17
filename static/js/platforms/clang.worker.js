@@ -249,6 +249,52 @@ class MemFS {
 
 const RAF_PROC_EXIT_CODE = 0xC0C0A;
 
+// A wasm trap says what the engine tripped over, not what the program did
+// wrong, and the wording differs per browser. Map the traps that student code
+// runs into onto the error they would have gotten outside the browser.
+const RUNTIME_ERRORS = [
+  // Calling through a bad function pointer, which is what reading from a FILE *
+  // that fopen returned NULL for comes down to.
+  [
+    /null function|signature mismatch|call_indirect/i,
+    'Segmentation fault. Did you use a pointer that is NULL, ' +
+    'for instance the result of an fopen that failed?',
+  ],
+  // Reading or writing outside of the program's memory.
+  [
+    /out of bounds/i,
+    'Segmentation fault. Did you index outside of an array, ' +
+    'or use a pointer that does not point at anything?',
+  ],
+  // Blowing the stack, usually recursion without a base case.
+  [
+    /call stack|recursion|stack overflow/i,
+    'Stack overflow. Did you write a recursive function that never stops?',
+  ],
+];
+
+/**
+ * Describe an error thrown while running the user's program in terms a student
+ * can act on, falling back to the original message.
+ *
+ * @param {Error} exn - The error that was thrown.
+ * @returns {string} The message to print.
+ */
+function describeRuntimeError(exn) {
+  const isTrap = exn instanceof WebAssembly.RuntimeError
+    || exn instanceof RangeError;
+
+  if (isTrap) {
+    for (const [pattern, message] of RUNTIME_ERRORS) {
+      if (pattern.test(exn.message)) {
+        return message;
+      }
+    }
+  }
+
+  return exn.message;
+}
+
 class App {
   constructor(module, memfs, name, ...args) {
     this.argv = [name, ...args];
@@ -299,7 +345,7 @@ class App {
       }
 
       // Write error message.
-      let msg = `\x1b[91mError: ${exn.message}`;
+      let msg = `\x1b[91mError: ${describeRuntimeError(exn)}`;
       if (writeStack) {
         msg = msg + `\n${exn.stack}`;
       }
