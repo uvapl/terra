@@ -249,12 +249,9 @@ class MemFS {
 
 const RAF_PROC_EXIT_CODE = 0xC0C0A;
 
-// A wasm trap says what the engine tripped over, not what the program did
-// wrong, and the wording differs per browser. Map the traps that student code
-// runs into onto the error they would have gotten outside the browser.
+// Convert WASM-specific runtime errors to more common C/Linux-style messages.
 const RUNTIME_ERRORS = [
-  // Calling through a bad function pointer, which is what reading from a FILE *
-  // that fopen returned NULL for comes down to.
+  // Bad "function pointer" apparently includes NULL file pointers.
   [
     /null function|signature mismatch|call_indirect/i,
     'Segmentation fault. Did you use a pointer that is NULL, ' +
@@ -266,7 +263,7 @@ const RUNTIME_ERRORS = [
     'Segmentation fault. Did you index outside of an array, ' +
     'or use a pointer that does not point at anything?',
   ],
-  // Blowing the stack, usually recursion without a base case.
+  // Stack.
   [
     /call stack|recursion|stack overflow/i,
     'Stack overflow. Did you write a recursive function that never stops?',
