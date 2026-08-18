@@ -44,6 +44,12 @@ export default class IDELayout extends FlexibleLayout {
           {
             type: 'stack',
             id: 'outputStack',
+            // Closable, unlike the base default's output stack: the IDE wraps
+            // the output area in a container of its own (see
+            // FlexibleLayout._ensureOutputWrapper), so the area survives on its
+            // own and GoldenLayout is free to take this stack away once its last
+            // tab is closed or dragged elsewhere.
+            isClosable: true,
             content: [
               createTabConfig(
                 { kind: 'terminal', title: 'Terminal', isClosable: true },

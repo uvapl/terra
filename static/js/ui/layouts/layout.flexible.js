@@ -2,9 +2,9 @@ import Layout from './layout.js';
 import { isEditorItem, isOutputItem } from './tab-config.js';
 
 /**
- * Whether the component is an output tab *other* than the default terminal.
+ * An output tab other than the terminal.
  *
- * @param {BaseTab} component - an open tab component
+ * @param {BaseTab} component
  * @returns {boolean}
  */
 function isExtraOutput(component) {
@@ -13,23 +13,42 @@ function isExtraOutput(component) {
 }
 
 /**
- * A Layout the user can restructure at runtime: flip the orientation and
- * split/merge tabs into separate stacks (while keeping a distinction between
- * editor tabs and output tabs).
+ * Id of the container that holds the output area.
+ * @type {string}
+ */
+const OUTPUT_AREA_ID = 'outputArea';
+
+/**
+ * Whether the item is, or contains, an output tab.
  *
- * We build on the base Layout that contains basic placement functionality
- * but does not allow user customization of the layout.
+ * @param {ContentItem} item
+ * @returns {boolean}
+ */
+function holdsOutput(item) {
+  return item.isComponent ? isOutputItem(item) : (item.contentItems || []).some(holdsOutput);
+}
+
+/**
+ * A layout the user can restructure at runtime, on top of the base Layout,
+ * which places tabs but does not let the user rearrange them.
+ *
+ * Tabs belong to one of two areas and never share a stack across them: the
+ * editors, and the output (terminal, canvas, images). Either area may be spread
+ * over several stacks — by dragging a tab out, or through the output's
+ * split/merge toggle. All output stacks are kept together in one container, so
+ * that output never ends up beside the editors; that container is the one item
+ * of the area that is never removed, so the area survives however its stacks
+ * come and go.
+ *
+ * Restructuring moves live components between stacks and never recreates them:
+ * editors keep their history, the terminal its scrollback and worker.
  */
 export default class FlexibleLayout extends Layout {
   /**
-   * Switch the layout orientation at runtime, in place, and without recreating
-   * any component (editors keep their undo history, the terminal its
-   * scrollback and worker). Creates a new root container in the requested
-   * orientation and relocates the existing stacks into it. And to make it even
-   * more elegant, when the output area is split, its container is rebuilt
-   * perpendicular to the new axis (row when vertical, column when horizontal).
+   * Put the output area below the editors (vertical) or beside them
+   * (horizontal).
    *
-   * @param {string} orientation - 'horizontal' | 'vertical'.
+   * @param {'horizontal'|'vertical'} orientation
    */
   setOrientation(orientation) {
     if (orientation !== 'horizontal' && orientation !== 'vertical') return;
@@ -39,39 +58,24 @@ export default class FlexibleLayout extends Layout {
     if (!oldMain) { this._orientation = orientation; return; }
 
     const mainType = orientation === 'vertical' ? 'column' : 'row';
-    // Split output stays perpendicular to the main axis.
     const outputType = orientation === 'vertical' ? 'row' : 'column';
 
-    // Snapshot the live top-level children before any reparenting.
     const children = [...oldMain.contentItems];
 
-    // Identify the output sub-tree (the one main child whose subtree holds output
-    // components) so only it is rebuilt perpendicular; editor stacks move as-is.
-    const isOutput = (item) => item.isComponent
-      ? isOutputItem(item)
-      : (item.contentItems || []).some(isOutput);
-
-    // Empty container of the new axis, swapped into the root in place of oldMain.
-    // No 3rd arg => oldMain (still holding the live stacks) is detached from the
-    // DOM but NOT destroyed, so its stacks survive for relocation. It is left
-    // unreferenced afterwards (destroying it would destroy the moved stacks) and
-    // is garbage-collected.
     const newMain = this._createItem(
       { type: mainType, content: [], isClosable: false }, this.root
     );
     this.root.replaceChild(oldMain, newMain);
 
-    // Relocate each live top-level item into newMain (moving DOM, not recreating).
     for (const child of children) {
-      if (!child.isStack && isOutput(child)) {
-        // Split output: rebuild perpendicular and move its stacks across.
+      if (!child.isStack && holdsOutput(child)) {
         const perp = this._createItem(
-          { type: outputType, content: [], id: child.id }, newMain
+          { type: outputType, content: [], id: child.id, isClosable: false }, newMain
         );
         newMain.addChild(perp);
-        [...child.contentItems].forEach((stack) => perp.addChild(stack));
+        [...child.contentItems].forEach((item) => perp.addChild(item));
       } else {
-        newMain.addChild(child); // editor stack(s) / single output stack
+        newMain.addChild(child);
       }
     }
 
@@ -80,11 +84,8 @@ export default class FlexibleLayout extends Layout {
   }
 
   /**
-   * Re-apply the orientation-dependent side effects after an in-place flip —
-   * those the destroy/recreate path used to get for free, minus anything that
-   * touches components. Updates the View ▸ Orientation menu state, re-tags the
-   * areas and re-renders the output split/merge toggle (its icon depends on
-   * orientation), and relays out so Ace/xterm recompute against the new geometry.
+   * Bring the menu, the output toggle and the components' geometry back in line
+   * with the orientation.
    */
   _afterOrientationChanged() {
     $('#menu-item--orientation-horizontal').toggleClass('active', !this.vertical);
@@ -95,12 +96,11 @@ export default class FlexibleLayout extends Layout {
   }
 
   /**
-   * Wire up the runtime-restructuring controls once the layout is initialised:
-   * tag the stacks, render the split/merge toggle, and keep both in sync with any
-   * structural change (tab add/remove/move, manual split/merge via drag).
-   * Overrides the base no-op hook.
+   * Set up the output area and its controls once the layout is initialised, and
+   * keep them in line with every later change. Overrides the base no-op hook.
    */
   _initStructureControls() {
+    this._ensureOutputWrapper();
     this._tagAreas();
     if (this.renderOutputArrangeControls()) {
       const { sig, firstEl } = this._outputSignature();
@@ -112,11 +112,41 @@ export default class FlexibleLayout extends Layout {
   }
 
   /**
-   * The output stack the split/merge toggle is anchored to. The toggle lives in
-   * a stack header's top-right controls, so it should sit in the corner of the
-   * whole output area: the first (topmost) stack when the split output is stacked
-   * vertically (horizontal main layout → output column), but the last (rightmost)
-   * stack when it is laid out horizontally (vertical main layout → output row).
+   * The container holding the output area, built around whatever output the tree
+   * has when there is none yet.
+   *
+   * @returns {?ContentItem}
+   */
+  _ensureOutputWrapper() {
+    const main = this.getMainContainer();
+    if (!main) return null;
+
+    const existing = main.contentItems.find((item) => item.id === OUTPUT_AREA_ID);
+    if (existing) return existing;
+
+    const wrapper = this._createItem(
+      { type: this.vertical ? 'row' : 'column', id: OUTPUT_AREA_ID, isClosable: false, content: [] },
+      main,
+    );
+
+    const children = main.contentItems.filter(holdsOutput);
+    if (children.length === 0) {
+      main.addChild(wrapper);
+      return wrapper;
+    }
+
+    main.replaceChild(children[0], wrapper);
+    children.forEach((child) => {
+      if (main.contentItems.indexOf(child) !== -1) main.removeChild(child, true);
+      wrapper.addChild(child);
+    });
+
+    return wrapper;
+  }
+
+  /**
+   * The output stack whose header carries the split/merge toggle: the one in the
+   * outer corner of the output area.
    *
    * @returns {?Stack}
    */
@@ -127,10 +157,7 @@ export default class FlexibleLayout extends Layout {
   }
 
   /**
-   * Stamp every stack with a `_terraArea` marker ('editor' | 'output') based on
-   * its content, so the drag constraint can tell which area a drop target
-   * belongs to regardless of how the tree is split or flattened. Empty stacks
-   * (transient mid-drag) keep their previous tag.
+   * Mark which area each stack belongs to, for the drag constraint to read.
    */
   _tagAreas() {
     this._allStacks().forEach((stack) => {
@@ -140,10 +167,9 @@ export default class FlexibleLayout extends Layout {
   }
 
   /**
-   * Whether this is the only editor stack. Used by the drag constraint to refuse
-   * a drag of its last tab.
+   * Whether this is the only editor stack, and so has to keep its last tab.
    *
-   * @param {Stack} stack - The stack a drag is starting from.
+   * @param {Stack} stack
    * @returns {boolean}
    */
   isSoleEditorStack(stack) {
@@ -152,8 +178,7 @@ export default class FlexibleLayout extends Layout {
   }
 
   /**
-   * Apply the user's remembered split/merge choice to the output area, called
-   * when a tab is added to it.
+   * Arrange a newly added output tab the way the user last chose.
    */
   _applyOutputArrangementPreference() {
     const arrangement = this.delegate?.getStoredOutputArrangement?.();
@@ -162,130 +187,75 @@ export default class FlexibleLayout extends Layout {
     }
   }
 
-  /** @returns {boolean} Whether the output tabs are spread across multiple stacks. */
+  /** @returns {boolean} Whether the output tabs are spread over several stacks. */
   isOutputSplit() {
     return this._allStacks().filter((stack) => this._isOutputStack(stack)).length > 1;
   }
 
   /**
-   * Finds (or even creates a stack) where a dragged tab can be placed, just in
-   * case it is dropped at an invalid place.
+   * A stack to put a dragged tab in when its own stack is gone and the drop
+   * landed nowhere.
    *
-   * @param {ContentItem} contentItem - The dragged tab.
+   * @param {ContentItem} contentItem
    * @param {?Stack} originalParent - The tab's stack at drag start.
-   * @returns {?Stack}
+   * @returns {?Stack} Null to leave the drop to GoldenLayout.
    */
   ensureDropHome(contentItem, originalParent) {
     const stacks = this._allStacks();
 
-    // Original stack still in the tree: let GoldenLayout revert there as usual.
     if (originalParent && stacks.includes(originalParent)) return null;
 
     const isEditor = isEditorItem(contentItem);
     const home = stacks.find((stack) => isEditor ? this._isEditorStack(stack) : this._isOutputStack(stack));
     if (home) return home;
 
-    // Nothing exists? Then create a new stack in main container (editors
-    // first, output last).
-    const main = this.getMainContainer();
-    if (!main) return null;
+    const parent = isEditor ? this.getMainContainer() : this._ensureOutputWrapper();
+    if (!parent) return null;
 
-    const index = isEditor ? 0 : main.contentItems.length;
-    main.addChild(this._createItem({ type: 'stack', isClosable: true }, main), index);
-    return main.contentItems[index] ?? null;
+    const index = isEditor ? 0 : parent.contentItems.length;
+    parent.addChild(this._createItem({ type: 'stack', isClosable: true }, parent), index);
+    return parent.contentItems[index] ?? null;
   }
 
   /**
-   * Rearrange the output tabs, leaving the editor stacks untouched. 'stacked'
-   * collapses the output tabs into one stack; 'split' gives each its own stack
-   * laid out perpendicular to the main orientation (a row when the layout is
-   * vertical, a column when horizontal — perpendicular nesting survives
-   * GoldenLayout's same-axis flattening).
+   * Gather the output tabs into one stack, or give each of them a stack of its
+   * own across the output area. Leaves the editors untouched.
    *
-   * Mutates only the output subtree in place: the live output components
-   * (terminal/canvas/image) are *relocated* between stacks, never recreated, so
-   * the terminal keeps its scrollback and worker connection and — crucially —
-   * the editors are never reloaded. This relies on GoldenLayout's
-   * `Stack.addChild(liveItem)` reparenting the item's DOM element, the same
-   * mechanism its drag-and-drop uses; `removeChild(item, true)` detaches without
-   * destroying.
-   *
-   * @param {string} mode - 'stacked' | 'split'.
+   * @param {'stacked'|'split'} mode
    */
   arrangeOutput(mode) {
-    const main = this.getMainContainer();
-    if (!main) return;
+    const wrapper = this._ensureOutputWrapper();
+    if (!wrapper) return;
 
-    // The output area is the single main child whose subtree holds output tabs
-    // (editors and output never share a stack, and the output is always
-    // consolidated into one child). Collect its live components in visual order.
-    const isOutput = (item) => item.isComponent
-      ? isOutputItem(item)
-      : (item.contentItems || []).some(isOutput);
-    const oldContainer = main.contentItems.find(isOutput);
-    if (!oldContainer) return;
-
-    const comps = [];
-    const walk = (item) => {
-      if (item.isComponent) comps.push(item);
-      else (item.contentItems || []).forEach(walk);
-    };
-    walk(oldContainer);
+    const oldStacks = this._allStacks().filter((stack) => this._isOutputStack(stack));
+    const comps = oldStacks.flatMap((stack) => stack.contentItems.filter(isOutputItem));
     if (comps.length === 0) return;
 
     const split = mode === 'split' && comps.length > 1;
 
-    // For 'split' every output tab has its own stack
-    const outputStackCount = this._allStacks().filter((s) => this._isOutputStack(s)).length;
-    if (split ? outputStackCount === comps.length : !this.isOutputSplit()) return;
+    if (split ? oldStacks.length === comps.length : oldStacks.length === 1) return;
 
-    // Build the new (empty) output container appended after the old one; removing
-    // the old one afterwards leaves it last (editors stay first).
-    main.addChild(
-      this._createItem(
-        split
-          ? { type: this.vertical ? 'row' : 'column', id: 'outputStack' }
-          : { type: 'stack', id: 'outputStack', isClosable: false },
-        main,
-      ),
-      main.contentItems.length
-    );
-    const newContainer = main.contentItems[main.contentItems.length - 1];
+    const newStacks = (split ? comps : [null]).map(() => {
+      const stack = this._createItem(
+        split ? { type: 'stack' } : { type: 'stack', id: 'outputStack' }, wrapper,
+      );
+      wrapper.addChild(stack);
+      return stack;
+    });
 
-    // Relocate (not recreate) each live component into the new structure. Split
-    // gives each its own stack; stacked drops them all into the one stack.
-    const relocate = (stack, comp) => {
+    // Moved, not recreated; the stacks left empty then remove themselves.
+    comps.forEach((comp, index) => {
       comp.parent.removeChild(comp, true);
-      stack.addChild(comp);
-    };
-    if (split) {
-      comps.forEach((comp) => {
-        newContainer.addChild(this._createItem({ type: 'stack' }, newContainer));
-        relocate(newContainer.contentItems[newContainer.contentItems.length - 1], comp);
-      });
-    } else {
-      comps.forEach((comp) => relocate(newContainer, comp));
-    }
+      newStacks[split ? index : 0].addChild(comp);
+    });
 
-    // Drop the emptied old container. A non-closable stack won't self-remove when
-    // emptied (closable split stacks already did), so remove it explicitly if it
-    // is still attached.
-    if (main.contentItems.indexOf(oldContainer) !== -1) {
-      main.removeChild(oldContainer);
-    }
-
-    this.outputStack = newContainer.isStack ? newContainer : newContainer.contentItems[0];
+    this.outputStack = newStacks[0];
     this._scheduleOutputControlsRefresh();
   }
 
   /**
-   * Re-tag the areas and, when the output structure actually changed, re-render
-   * the output controls.
-   *
-   * Coalesced to once per tick so bursts of GoldenLayout
-   * `stateChanged` events (e.g. typing, or dragging a splitter) collapse to one
-   * pass — and the signature guard skips the DOM work entirely when only
-   * content changed.
+   * Bring the area tags and the output toggle in line with the tree, at most
+   * once per tick.
    */
   _scheduleOutputControlsRefresh() {
     if (this._outputRefreshScheduled) return;
@@ -297,9 +267,6 @@ export default class FlexibleLayout extends Layout {
       const { sig, firstEl } = this._outputSignature();
       if (sig === this._outputSig && firstEl === this._outputFirstEl) return;
 
-      // Cache only on a successful render, so a transient miss (controls not yet
-      // in the DOM) is retried on the next structural change rather than poisoning
-      // the cache and leaving the toggle permanently missing.
       if (this.renderOutputArrangeControls()) {
         this._outputSig = sig;
         this._outputFirstEl = firstEl;
@@ -308,10 +275,7 @@ export default class FlexibleLayout extends Layout {
   }
 
   /**
-   * A signature of what determines the output toggle: whether the output is
-   * split, the number of extra output tabs (visibility), and the anchor output
-   * stack element (where the toggle is rendered — which itself moves with the
-   * orientation, so a flip re-renders the toggle).
+   * Everything the output toggle's appearance and placement depend on.
    *
    * @returns {{ sig: string, firstEl: ?Element }}
    */
@@ -323,17 +287,10 @@ export default class FlexibleLayout extends Layout {
   }
 
   /**
-   * Render the single split/merge toggle into the controls of the anchor output
-   * stack (topmost when the split output is a column, rightmost when it is a row;
-   * see _anchorOutputStack). The button reflects the current state: it splits the
-   * output when it is a single stack, and merges it back when it is split. Shown
-   * only when the output area holds more than one tab. Idempotent.
+   * Render the split/merge toggle, showing the arrangement it switches to.
    *
-   * Returns false (without disturbing any existing button) when the target
-   * controls element is not in the DOM yet, so a transient miss never destroys a
-   * good toggle.
-   *
-   * @returns {boolean} Whether the toggle was (re)rendered.
+   * @returns {boolean} Whether it was rendered; false leaves an existing toggle
+   * alone, to be retried on the next change.
    */
   renderOutputArrangeControls() {
     const firstStack = this._anchorOutputStack();
@@ -359,7 +316,6 @@ export default class FlexibleLayout extends Layout {
     $group.on('click', '.output-arrange-btn', (event) => {
       const arrangement = $(event.currentTarget).data('arrange');
 
-      // Remember the choice
       this.delegate?.setStoredOutputArrangement?.(arrangement);
       this.arrangeOutput(arrangement);
     });
@@ -370,8 +326,7 @@ export default class FlexibleLayout extends Layout {
   }
 
   /**
-   * Show the output split/merge toggle only when the output area holds more than
-   * one tab (i.e. the terminal plus at least one canvas/image).
+   * Show the toggle only when the output area holds more than the terminal.
    */
   updateOutputControlsVisibility() {
     const hasExtraOutput = this.getTabComponents().some(isExtraOutput);

@@ -10,7 +10,7 @@ import CommandSurfaces from '../../commands/surfaces.js';
  * Current version of the default layout config. Bump it when a breaking change
  * requires every user to reload a fresh config instead of their stored one.
  */
-const LAYOUT_CONFIG_VERSION = 4;
+const LAYOUT_CONFIG_VERSION = 5;
 
 /**
  * BaseController is the app's single interface to the UI layer. Each app variant
