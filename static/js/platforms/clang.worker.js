@@ -546,6 +546,49 @@ class MemFS {
 
 const RAF_PROC_EXIT_CODE = 0xC0C0A;
 
+// Convert WASM-specific runtime errors to more common C/Linux-style messages.
+const RUNTIME_ERRORS = [
+  // Bad "function pointer" apparently includes NULL file pointers.
+  [
+    /null function|signature mismatch|call_indirect/i,
+    'Segmentation fault. Did you use a pointer that is NULL, ' +
+    'for instance the result of an fopen that failed?',
+  ],
+  // Reading or writing outside of the program's memory.
+  [
+    /out of bounds/i,
+    'Segmentation fault. Did you index outside of an array, ' +
+    'or use a pointer that does not point at anything?',
+  ],
+  // Stack.
+  [
+    /call stack|recursion|stack overflow/i,
+    'Stack overflow. Did you write a recursive function that never stops?',
+  ],
+];
+
+/**
+ * Describe an error thrown while running the user's program in terms a student
+ * can act on, falling back to the original message.
+ *
+ * @param {Error} exn - The error that was thrown.
+ * @returns {string} The message to print.
+ */
+function describeRuntimeError(exn) {
+  const isTrap = exn instanceof WebAssembly.RuntimeError
+    || exn instanceof RangeError;
+
+  if (isTrap) {
+    for (const [pattern, message] of RUNTIME_ERRORS) {
+      if (pattern.test(exn.message)) {
+        return message;
+      }
+    }
+  }
+
+  return exn.message;
+}
+
 class App {
   constructor(module, memfs, name, ...args) {
     this.argv = [name, ...args];
@@ -596,7 +639,7 @@ class App {
       }
 
       // Write error message.
-      let msg = `\x1b[91mError: ${exn.message}`;
+      let msg = `\x1b[91mError: ${describeRuntimeError(exn)}`;
       if (writeStack) {
         msg = msg + `\n${exn.stack}`;
       }
