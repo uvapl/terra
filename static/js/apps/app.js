@@ -170,6 +170,7 @@ export default class App extends BaseApp {
    */
   clearTerminal() {
     this.term?.clear();
+    triggerPluginEvent('onTerminalCleared');
   }
 
   /**
