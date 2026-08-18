@@ -1,5 +1,5 @@
 .lm_goldenlayout {
-  background: var(--color-white);
+  background: var(--panel-bg);
 }
 
 .lm_goldenlayout,
@@ -109,7 +109,7 @@
 }
 
 .lm_splitter.locked:hover {
-  background: var(--color-white);
+  background: var(--panel-bg);
 }
 
 /* Create two vertical bars as a drag-handler icon */
@@ -169,7 +169,7 @@
 
 .lm_header .lm_tabdropdown_list {
   top: 30px;
-  background-color: var(--color-white);
+  background-color: var(--overlay-bg);
   border: 1px solid var(--border-color);
 }
 
@@ -209,7 +209,7 @@
   justify-content: center;
   user-select: none;
   -webkit-user-select: none;
-  background-color: rgba(255, 255, 255, 0.7);
+  background-color: var(--veil);
   -webkit-backdrop-filter: blur(1px) grayscale(40%);
   backdrop-filter: blur(1px) grayscale(40%);
 }
@@ -221,55 +221,21 @@
 /* ========================================================================== */
 /* Dark Mode                                                                  */
 /* ========================================================================== */
-.dark-mode .lm_tab {
-  background-color: var(--dark-mode-tab-bg-color);
-  color: var(--dark-mode-tab-fg-color);
-}
-
-.dark-mode .lm_tab.lm_active {
-  background-color: var(--dark-mode-active-tab-bg-color);
-  color: var(--dark-mode-active-tab-fg-color);
-  border-color: var(--dark-mode-border-color-active);
-}
-
-.dark-mode .lm_goldenlayout {
-  background-color: var(--dark-mode-bg);
-}
-
-.dark-mode .lm_content,
-.dark-mode .lm_tab {
-  border-color: var(--dark-mode-border-color);
-}
-
 .dark-mode .ace_gutter-active-line,
 .dark-mode .ace_marker-layer .ace_active-line {
-  background-color: var(--dark-mode-editor-cursor-active-line-bg);
+  background-color: var(--overlay-bg);
   border: 0;
 }
 
 
-.dark-mode .lm_header .lm_tabdropdown_list {
-  background-color: var(--dark-mode-bg);
-  border: 1px solid var(--dark-mode-border-color);
-}
-
-.dark-mode .lm_header .lm_tabdropdown_list .lm_tab + .lm_tab {
-  border-top: 1px solid var(--dark-mode-border-color);
-}
-
-.dark-mode .lm_header .lm_tabdropdown_list .lm_tab:hover {
-  background: var(--dark-mode-active-tab-bg-color);
-  color: var(--dark-mode-active-tab-fg-color);
-}
-
-.dark-mode .lm_header .lm_controls .lm_tabdropdown:before {
-  color: var(--dark-mode-fg);
+.lm_header .lm_controls .lm_tabdropdown:before {
+  color: var(--fg);
 }
 
 .dark-mode .ace_search {
-  background-color: var(--dark-mode-bg);
-  color: var(--dark-mode-fg);
-  border-color: var(--dark-mode-border-color);
+  background-color: var(--overlay-bg);
+  color: var(--fg);
+  border-color: var(--line-color);
   box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.5);
 }
 
@@ -278,8 +244,8 @@
 }
 
 .dark-mode .ace_search .ace_button.checked {
-  border-color: var(--dark-mode-border-color-active);
-  color: var(--color-white);
+  border-color: var(--line-strong);
+  color: var(--fg-strong);
 }
 
 .dark-mode .ace_search .ace_button:hover {
@@ -287,18 +253,18 @@
 }
 
 .dark-mode .ace_search .ace_button:active {
-  background: var(--dark-mode-active-tab-bg-color);
+  background: var(--muted-bg);
 }
 
 .dark-mode .ace_search .ace_searchbtn {
   background: transparent;
-  border-color: var(--dark-mode-border-color);
+  border-color: var(--line-color);
   color: unset;
 }
 
 .dark-mode .ace_searchbtn.prev:after,
 .dark-mode .ace_searchbtn.next:after {
-  border-color: var(--dark-mode-fg);
+  border-color: var(--fg);
 }
 
 /* Hide the stack-level close button (stacks needs to be closable by other

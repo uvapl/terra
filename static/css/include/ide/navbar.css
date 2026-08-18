@@ -4,10 +4,11 @@
 .navbar {
   position: relative;
   padding: 0 var(--navbar-padding);
+  background: var(--panel-bg);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: var(--color-black);
+  color: var(--fg);
   user-select: none;
   -webkit-user-select: none;
   border-bottom: none;
@@ -35,7 +36,7 @@
   font-weight: bold;
   font-size: 18px;
   /* Logo colors from the Terra IDE mark: mountain green -> earth brown. */
-  background: linear-gradient(to right, #4E7C4E, #8A6D4B);
+  background: linear-gradient(to right, #539553, #c07722);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -56,7 +57,8 @@
   margin: 0;
   padding: 0;
   display: flex;
-  color: var(--tab-fg-color);
+  /* the same tone as the file names in the file tree */
+  color: var(--fg-chrome);
 }
 
 .menubar > li {
@@ -65,8 +67,8 @@
 
 .menubar li:not(.disabled):hover,
 .menubar li:not(.disabled):focus {
-  background: var(--tab-bg-color);
-  color: var(--color-black);
+  background: var(--muted-bg);
+  color: var(--fg-strong);
   cursor: pointer;
 }
 
@@ -76,17 +78,17 @@
 }
 
 .menubar > li.open {
-  background: var(--tab-bg-color);
-  color: var(--color-black);
+  background: var(--muted-bg);
+  color: var(--fg-strong);
 }
 
 .menubar li.active {
-  color: var(--color-black);
+  color: var(--fg-strong);
   font-weight: bold;
 }
 
 .menubar li.disabled {
-  color: #cecece;
+  color: var(--fg-disabled);
   cursor: not-allowed;
 }
 
@@ -104,7 +106,7 @@
   position: relative;
   white-space: nowrap;
   display: flex;
-  color: var(--tab-fg-color);
+  color: var(--fg-chrome);
 }
 
 .menubar .text {
@@ -122,7 +124,7 @@
   top: 0;
   left: 100%;
   border: 1px solid var(--border-color);
-  background: var(--color-white);
+  background: var(--overlay-bg);
   z-index: 50;
   margin: 0;
   padding: 0;
@@ -152,48 +154,12 @@
 }
 
 .menubar .separator {
-  border-bottom: 1px solid var(--tab-bg-color);
+  border-bottom: 1px solid var(--separator-color);
 }
 
-/* ========================================================================== */
-/* Dark Mode                                                                  */
-/* ========================================================================== */
-.dark-mode .navbar {
-  border-bottom: 1px solid var(--dark-mode-border-color);
-}
-
-.dark-mode .page-title {
-  color: var(--dark-mode-fg);
-}
-
-.dark-mode .menubar ul {
-  background: var(--dark-mode-overlay-bg-color);
-  border-color: var(--dark-mode-border-color);
-}
-
-.dark-mode .menubar li {
-  color: var(--dark-mode-overlay-fg-color);
-}
-
-.dark-mode .menubar li.disabled {
-  color: var(--dark-mode-overlay-disabled-fg-color);
-}
-
-.dark-mode .menubar li:not(.disabled):hover,
-.dark-mode .menubar li:not(.disabled):focus {
-  background: var(--dark-mode-active-tab-bg-color);
-  color: var(--dark-mode-active-tab-fg-color);
-}
-
-.dark-mode .menubar > li.open {
-  background: var(--dark-mode-active-tab-bg-color);
-  color: var(--dark-mode-active-tab-fg-color);
-}
-
+/* ==========================================================================
+ *  Dark mode: only what the palette cannot express.
+ * ========================================================================== */
 .dark-mode .menubar > li.open ul {
   box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.5);
-}
-
-.dark-mode .menubar .separator {
-  border-bottom: 1px solid var(--dark-mode-border-color);
 }

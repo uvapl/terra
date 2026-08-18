@@ -2,9 +2,9 @@
   -webkit-appearance: none;
   appearance: none;
   padding: 3px 5px;
-  background: var(--color-white);
+  background: var(--control-bg);
   border-radius: var(--border-radius);
-  border: 1px solid var(--color-black);
+  border: none;
 }
 
 .button + .button {
@@ -23,7 +23,6 @@
   background: #cfcfcf;
   color: #606060;
   cursor: not-allowed;
-  border-color: #606060;
 }
 
 .primary-btn {
@@ -63,23 +62,21 @@
 /* Dark Mode                                                                  */
 /* ========================================================================== */
 .dark-mode .button {
-  color: var(--dark-mode-fg);
-  background: none;
-  border-color: var(--dark-mode-border-color);
+  color: var(--fg-strong);
 }
 
 .dark-mode .button:not(.primary-btn):not(.danger-btn):not([disabled]):hover {
   color: var(--color-white);
-  border-color: var(--dark-mode-border-color-active);
+  background: var(--line-strong);
 }
 
 .dark-mode .button:active {
-  background: var(--dark-mode-active-tab-bg-color);
+  background: var(--muted-bg);
 }
 
 .dark-mode .primary-btn {
+  background: var(--control-bg);
   color: #3b8dc4;
-  border-color: #3b8dc4;
 }
 
 .primary-btn:not([disabled]):active {
@@ -87,8 +84,9 @@
 }
 
 .dark-mode .button[disabled] {
-  color: #66686d;
-  border-color: #66686d;
+  /* disabled controls drop back to the surface below the dialog */
+  background: var(--surface-bg);
+  color: var(--fg-disabled);
 }
 
 .dark-mode .clear-term-btn:before {
@@ -96,8 +94,8 @@
 }
 
 .dark-mode .danger-btn {
-  color: var(--dark-mode-color-error);
-  border: 1px solid var(--dark-mode-color-error);
+  background: var(--control-bg);
+  color: var(--color-error);
 }
 
 .dark-mode .danger-btn:active {

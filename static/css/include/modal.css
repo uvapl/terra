@@ -9,7 +9,9 @@ dialog.modal {
   max-height: calc(100vh - 40px);
   border: none;
   padding: 0;
-  background-color: var(--ide-panel-bg);
+  background-color: var(--panel-bg);
+  /* the UA stylesheet paints dialog text black, so set it explicitly */
+  color: var(--fg);
   border-radius: var(--border-radius);
   flex-direction: column;
   display: none;
@@ -21,7 +23,7 @@ dialog.modal[open] {
 }
 
 .modal-header {
-  border-bottom: 1px solid var(--ide-tint-border);
+  border-bottom: 1px solid var(--line-color);
   padding: var(--modal-padding);
   display: flex;
   align-items: center;
@@ -52,7 +54,7 @@ dialog.modal[open] {
 
 .modal-footer {
   padding: var(--modal-padding);
-  border-top: 1px solid var(--ide-tint-border);
+  border-top: 1px solid var(--line-color);
   display: flex;
   justify-content: space-between;
 }
@@ -77,12 +79,8 @@ dialog.modal[open] {
 /* Dark Mode                                                                  */
 /* ========================================================================== */
 .dark-mode dialog.modal {
-  background: var(--dark-mode-bg);
-  color: var(--dark-mode-fg);
+  /* light mode lets the panel colour carry the dialog; in dark it needs to be
+     lighter than the app behind it to lift off the page */
+  background-color: var(--overlay-bg);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-}
-
-.dark-mode .modal-header,
-.dark-mode .modal-footer {
-  border-color: var(--dark-mode-border-color);
 }

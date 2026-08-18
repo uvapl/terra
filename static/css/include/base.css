@@ -1,81 +1,98 @@
+/* ==========================================================================
+ *  Theme palette.
+ *
+ *  Light and dark are described by the same set of tokens; only the values in
+ *  the two blocks below differ. Everything else in the stylesheets refers to
+ *  these tokens (or to the derived names further down), so layout rules are
+ *  written once and both themes follow them.
+ *
+ *  The palette lives on :root (light) and on body.dark-mode (dark). The derived
+ *  names must be declared on `body` — the same element that carries the
+ *  dark-mode class — so that they resolve against the active palette.
+ * ========================================================================== */
+:root {
+  /* Chrome around the work area: navbar, tab strip, splitters, layout gaps. */
+  --panel-bg: #edebe8;
+  /* Editing surfaces: editor, file tree card, active tab. */
+  --surface-bg: #fbfaf9;
+  /* Secondary surface next to it: editor gutter. */
+  --surface-alt-bg: #f7f6f6;
+  /* Recessed fill: inactive tabs, hovered rows and menu items. */
+  --muted-bg: #d5d3d3;
+  /* Floating surfaces: menus, dropdowns, tooltips, drag helper. */
+  --overlay-bg: #ffffff;
+  /* Controls that must sit on top of a floating surface: modal buttons. */
+  --control-bg: #ffffff;
+
+  --line-color: #e3d6d2;
+  --line-strong: #c6c6c6;
+  /* Generic 1px borders (tabs, menus, panes). Light mode leans on the surface
+     colours alone and keeps them invisible; dark mode needs the line. */
+  --border-color: transparent;
+  /* Dividers inside a menu: a light hairline on white, a lifted one on the
+     dark menu surface. */
+  --separator-color: var(--muted-bg);
+
+  --fg: #222222;
+  --fg-muted: #555555;
+  --fg-strong: #000000;
+  --fg-disabled: #cecece;
+  /* Text in the chrome — menus, file tree, context menus. Softer than editor
+     text on the light panel; at full strength on the dark one. */
+  --fg-chrome: var(--fg-muted);
+
+  --color-error: #f9776a;
+  --color-error-hover: #e64a3a;
+
+  /* Wash over locked / read-only content. */
+  --veil: rgba(255, 255, 255, 0.7);
+}
+
+.dark-mode {
+  --panel-bg: #1b1e24;
+  --surface-bg: #282c34;
+  --surface-alt-bg: #22262d;
+  --muted-bg: #21242b;
+  --overlay-bg: #363c47;
+  --control-bg: #454c59;
+
+  --line-color: #3a3f4b;
+  --line-strong: #51576a;
+  --border-color: var(--line-color);
+  --separator-color: var(--line-strong);
+
+  --fg: #abb2bf;
+  --fg-muted: #7b818a;
+  --fg-strong: #dcdfe4;
+  --fg-disabled: #5c6370;
+  --fg-chrome: var(--fg);
+
+  --color-error: #c65e54;
+  --color-error-hover: #e64a3a;
+
+  --veil: rgba(0, 0, 0, 0.5);
+}
+
+/* Fixed values, identical in both themes. */
 :root {
   --color-white: #fff;
   --color-black: #000;
-  --color-error: #f9776a;
-  --color-error-hover: #e64a3a;
   --font-size: 16px;
   --navbar-padding: 15px;
   --editor-tab-font-size: 12px;
   --modal-padding: 20px;
-  --tab-fg-color: #555;
-  --tab-bg-color: #d5d3d3;
-  --active-tab-fg-color: #000;
-  --active-tab-bg-color: #fff;
-  --border-color:transparent;
   --border-radius: 4px;
-  --scrollbar-bg-color: #fff;
-  --scrollbar-thumb-color: #c6c6c6;
-
-  --dark-mode-color-error: #c65e54;
-  --dark-mode-color-error-hover: #e64a3a;
-  --dark-mode-bg-lighter: #393e4b;
-  --dark-mode-bg: #282c34;
-  --dark-mode-fg: #abb2bf;
-  --dark-mode-tab-fg-color: #7b818a;
-  --dark-mode-tab-bg-color: #282c34;
-  --dark-mode-layout-window-bg: #21242b;
-  --dark-mode-active-tab-fg-color: #dcdfe4;
-  --dark-mode-active-tab-bg-color: #31353e;
-  --dark-mode-border-color: #3a3f4b;
-  --dark-mode-border-color-active: #51576a;
-  --dark-mode-editor-cursor-active-line-bg: #31353e;
-  --dark-mode-editor-print-margin-color: #717784;
-  --dark-mode-overlay-bg-color: #282c34;
-  --dark-mode-overlay-fg-color: #abb2bf;
-  --dark-mode-overlay-disabled-fg-color: #5c6370;
-
-  /* Soft tinted surfaces (light mode).
-     - editor + GoldenLayout tab header: plain off-white.
-     - file tree + navbar/menubar: a slightly deeper, warm (faint red) off-white
-       so the side/top chrome reads as distinct from the editing surface. */
-  --ide-editor-bg: #fbfaf9;
-  --ide-editor-gutter-bg: #f7f6f6;
-  --ide-editor-gutter-color: darkgray;
-  --ide-panel-bg: #edebe8;
-  --ide-tint-border: #e3d6d2;
-
-  /* Navbar mini toolbar buttons. */
-  --toolbar-btn-bg: #ffffff;
-  --toolbar-btn-bg-hover: #f0f5f2;
-  --toolbar-btn-border: #cdddd5;
-  --toolbar-btn-fg: #3a4a44;
-
-  --toolbar-run-bg: #e3f5ea;
-  --toolbar-run-bg-hover: #d3eede;
-  --toolbar-run-border: #8ed4ac;
-  --toolbar-run-fg: #1c7a47;
-
-  --toolbar-stop-bg: #fdeae6;
-  --toolbar-stop-bg-hover: #fbdcd5;
-  --toolbar-stop-border: #f0a999;
-  --toolbar-stop-fg: #c23c25;
 }
 
-.dark-mode {
-  --toolbar-btn-bg: transparent;
-  --toolbar-btn-bg-hover: var(--dark-mode-active-tab-bg-color);
-  --toolbar-btn-border: var(--dark-mode-border-color);
-  --toolbar-btn-fg: var(--dark-mode-fg);
-
-  --toolbar-run-bg: rgba(34, 160, 90, 0.16);
-  --toolbar-run-bg-hover: rgba(34, 160, 90, 0.26);
-  --toolbar-run-border: #2f7d4f;
-  --toolbar-run-fg: #5fcf8e;
-
-  --toolbar-stop-bg: rgba(224, 73, 47, 0.16);
-  --toolbar-stop-bg-hover: rgba(224, 73, 47, 0.26);
-  --toolbar-stop-border: #8f3a2c;
-  --toolbar-stop-fg: #e8826f;
+/* Derived names. Declared on `body` so they resolve against the active
+   palette; see the note above. */
+body {
+  --tab-fg-color: var(--fg-muted);
+  --tab-bg-color: var(--muted-bg);
+  --active-tab-fg-color: var(--fg-strong);
+  --active-tab-bg-color: var(--surface-bg);
+  --scrollbar-bg-color: var(--surface-bg);
+  --scrollbar-thumb-color: var(--line-strong);
 }
 
 * {
@@ -108,6 +125,8 @@ a:visited {
 
 body {
   margin: 0;
+  background-color: var(--panel-bg);
+  color: var(--fg);
   font-size: var(--font-size);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
     "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji",
@@ -171,7 +190,7 @@ body {
   left: -2px;
   right: -2px;
   bottom: 0;
-  background-color: rgba(255, 255, 255, 0.7);
+  background-color: var(--veil);
   z-index: 10;
   background-image: url('../../img/icons/lock.png');
   background-repeat: no-repeat;
@@ -183,64 +202,51 @@ body {
 
 
 /* ==========================================================================
- *  Soft tinted surfaces (light mode only).
+ *  Surfaces.
+ *
+ *  One set of rules for both themes; only the token values differ.
  * ========================================================================== */
 
-/* Warm off-white chrome: navbar/menubar and file tree. */
-body:not(.dark-mode) .navbar {
-  background: var(--ide-panel-bg);
-  border-bottom-color: var(--ide-tint-border);
-}
+/* The GoldenLayout tab strip and the file tree card sit on the panel colour,
+   so the surrounding chrome reads as distinct from the work area.
+   (The IDE navbar does the same; see ide/navbar.css.) */
 
-body:not(.dark-mode) .file-tree-container {
+/* The file tree is a card floating on the panel colour. */
+.file-tree-container {
   border-radius: 0.25rem;
   margin: 0 0.5rem 0.5rem 0.5rem;
-  background-color: var(--ide-editor-bg) !important;
+  background-color: var(--surface-bg);
 }
 
-/* Off-white GoldenLayout tab header (the tab strip above editor/terminal). */
-body:not(.dark-mode) .lm_header {
-  background: var(--ide-panel-bg);
+.lm_header {
+  background: var(--panel-bg);
 }
 
-/* Off-white Ace (textmate) editor surface and gutter. The theme stylesheet is
-   injected at runtime, so these need !important to win. */
-body:not(.dark-mode) .ace-tm {
-  background-color: var(--ide-editor-bg) !important;
+/* Ace editor surface and gutter. The theme stylesheet (textmate for light,
+   cloud_editor_dark for dark) is injected at runtime, so these need
+   !important to win. */
+.ace-tm,
+.ace-cloud_editor_dark {
+  background-color: var(--surface-bg) !important;
 }
 
-body:not(.dark-mode) .ace-tm .ace_gutter {
-  background-color: var(--ide-editor-gutter-bg) !important;
-  color: var(--ide-editor-gutter-color);
+.ace-tm .ace_gutter,
+.ace-cloud_editor_dark .ace_gutter {
+  background-color: var(--surface-alt-bg) !important;
+  color: var(--fg-muted);
 }
 
-body:not(.dark-mode) .lm_splitter {
-  background-color: var(--ide-panel-bg) !important;
+.lm_splitter {
+  background-color: var(--panel-bg) !important;
 }
 
 /* ========================================================================== */
 /* Dark Mode                                                                  */
 /* ========================================================================== */
-.dark-mode {
-  background-color: var(--dark-mode-bg);
-  color: var(--dark-mode-fg);
-}
-
-.dark-mode * {
-  scrollbar-color: var(--dark-mode-bg-lighter) var(--dark-mode-bg);
-  scrollbar-width: thin;
-}
-
+/* xterm paints its own black background in light mode; in dark that reads as a
+   hole, so the terminal pane gets a recessed surface instead. */
+.dark-mode .terminal,
 .dark-mode .xterm-viewport {
   /* use !important to overwrite inline style by GoldenLayout */
-  background-color: var(--dark-mode-layout-window-bg) !important;
-}
-
-.dark-mode .terminal {
-  border: 1px solid var(--dark-mode-border-color);
-}
-
-.dark-mode .code-block {
-  background-color: var(--dark-mode-layout-window-bg);
-  border: 1px solid var(--dark-mode-border-color);
+  background-color: var(--muted-bg) !important;
 }

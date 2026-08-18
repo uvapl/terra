@@ -47,7 +47,7 @@
 }
 
 .lm_header .lm_tab.lm_active .lm_close_tab:hover {
-  background-color: lightgray;
+  background-color: var(--muted-bg);
   opacity: 1;
 }
 
@@ -58,7 +58,7 @@
 
 .layout-outer-container {
   overflow: hidden;
-  background: var(--ide-panel-bg);
+  background: var(--panel-bg);
 }
 
 .lm_header .lm_controls > * {
@@ -70,10 +70,10 @@
 }
 
 .code-block {
-  background-color: #f5f5f5;
+  background-color: var(--surface-alt-bg);
   border-radius: 3px;
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--line-color);
   font-family: monospace;
 }
 

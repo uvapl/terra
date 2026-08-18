@@ -183,6 +183,7 @@ export default class TerminalTab extends BaseTab {
       fontSize,
       lineHeight: 1.2
     });
+    this.setTheme(document.body.classList.contains('dark-mode') ? 'dark' : 'light');
     this.terminalInstance.loadAddon(this.fitAddon);
     this.terminalInstance.open(this.container.element);
     // show cursor immediately
@@ -224,6 +225,25 @@ export default class TerminalTab extends BaseTab {
   onContainerResize = () => {
     this.fitAddon.fit();
   }
+
+  /**
+   * Set the theme. Only the text colour is themed outside of CSS.
+   *
+   * @param {string} theme - Either 'dark' or 'light'.
+   */
+  setTheme = (theme) => {
+    if (!this.terminalInstance) return;
+
+    const foreground = (theme === 'dark')
+      ? getComputedStyle(document.body).getPropertyValue('--fg-strong').trim() || '#dcdfe4'
+      : '#ffffff';
+
+    this.terminalInstance.options.theme = {
+      ...this.terminalInstance.options.theme,
+      foreground,
+      cursor: foreground,
+    };
+  };
 
   /**
    * Set the font size of the editor.
@@ -384,6 +404,7 @@ export default class TerminalTab extends BaseTab {
   bindContainerEvents = () => {
     this.container.on('show', this.onShow);
     this.container.on('fontSizeChanged', this.setFontSize);
+    this.container.on('themeChanged', this.setTheme);
     this.container.on('resize', this.onContainerResize);
     this.container.on('destroy', this.onContainerDestroy);
   }

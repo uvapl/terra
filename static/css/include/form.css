@@ -68,7 +68,7 @@ textarea {
 /* ========================================================================== */
 .dark-mode input,
 .dark-mode .select {
-  background-color: var(--dark-mode-bg);
-  color: var(--dark-mode-fg);
-  border-color: var(--dark-mode-border-color);
+  background-color: var(--surface-bg);
+  color: var(--fg);
+  border-color: var(--line-color);
 }

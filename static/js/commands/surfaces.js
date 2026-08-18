@@ -112,7 +112,19 @@ export default class CommandSurfaces {
     if (!$(selector).length) {
       const titleAttr = title ? ` title="${title}"` : '';
       const disabledAttr = this.registry.available(cmd) ? '' : ' disabled';
-      $container.append(`<button id="${id}" class="button ${cls}"${titleAttr}${disabledAttr} style="order:${position}">${label}</button>`);
+      const $button = $(`<button id="${id}" class="button ${cls}"${titleAttr}${disabledAttr} style="order:${position}">${label}</button>`);
+
+      // Insert at the position the flexbox `order` puts it in, so CSS-defined
+      // dividers show up correctly.
+      const $next = $container.children('.button').filter(
+        (_, el) => (parseInt(el.style.order, 10) || 0) > position
+      ).first();
+
+      if ($next.length) {
+        $next.before($button);
+      } else {
+        $container.append($button);
+      }
     }
 
     $(selector).off('click.cmd').on('click.cmd', () => {

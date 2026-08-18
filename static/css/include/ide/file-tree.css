@@ -83,8 +83,8 @@
   position: absolute;
   bottom: -5px;
   left: -5px;
-  border: 1px solid var(--color-black);
-  background: var(--color-white);
+  border: 1px solid var(--fg-muted);
+  background: var(--surface-bg);
   width: 12px;
   height: 12px;
   border-radius: 50%;
@@ -137,6 +137,7 @@
   display: inline-flex;
   padding: 3px 5px;
   border-radius: var(--border-radius);
+  color: var(--fg-chrome);
 }
 
 .fancytree-folder {
@@ -182,23 +183,36 @@
   background-image: url('../../../img/icons/file.png');
 }
 
+/* The folder glyphs are drawn as a mask filled with the current text colour,
+ * so they follow the palette instead of needing a second, light-coloured asset
+ * per theme. */
 .file-tree-folder-icon {
   width: 1em;
   height: 1em;
-  background-image: url('../../../img/icons/folder.png');
+  background-image: none;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center 50%;
+  mask-position: center 50%;
+  -webkit-mask-size: contain;
+  mask-size: contain;
 }
 
 .fancytree-expanded > .file-tree-folder-icon {
-  background-image: url('../../../img/icons/bs-folder2-open.svg');
+  -webkit-mask-image: url('../../../img/icons/bs-folder2-open.svg');
+  mask-image: url('../../../img/icons/bs-folder2-open.svg');
 }
 
 .fancytree-node:not(.fancytree-expanded) > .file-tree-folder-icon {
-  background-image: url('../../../img/icons/bs-folder.svg');
+  -webkit-mask-image: url('../../../img/icons/bs-folder.svg');
+  mask-image: url('../../../img/icons/bs-folder.svg');
 }
 
 /* Empty folders are always shown with a downward-pointing caret */
 .fancytree-folder:not(.fancytree-has-children) > .file-tree-folder-icon {
-  background-image: url('../../../img/icons/bs-folder2-open.svg');
+  -webkit-mask-image: url('../../../img/icons/bs-folder2-open.svg');
+  mask-image: url('../../../img/icons/bs-folder2-open.svg');
 }
 
 .fancytree-node input {
@@ -212,13 +226,13 @@
   box-sizing: border-box;
   margin: -2px -4px;
   padding: 1px 3px;
-  border: 1px solid #999;
+  border: 1px solid var(--line-strong);
   border-radius: var(--border-radius);
   outline: 0;
   font: inherit;
   line-height: inherit;
   color: inherit;
-  background: var(--color-white);
+  background: var(--surface-bg);
 }
 
 /* ==========================================================================
@@ -229,7 +243,7 @@
   width: auto !important;
   min-width: auto;
   max-width: auto;
-  background-color: var(--color-white);
+  background-color: var(--overlay-bg);
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
@@ -238,11 +252,14 @@
 .context-menu-item {
   display: block;
   padding: 5px 10px;
+  /* the vendor stylesheet paints these white, so both colours are set here */
+  color: var(--fg-chrome);
+  background-color: var(--overlay-bg);
 }
 
 .context-menu-item:hover {
-  color: var(--color-black);
-  background-color: var(--tab-bg-color);
+  color: var(--fg-strong);
+  background-color: var(--muted-bg);
   cursor: pointer;
   outline: 0;
 }
@@ -287,7 +304,7 @@
 .custom-drag-helper {
   position: absolute;
   display: inline-block;
-  background-color: var(--color-white);
+  background-color: var(--overlay-bg);
   border: 1px solid var(--border-color);
   padding: 5px 10px;
   border-radius: var(--border-radius);
@@ -343,7 +360,7 @@
   width: var(--file-tree-width);
   padding: var(--file-tree-padding);
   border-top: 1px solid var(--border-color);
-  background-color: var(--color-white);
+  background-color: var(--surface-bg);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -355,23 +372,11 @@
   font-size: 12px;
 }
 
-/* ========================================================================== */
-/* Dark Mode                                                                  */
-/* ========================================================================== */
-.dark-mode .file-tree-container .title {
-  color: #6b7280;
-}
-
-.dark-mode .fancytree-node:not(.fancytree-drop-accept):not(.fancytree-drop-reject):not(.fancytree-statusnode-nodata):hover {
-  background-color: var(--dark-mode-bg-lighter);
-}
-
+/* ==========================================================================
+ *  Dark mode: icon assets only — the colours come from the palette tokens.
+ * ========================================================================== */
 .dark-mode .file-tree-file-icon {
   background-image: url('../../../img/icons/file-white.png');
-}
-
-.dark-mode .file-tree-folder-icon {
-  background-image: url('../../../img/icons/folder-white.png');
 }
 
 .dark-mode .fancytree-expanded > .fancytree-expander {
@@ -382,9 +387,9 @@
   background-image: url('../../../img/icons/arrow-head-right-white.png');
 }
 
-.dark-mode .drop-area-indicator[aria-expanded="true"]::before,
-.dark-mode .file-tree.drop-area-indicator::before {
-  background: var(--dark-mode-fg);
+/* The small "+" badge is a dark glyph; invert it on the dark surface. */
+.dark-mode .file-tree-container button:after {
+  filter: invert(1);
 }
 
 .dark-mode .file-tree-container .add-file-btn {
@@ -395,32 +400,3 @@
   background-image: url('../../../img/icons/folder-white.png');
 }
 
-.dark-mode .local-storage-warning {
-  border-top: 1px solid var(--dark-mode-border-color);
-}
-
-.dark-mode .file-dropzone.drag-over:before {
-  border-color: var(--dark-mode-fg);
-  color: var(--dark-mode-fg);
-}
-
-.dark-mode .context-menu-list {
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
-  background-color: var(--dark-mode-overlay-bg-color);
-  border-color: var(--dark-mode-border-color);
-}
-
-.dark-mode .context-menu-item {
-  background-color: var(--dark-mode-overlay-bg-color);
-  color: var(--dark-mode-overlay-fg-color);
-}
-
-.dark-mode .context-menu-item:hover {
-  color: var(--dark-mode-active-tab-fg-color);
-  background-color: var(--dark-mode-active-tab-bg-color);
-}
-
-.dark-mode .custom-drag-helper {
-  background-color: var(--dark-mode-bg-lighter);
-  border-color: var(--dark-mode-border-color);
-}

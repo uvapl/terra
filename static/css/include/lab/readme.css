@@ -201,9 +201,9 @@
 /* ========================================================================== */
 
 .dark-mode .readme-container {
-  background-color: var(--dark-mode-bg);
-  border-right-color: var(--dark-mode-border-color);
-  color: var(--dark-mode-fg);
+  background-color: var(--surface-bg);
+  border-right-color: var(--line-color);
+  color: var(--fg);
 }
 
 .dark-mode .readme-content a {
@@ -216,47 +216,47 @@
 
 .dark-mode .readme-content pre,
 .dark-mode .readme-content code {
-  background-color: var(--dark-mode-layout-window-bg);
-  border-color: var(--dark-mode-border-color);
+  background-color: var(--panel-bg);
+  border-color: var(--line-color);
 }
 
 .dark-mode .readme-content blockquote {
-  color: var(--dark-mode-tab-fg-color);
-  border-left-color: var(--dark-mode-border-color);
+  color: var(--fg-muted);
+  border-left-color: var(--line-color);
 }
 
 .dark-mode .readme-content details.spoiler,
 .dark-mode .readme-content th,
 .dark-mode .readme-content td {
-  border-color: var(--dark-mode-border-color);
+  border-color: var(--line-color);
 }
 
 .dark-mode .readme-page + .readme-page {
-  border-top-color: var(--dark-mode-border-color);
+  border-top-color: var(--line-color);
 }
 
 .dark-mode .readme-page + .readme-page:before {
-  background-color: var(--dark-mode-bg);
-  color: var(--dark-mode-tab-fg-color);
+  background-color: var(--surface-bg);
+  color: var(--fg-muted);
 }
 
 .dark-mode .readme-next-btn {
-  color: var(--dark-mode-bg);
+  color: var(--surface-bg);
   background: #3b8dc4;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .dark-mode .readme-next-btn:active {
   background: #1a374b;
-  color: var(--dark-mode-fg);
+  color: var(--fg);
 }
 
 .dark-mode .lab-landing-form {
-  background-color: var(--dark-mode-bg);
+  background-color: var(--surface-bg);
 }
 
 .dark-mode .lab-landing-form input[type="text"] {
-  background-color: var(--dark-mode-layout-window-bg);
-  border-color: var(--dark-mode-border-color);
-  color: var(--dark-mode-fg);
+  background-color: var(--panel-bg);
+  border-color: var(--line-color);
+  color: var(--fg);
 }

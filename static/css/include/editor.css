@@ -5,7 +5,8 @@
 
 /* The docText popup menu when selecting a suggestion */
 .ace_doc-tooltip {
-  background: #fff;
+  color: var(--fg);
+  background: var(--overlay-bg);
   border: 1px solid var(--border-color);
 }
 
@@ -36,35 +37,29 @@
   display: none !important;
 }
 
-.ace-tm .ace_marker-layer .ace_active-line {
-  background: rgba(0, 0, 0, 0.03);
+/* Current-line highlight (row and gutter). The textmate theme's own rules are
+ * injected at runtime and would otherwise win, hence !important */
+.ace-tm .ace_marker-layer .ace_active-line,
+.ace-tm .ace_gutter-active-line {
+  background: rgba(0, 0, 0, 0.035) !important;
 }
 
-/* ========================================================================== */
-/* Dark Mode                                                                  */
-/* ========================================================================== */
-.ace-cloud_editor_dark {
-  background-color: var(--dark-mode-layout-window-bg);
-}
-
-.dark-mode .ace_doc-tooltip,
+/* ==========================================================================
+ *  Dark mode: the Ace dark theme's own surfaces, pulled onto the palette.
+ * ========================================================================== */
 .ace-cloud_editor_dark.ace_dark.ace_editor.ace_autocomplete {
-  color: var(--dark-mode-overlay-fg-color);
-  background: var(--dark-mode-overlay-bg-color);
-  border: 1px solid var(--dark-mode-border-color);
-}
-
-.ace-cloud_editor_dark.ace_dark.ace_editor.ace_autocomplete {
+  color: var(--fg);
+  background: var(--overlay-bg);
+  border: 1px solid var(--line-color);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
 }
-
 
 .ace-cloud_editor_dark.ace_dark.ace_editor.ace_autocomplete .ace_line-hover,
 .ace-cloud_editor_dark.ace_dark.ace_editor.ace_autocomplete .ace_marker-layer .ace_active-line {
   border: 0;
-  background-color: var(--dark-mode-editor-cursor-active-line-bg);
+  background-color: var(--muted-bg);
 }
 
 .ace-cloud_editor_dark .ace_print-margin {
-  background: var(--dark-mode-editor-print-margin-color);
+  background: var(--line-strong);
 }
