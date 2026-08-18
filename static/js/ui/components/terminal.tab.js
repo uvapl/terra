@@ -188,7 +188,7 @@ export default class TerminalTab extends BaseTab {
       fontSize,
       lineHeight: 1.2
     });
-    this.setTheme(document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+    this.setTheme(document.documentElement.classList.contains('dark-mode') ? 'dark' : 'light');
     this.terminalInstance.loadAddon(this.fitAddon);
     this.terminalInstance.open(this.container.element);
     // show cursor immediately

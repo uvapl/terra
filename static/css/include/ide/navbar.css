@@ -4,7 +4,6 @@
 .navbar {
   position: relative;
   padding: 0 var(--navbar-padding);
-  background: var(--panel-bg);
   display: flex;
   justify-content: space-between;
   align-items: center;

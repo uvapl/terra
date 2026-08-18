@@ -5,6 +5,13 @@
   <meta charset="utf-8" />
   <meta name="robots" content="noindex,nofollow">
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+  <script>
+    // Apply dark mode early, so Safari can pick up the background color
+    // and mirror that in the toolbar.
+    if (localStorage.getItem('terra-ide-theme') === 'dark') {
+      document.documentElement.classList.add('dark-mode');
+    }
+  </script>
   <link rel="stylesheet" href="static/vendor/golden-layout/2.6.0/css/goldenlayout-base.css" />
   <link rel="stylesheet" href="static/vendor/golden-layout/2.6.0/css/goldenlayout-light-theme.css" />
   <link rel="stylesheet" href="static/css/vendor/xterm-5.4.0.min.css" />

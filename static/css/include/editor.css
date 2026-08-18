@@ -68,5 +68,5 @@
 }
 
 .ace-cloud_editor_dark .ace_print-margin {
-  background: var(--line-strong);
+  background: var(--line-color);
 }

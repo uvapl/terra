@@ -1,5 +1,11 @@
 .lm_goldenlayout {
-  background: var(--panel-bg);
+  background: transparent;
+}
+
+/* set tabs active while dragging to prevent janky hover effects */
+.lm_dragProxy .lm_header .lm_tab {
+  background: var(--active-tab-bg-color);
+  color: var(--active-tab-fg-color);
 }
 
 .lm_goldenlayout,
@@ -15,16 +21,22 @@
   -webkit-user-select: none;
   border-top-right-radius: var(--border-radius);
   border-top-left-radius: var(--border-radius);
-  padding: 2px 10px 5px;
+  padding: 1px 10px 5px;
   height: 100%;
   margin-top: 0;
   margin-right: 3px;
   color: var(--tab-fg-color);
   background-color: var(--tab-bg-color);
+  border-color: transparent;
 }
 
 .lm_header .lm_tab .lm_title {
   padding-top: 3px;
+}
+
+/* correct tab header height while dragging */
+.lm_dragProxy .lm_header {
+  height: 30px;
 }
 
 .lm_header {
@@ -41,8 +53,7 @@
   align-items: center;
 }
 
-/* Output-stack arrange buttons (stacked / split). Hidden until the output area
-   holds more than one tab. */
+/* output-stack arrange button (stacked / split) */
 .output-arrange {
   display: inline-flex;
   align-items: center;
@@ -70,12 +81,6 @@
   opacity: 1;
 }
 
-/* Tabs are told apart by their fill, not by an outline: the vendor's 1px tab
-   border stays invisible in both themes. */
-.lm_header .lm_tab {
-  border-color: transparent;
-}
-
 .lm_content {
   width: 100% !important;
   border: none;
@@ -96,6 +101,8 @@
 }
 
 .lm_splitter {
+  /* let it go over Ace's gutter (z-index 4) */
+  z-index: 5;
   opacity: 1;
   background: transparent;
   transition: background 200ms ease;
@@ -103,6 +110,10 @@
 
 .lm_splitter:hover {
   background: #999;
+}
+
+.dark-mode .lm_splitter:hover {
+  background: var(--line-strong);
 }
 
 .lm_splitter.locked {
@@ -113,7 +124,7 @@
   background: var(--panel-bg);
 }
 
-/* Create two vertical bars as a drag-handler icon */
+/* two vertical bars as a drag icon */
 .lm_splitter.lm_horizontal:not(.locked):before,
 .lm_splitter.lm_horizontal:not(.locked):after {
   content: '';
@@ -141,7 +152,7 @@
   opacity: 0;
 }
 
-/* Create two horizontal bars as a drag-handler icon */
+/* two horizontal bars as a drag icon */
 .lm_splitter.lm_vertical:before,
 .lm_splitter.lm_vertical:after {
   content: '';
@@ -262,14 +273,14 @@
   border-color: var(--fg);
 }
 
-/* Hide the stack-level close button (stacks needs to be closable by other
+/* hide the stack-level close button (stacks needs to be closable by other
    means, so we do not mark stacks `header.close: false`) */
 .lm_header .lm_close {
   display: none;
 }
 
-/* Replace the close cross mark by a unicode character and position it as
-   best we can */
+/* replace the standard close cross mark by a unicode character and position
+   it as best we can */
 .lm_header .lm_tab .lm_close_tab {
   background-image: none;
 

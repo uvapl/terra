@@ -58,7 +58,6 @@
 
 .layout-outer-container {
   overflow: hidden;
-  background: var(--panel-bg);
 }
 
 .lm_header .lm_controls > * {

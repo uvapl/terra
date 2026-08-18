@@ -1,14 +1,5 @@
 /* ==========================================================================
- *  Theme palette.
- *
- *  Light and dark are described by the same set of tokens; only the values in
- *  the two blocks below differ. Everything else in the stylesheets refers to
- *  these tokens (or to the derived names further down), so layout rules are
- *  written once and both themes follow them.
- *
- *  The palette lives on :root (light) and on body.dark-mode (dark). The derived
- *  names must be declared on `body` — the same element that carries the
- *  dark-mode class — so that they resolve against the active palette.
+ *  Theme palette
  * ========================================================================== */
 :root {
   /* Chrome around the work area: navbar, tab strip, splitters, layout gaps. */
@@ -48,7 +39,7 @@
   --veil: rgba(255, 255, 255, 0.7);
 }
 
-.dark-mode {
+:root.dark-mode {
   --panel-bg: #1b1e24;
   --surface-bg: #282c34;
   --surface-alt-bg: #22262d;
@@ -126,6 +117,8 @@ a:visited {
 body {
   margin: 0;
   background-color: var(--panel-bg);
+  /* fixed makes Safari pick up the background color */
+  position: fixed;
   color: var(--fg);
   font-size: var(--font-size);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
@@ -218,10 +211,6 @@ body {
   background-color: var(--surface-bg);
 }
 
-.lm_header {
-  background: var(--panel-bg);
-}
-
 /* Ace editor surface and gutter. The theme stylesheet (textmate for light,
    cloud_editor_dark for dark) is injected at runtime, so these need
    !important to win. */
@@ -234,10 +223,6 @@ body {
 .ace-cloud_editor_dark .ace_gutter {
   background-color: var(--surface-alt-bg) !important;
   color: var(--fg-muted);
-}
-
-.lm_splitter {
-  background-color: var(--panel-bg) !important;
 }
 
 /* ========================================================================== */

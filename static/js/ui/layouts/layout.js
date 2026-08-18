@@ -705,10 +705,10 @@ export default class Layout extends GoldenLayout {
     const isDarkMode = (theme === 'dark');
 
     if (isDarkMode) {
-      $('body').addClass('dark-mode');
+      document.documentElement.classList.add('dark-mode');
       $('#theme').val('dark');
     } else {
-      $('body').removeClass('dark-mode');
+      document.documentElement.classList.remove('dark-mode');
       $('#theme').val('light');
     }
 
