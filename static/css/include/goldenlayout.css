@@ -70,9 +70,10 @@
   opacity: 1;
 }
 
-.lm_content,
+/* Tabs are told apart by their fill, not by an outline: the vendor's 1px tab
+   border stays invisible in both themes. */
 .lm_header .lm_tab {
-  border-color: var(--border-color);
+  border-color: transparent;
 }
 
 .lm_content {
@@ -221,12 +222,6 @@
 /* ========================================================================== */
 /* Dark Mode                                                                  */
 /* ========================================================================== */
-.dark-mode .ace_gutter-active-line,
-.dark-mode .ace_marker-layer .ace_active-line {
-  background-color: var(--overlay-bg);
-  border: 0;
-}
-
 
 .lm_header .lm_controls .lm_tabdropdown:before {
   color: var(--fg);

@@ -171,6 +171,11 @@ export default class TerminalTab extends BaseTab {
     // Add custom class for styling purposes.
     this.getParentComponentElement().classList.add('component-container', 'terminal-component-container');
 
+    if (this.terminalInstance) {
+      this.fitAddon.fit();
+      return;
+    }
+
     const fontFamily = "12px/normal 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Source Code Pro', 'source-code-pro', monospace";
     const fontSize = this.container.getState().fontSize || BASE_FONT_SIZE;
 

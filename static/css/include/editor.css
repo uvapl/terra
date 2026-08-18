@@ -42,6 +42,13 @@
 .ace-tm .ace_marker-layer .ace_active-line,
 .ace-tm .ace_gutter-active-line {
   background: rgba(0, 0, 0, 0.035) !important;
+  border: 0 !important;
+}
+
+.ace-cloud_editor_dark .ace_marker-layer .ace_active-line,
+.ace-cloud_editor_dark .ace_gutter-active-line {
+  background: rgba(255, 255, 255, 0.045) !important;
+  border: 0 !important;
 }
 
 /* ==========================================================================
