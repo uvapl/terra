@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "terra",
+      "runtimeExecutable": "ruby",
+      "runtimeArgs": ["dev-server/serve.rb"],
+      "port": 8000
+    }
+  ]
+}
