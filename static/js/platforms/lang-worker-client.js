@@ -6,16 +6,21 @@ import {
   STATUS_TOO_LARGE,
 } from './file-channel.js';
 import { FileNotFoundError, FileTooLargeError } from '../fs/vfs.js';
+import { hasSharedMemory } from '../lib/environment.js';
 
 /**
  * Built-in languages are registered here with owner `null`. Plugins may add
  * more via registerLang(). The owner lets a worker's custom messages be routed
  * back to just that plugin instead of every plugin.
- * @type {Object<string, { path: string, owner: ?string }>}
+ *
+ * `commands` names the interpreters that directly run a script in this
+ * language from the shell.
+ *
+ * @type {Object<string, { path: string, owner: ?string, lazyFiles: boolean, commands: string[] }>}
  */
 const workers = {
-  c: { path: 'static/js/platforms/clang.worker.js', owner: null, lazyFiles: true },
-  py: { path: 'static/js/platforms/py.worker.js', owner: null, lazyFiles: false },
+  c: { path: 'static/js/platforms/clang.worker.js', owner: null, lazyFiles: true, commands: [] },
+  py: { path: 'static/js/platforms/py.worker.js', owner: null, lazyFiles: false, commands: ['python', 'python3'] },
 };
 
 
@@ -126,9 +131,30 @@ export default class LangWorkerClient {
    * @param {string} workerPath - Path to the worker script.
    * @param {?string} owner - Name of the plugin registering the language; it
    *   receives this language's custom worker messages (see onWorkerMessage).
+   * @param {object} [options]
+   * @param {boolean} [options.lazyFiles] - Whether the worker reads project
+   *   files on demand instead of being handed their content up front.
+   * @param {string[]} [options.commands] - Interpreter names that launch this
+   *   language from the shell, e.g. `['python', 'python3']`.
    */
-  registerLang(proglang, workerPath, owner = null, { lazyFiles = false } = {}) {
-    workers[proglang] = { path: workerPath, owner, lazyFiles };
+  registerLang(proglang, workerPath, owner = null, { lazyFiles = false, commands = [] } = {}) {
+    workers[proglang] = { path: workerPath, owner, lazyFiles, commands };
+  }
+
+  /**
+   * The language an interpreter command runs, e.g. 'py' for 'python3'. The
+   * shell uses this to tell an interpreter launch from a builtin, and to
+   * reject a file the interpreter cannot run.
+   *
+   * @param {string} command - The first word of a command line.
+   * @returns {?string} The programming language, or null when the command is
+   * not an interpreter.
+   */
+  getLangForCommand(command) {
+    const match = Object.entries(workers).find(
+      ([, worker]) => worker.commands?.includes(command)
+    );
+    return match ? match[0] : null;
   }
 
   /**
@@ -140,7 +166,7 @@ export default class LangWorkerClient {
    * @returns {boolean}
    */
   usesLazyFiles(proglang) {
-    return !!workers[proglang]?.lazyFiles && this.hasSharedMemoryEnabled();
+    return !!workers[proglang]?.lazyFiles;
   }
 
   /**
@@ -199,20 +225,14 @@ export default class LangWorkerClient {
   }
 
   /**
-   * Checks whether the browser enabled support for WebAssembly.Memory object
-   * usage by trying to create a new SharedArrayBuffer object. This object can
-   * only be created when both Cross-Origin-Opener-Policy and
-   * Cross-Origin-Embedder-Policy headers are set.
+   * Whether the page has shared memory. The app refuses to start without it
+   * (see checkEnvironment), so this only guards the spawn path, where creating
+   * the buffer would otherwise throw.
    *
    * @returns {boolean} True if browser supports shared memory, false otherwise.
    */
   hasSharedMemoryEnabled() {
-    try {
-      new SharedArrayBuffer(1024);
-      return true;
-    } catch (e) {
-      return false;
-    }
+    return hasSharedMemory();
   }
 
   /**
@@ -296,7 +316,7 @@ export default class LangWorkerClient {
     }, [remotePort]);
   }
 
-  async runFile(proglang, filepath, files, runAsConfig) {
+  async runFile(proglang, filepath, files, runAsConfig, echoCmd = true) {
     this._runQueued = true;
     await this.load(proglang);
     this._runQueued = false;
@@ -311,8 +331,61 @@ export default class LangWorkerClient {
         // Tells the worker whether `vfsFiles` entries carry content or are
         // name-only entries that can later be lazy-loaded.
         lazyFiles: this.usesLazyFiles(proglang),
+        echoCmd,
       },
     });
+  }
+
+  /**
+   * Compile a file without running it. Only the C worker implements this.
+   *
+   * @param {string} proglang - The programming language.
+   * @param {string} filepath - The source file.
+   * @param {object[]} files - The run file payload, see App.getRunFiles().
+   * @param {boolean} [echoCmd] - Whether the worker should echo the command.
+   */
+  async compileFile(proglang, filepath, files, echoCmd = true) {
+    this._runQueued = true;
+    await this.load(proglang);
+    this._runQueued = false;
+    this.isRunningCode = true;
+    this.handlers.onRunStarted();
+    this.port.postMessage({
+      id: 'compileUserCode',
+      data: {
+        activeTabPath: filepath,
+        vfsFiles: files,
+        lazyFiles: this.usesLazyFiles(proglang),
+        echoCmd,
+      },
+    });
+  }
+
+  /**
+   * Run a binary that was built earlier, with command-line arguments.
+   *
+   * @param {string} cmd - The command as the user typed it, used as argv[0].
+   * @param {ArrayBuffer} binary - The compiled binary.
+   * @param {string[]} args - The command-line arguments.
+   * @param {object[]} files - The run file payload, so the program can open
+   * project files while it runs.
+   * @param {boolean} [echoCmd] - Whether the worker should echo the command.
+   */
+  async runBinary(cmd, binary, args, files, echoCmd = true) {
+    this._runQueued = true;
+    await this.load('c');
+    this._runQueued = false;
+    this.isRunningCode = true;
+    this.handlers.onRunStarted();
+    this.port.postMessage({
+      id: 'runBinary',
+      data: {
+        cmd, binary, args,
+        vfsFiles: files,
+        lazyFiles: this.usesLazyFiles('c'),
+        echoCmd,
+      },
+    }, [binary]);
   }
 
   async runSnippet(proglang, selector, filename, command, files) {
@@ -472,10 +545,7 @@ export default class LangWorkerClient {
         break;
 
       case 'newOrModifiedFilesCallback':
-        // New or modified files callback invoked from the worker instance. This
-        // event will be triggered just before the run-user-code callback and
-        // will only triggerer if there are new files created or existing files
-        // have been modified during execution time.
+        // Any files created or changed in the worker FS are propagated to VFS
         this.handlers.onNewOrModifiedFiles(event.data.newOrModifiedFiles);
         break;
 

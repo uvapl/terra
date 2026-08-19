@@ -549,6 +549,9 @@ let api;
 let port;
 
 const onAnyMessage = async event => {
+  // Whether or not a fake prompt + command is echoed on the terminal
+  if (api) api.echoCmd = event.data.data?.echoCmd !== false;
+
   switch (event.data.id) {
     case 'constructor':
       const { port, sharedMem } = event.data.data;

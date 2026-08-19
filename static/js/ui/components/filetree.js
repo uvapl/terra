@@ -911,7 +911,9 @@ function toFancyTree(tree, path = '') {
         type: isFolder ? 'folder' : 'file',
         isFolder,
         isFile: !isFolder,
+        temporary: !!node.temporary,
       },
+      ...(node.temporary ? { extraClasses: 'temporary-file' } : {}),
       ...(isFolder && node.children
         ? { children: toFancyTree(node.children, key) }
         : {}),

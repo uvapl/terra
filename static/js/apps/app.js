@@ -1,5 +1,5 @@
 import { getFileExtension, isImageExtension } from '../lib/helpers.js'
-import { FileNotFoundError, FileTooLargeError } from '../fs/vfs.js';
+import { FileExistsError, FileNotFoundError, FileTooLargeError } from '../fs/vfs.js';
 import BaseApp from './app.base.js';
 import { triggerPluginEvent, triggerPluginEventFor } from '../lib/plugin-manager.js';
 import { MAX_FILE_SIZE } from '../constants.js';
@@ -12,11 +12,18 @@ import { MAX_FILE_SIZE } from '../constants.js';
  */
 export default class App extends BaseApp {
   /**
-   * Resolver for the promise returned by the most recent runFile() call, or
-   * null when no shell-initiated run is in flight. Resolved by onRunEnded.
+   * Whether last command finished.
+   *
    * @type {?function}
    */
   _runEndResolver = null;
+
+  /**
+   * Whether the editor should take focus back when the current run ends.
+   *
+   * @type {boolean}
+   */
+  _refocusEditorOnRunEnd = true;
 
   /** Timer ID for the delayed run-button → stop-button flip, or null. */
   _runButtonTimer = null;
@@ -457,17 +464,13 @@ export default class App extends BaseApp {
         this.term?.disposeUserInput();
 
         // Set focus to the active editor.
-        this.view.getActiveEditor().focus?.();
-
-        // Reset the run/stop button and re-pull availability. The run button's
-        // predicate handles the case where the active tab is not runnable (e.g.
-        // code was launched via the file-tree context menu in the IDE).
-        // this.view.runEnded();
+        if (this._refocusEditorOnRunEnd) {
+          this.view.getActiveEditor().focus?.();
+        }
 
         this.view.invalidateActions();
 
-        // If a run was started through runFile (e.g. by the shell), resolve its
-        // promise now so the caller can resume.
+        // Clean up resolver.
         if (this._runEndResolver) {
           const resolve = this._runEndResolver;
           this._runEndResolver = null;
@@ -485,7 +488,8 @@ export default class App extends BaseApp {
        * file tree.
        *
        * @async
-       * @param {array} newOrModifiedFiles - List of file objects.
+       * @param {array} newOrModifiedFiles - List of file objects, each with a
+       * `path`, its `content`, and `temporary` when it is a build artifact.
        */
       onNewOrModifiedFiles: async (newOrModifiedFiles) => {
         if (!Array.isArray(newOrModifiedFiles)) {
@@ -495,12 +499,15 @@ export default class App extends BaseApp {
         var lastImage = null;
 
         for (const file of newOrModifiedFiles) {
-          const exists = await this.vfs.pathExists(file.path);
-
-          if (exists) {
-            await this.vfs.updateFile(file.path, file.content, true, true);
-          } else {
-            await this.vfs.createFile(file.path, file.content);
+          // One unwritable file must not cost us the rest of the batch.
+          try {
+            await this.vfs.writeProducedFile(file.path, file.content, file.temporary);
+          } catch (err) {
+            if (!(err instanceof FileExistsError)) throw err;
+            this.term?.write(
+              `\x1b[1;31mCannot write '${file.path}': a file or folder with that name already exists\x1b[0m\n`
+            );
+            continue;
           }
 
           if (isImageExtension(file.path)) {
@@ -561,6 +568,7 @@ export default class App extends BaseApp {
    * @param {object} [options]
    * @param {boolean} [options.clearTerm] - Clear the terminal before running.
    * @param {boolean} [options.runAs] - Use the runAs config.
+   * @param {boolean} [options.fromShell] - The user typed this command.
    * @returns {Promise<void>} Resolves when the run has ended.
    */
   async runFile(filepath, options = {}) {
@@ -571,6 +579,7 @@ export default class App extends BaseApp {
       throw new Error('a program is already running');
     }
     if (options.clearTerm) this.term.clear();
+    this._refocusEditorOnRunEnd = !options.fromShell;
 
     // Notify plugins that a run is starting (e.g. the shell, to yield the
     // terminal and start program output on a fresh line).
@@ -587,7 +596,64 @@ export default class App extends BaseApp {
     // Set up the completion promise before starting the run so onRunEnded can
     // resolve it regardless of how quickly the worker responds.
     const runEnded = new Promise(resolve => { this._runEndResolver = resolve; });
-    await this.langWorkerClient.runFile(getFileExtension(filepath), filepath, files, runAsConfig);
+    await this.langWorkerClient.runFile(
+      getFileExtension(filepath), filepath, files, runAsConfig, !options.fromShell);
+    return runEnded;
+  }
+
+  /**
+   * Compile a source file without running it.
+   *
+   * @async
+   * @param {string} filepath - The source file to compile.
+   * @returns {Promise<void>} Resolves when the build has ended.
+   */
+  async compileFile(filepath) {
+    const proglang = getFileExtension(filepath);
+    if (proglang !== 'c') {
+      throw new Error(`cannot compile '${filepath}': not a C file`);
+    }
+    if (this.langWorkerClient.isRunningCode) {
+      throw new Error('a program is already running');
+    }
+
+    this._refocusEditorOnRunEnd = false;
+    triggerPluginEvent('onRunStart');
+    this.term.focus();
+
+    const files = await this.getRunFiles(proglang);
+
+    const compileEnded = new Promise(resolve => { this._runEndResolver = resolve; });
+    await this.langWorkerClient.compileFile(proglang, filepath, files, false);
+    return compileEnded;
+  }
+
+  /**
+   * Run a previously generated binary by path.
+   *
+   * @async
+   * @param {string} path - The (VFS-absolute) path of the binary.
+   * @param {string[]} args - The command-line arguments.
+   * @param {string} [cmd] - The command as the user typed it, used as argv[0].
+   * @returns {Promise<void>} Resolves when the run has ended.
+   */
+  async execBinary(path, args = [], cmd = path) {
+    if (!(await this.vfs.isTempBinary(path))) {
+      throw new Error(`cannot run '${path}': not an executable`);
+    }
+    if (this.langWorkerClient.isRunningCode) {
+      throw new Error('a program is already running');
+    }
+
+    this._refocusEditorOnRunEnd = false;
+    triggerPluginEvent('onRunStart');
+    this.term.focus();
+
+    const binary = await this.vfs.readFile(path);
+    const files = await this.getRunFiles('c');
+
+    const runEnded = new Promise(resolve => { this._runEndResolver = resolve; });
+    await this.langWorkerClient.runBinary(cmd, binary, args, files, false);
     return runEnded;
   }
 

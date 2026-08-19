@@ -153,7 +153,7 @@ export default class IDEApp extends App {
 
     const editorComponent = this.view.getActiveEditor();
     const activeTabPath = editorComponent.getPath();
-    const defaultTarget = editorComponent.getFilename().replace(/\.c$/, '');
+    const defaultTarget = activeTabPath.replace(/\.c$/, '');
 
     // This regex matches quoted strings (single or double quotes) or unquoted
     // words separated by whitespace and is used to split a string of arguments
@@ -237,7 +237,9 @@ export default class IDEApp extends App {
    *
    * @param {string} filepath - The path of the file to open.
    */
-  openFile(filepath) {
+  async openFile(filepath) {
+    if (await this.vfs.isTempBinary(filepath)) return;
+
     this.view.addFileTab(filepath);
     const proglang = getFileExtension(filepath);
     this.createLangWorker(proglang);

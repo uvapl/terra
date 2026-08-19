@@ -63,6 +63,14 @@ let _vfsBaseFolder = '';
 let hidePatterns = [];
 
 /**
+ * Compiled binaries are kept in memory only, but made accessible in some
+ * cases, e.g. to run them.
+ *
+ * @type {Map<string, { content: Uint8Array, mtime: number }>}
+ */
+const tempBinaries = new Map();
+
+/**
  * For polling or external changes in the FS.
  */
 let watchRootFolderInterval;
@@ -130,6 +138,8 @@ const handlers = {
     _vfsRoot = handle;
     _vfsBaseFolder = baseFolderName;
 
+    tempBinaries.clear();
+
     console.log(`base folder set: ${baseFolderName} in ${handle}`);
 
     // (De)activate external changes polling.
@@ -160,7 +170,10 @@ const handlers = {
    * @returns {Promise<void>} Resolves when the root handle is cleared.
    */
   async clear() {
-    // We only allow this when a private browser file system
+    // In-memory tempfiles can always be cleared.
+    tempBinaries.clear();
+
+    // We only allow clearing when a private browser file system
     // (origin private) is connected and not when the real file
     // system is connected.
     if (isOPFS()) {
@@ -206,6 +219,17 @@ const handlers = {
   async readFile(path, maxSize) {
     console.log(`readFile: ${path}`);
 
+    // Either get the file from the binaries store...
+    const temp = tempBinaries.get(path);
+    if (temp) {
+      if (maxSize && temp.content.byteLength > maxSize) {
+        return { error: 'FileTooLarge' };
+      }
+      // Create a copy to return.
+      return temp.content.slice().buffer;
+    }
+
+    // ...or get it from the FS.
     const handle = await getFileHandleByPath(path);
     if (!handle) {
       return { error: 'FileNotFound' };
@@ -246,6 +270,9 @@ const handlers = {
 
     const folder = await getFolderHandleByPath(parentPath);
 
+    // A real file overwrites a binary with the same name.
+    tempBinaries.delete(parentPath ? `${parentPath}/${name}` : name);
+
     while (await handlers.pathExists(`${parentPath}/${name}`)) {
       name = incrementString(name);
     }
@@ -276,6 +303,9 @@ const handlers = {
    * @returns {Promise<FileSystemFileHandle>} The updated file handle.
    */
   async updateFile(path, content, isUserInvoked = true, immediate = false) {
+    // A real file overwrites a binary with the same name.
+    tempBinaries.delete(path);
+
     // Upsert: create the file (and any missing parent folders) when it does
     // not exist yet, writing to the exact path with no collision rename.
     const existed = await handlers.pathExists(path);
@@ -311,6 +341,16 @@ const handlers = {
    * @returns {Promise<boolean>} Resolves to true if deleted successfully, false otherwise.
    */
   async deleteFile(path, isUserInvoked = true) {
+    // Either delete from the binaries store...
+    if (tempBinaries.delete(path)) {
+      if (isUserInvoked) {
+        // Note that we do not post fileDeleted (e.g. to git) for tempfiles
+        self.postMessage({ type: 'fileSystemChanged' });
+      }
+      return true;
+    }
+
+    // ...or from the FS.
     if (!(await handlers.pathExists(path))) {
       return false;
     }
@@ -329,6 +369,54 @@ const handlers = {
     }
 
     return true;
+  },
+
+  /**
+   * Write a file that a run produced, either in mem or persisted.
+   *
+   * @param {string} path - The absolute file path.
+   * @param {string|ArrayBuffer|Uint8Array} content - The file content.
+   * @param {boolean} temporary - Whether this is a build artifact.
+   * @returns {Promise<void>}
+   */
+  async writeProducedFile(path, content, temporary = false) {
+    return temporary
+      ? handlers.writeTempBinary(path, content)
+      : handlers.updateFile(path, content, true, true);
+  },
+
+  /**
+   * Write a temporary compiled binary file.
+   *
+   * @param {string} path - The absolute file path.
+   * @param {ArrayBuffer|Uint8Array} content - The file content.
+   * @returns {Promise<void>}
+   */
+  async writeTempBinary(path, content) {
+    const existed = tempBinaries.has(path);
+
+    // Do not allow overwriting a "real" file with a temp binary.
+    if (!existed && (await handlers.pathExists(path))) {
+      return { error: 'FileExists' };
+    }
+
+    tempBinaries.set(path, {
+      content: content instanceof Uint8Array ? content : new Uint8Array(content),
+      mtime: Date.now(),
+    });
+
+    // Note that we do not post fileCreated (e.g. to git) for tempfiles
+    self.postMessage({ type: 'fileSystemChanged' });
+  },
+
+  /**
+   * Whether a path holds a compiled binary.
+   *
+   * @param {string} path - The absolute file path.
+   * @returns {Promise<boolean>}
+   */
+  async isTempBinary(path) {
+    return tempBinaries.has(path);
   },
 
   /**
@@ -441,6 +529,11 @@ const handlers = {
       await handlers.deleteFile(filepath, true);
     }
 
+    // Delete temporary binaries.
+    for (const filepath of tempBinariesUnder(path)) {
+      await handlers.deleteFile(filepath, true);
+    }
+
     // Delete all the nested folders inside the current folder.
     const folders = await findFoldersInFolder(path);
     for (const folder of folders) {
@@ -469,6 +562,16 @@ const handlers = {
    */
   async moveFile(src, dest) {
     console.log(`moveFile: ${src} -> ${dest}`);
+
+    // A temp binary is just tagged with its new filename.
+    const temp = tempBinaries.get(src);
+    if (temp) {
+      tempBinaries.delete(src);
+      tempBinaries.set(dest, temp);
+
+      self.postMessage({ type: 'fileSystemChanged' });
+      return;
+    }
 
     const srcFileContent = await handlers.readFile(src);
 
@@ -544,10 +647,15 @@ const handlers = {
       }),
     );
 
-    const files = (await findFilesInFolder(path)).map((file) => ({
-      title: file.name,
-      folder: false,
-    }));
+    const files = (await findFilesInFolder(path))
+      .map((file) => ({ title: file.name, folder: false }))
+      .concat(
+        tempBinariesInFolder(path).map((name) => ({
+          title: name,
+          folder: false,
+          temporary: true,
+        }))
+      );
 
     // Sort the tree so it can be compared in watchRootFolder.
     folders.sort((a, b) => a.title.localeCompare(b.title));
@@ -564,7 +672,7 @@ const handlers = {
    */
   async listFilesInFolder(path) {
     const handles = await findFilesInFolder(path);
-    return handles.map((handle) => handle.name);
+    return handles.map((handle) => handle.name).concat(tempBinariesInFolder(path));
   },
 
   /**
@@ -585,6 +693,8 @@ const handlers = {
    * @returns {Promise<boolean>} True if the path exists, false otherwise.
    */
   async pathExists(path) {
+    if (tempBinaries.has(path)) return true;
+
     // First parts of the path are directories, the last
     // is the name of what we need to find (be it a file
     // or directory name).
@@ -646,6 +756,30 @@ function watchRootFolder() {
  */
 async function resetTreeState() {
   previousTree = await handlers.getFileTree();
+}
+
+/**
+ * Every compiled binary inside a folder, at any depth.
+ *
+ * @param {string} folderpath - The absolute folder path ('' for the root).
+ * @returns {string[]} Absolute file paths.
+ */
+function tempBinariesUnder(folderpath) {
+  const prefix = folderpath ? `${folderpath}/` : '';
+  return [...tempBinaries.keys()].filter((path) => path.startsWith(prefix));
+}
+
+/**
+ * The compiled binaries directly inside a folder, excluding deeper ones.
+ *
+ * @param {string} folderpath - The absolute folder path ('' for the root).
+ * @returns {string[]} File names, without their path.
+ */
+function tempBinariesInFolder(folderpath) {
+  const prefix = folderpath ? `${folderpath}/` : '';
+  return tempBinariesUnder(folderpath)
+    .map((path) => path.slice(prefix.length))
+    .filter((name) => !name.includes('/'));
 }
 
 function incrementString(str) {

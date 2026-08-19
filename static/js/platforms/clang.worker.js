@@ -696,11 +696,8 @@ class App {
   args_get(argv_ptrs, argv_buf) {
     this.mem.check();
     for (let i = 0; i < this.argv.length; i++) {
-      // Make sure the first argument is the program name with .c extension
-      // instead of .wasm since students have no idea what a wasm file is.
-      let arg = (i === 0 && /\.wasm/.test(this.argv[i]))
-        ? this.argv[i].replace(/\.wasm/, '.c')
-        : this.argv[i];
+      // argv[0] is the command as the user typed it (e.g. './hello')
+      let arg = this.argv[i];
 
       // Remove quotes around the argument just like in a real shell.
       // '"FOO BAR"' with 'FOO BAR' or "'FOO BAR'" with "FOO BAR"
@@ -828,6 +825,7 @@ class API extends BaseAPI {
     super(options);
     this.moduleCache = {};
     this.hostWriteError = options.hostWriteError;
+    this.newOrModifiedFilesCallback = options.newOrModifiedFilesCallback;
     this.readBuffer = options.readBuffer;
     this.sharedMem = options.sharedMem;
     this.hostRead = options.hostRead;
@@ -871,10 +869,6 @@ class API extends BaseAPI {
       this.getModule(this.clangFilename),
       this.getModule(this.lldFilename),
     ]);
-  }
-
-  hostWriteCmd(message) {
-    this.hostWrite(`\$ ${message}\n`);
   }
 
   async hostLogAsync(message, promise) {
@@ -954,34 +948,20 @@ class API extends BaseAPI {
   }
 
   /**
-   * Run the user's code and print the output to the terminal.
+   * Compile and link a target from its sources.
    *
-   * @param {object} data - The data object coming from the worker.
-   * @param {string} data.activeTabName - The name of the active editor tab.
-   * @param {array} data.vfsFiles - Every file in the VFS. When `lazyFiles` is
-   * set these carry no content, and the file is read on
-   * demand the first time the runtime opens it; otherwise each carries its
-   * content up front.
-   * @param {boolean} data.lazyFiles - Whether `vfsFiles` entries are stubs.
-   * @param {array} data.runAsConfig - The configuration for run-code button.
+   * @param {object} options
+   * @param {object[]} options.srcFiles - The source files to compile. These
+   * carry their content unless `lazyFiles` is set.
+   * @param {string[]} options.srcFilenames - The source paths as requested,
+   * used for the echoed command and the existence check.
+   * @param {string[]} options.vfsFilePaths - Every path in the project.
+   * @param {string} options.target - The output path, without an extension.
+   * @param {boolean} options.lazyFiles - Whether sources are read on demand.
+   * @returns {Promise<?Uint8Array>} The linked binary, or null when the build
+   * failed.
    */
-  async runUserCode({ activeTabPath, vfsFiles, runAsConfig, lazyFiles }) {
-    await this.ready;
-
-    const srcFilenames = runAsConfig
-      ? runAsConfig.compileSrcFilenames
-      : [activeTabPath];
-
-    const srcFiles = runAsConfig
-      ? vfsFiles.filter((file) => srcFilenames.includes(file.path))
-      : vfsFiles.filter((file) => file.path === activeTabPath);
-
-    // An empty list leaves on-demand loading off, so an eager run behaves
-    // exactly as before while still getting its per-run state reset.
-    this.memfs.startRun(lazyFiles ? vfsFiles.map((file) => file.path) : []);
-
-    const activeTabName = getPartsFromPath(activeTabPath).name;
-    const target = runAsConfig ? runAsConfig.compileTarget : activeTabName.replace(/\.c$/, '');
+  async buildTarget({ srcFiles, srcFilenames, vfsFilePaths, target, lazyFiles }) {
     const wasm = `${target}.wasm`;
     const objectFiles = [];
 
@@ -989,17 +969,13 @@ class API extends BaseAPI {
     this.hostWrite(makeCmdPlaceholder(srcFilenames, target) + '\n');
 
     // Check if the user misspelled some paths in srcFilenames.
-    if (runAsConfig) {
-      const vfsFilePaths = vfsFiles.map((file) => file.path);
-      const incorrectFiles = srcFilenames
-        .filter((filepath) => !vfsFilePaths.includes(filepath))
-        .join(', ');
+    const incorrectFiles = srcFilenames
+      .filter((filepath) => !vfsFilePaths.includes(filepath))
+      .join(', ');
 
-      if (incorrectFiles.length > 0) {
-        this.hostWriteError(`Error: The following files do not exist: ${incorrectFiles}\n`);
-        this.runUserCodeCallback();
-        return;
-      }
+    if (incorrectFiles.length > 0) {
+      this.hostWriteError(`Error: The following files do not exist: ${incorrectFiles}\n`);
+      return null;
     }
 
     for (const file of srcFiles) {
@@ -1017,24 +993,17 @@ class API extends BaseAPI {
       const content = lazyFiles ? this.readProjectFile(file.path) : file.content;
       if (lazyFiles && content === null) {
         this.hostWriteError(`Error: could not read ${file.path}\n`);
-        this.runUserCodeCallback();
-        return;
+        return null;
       }
 
       // compile() adds this to memfs itself; keep the wrapper off it.
       this.memfs.markRead(file.path);
 
-      const input = file.path;
       const obj = `${file.path.replace(/\.c$/, '')}.o`;
       try {
-        await this.compile({ input, content, obj });
-      }
-      catch (err) {
-        // Signal run-end only when compilation fails (which aborts the run).
-        // On success the run continues to link/run, which reports the single
-        // run-end itself; firing here too would end the run prematurely.
-        this.runUserCodeCallback();
-        throw err;
+        await this.compile({ input: file.path, content, obj });
+      } catch {
+        return null;
       }
       objectFiles.push(obj);
     }
@@ -1042,19 +1011,132 @@ class API extends BaseAPI {
     try {
       await this.link(objectFiles, wasm);
     } catch {
-      this.runUserCodeCallback();
+      return null;
     }
 
-    const buffer = this.memfs.getFileContents(wasm);
-    const testMod = await WebAssembly.compile(buffer);
-    const args = runAsConfig ? runAsConfig.args : [];
-    this.hostWriteCmd(`./${target} ${(args).join(' ')}`);
+    // getFileContents hands back a view onto memfs's own heap, which the next
+    // build overwrites, so take a copy before it leaves this method.
+    return this.memfs.getFileContents(wasm).slice();
+  }
+
+  /**
+   * Work out what to build from a run payload, build it, and hand the binary
+   * to the host so it shows up in the file tree.
+   *
+   * @param {object} data - The data object coming from the main thread.
+   * @param {string} data.activeTabPath - The path of the file being run.
+   * @param {array} data.vfsFiles - Every file in the VFS. When `lazyFiles` is
+   * set these carry no content, and the file is read on demand the first time
+   * the runtime opens it; otherwise each carries its content up front.
+   * @param {boolean} data.lazyFiles - Whether `vfsFiles` entries are stubs.
+   * @param {?object} data.runAsConfig - The configuration for the run-as button.
+   * @returns {Promise<{ target: string, binary: ?Uint8Array }>}
+   */
+  async build({ activeTabPath, vfsFiles, runAsConfig, lazyFiles }) {
+    const srcFilenames = runAsConfig
+      ? runAsConfig.compileSrcFilenames
+      : [activeTabPath];
+
+    const srcFiles = vfsFiles.filter((file) => srcFilenames.includes(file.path));
+    const vfsFilePaths = vfsFiles.map((file) => file.path);
+
+    // An empty list leaves on-demand loading off, so an eager run behaves
+    // exactly as before while still getting its per-run state reset.
+    this.memfs.startRun(lazyFiles ? vfsFilePaths : []);
+
+    // The binary lands next to its source, so `./hello` works from the folder
+    // the source is in.
+    const target = runAsConfig
+      ? runAsConfig.compileTarget
+      : activeTabPath.replace(/\.c$/, '');
+
+    const binary = await this.buildTarget({
+      srcFiles, srcFilenames, vfsFilePaths, target, lazyFiles,
+    });
+
+    // Reported through the same channel a run uses for any file it produced.
+    // `temporary` is what marks it as a build artifact: visible in the file
+    // tree, but held in memory and never written to disk or committed.
+    if (binary) {
+      this.newOrModifiedFilesCallback([
+        { path: target, content: binary, temporary: true },
+      ]);
+    }
+
+    return { target, binary };
+  }
+
+  /**
+   * Run a compiled binary and print its output to the terminal.
+   *
+   * @param {string} cmd - The command as the user typed it, echoed to the
+   * terminal and passed to the program as argv[0].
+   * @param {Uint8Array} binary - The compiled wasm binary.
+   * @param {string[]} args - The command-line arguments.
+   */
+  async execute(cmd, binary, args) {
+    this.hostWriteCmd([cmd, ...args].join(' '));
 
     try {
-      return await this.run([testMod, wasm, ...args]);
+      const module = await WebAssembly.compile(binary);
+      return await this.run([module, cmd, ...args]);
     } finally {
       this.runUserCodeCallback();
     }
+  }
+
+  /**
+   * Compile the user's code and run it. Backs the Run button.
+   *
+   * @param {object} data - See build().
+   */
+  async runUserCode(data) {
+    await this.ready;
+
+    const { target, binary } = await this.build(data);
+    if (!binary) {
+      this.runUserCodeCallback();
+      return;
+    }
+
+    const args = data.runAsConfig ? data.runAsConfig.args : [];
+    return await this.execute(`./${target}`, binary, args);
+  }
+
+  /**
+   * Compile the user's code without running it. Backs the shell's `make`.
+   *
+   * @param {object} data - See build().
+   */
+  async compileUserCode(data) {
+    await this.ready;
+
+    await this.build(data);
+
+    // Run-end both cleans up the terminal and releases whoever is waiting. A
+    // build reports nothing else: its diagnostics have already been written,
+    // and killing the worker mid-build still settles the caller through the
+    // run-end the client synthesises.
+    this.runUserCodeCallback();
+  }
+
+  /**
+   * Run a binary the user built earlier, e.g. `./hello alice` from the shell.
+   *
+   * @param {object} data - The data object coming from the main thread.
+   * @param {string} data.cmd - The command as typed, echoed and used as argv[0].
+   * @param {ArrayBuffer} data.binary - The compiled wasm binary.
+   * @param {string[]} data.args - The command-line arguments.
+   * @param {array} data.vfsFiles - Every file in the VFS, so the program can
+   * open project files while it runs.
+   * @param {boolean} data.lazyFiles - Whether `vfsFiles` entries are stubs.
+   */
+  async runBinary({ cmd, binary, args, vfsFiles, lazyFiles }) {
+    await this.ready;
+
+    this.memfs.startRun(lazyFiles ? vfsFiles.map((file) => file.path) : []);
+
+    return await this.execute(cmd, new Uint8Array(binary), args);
   }
 }
 
@@ -1086,6 +1168,10 @@ let api;
 let currentApp = null;
 
 const onAnyMessage = async event => {
+  // Per message, so an entry point can never inherit the previous run's
+  // setting, and a message that says nothing about it (runSnippet) echoes.
+  if (api) api.echoCmd = event.data.data?.echoCmd !== false;
+
   switch (event.data.id) {
     case 'constructor':
       const { port, sharedMem, fileChannel } = event.data.data;
@@ -1128,6 +1214,11 @@ const onAnyMessage = async event => {
           port.postMessage({ id: 'runUserCodeCallback' });
         },
 
+        newOrModifiedFilesCallback(newOrModifiedFiles) {
+          // Posts full file contents:
+          port.postMessage({ id: 'newOrModifiedFilesCallback', newOrModifiedFiles });
+        },
+
         clang: '../../wasm/c_cpp/clang',
         lld: '../../wasm/c_cpp/lld',
         sysroot: '../../wasm/c_cpp/sysroot.tar',
@@ -1141,6 +1232,17 @@ const onAnyMessage = async event => {
         currentApp.allowRequestAnimationFrame = false;
       }
       currentApp = await api.runUserCode(event.data.data);
+      break;
+
+    case 'compileUserCode':
+      await api.compileUserCode(event.data.data);
+      break;
+
+    case 'runBinary':
+      if (currentApp) {
+        currentApp.allowRequestAnimationFrame = false;
+      }
+      currentApp = await api.runBinary(event.data.data);
       break;
   }
 };

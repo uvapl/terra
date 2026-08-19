@@ -35,8 +35,16 @@ Python and C runtimes were updated.
   (`ls`, `cat`, `head`, `echo`, `pwd`, `cd`, `mkdir`, `touch`) operating on the
   virtual file system, pipes between builtins, and output redirection.
 - The shell keeps its own working directory, separate from the editor and file
-  tree, and launches programs (`python`, `python3`) through the app, yielding
-  terminal input while a program runs.
+  tree, and launches programs through the app, yielding terminal input while a
+  program runs.
+- `make hello` compiles `hello.c` into `hello`, and `./hello alice bob` runs it
+  with command-line arguments. Both take relative and absolute paths; a bare
+  `hello` is not a path, as in a real shell. `make` does not read a makefile: it
+  compiles with the same clang flags the Run button uses.
+- An interpreter now has to match the file it is given. `python3 hello.c` used
+  to compile and run a C program; it is now an error. Interpreter names are
+  registered per language rather than hardcoded in the shell, so a plugin
+  language can name its own.
 - Terminal internals moved into their own module as part of this work.
 
 ### Edit history

@@ -162,10 +162,7 @@ export function useFileTree(app) {
     },
   });
 
-  // Rebuild the tree when the VFS structure changes from outside the tree UI
-  // (shell touch/mkdir, output redirection, or local filesystem polling), unless
-  // the user is mid-interaction. Consolidates what used to be two separate
-  // listeners (FS-structure events and LFS fileSystemChanged).
+  // Rebuild the tree when the VFS changes.
   const rebuildOnChange = () => {
     if (!app.isFSReloadSuspended()) app.refreshFileTree();
   };

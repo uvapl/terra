@@ -2,6 +2,7 @@ import { getFileExtension } from '../lib/helpers.js'
 import LangWorkerClient from '../platforms/lang-worker-client.js';
 import VirtualFileSystem from '../fs/vfs.js';
 import CommandRegistry from '../commands/registry.js';
+import { checkEnvironment } from '../lib/environment.js';
 
 /**
  * Composition + wiring layer shared by every app.
@@ -124,6 +125,9 @@ export default class BaseApp {
    * constructor to ensure that the app is properly loaded before it is used.
    */
   async init() {
+    // Nothing can run without shared memory.
+    if (!checkEnvironment()) return;
+
     // Await the setupLayout because some apps might need to do async work.
     await this.setupLayout();
 

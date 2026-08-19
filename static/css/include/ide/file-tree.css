@@ -154,6 +154,11 @@
   pointer-events: none;
 }
 
+/* compiled binaries are temporary and grayed out */
+.fancytree-node.temporary-file {
+  opacity: 0.6;
+}
+
 .fancytree-title {
   overflow: hidden;
   white-space: nowrap;
@@ -399,4 +404,3 @@
 .dark-mode .file-tree-container .add-folder-btn {
   background-image: url('../../../img/icons/folder-white.png');
 }
-

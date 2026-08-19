@@ -1,11 +1,7 @@
 import { getPartsFromPath } from '../lib/helpers.js';
 
 /**
- * VFS interface for the main thread ---
- * delegates most of its work to a VFS worker module.
- *
- * By default it will operate, through the worker, on the
- * origin private file system provided by the browser.
+ * VFS interface for the main thread. It delegates to the VFS worker module.
  */
 export default class VirtualFileSystem extends EventTarget {
   constructor() {
@@ -127,6 +123,12 @@ export default class VirtualFileSystem extends EventTarget {
   deleteFile = (path, isUserInvoked = true) =>
     this._send('deleteFile', [path, isUserInvoked]);
 
+  isTempBinary = (path) =>
+    this._send('isTempBinary', [path]);
+
+  writeProducedFile = (path, content, temporary = false) =>
+    this._send('writeProducedFile', [path, content, temporary]);
+
   listFoldersInFolder = async (path = '') => {
     const names = await this._send('listFoldersInFolder', [path]);
     return names.filter((name) => !this._isHidden(name));
@@ -246,6 +248,7 @@ export default class VirtualFileSystem extends EventTarget {
 
 export class FileTooLargeError extends Error {}
 export class FileNotFoundError extends Error {}
+export class FileExistsError extends Error {}
 
 const _errorTypes = [
   {
@@ -255,6 +258,10 @@ const _errorTypes = [
   {
     pattern: /^FileNotFound$/,
     ErrorClass: FileNotFoundError,
+  },
+  {
+    pattern: /^FileExists$/,
+    ErrorClass: FileExistsError,
   },
 ];
 
