@@ -48,8 +48,8 @@ export default class KarelInterpreter {
   }
 
   /**
-   * Run the program body. Resolves normally on turnoff or when the body ends;
-   * rejects if a primitive/world rule is violated.
+   * Run the program body. Function resolves normally on turnoff and rejects if
+   * there's no turnoff, or if a rule is violated.
    *
    * @param {object} body - The execution block AST.
    */
@@ -60,6 +60,7 @@ export default class KarelInterpreter {
       if (err instanceof Halt) return;
       throw err;
     }
+    throw new Error("Karel was not shutdown correctly");
   }
 
   async exec(node) {
@@ -159,7 +160,7 @@ export default class KarelInterpreter {
 
     const body = this.definitions[name];
     if (!body) {
-      throw new Error(`Karel does not know how to '${node.name}'.`);
+      throw new Error(`Karel does not understand '${node.name}'`);
     }
     await this.withFrame(node, 'call', async () => {
       await this.onEnter([...this.stack]);
