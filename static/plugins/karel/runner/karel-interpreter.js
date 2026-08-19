@@ -60,7 +60,7 @@ export default class KarelInterpreter {
       if (err instanceof Halt) return;
       throw err;
     }
-    throw new Error("Karel was not shutdown correctly");
+    throw new Error("Karel was not shut off correctly");
   }
 
   async exec(node) {
