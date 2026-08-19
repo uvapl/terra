@@ -237,9 +237,7 @@ export default class IDEApp extends App {
    *
    * @param {string} filepath - The path of the file to open.
    */
-  async openFile(filepath) {
-    if (await this.vfs.isTempBinary(filepath)) return;
-
+  openFile(filepath) {
     this.view.addFileTab(filepath);
     const proglang = getFileExtension(filepath);
     this.createLangWorker(proglang);

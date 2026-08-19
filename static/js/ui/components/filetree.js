@@ -397,7 +397,7 @@ export default class FileTreeComponent {
       // rename) doesn't open the file and steal focus from the edit input.
       clearTimeout(this._activateTimeout);
       this._activateTimeout = setTimeout(() => {
-        this.delegate.onFileActivated(data.node.key);
+        this.delegate.onFileActivated(data.node.key, data.node.data);
       }, 200);
     } else if (data.node.data.isFolder) {
       clearTimeout(this._toggleTimeout);

@@ -71,8 +71,14 @@ export function useFileTree(app) {
 
     // ── Component intents (the app is the component's delegate) ──
 
-    /** A file node was activated (clicked). */
-    onFileActivated(key) {
+    /**
+     * A file node was activated (clicked). Temp files cannot be opened.
+     *
+     * @param {string} key - The node's path.
+     * @param {object} [nodeData] - The node's data, see toFancyTree().
+     */
+    onFileActivated(key, nodeData = {}) {
+      if (nodeData.temporary) return;
       this.openFile(key);
     },
 
