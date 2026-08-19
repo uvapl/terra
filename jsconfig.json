@@ -6,14 +6,17 @@
     "checkJs": true,
     "allowJs": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "noEmit": true,
-    "typeRoots": ["/Users/martijn/.local/share/js-types/node_modules/@types"],
-    "types": ["jquery"]
+    "noEmit": true
   },
-  "include": ["static/js/**/*.js", "static/plugins/**/*.js"],
+  "include": [
+    "static/js/**/*.js",
+    "static/plugins/**/*.js",
+    "static/js/vendor/jquery/jquery.d.ts",
+    "static/vendor/golden-layout/2.6.0/golden-layout.esm.d.ts"
+  ],
   "exclude": [
-    "static/js/vendor/**",
-    "static/vendor/**",
+    "static/js/vendor/**/*.js",
+    "static/vendor/**/*.js",
     "static/wasm/**",
     "node_modules"
   ]

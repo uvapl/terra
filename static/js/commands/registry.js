@@ -1,21 +1,22 @@
-////////////////////////////////////////////////////////////////////////////////
-// Command registry — the catalog of "things the user can do" and their dispatch.
+// Command registry: manages commands available in the application.
 //
-// A *command* is the single declaration of an action: its name, an optional
-// keyboard shortcut, an optional menu location, an optional `button` surface, an
-// optional `isAvailable` predicate, and the function to run. Commands act on a
-// *target* (the app): the registry is constructed with that target and injects a
-// dispatch context into every exec/isAvailable, so command definitions never
-// reach for a global. They are pure: "given an app (and the active editor), do
-// X".
+// A command is the declaration of an action:
 //
-// This registry owns the catalog and the dispatch only — it knows nothing about
-// the DOM. Rendering the menubar/buttons, binding the keyboard and reflecting
-// availability onto the UI is the job of CommandSurfaces (commands/surfaces.js),
-// which reads this registry. The app owns the registry; the controller owns the
-// surfaces.
+//    - the assigned name
+//    - an optional keyboard shortcut
+//    - an optional menu location
+//    - an optional `button` surface
+//    - an optional `isAvailable` predicate
+//    - and the function to run
 //
-// Command shape:
+// Commands act on a target, which is the app itself. Additionally, a currently
+// active editor may be determined and provided to the command.
+//
+// This registry catalogs all the commands, and the CommandSurfaces class in
+// surfaces.js hooks these into the UI and binds keyboard shortcuts.
+//
+// An example command definition:
+//
 //   {
 //     name: 'quicksave',                          // unique id
 //     scope: 'editor' | 'global',                 // where the key is dispatched
@@ -27,23 +28,20 @@
 //     exec: ({ app, editor }) => { … },            // function, OR…
 //     command: 'undo',                            // …name of a native Ace command
 //   }
-////////////////////////////////////////////////////////////////////////////////
 
 export default class CommandRegistry {
   /**
-   * @param {object} target - The object commands act on (the app). Injected into
-   * every exec/isAvailable via context(), so command defs stay global-free.
+   * @param {object} target - the app that commands act on
    */
   constructor(target) {
     this.target = target;
-    this._commands = new Map(); // name -> command
-    this._submenus = new Map(); // 'View/Font size' -> { position, id }
+    this._commands = new Map(); // name to command
+    this._submenus = new Map(); // 'View/Font size' to { position, id }
     this._rawItems = [];        // { path (parent), position, html }
   }
 
   /**
-   * The dispatch context handed to every exec/isAvailable. The registry derives
-   * the active editor itself so commands never reach for it.
+   * Provides the context for an action.
    *
    * @returns {{ app: object, editor: ?object }}
    */
@@ -56,6 +54,11 @@ export default class CommandRegistry {
 
   // ── Registration ──
 
+  /**
+   * Add a single command to the registry.
+   *
+   * @param {object} cmd
+   */
   addCommand(cmd) {
     if (!cmd || !cmd.name) {
       throw new Error('CommandRegistry.addCommand: a command needs a unique `name`');
@@ -64,19 +67,22 @@ export default class CommandRegistry {
     return cmd;
   }
 
+  /**
+   * Add a number of commands to the registry.
+   *
+   * @param {object[]} list
+   */
   addCommands(list) {
     list.forEach((cmd) => this.addCommand(cmd));
   }
 
   /**
-   * Populate the registry from a variant's command config: the commands plus any
-   * submenu metadata and raw (non-command) menu items they carry. This is the
-   * single, explicit entry point each variant controller calls.
+   * Populate the registry from a variant's command config.
    *
-   * @param {object[]} [commandList] - Commands to register.
+   * @param {object[]} [commandList] - commands to register
    * @param {object} [opts]
-   * @param {object} [opts.submenus] - Map of container path -> { position, id }.
-   * @param {object[]} [opts.rawItems] - Raw menu items ({ path, position, html }).
+   * @param {object} [opts.submenus] - map of container path to { position, id }
+   * @param {object[]} [opts.rawItems] - raw menu items ({ path, position, html })
    */
   register(commandList = [], { submenus = {}, rawItems = [] } = {}) {
     this.addCommands(commandList);
@@ -87,8 +93,7 @@ export default class CommandRegistry {
   }
 
   /**
-   * Clear the catalog. Rarely needed within a single app (commands are not
-   * layout-bound and persist across a layout reset).
+   * Clear the catalog.
    */
   reset() {
     this._commands.clear();
@@ -97,21 +102,21 @@ export default class CommandRegistry {
   }
 
   /**
-   * Declare metadata for a submenu / top-level menu container (its position among
-   * siblings and, optionally, a fixed DOM id on its <ul>).
+   * Add a menu or submenu.
    *
-   * @param {string} path - Full container path, e.g. 'View/Font size'.
-   * @param {object} opts - { position, id }.
+   * @param {string} path - full container path, e.g. 'View/Font size'
+   * @param {object} opts - { position, id } position among siblings and optionally a fixed
+   * DOM id on its <ul>
    */
   configureSubmenu(path, opts) {
     this._submenus.set(path, opts);
   }
 
   /**
-   * Register a raw <li> (or fragment) that is not a command, e.g. the data-driven
-   * theme / font-size value lists or the Git branch placeholder.
+   * Add a submenu for which the action is defined elsewhere; e.g. the
+   * theme or font-size value lists, or the Git branch placeholder.
    *
-   * @param {object} item - { path (parent container), position, html }.
+   * @param {object} item - { path (parent container), position, html }
    */
   addMenuItem(item) {
     this._rawItems.push(item);
@@ -138,9 +143,8 @@ export default class CommandRegistry {
   // ── Dispatch ──
 
   /**
-   * Run a command by name against the current context. Handles both `exec`
-   * functions and native Ace `command` aliases (which run on the active editor).
-   * A no-op for an unknown command.
+   * Run a command by name, against the current context. Handles both `exec`
+   * functions and native Ace `command` aliases. Unknown commands are ignored.
    *
    * @param {string} name
    */
@@ -157,8 +161,8 @@ export default class CommandRegistry {
   }
 
   /**
-   * Whether a command is currently available. Commands without an `isAvailable`
-   * predicate are always available.
+   * Whether a command is currently available. Commands that do not define
+   * an `isAvailable` flag are always available.
    *
    * @param {object} cmd
    * @returns {boolean}

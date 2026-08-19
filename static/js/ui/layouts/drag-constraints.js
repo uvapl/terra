@@ -1,22 +1,20 @@
-////////////////////////////////////////////////////////////////////////////////
-// Cross-stack drag constraint for GoldenLayout.
+// Drag constraints for GoldenLayout.
 //
 // For this application, we keep editor tabs in a separate stack from terminal
 // and canvas output tabs.
 //
 // To make GoldenLayout work with this restriction, we change the internally
-// reported drop area to be none when dragging over the wrong part. To know
-// what is where, stacks are tagged as having a `_terraArea`: 'editor' or
-// 'output'.
+// reported drop area to be `none` when dragging over the wrong part. To know
+// what is where, stacks are tagged as belonging to one of two areas via
+// `_terraArea`: either 'editor' or 'output'.
 //
 // Tagging of areas is done in the layout.flexible class.
 //
 // We probably could have used two separate GoldenLayouts to get the same
-// effect, but: this way we can serialize the full layout at once.
+// effect, but: this way we can serialize and reinstate the full layout at once.
 //
 // The exported function constrainDrops() below is called by the layout to
 // activate the hook.
-////////////////////////////////////////////////////////////////////////////////
 
 import { isEditorItem } from './tab-config.js';
 
@@ -57,8 +55,7 @@ function isAttached(item, layout) {
 }
 
 /**
- * Install the drag constraint on a layout by wrapping two of its public
- * LayoutManager methods:
+ * Install drag constraints on a layout by wrapping two of its public methods.
  *
  *  - startComponentDrag() saves a reference to the item when dragging starts
  *    and clears it when dragging is stopped
@@ -73,7 +70,7 @@ export function constrainDrops(layout) {
   const getArea = layout.getArea.bind(layout);
 
   layout.startComponentDrag = (x, y, dragListener, componentItem, stack) => {
-    // Refuse to drag the last tab out of the only editor stack
+    // refuse to drag the last tab out of the only editor stack
     if (stack?.contentItems.length === 1 && layout.isSoleEditorStack?.(stack)) {
       dragListener.cancelDrag();
       return;
@@ -96,8 +93,7 @@ export function constrainDrops(layout) {
     return isDropAllowed(layout._terraDragged, area.contentItem) ? area : null;
   };
 
-  // If a drop is effected outside allowed areas, this makes sure that the
-  // layout is asked to provide a "new home".
+  // if dropped outside allowed areas, this asks the layout for a "new home"
   layout.on('itemDropped', (componentItem) => {
     if (isAttached(componentItem, layout)) return;
 

@@ -18,8 +18,8 @@ export function useStorageCoordinator(app) {
      * Register a storage backend's teardown so the coordinator can disconnect
      * it when another backend becomes active.
      *
-     * @param {string} name - Unique backend name (e.g. 'git', 'lfs').
-     * @param {function(): (void|Promise<void>)} teardown - Disconnects the backend.
+     * @param {string} name - unique backend name (e.g. 'git', 'lfs')
+     * @param {function(): (void|Promise<void>)} teardown - disconnects the backend
      */
     registerStorageBackend(name, teardown) {
       this._storageBackends[name] = teardown;
@@ -27,10 +27,10 @@ export function useStorageCoordinator(app) {
 
     /**
      * Tear down every backend other than `name` before it becomes active. The
-     * teardowns are guarded no-ops when their backend is already inactive.
+     * teardowns can be safely called when their backend is already inactive.
      *
      * @async
-     * @param {string} name - The backend that is about to become active.
+     * @param {string} name - the backend that is about to become active
      */
     async activateStorageBackend(name) {
       for (const [key, teardown] of Object.entries(this._storageBackends)) {

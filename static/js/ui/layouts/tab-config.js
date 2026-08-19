@@ -1,11 +1,11 @@
 /**
- * Builder for tab component config.
+ * Builder for tab component configurations that GoldenLayout needs.
  *
- * @param {object} [config] - overrides for the item config: `kind` selects the
+ * @param {object} [config] - item config: `kind` selects the
  * component (default 'editor') and `componentState` is merged into the
- * defaults from the second parameter
+ * defaults
  * @param {object} [stateDefaults] - default componentState (font size, theme)
- * @returns {object} the item config
+ * @returns {object} the complete item config
  */
 export function createTabConfig(config = {}, stateDefaults = {}) {
   const { kind, componentState, ...rest } = config;

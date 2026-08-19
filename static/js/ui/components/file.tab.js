@@ -1,23 +1,24 @@
-import { getPartsFromPath } from '../../lib/helpers.js';
-import BaseTab from './base.tab.js';
+import { getPartsFromPath } from "../../lib/helpers.js";
+import BaseTab from "./base.tab.js";
 
 /**
- * A tab backed by a file on disk, holding a path and a filename. Superclass for
- * the editor and image tabs; tabs without a file (canvas, terminal) extend
+ * A tab connected to a file on disk, having a path and a filename. Editor and
+ * image tabs extend this class. Tabs without a file (Canvas, Terminal) extend
  * BaseTab directly.
  */
 export default class FileTab extends BaseTab {
   /**
-   * Get tab's corresponding filepath.
+   * Get the tab's file path.
    *
-   * @returns {string} The path of the tab.
+   * @returns {string} path
    */
   getPath = () => {
     return this.container.getState().path;
-  }
+  };
 
   /**
-   * Set the path of the tab. This also updates the tab's filename.
+   * Set the path of the tab and update the tab's filename.
+   * Might be called when a file is moved in the FS, for example.
    *
    * @param {string} path - The absolute file path of the tab.
    */
@@ -28,23 +29,23 @@ export default class FileTab extends BaseTab {
 
     // Update the state with the new path.
     this.container.extendState({ path });
-  }
+  };
 
   /**
-   * Get the filename of the corresponding tab.
+   * Get the tab's filename.
    *
-   * @returns {string} The name of the tab.
+   * @returns {string} filename
    */
   getFilename = () => {
     return this.container.title;
-  }
+  };
 
   /**
-   * Set the filename of the corresponding tab.
+   * Set the tab's filename.
    *
-   * @param {string} filename - The new name of the tab.
+   * @param {string} filename - new name
    */
   setFilename = (filename) => {
     this.container.setTitle(filename);
-  }
+  };
 }
