@@ -3,7 +3,7 @@ import Terra from '../terra.js';
 import { loadPlugins } from '../lib/plugin-manager.js';
 
 const plugins = [
-  'run-as',
+  // 'run-as',
   'check50',
   'right-sidebar',
   'shell',
