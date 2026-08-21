@@ -653,7 +653,7 @@ export default class App extends BaseApp {
     const files = await this.getRunFiles('c');
 
     const runEnded = new Promise(resolve => { this._runEndResolver = resolve; });
-    await this.langWorkerClient.runBinary(cmd, binary, args, files, false);
+    await this.langWorkerClient.runBinary(cmd, binary, args, files, path, false);
     return runEnded;
   }
 

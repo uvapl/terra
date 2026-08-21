@@ -369,9 +369,11 @@ export default class LangWorkerClient {
    * @param {string[]} args - The command-line arguments.
    * @param {object[]} files - The run file payload, so the program can open
    * project files while it runs.
+   * @param {string} path - The (VFS-relative) path of the binary, so the
+   * worker can resolve relative file opens against its folder.
    * @param {boolean} [echoCmd] - Whether the worker should echo the command.
    */
-  async runBinary(cmd, binary, args, files, echoCmd = true) {
+  async runBinary(cmd, binary, args, files, path, echoCmd = true) {
     this._runQueued = true;
     await this.load('c');
     this._runQueued = false;
@@ -380,7 +382,7 @@ export default class LangWorkerClient {
     this.port.postMessage({
       id: 'runBinary',
       data: {
-        cmd, binary, args,
+        cmd, binary, args, path,
         vfsFiles: files,
         lazyFiles: this.usesLazyFiles('c'),
         echoCmd,

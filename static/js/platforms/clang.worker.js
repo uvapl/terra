@@ -180,6 +180,7 @@ class MemFS {
     // outlives a run, so these must not persist: re-reading next run is what
     // picks up edits the user made in between.
     this.projectFiles = new Set();
+    this.cwd = '';
     this.filesRead = new Set();
     this.dirsCreated = new Set();
 
@@ -341,9 +342,14 @@ class MemFS {
    * to build its parents at that point.
    *
    * @param {string[]} paths - Canonical paths of every file in the project.
+   * @param {string} [cwd] - The VFS folder the running binary lives in, used
+   * to resolve the relative paths it opens the same way a real OS resolves
+   * them against the launching process's working directory. There is no real
+   * chdir()/getcwd() in this WASI runtime, so this is the closest equivalent.
    */
-  startRun(paths) {
+  startRun(paths, cwd = '') {
     this.projectFiles = new Set(paths);
+    this.cwd = cwd;
     this.filesRead.clear();
     this.dirsCreated.clear();
     this.openFiles.clear();
@@ -370,8 +376,9 @@ class MemFS {
    *
    * @param {number} pathPtr - Path offset, in the *calling* module's memory.
    * @param {number} pathLen - Path length in bytes.
-   * @returns {?string} The canonical path when it is a project file that is now
-   * in memfs, else null.
+   * @returns {?string} The raw path it was loaded under (matching what
+   * realOpen will look up next) when it is a project file that is now in
+   * memfs, else null.
    */
   _loadIfNeeded(pathPtr, pathLen) {
     if (!this.fileReader || this.projectFiles.size === 0 || !this.hostMem_) return null;
@@ -387,23 +394,38 @@ class MemFS {
       return null;
     }
 
-    const canonical = normalizePath(path);
-    if (!this.projectFiles.has(canonical)) return null;
-    if (this.filesRead.has(canonical)) return canonical;
+    // realOpen (called right after this, with the same untouched pathPtr/
+    // pathLen) resolves purely against memfs's own flat tree — this WASI
+    // runtime has no chdir()/getcwd(), so whatever raw path the program
+    // passed to fopen() is exactly what realOpen will look up. The file must
+    // therefore be added under that same raw path, or realOpen won't find it.
+    //
+    // The project's file list, on the other hand, is cwd-resolved first, the
+    // same way a real OS resolves a relative open() against the launching
+    // process's working directory — that's the only way to find the right
+    // file when the same relative name exists under more than one folder.
+    const requestPath = normalizePath(path);
+    const projectPath = normalizePath(this.cwd ? `${this.cwd}/${path}` : path);
+    if (!this.projectFiles.has(projectPath)) return null;
+    if (this.filesRead.has(requestPath)) return requestPath;
 
     // Recorded before reading, so a failure is not retried on every attempt.
-    this.filesRead.add(canonical);
+    this.filesRead.add(requestPath);
 
-    const { status, bytes } = this.fileReader.read(canonical);
+    const { status, bytes } = this.fileReader.read(projectPath);
     if (status === STATUS_TOO_LARGE) {
       this.hostWriteError(
-        `Cannot open '${canonical}': file is too large to use while running.\n`);
+        `Cannot open '${projectPath}': file is too large to use while running.\n`);
       return null;
     }
     if (status !== STATUS_OK) return null;
 
-    this.addFile(canonical, bytes);
-    return canonical;
+    // In case the raw path has folders of its own (a relative open reaching
+    // into a subfolder of cwd) that startRun's own ensureDirs pass, keyed on
+    // full project paths, never had reason to create.
+    this.ensureDirs(requestPath);
+    this.addFile(requestPath, bytes);
+    return requestPath;
   }
 
   /**
@@ -1040,15 +1062,17 @@ class API extends BaseAPI {
     const srcFiles = vfsFiles.filter((file) => srcFilenames.includes(file.path));
     const vfsFilePaths = vfsFiles.map((file) => file.path);
 
-    // An empty list leaves on-demand loading off, so an eager run behaves
-    // exactly as before while still getting its per-run state reset.
-    this.memfs.startRun(lazyFiles ? vfsFilePaths : []);
-
     // The binary lands next to its source, so `./hello` works from the folder
-    // the source is in.
+    // the source is in, and that folder also doubles as the cwd for the run
+    // it is about to be executed in (see startRun's `cwd`).
     const target = runAsConfig
       ? runAsConfig.compileTarget
       : activeTabPath.replace(/\.c$/, '');
+
+    // An empty list leaves on-demand loading off, so an eager run behaves
+    // exactly as before while still getting its per-run state reset.
+    this.memfs.startRun(
+      lazyFiles ? vfsFilePaths : [], getPartsFromPath(target).parentPath);
 
     const binary = await this.buildTarget({
       srcFiles, srcFilenames, vfsFilePaths, target, lazyFiles,
@@ -1130,11 +1154,15 @@ class API extends BaseAPI {
    * @param {array} data.vfsFiles - Every file in the VFS, so the program can
    * open project files while it runs.
    * @param {boolean} data.lazyFiles - Whether `vfsFiles` entries are stubs.
+   * @param {string} data.path - The (VFS-relative) path of the binary, used
+   * as the cwd for resolving the relative paths it opens.
    */
-  async runBinary({ cmd, binary, args, vfsFiles, lazyFiles }) {
+  async runBinary({ cmd, binary, args, vfsFiles, lazyFiles, path }) {
     await this.ready;
 
-    this.memfs.startRun(lazyFiles ? vfsFiles.map((file) => file.path) : []);
+    this.memfs.startRun(
+      lazyFiles ? vfsFiles.map((file) => file.path) : [],
+      getPartsFromPath(path).parentPath);
 
     return await this.execute(cmd, new Uint8Array(binary), args);
   }
