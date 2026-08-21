@@ -1062,25 +1062,20 @@ class API extends BaseAPI {
     const srcFiles = vfsFiles.filter((file) => srcFilenames.includes(file.path));
     const vfsFilePaths = vfsFiles.map((file) => file.path);
 
-    // The binary lands next to its source, so `./hello` works from the folder
-    // the source is in, and that folder also doubles as the cwd for the run
-    // it is about to be executed in (see startRun's `cwd`).
+    // the binary is placed next to the source
     const target = runAsConfig
       ? runAsConfig.compileTarget
       : activeTabPath.replace(/\.c$/, '');
 
-    // An empty list leaves on-demand loading off, so an eager run behaves
-    // exactly as before while still getting its per-run state reset.
-    this.memfs.startRun(
-      lazyFiles ? vfsFilePaths : [], getPartsFromPath(target).parentPath);
+    // prep
+    this.memfs.startRun(lazyFiles ? vfsFilePaths : []);
 
+    // start the build
     const binary = await this.buildTarget({
       srcFiles, srcFilenames, vfsFilePaths, target, lazyFiles,
     });
 
-    // Reported through the same channel a run uses for any file it produced.
-    // `temporary` is what marks it as a build artifact: visible in the file
-    // tree, but held in memory and never written to disk or committed.
+    // notify of generated binary
     if (binary) {
       this.newOrModifiedFilesCallback([
         { path: target, content: binary, temporary: true },
@@ -1117,12 +1112,17 @@ class API extends BaseAPI {
   async runUserCode(data) {
     await this.ready;
 
+    // start the build
     const { target, binary } = await this.build(data);
     if (!binary) {
       this.runUserCodeCallback();
       return;
     }
 
+    // set the cwd for running the binary
+    this.memfs.cwd = getPartsFromPath(target).parentPath;
+
+    // run it
     const args = data.runAsConfig ? data.runAsConfig.args : [];
     return await this.execute(`./${target}`, binary, args);
   }
