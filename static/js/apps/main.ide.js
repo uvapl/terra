@@ -4,8 +4,8 @@ import { loadPlugins } from '../lib/plugin-manager.js';
 
 const plugins = [
   // 'run-as',
-  'check50',
-  'right-sidebar',
+  // 'check50',
+  // 'right-sidebar',
   'shell',
   'karel',
   'rover',
