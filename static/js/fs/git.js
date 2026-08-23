@@ -71,9 +71,9 @@ export default class GitFS {
     this.commit(file.path, file.content);
   }
 
-  vfsFileMovedHandler = (event) => {
+  vfsFileMovedHandler = async (event) => {
     const { file, oldPath } = event.detail;
-    this.moveFile(oldPath, file.path, file.content);
+    this.moveFile(oldPath, file.path, await this.vfs.readFile(file.path));
   }
 
   vfsFileContentChangedHandler = (event) => {
@@ -88,6 +88,11 @@ export default class GitFS {
     this.rm(file.path);
   }
 
+  /**
+   * Note that this function is moot. No `folderMoved` event is actually
+   * sent, nor needed for git. Git does not keep track of folders per se,
+   * so file move events suffice.
+   */
   vfsFolderMovedHandler = (event) => {
     const { filesMoved } = event.detail;
     this.moveFolder(filesMoved);

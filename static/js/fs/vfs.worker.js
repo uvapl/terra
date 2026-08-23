@@ -610,16 +610,13 @@ const handlers = {
     }
     const destPath = fullPath(destName);
 
-    let srcFileContent;
     try {
-      srcFileContent = await handlers.readFile(src);
-
       const srcHandle = await getFileHandleByPath(src);
       const destFolder = await getFolderHandleByPath(parentPath, { create: true });
 
       // Use FS API or do it manually with copy and delete
       if (!srcHandle || !(await nativeMove(srcHandle, destFolder, destName))) {
-        await handlers.createFile(destPath, srcFileContent, false);
+        await handlers.createFile(destPath, await handlers.readFile(src), false);
         await handlers.deleteFile(src, false);
       }
     } catch (err) {
@@ -634,7 +631,6 @@ const handlers = {
         oldPath: src,
         file: {
           path: destPath,
-          content: srcFileContent,
         },
       },
     });
@@ -1059,6 +1055,16 @@ async function findFilesInFolder(folderpath, { include = 'listed' } = {}) {
 }
 
 /**
+ * Handle kinds ("file", "directory") whose move the browser does not implement.
+ *
+ * @type {Set<string>}
+ */
+const unmovableKinds = new Set();
+
+/** Errors that mean the browser does not implement the move at all. */
+const UNSUPPORTED_ERRORS = ['NotSupportedError', 'TypeError'];
+
+/**
  * Move an entry with the browser's move operation, which is not offered for
  * every kind of handle. Returns false when unavailable, so we can copy instead.
  *
@@ -1068,13 +1074,24 @@ async function findFilesInFolder(folderpath, { include = 'listed' } = {}) {
  * @returns {Promise<boolean>} False when the move is unavailable.
  */
 async function nativeMove(handle, destFolder, name) {
-  if (typeof handle.move !== 'function') return false;
+  if (unmovableKinds.has(handle.kind)) return false;
+
+  if (typeof handle.move !== 'function') {
+    unmovableKinds.add(handle.kind);
+    return false;
+  }
 
   try {
     await handle.move(destFolder, name);
     return true;
   } catch (err) {
-    console.log(`nativeMove unavailable for ${handle.name}:`, err.name);
+    // Only a refusal of the operation itself rules out the whole kind; other
+    // failures say nothing about the next entry.
+    if (UNSUPPORTED_ERRORS.includes(err.name)) {
+      unmovableKinds.add(handle.kind);
+    }
+
+    console.log(`nativeMove failed for ${handle.name}:`, err.name);
     return false;
   }
 }
