@@ -1,4 +1,5 @@
-import { getFileExtension, isImageExtension } from '../lib/helpers.js'
+import { getFileExtension, isImageExtension, seconds } from '../lib/helpers.js'
+import { createScheduler } from '../lib/scheduler.js';
 import { FileExistsError, FileNotFoundError, FileTooLargeError } from '../fs/vfs.js';
 import BaseApp from './app.base.js';
 import { triggerPluginEvent, triggerPluginEventFor } from '../lib/plugin-manager.js';
@@ -28,6 +29,9 @@ export default class App extends BaseApp {
   /** Timer ID for the delayed run-button → stop-button flip, or null. */
   _runButtonTimer = null;
 
+  /** Scheduler holding the pending editor writes, keyed by path. */
+  _editorWrites = createScheduler();
+
   /**
    * Maps a proglang to the output surface kind it pairs with (currently only
    * 'canvas'). A plugin links its languages here via registerSurface(); the core
@@ -38,6 +42,16 @@ export default class App extends BaseApp {
    */
   _surfaces = {};
 
+  constructor() {
+    super();
+
+    // Best-effort write of unsaved editor content. This handler must not return
+    // a value, as jQuery turns that into a request for the leave-site dialog.
+    $(window).on('beforeunload', () => {
+      this.writeEditorsNow();
+    });
+  }
+
   // ─────────────────────────── Editor handlers ───────────────────────────
 
   /**
@@ -46,13 +60,32 @@ export default class App extends BaseApp {
    * This is default functionality and super.onEditorTextChanged() must be
    * called first in child classes before any additional functionality.
    *
-   * @async
    * @param {EditorTab} editorComponent - The editor component instance.
    */
-  async onEditorTextChanged(editorComponent) {
+  onEditorTextChanged(editorComponent) {
     const path = editorComponent.getPath();
-    await this.vfs.updateFile(path, editorComponent.getContent());
+    const content = editorComponent.getContent();
+
+    // each keystroke replaces the previously scheduled write, so the last
+    // content wins
+    this._editorWrites.schedule(path, seconds(0.2), () => this.vfs.updateFile(path, content));
+
     triggerPluginEvent('onEditorTextChanged', editorComponent);
+  }
+
+  /**
+   * Write scheduled editor content right now, without waiting out its delay.
+   *
+   * @async
+   * @param {?string} [path] - A single path, or null for every scheduled path.
+   * @returns {Promise<void>} Resolves once the writes have completed.
+   */
+  async writeEditorsNow(path = null) {
+    if (path === null) {
+      await this._editorWrites.runAllNow();
+    } else {
+      await this._editorWrites.runNow(path);
+    }
   }
 
   /**
@@ -152,6 +185,7 @@ export default class App extends BaseApp {
   }
 
   onEditorDestroyed(editorComponent) {
+    this.writeEditorsNow(editorComponent.getPath());
     triggerPluginEvent('onEditorDestroy', editorComponent);
     // Retire any surface that just lost its last linked editor.
     this._pruneSurfaces(editorComponent);
@@ -586,6 +620,7 @@ export default class App extends BaseApp {
     triggerPluginEvent('onRunStart');
     this.term.focus();
 
+    await this.writeEditorsNow();
     const files = await this.getRunFiles(getFileExtension(filepath));
 
     // Only resolve the runAs config when actually running "as", because
@@ -621,6 +656,7 @@ export default class App extends BaseApp {
     triggerPluginEvent('onRunStart');
     this.term.focus();
 
+    await this.writeEditorsNow();
     const files = await this.getRunFiles(proglang);
 
     const compileEnded = new Promise(resolve => { this._runEndResolver = resolve; });
@@ -650,6 +686,7 @@ export default class App extends BaseApp {
     this.term.focus();
 
     const binary = await this.vfs.readFile(path);
+    await this.writeEditorsNow();
     const files = await this.getRunFiles('c');
 
     const runEnded = new Promise(resolve => { this._runEndResolver = resolve; });
@@ -678,6 +715,7 @@ export default class App extends BaseApp {
 
     const filename = this.view.getActiveEditor().getFilename();
     const proglang = getFileExtension(filename);
+    await this.writeEditorsNow();
     const files = await this.getRunFiles(proglang);
 
     this.langWorkerClient.runSnippet(proglang, selector, filename, cmd, files);

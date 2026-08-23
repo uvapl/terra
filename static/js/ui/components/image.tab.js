@@ -58,10 +58,9 @@ export default class ImageTab extends FileTab {
   }
 
   /**
-   * Update the displayed image directly from raw file content. Used when a
-   * program run modifies an already-open image: reading back through the VFS
-   * would race the debounced disk write and show the previous image, so we
-   * build a blob URL straight from the new bytes.
+   * Update the displayed image directly from raw file content, by building a
+   * blob URL from the given bytes. Used when a program run modifies an
+   * already-open image.
    *
    * @param {ArrayBuffer|Uint8Array} content - The raw image bytes.
    */

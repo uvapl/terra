@@ -114,8 +114,8 @@ export default class VirtualFileSystem extends EventTarget {
 
   getFileURL = (path) => this._send('getFileURL', [path]);
 
-  updateFile = (path, content, isUserInvoked = true, immediate = false) =>
-    this._send('updateFile', [path, content, isUserInvoked, immediate]);
+  updateFile = (path, content, isUserInvoked = true) =>
+    this._send('updateFile', [path, content, isUserInvoked]);
 
   createFile = (path, content = '', isUserInvoked = true) =>
     this._send('createFile', [path, content, isUserInvoked]);

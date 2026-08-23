@@ -356,6 +356,9 @@ export default class ExamApp extends App {
    * @returns {Promise<Response>} The response from the submission endpoint.
    */
   async doAutoSave(url, uuid) {
+    // Post what is in the editors, not what the delayed writes have reached.
+    await this.writeEditorsNow();
+
     const formData = new FormData();
     formData.append('code', uuid);
 

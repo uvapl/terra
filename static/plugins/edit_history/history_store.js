@@ -1,17 +1,18 @@
 import { getPartsFromPath } from '../../js/lib/helpers.js';
+import { createScheduler } from '../../js/lib/scheduler.js';
 import { FileNotFoundError } from '../../js/fs/vfs.js';
 import Terra from '../../js/terra.js';
 
-// The naming convention for hidden history siblings (`foo.py` ->
-// `.foo.py.history`), owned by this plugin. Exported so the plugin can
-// register it with the VFS as an ignore pattern (see edit-history.js).
+// The naming convention for hidden history siblings (`foo.py` yields
+// `.foo.py.history`). Exported so the plugin can register it with the
+// VFS as an ignore pattern (see edit-history.js).
 export const HISTORY_FILE_PATTERN = /^\..+\.history$/;
 
 // Source files larger than this no longer get history recorded.
 export const MAX_TRACKED_FILE_SIZE = 100 * 1024;
 
 // A full snapshot is stored every KEYFRAME_INTERVAL revisions so that
-// reconstructing any revision applies at most that many patches.
+// reconstructing any revision is based on a limited number of patches.
 const KEYFRAME_INTERVAL = 20;
 
 // Per-file history bounds. OPFS space is plentiful, but exam submissions
@@ -20,17 +21,17 @@ const MAX_REVISIONS = 1000;
 const MAX_SERIALIZED_SIZE = 1024 * 1024;
 
 // How long to wait after a commit before writing to the VFS, so rapid
-// commits coalesce into one write.
+// commits combine into one write.
 const PERSIST_DELAY_MS = 300;
 
-// In-memory cache: source file path -> history object, plus per-path pending
-// write timers.
+// In-memory cache: maps source file path to a history object, plus the
+// scheduler holding the pending writes, keyed by that same path.
 const cache = new Map();
-const pendingWrites = new Map();
+const writes = createScheduler();
 
 /**
  * Build the path of the hidden history sibling for a source file,
- * swap-file style: `src/foo.py` -> `src/.foo.py.history`.
+ * `src/foo.py` has the history file `src/.foo.py.history`.
  *
  * @param {string} path - The source file path.
  * @returns {string} The history file path.
@@ -161,12 +162,7 @@ export function getContentAt(history, index) {
 }
 
 /**
- * Prune a history in place until it is within the revision-count and
- * serialized-size caps, and return its serialized form. Removes the oldest
- * revisions, materializing the new first revision into a keyframe so
- * reconstruction still works. Called from the (debounced) persist path so
- * the serialization needed for the size check is the one that is written,
- * rather than an extra full stringify on every commit.
+ * Prune older revisions to keep history size within limits.
  *
  * @param {object} history - The history object to prune.
  * @returns {string} The serialized history, within the size cap.
@@ -186,8 +182,8 @@ export function pruneToCaps(history) {
 }
 
 /**
- * Drop the oldest revisions of a history in place: cut up to the next
- * keyframe (a patch cannot be the first revision without its base).
+ * Drop the oldest revisions of a history in place, while making sure that
+ * history always starts at a keyframe (a full snapshot).
  *
  * @param {object} history - The history object to prune.
  */
@@ -211,23 +207,15 @@ function pruneOldest(history) {
 }
 
 /**
- * Schedule a debounced write of a file's cached history. The store does
- * its own debouncing (not lib/debouncer.js, which offers no way to cancel
- * or flush a pending call) and always writes with `immediate=true`,
- * because the VFS worker's internal debounce cannot be cancelled: an older
- * debounced write could otherwise land *after* a newer immediate one (e.g.
- * during the exam-submission flush) and regress the file.
+ * Schedule a write of a file's cached history, after a short delay so that
+ * rapid commits end up as one write.
  *
  * @param {string} path - The source file path.
  */
 function schedulePersist(path) {
-  clearTimeout(pendingWrites.get(path));
-  pendingWrites.set(path, setTimeout(() => {
-    pendingWrites.delete(path);
-    persist(path).catch((err) => {
-      console.warn(`edit-history: failed to persist history for ${path}`, err);
-    });
-  }, PERSIST_DELAY_MS));
+  writes.schedule(path, PERSIST_DELAY_MS, () => persist(path).catch((err) => {
+    console.warn(`edit-history: failed to persist history for ${path}`, err);
+  }));
 }
 
 /**
@@ -243,26 +231,18 @@ async function persist(path) {
   const json = pruneToCaps(history);
 
   // updateFile upserts, writing to the exact path (no collision rename), so it
-  // both creates the history file on first write and overwrites it thereafter.
-  await Terra.app.vfs.updateFile(historyFilePath(path), json, false, true);
+  // both creates the history file on first write and overwrites it thereafter
+  await Terra.app.vfs.updateFile(historyFilePath(path), json, false);
 }
 
 /**
- * Flush all pending history writes to the VFS immediately. Used before
- * exam submission and on page unload.
+ * Write every scheduled history to the VFS right now. Used before exam
+ * submission and on page unload.
  *
  * @returns {Promise<void>} Resolves when all writes have completed.
  */
-export async function flushAll() {
-  const paths = [...pendingWrites.keys()];
-  for (const path of paths) {
-    clearTimeout(pendingWrites.get(path));
-    pendingWrites.delete(path);
-  }
-
-  await Promise.all(paths.map((path) => persist(path).catch((err) => {
-    console.warn(`edit-history: failed to persist history for ${path}`, err);
-  })));
+export async function writeAllNow() {
+  await writes.runAllNow();
 }
 
 /**
@@ -275,11 +255,7 @@ export async function moveHistory(oldPath, newPath) {
   try {
     // A pending write against the old path would recreate an orphaned
     // history file after the move; retarget it to the new path instead.
-    const hadPendingWrite = pendingWrites.has(oldPath);
-    if (hadPendingWrite) {
-      clearTimeout(pendingWrites.get(oldPath));
-      pendingWrites.delete(oldPath);
-    }
+    const hadPendingWrite = writes.cancel(oldPath);
 
     const oldFilePath = historyFilePath(oldPath);
     if (await Terra.app.vfs.pathExists(oldFilePath)) {
@@ -300,28 +276,21 @@ export async function moveHistory(oldPath, newPath) {
 }
 
 /**
- * Forget everything cached about one source file, e.g. when the file is
- * deleted: a later file with the same path must not inherit the stale
- * in-memory history. Any history file still in the VFS is reloaded (and
- * continued) on the next edit.
+ * Forget everything cached about a source file, for example when the file is
+ * deleted.
  *
  * @param {string} path - The source file path.
  */
 export function forgetPath(path) {
-  clearTimeout(pendingWrites.get(path));
-  pendingWrites.delete(path);
+  writes.cancel(path);
   cache.delete(path);
 }
 
 /**
- * Clear all cached histories and cancel pending writes, e.g. when the
- * storage backend changes: the underlying file system is a different one,
- * so anything still in flight would be written to the wrong backend.
+ * Clear all cached histories and cancel pending writes, for example when the
+ * storage backend changes.
  */
 export function clearCache() {
-  for (const timer of pendingWrites.values()) {
-    clearTimeout(timer);
-  }
-  pendingWrites.clear();
+  writes.cancelAll();
   cache.clear();
 }

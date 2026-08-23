@@ -8,7 +8,7 @@ import {
   MAX_TRACKED_FILE_SIZE,
   commitRevision,
   clearCache,
-  flushAll,
+  writeAllNow,
   forgetPath,
   getContentAt,
   isHistoryFilePath,
@@ -117,9 +117,9 @@ export default class EditHistoryPlugin extends TerraPlugin {
       forgetPath(e.detail.file.path);
     });
 
-    // Best-effort flush when the page closes mid-revision.
+    // Best-effort write when the page closes mid-revision.
     window.addEventListener('beforeunload', () => {
-      this.flush();
+      this.saveAllNow();
     });
   }
 
@@ -485,12 +485,12 @@ export default class EditHistoryPlugin extends TerraPlugin {
    *
    * @returns {Promise<void>} Resolves when everything is on disk.
    */
-  flush = async () => {
+  saveAllNow = async () => {
     for (const comp of this.trackers.keys()) {
       this._commitOpenRevision(comp);
     }
     await Promise.all([...this.trackers.values()].map((t) => t.chain));
-    await flushAll();
+    await writeAllNow();
   }
 
   /**
@@ -500,7 +500,7 @@ export default class EditHistoryPlugin extends TerraPlugin {
    *
    * @returns {Promise<void>} Resolves when everything is on disk.
    */
-  onBeforeSubmit = () => this.flush();
+  onBeforeSubmit = () => this.saveAllNow();
 
   // ---------------------------------------------------------------------
   // Overlay UI (IDE only)

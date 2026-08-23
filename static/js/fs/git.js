@@ -4,9 +4,9 @@ import {
   setLocalStorageItem,
   getLocalStorageItem,
 } from '../lib/local-storage-manager.js';
-import { isBase64, seconds, slugify, isImageExtension } from '../lib/helpers.js';
+import { isBase64, seconds, isImageExtension } from '../lib/helpers.js';
 import { GITHUB_URL_PATTERN } from '../constants.js';
-import debounce from '../lib/debouncer.js';
+import { createScheduler } from '../lib/scheduler.js';
 
 /**
  * GitFS worker class that handles all Git operations.
@@ -36,6 +36,9 @@ export default class GitFS {
    * @type {Worker}
    */
   worker = null;
+
+  /** Scheduler holding the pending commits, keyed by path. */
+  _commits = createScheduler();
 
   constructor(vfs, repoLink) {
     this.vfs = vfs;
@@ -77,11 +80,7 @@ export default class GitFS {
     const { file } = event.detail;
 
     // Only commit changes after 2 seconds of inactivity.
-    debounce(
-      `commit-${slugify(file.path)}`,
-      seconds(2),
-      () => this.commit(file.path, file.content)
-    );
+    this._commits.schedule(file.path, seconds(2), () => this.commit(file.path, file.content));
   }
 
   vfsBeforeFileDeletedHandler = (event) => {

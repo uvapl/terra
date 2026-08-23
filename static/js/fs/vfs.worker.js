@@ -20,10 +20,8 @@
 import {
   getPartsFromPath,
   seconds,
-  slugify,
   isImageExtension
 } from '../lib/helpers.js';
-import debounce from '../lib/debouncer.js';
 
 const blacklistedPaths = [
   'site-packages', // when user folder has python virtual env
@@ -300,9 +298,9 @@ const handlers = {
    * @param {string} path - The file path.
    * @param {string} content - The new content of the file.
    * @param {boolean} isUserInvoked - Whether user invoked the action.
-   * @returns {Promise<FileSystemFileHandle>} The updated file handle.
+   * @returns {Promise<void>}
    */
-  async updateFile(path, content, isUserInvoked = true, immediate = false) {
+  async updateFile(path, content, isUserInvoked = true) {
     // A real file overwrites a binary with the same name.
     tempBinaries.delete(path);
 
@@ -311,17 +309,7 @@ const handlers = {
     const existed = await handlers.pathExists(path);
     const handle = await getFileHandleByPath(path, { create: true });
 
-    if (immediate) {
-      // Write synchronously (e.g. for program run output), so a subsequent
-      // read sees the new content instead of racing the debounced write.
-      await writeFile(handle, content);
-    } else {
-      debounce(
-        `file-update-${slugify(path)}`,
-        seconds(0.2),
-        () => writeFile(handle, content)
-      );
-    }
+    await writeFile(handle, content);
 
     if (isUserInvoked) {
       // A freshly created file must post `fileCreated` so the file tree learns
@@ -382,7 +370,7 @@ const handlers = {
   async writeProducedFile(path, content, temporary = false) {
     return temporary
       ? handlers.writeTempBinary(path, content)
-      : handlers.updateFile(path, content, true, true);
+      : handlers.updateFile(path, content);
   },
 
   /**
