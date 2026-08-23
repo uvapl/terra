@@ -98,10 +98,11 @@ export default class EditHistoryPlugin extends TerraPlugin {
     if (this._globalEventsBound) return;
     this._globalEventsBound = true;
 
-    // Hide history siblings from the file tree, downloads and run sandbox.
-    // The VFS keeps them on disk (and still submits them on exams), it just
-    // filters them out of listings. The naming convention stays owned here.
-    Terra.app.vfs.registerHidePattern(HISTORY_FILE_PATTERN.source);
+    // Hide history files from the file tree, downloads and run sandbox.
+    Terra.app.vfs.registerIgnoreRule({
+      pattern: HISTORY_FILE_PATTERN.source,
+      tracked: true,
+    });
 
     // Move a file's history along when the file itself is moved/renamed.
     Terra.app.vfs.addEventListener('fileMoved', (e) => {

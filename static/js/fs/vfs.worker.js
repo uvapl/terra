@@ -23,23 +23,6 @@ import {
   isImageExtension
 } from '../lib/helpers.js';
 
-const blacklistedPaths = [
-  'site-packages', // when user folder has python virtual env
-  '__pycache__', // Python cache directory
-  '.mypy_cache', // Mypy cache directory
-  '.venv',
-  'venv',
-  'env', // virtual environment
-  '.DS_Store', // Macos metadata file
-  'dist',
-  'build',  // compiled assets for various languages
-  'coverage',
-  '.nyc_output', // code coverage reports
-  '.git',  // Git directory
-  'node_modules', // NodeJS projects
-  'default.profraw',
-];
-
 /**
  * When set, the _vfsRoot should be a FileSystemDirectoryHandle
  * pointing to a local file system.
@@ -54,11 +37,42 @@ let _vfsRoot = null;
 let _vfsBaseFolder = '';
 
 /**
- * Hide-patterns registered by the main thread (see vfs.js registerHidePattern).
- * Matching files, and whole subtrees under a matching folder, are skipped by
- * the recursive walks so their content is never read.
+ * Ignore rules registered by the main thread (see vfs.js). Each holds a test
+ * for a single path segment and whether matching files are Terra's own.
  */
-let hidePatterns = [];
+let ignoreRules = [];
+
+/**
+ * Whether a path segment is left out of listings.
+ *
+ * @param {string} name - A file or folder name.
+ * @returns {boolean}
+ */
+const isIgnored = (name) => ignoreRules.some((rule) => rule.test(name));
+
+/**
+ * Whether a path segment belongs to something Terra does not own, which is
+ * never read and never reported in an event.
+ *
+ * @param {string} name - A file or folder name.
+ * @returns {boolean}
+ */
+const isUntracked = (name) =>
+  ignoreRules.some((rule) => rule.test(name) && !rule.tracked);
+
+/**
+ * Whether an entry is left out at the given level.
+ *
+ * @param {string} name - A file or folder name.
+ * @param {string} include - `listed` leaves out every ignored entry, `tracked`
+ * leaves out only what Terra does not own, `all` leaves out nothing.
+ * @returns {boolean}
+ */
+function excluded(name, include) {
+  if (include === 'all') return false;
+  if (include === 'tracked') return isUntracked(name);
+  return isIgnored(name);
+}
 
 /**
  * Compiled binaries are kept in memory only, but made accessible in some
@@ -91,8 +105,16 @@ self.onmessage = async (event) => {
   }
   console.log(`vfs worker message: ${type}`);
 
-  // Call function, wait for result to resolve, and post that back
-  const result = await handlers[type](...(data ?? []));
+  // Call function, wait for result to resolve, and post that back. A handler
+  // that throws still has to answer, otherwise the caller waits forever.
+  let result;
+  try {
+    result = await handlers[type](...(data ?? []));
+  } catch (err) {
+    self.postMessage({ id, type: `${type}:error`, error: `${err.name}: ${err.message}` });
+    return;
+  }
+
   if (result && result.error) {
     self.postMessage({ id, type: `${type}:error`, error: result.error });
   } else {
@@ -178,13 +200,14 @@ const handlers = {
       const rootHandle = await getRootFolderHandle();
 
       // To date, the 'remove' function is only available in Chromium-based
-      // browsers. For other browsers, we iteratore through the first level of
+      // browsers. For other browsers, we iterate through the first level of
       // files and folders and delete them one by one.
       if ('remove' in FileSystemDirectoryHandle.prototype) {
         await rootHandle.remove({ recursive: true });
       } else {
-        // Fallback for non-Chromium browsers.
-        for await (const name of rootHandle.keys()) {
+        // Fallback for non-Chromium browsers. The names are collected first,
+        // so removing them does not disturb the iteration.
+        for (const [name] of await readEntries(rootHandle)) {
           await rootHandle.removeEntry(name, { recursive: true });
         }
       }
@@ -266,7 +289,7 @@ const handlers = {
     let name = path ? parts.pop() : 'Untitled';
     const parentPath = parts.join('/');
 
-    const folder = await getFolderHandleByPath(parentPath);
+    const folder = await getFolderHandleByPath(parentPath, { create: true });
 
     // A real file overwrites a binary with the same name.
     tempBinaries.delete(parentPath ? `${parentPath}/${name}` : name);
@@ -347,6 +370,8 @@ const handlers = {
     const filename = parts.pop();
     const parentPath = parts.join('/');
     const parent = await getFolderHandleByPath(parentPath);
+    if (!parent) return false;
+
     await parent.removeEntry(filename);
 
     if (isUserInvoked) {
@@ -408,26 +433,35 @@ const handlers = {
   },
 
   /**
-   * Set the hide-patterns used to prune the recursive walks.
+   * Set the rules that decide which entries are left out of listings.
    *
-   * @param {string[]} sources - RegExp sources, each matched against a single
-   * path segment.
+   * @param {object[]} rules - Each with a `name`, `suffix` or `pattern` to
+   * match one path segment, and a `tracked` flag.
    */
-  setHidePatterns(sources) {
-    hidePatterns = sources.map((source) => new RegExp(source));
+  setIgnoreRules(rules) {
+    ignoreRules = rules.map(({ name, suffix, pattern, tracked = true }) => {
+      const re = pattern ? new RegExp(pattern) : null;
+
+      return {
+        tracked,
+        test: (segment) =>
+          re ? re.test(segment)
+            : suffix ? segment.endsWith(suffix)
+            : segment === name,
+      };
+    });
   },
 
   /**
    * Gathers all files from the VFS.
-   * Formerly known as getAllEditorFiles.
    *
    * @returns {Promise<object[]>} List of objects, each containing the filepath
    * and content of the corresponding file.
    */
-  async getAllFiles(path, includeHidden = false) {
+  async getAllFiles(path) {
     const files = [];
 
-    await walkFiles(path, includeHidden, async (filepath, handle) => {
+    await walkFiles(path, async (filepath, handle) => {
       const file = await handle.getFile();
       const content = isImageExtension(filepath)
         ? await file.arrayBuffer()
@@ -441,15 +475,15 @@ const handlers = {
 
   /**
    * Lists every file in the VFS without reading any content. `size` and `mtime`
-   * come from file metadata, so this stays cheap on large projects.
+   * come from file metadata.
    *
    * @returns {Promise<object[]>} List of objects, each containing the filepath,
    * byte size and last-modified timestamp of the corresponding file.
    */
-  async getFileList(path, includeHidden = false) {
+  async getFileList(path) {
     const entries = [];
 
-    await walkFiles(path, includeHidden, async (filepath, handle) => {
+    await walkFiles(path, async (filepath, handle) => {
       const file = await handle.getFile();
       entries.push({
         path: filepath,
@@ -475,7 +509,7 @@ const handlers = {
     const parentPath = parts.join('/');
 
     let parentFolderHandle = parentPath
-      ? await getFolderHandleByPath(parentPath)
+      ? await getFolderHandleByPath(parentPath, { create: true })
       : await getRootFolderHandle();
 
     // Ensure a unique folder name.
@@ -511,7 +545,7 @@ const handlers = {
     }
 
     // Gather all subfiles and trigger a deleteFile on them.
-    const files = await findFilesInFolder(path);
+    const files = await findFilesInFolder(path, { include: 'tracked' });
     for (const file of files) {
       const filepath = `${path}/${file.name}`;
       await handlers.deleteFile(filepath, true);
@@ -523,7 +557,7 @@ const handlers = {
     }
 
     // Delete all the nested folders inside the current folder.
-    const folders = await findFoldersInFolder(path);
+    const folders = await findFoldersInFolder(path, { include: 'tracked' });
     for (const folder of folders) {
       const folderpath = `${path}/${folder.name}`;
       await handlers.deleteFolder(folderpath, false);
@@ -534,6 +568,8 @@ const handlers = {
     const foldername = parts.pop();
     const parentPath = parts.join('/');
     const parentFolderHandle = await getFolderHandleByPath(parentPath);
+    if (!parentFolderHandle) return false;
+
     await parentFolderHandle.removeEntry(foldername, { recursive: true });
 
     return true;
@@ -546,12 +582,12 @@ const handlers = {
    *
    * @param {string} srcPath - The source path of the file to move.
    * @param {string} destPath - The destination path where the file should be moved to.
-   * @returns {Promise}
+   * @returns {Promise<boolean|void>} False if the source does not exist.
    */
   async moveFile(src, dest) {
     console.log(`moveFile: ${src} -> ${dest}`);
 
-    // A temp binary is just tagged with its new filename.
+    // A temp binary is just tagged with its new filename
     const temp = tempBinaries.get(src);
     if (temp) {
       tempBinaries.delete(src);
@@ -561,20 +597,43 @@ const handlers = {
       return;
     }
 
-    const srcFileContent = await handlers.readFile(src);
+    if (!(await handlers.pathExists(src))) {
+      return false;
+    }
 
-    // Create the file in the new destination path.
-    await handlers.createFile(dest, srcFileContent, false);
+    // Choose a free name first, so a move cannot overwrite anything
+    const { name, parentPath } = getPartsFromPath(dest);
+    const fullPath = (n) => (parentPath ? `${parentPath}/${n}` : n);
+    let destName = name;
+    while (await handlers.pathExists(fullPath(destName))) {
+      destName = incrementString(destName);
+    }
+    const destPath = fullPath(destName);
 
-    // Delete the old file.
-    await handlers.deleteFile(src, false);
+    let srcFileContent;
+    try {
+      srcFileContent = await handlers.readFile(src);
+
+      const srcHandle = await getFileHandleByPath(src);
+      const destFolder = await getFolderHandleByPath(parentPath, { create: true });
+
+      // Use FS API or do it manually with copy and delete
+      if (!srcHandle || !(await nativeMove(srcHandle, destFolder, destName))) {
+        await handlers.createFile(destPath, srcFileContent, false);
+        await handlers.deleteFile(src, false);
+      }
+    } catch (err) {
+      // The file was moved by something else between the check and here
+      if (err.name !== 'NotFoundError') throw err;
+      return false;
+    }
 
     self.postMessage({
       type: 'fileMoved',
       data: {
         oldPath: src,
         file: {
-          path: dest,
+          path: destPath,
           content: srcFileContent,
         },
       },
@@ -583,6 +642,8 @@ const handlers = {
 
   /**
    * Update a folder in the virtual filesystem.
+   *
+   * Everything inside is moved, hidden entries included.
    *
    * Move folder2 from folder1 to folder3
    * @example moveFolder('folder1/folder2', 'folder3/folder2')
@@ -593,26 +654,55 @@ const handlers = {
    * @returns {Promise}
    */
   async moveFolder(srcPath, dstPath) {
-    // Create the destination folder before moving contents.
-    await handlers.createFolder(dstPath);
+    const { name, parentPath } = getPartsFromPath(dstPath);
+    const dstParentHandle = await getFolderHandleByPath(parentPath, {
+      create: true,
+    });
 
-    // Move all files inside the folder to the new destination path.
-    const files = await findFilesInFolder(srcPath);
+    // Choose a free name first, so a move cannot overwrite anything
+    let dstName = name;
+    while (await nameExistsInFolder(dstParentHandle, dstName)) {
+      dstName = incrementString(dstName);
+    }
+    dstPath = parentPath ? `${parentPath}/${dstName}` : dstName;
+
+    // Folder handles have no `move` in some browsers, so the contents are
+    // moved one entry at a time. Create the destination folder before moving
+    // contents.
+    await handlers.createFolder(dstPath);
+    const dstHandle = await getFolderHandleByPath(dstPath);
+
+    // Move all files inside the folder to the new destination path. Ignored
+    // files go first, so a listener reacting to a visible file's move already
+    // finds its ignored siblings in their new place.
+    const files = await findFilesInFolder(srcPath, { include: 'all' });
+    files.sort((a, b) => Number(isIgnored(b.name)) - Number(isIgnored(a.name)));
+
     for (const file of files) {
+      if (isUntracked(file.name)) {
+        await relocateEntry(file, dstHandle);
+        continue;
+      }
+
       const filePath = `${srcPath}/${file.name}`;
       const newFilePath = dstPath ? `${dstPath}/${file.name}` : file.name;
       await handlers.moveFile(filePath, newFilePath);
     }
 
-    // Recurse on folders inside the folder.
-    const folders = await findFoldersInFolder(srcPath);
+    // Recurse on folders inside the folder
+    const folders = await findFoldersInFolder(srcPath, { include: 'all' });
     for (const folder of folders) {
+      if (isUntracked(folder.name)) {
+        await relocateEntry(folder, dstHandle);
+        continue;
+      }
+
       const subFolderPath = `${srcPath}/${folder.name}`;
       const newFolderPath = dstPath ? `${dstPath}/${folder.name}` : folder.name;
       await handlers.moveFolder(subFolderPath, newFolderPath);
     }
 
-    // Delete source folder recursively.
+    // Delete source folder recursively
     await handlers.deleteFolder(srcPath);
   },
 
@@ -813,9 +903,13 @@ async function getRootFolderHandle() {
  * @example getFolderHandleByPath()
  *
  * @param {string} folderpath - The absolute folder path.
- * @returns {Promise<FileSystemDirectoryHandle>} The folder handle.
+ * @param {object} [options]
+ * @param {boolean} [options.create=false] - Create missing folders along the
+ * way, instead of returning null.
+ * @returns {Promise<FileSystemDirectoryHandle|null>} The folder handle, or null
+ * if it does not exist and `create` is false.
  */
-async function getFolderHandleByPath(folderpath = '') {
+async function getFolderHandleByPath(folderpath = '', { create = false } = {}) {
   const rootHandle = await getRootFolderHandle();
   if (!folderpath) return rootHandle;
 
@@ -824,34 +918,55 @@ async function getFolderHandleByPath(folderpath = '') {
 
   // Walk path segments
   while (handle && parts.length > 0) {
-    handle = await handle.getDirectoryHandle(parts.shift(), { create: true });
+    try {
+      handle = await handle.getDirectoryHandle(parts.shift(), { create });
+    } catch {
+      return null;
+    }
   }
 
   return handle;
 }
 
 /**
+ * List a folder's entries. A folder that is removed while it is being read
+ * lists as empty.
+ *
+ * @param {FileSystemDirectoryHandle} folderHandle - The folder to read.
+ * @returns {Promise<Array<[string, FileSystemHandle]>>} Name/handle pairs.
+ */
+async function readEntries(folderHandle) {
+  const entries = [];
+
+  try {
+    for await (const entry of folderHandle.entries()) {
+      entries.push(entry);
+    }
+  } catch (err) {
+    if (err.name !== 'NotFoundError') throw err;
+    return [];
+  }
+
+  return entries;
+}
+
+/**
  * Recursively walk every file under a folder, calling `visit` for each one.
  *
- * Blacklisted names and, unless `includeHidden`, hide-pattern matches are
- * skipped. A matching folder is skipped without being entered, so its subtree
- * is never touched.
+ * Skipped names and hide-pattern matches are left out. A matching folder is
+ * skipped without being entered, so its subtree is never touched.
  *
  * @param {string} path - The folder to walk. Empty for the project root.
- * @param {boolean} includeHidden - Whether to include hide-pattern matches.
  * @param {function} visit - Called as `visit(filepath, fileHandle)`, awaited.
  * @returns {Promise<void>}
  */
-async function walkFiles(path, includeHidden, visit) {
-  const root =
-    (await getFolderHandleByPath(path)) || (await getRootFolderHandle());
-
-  const isHidden = (name) =>
-    !includeHidden && hidePatterns.some((re) => re.test(name));
+async function walkFiles(path, visit) {
+  const root = await getFolderHandleByPath(path);
+  if (!root) return;
 
   async function walk(folderHandle, currentPath = '') {
-    for await (const [name, handle] of folderHandle.entries()) {
-      if (blacklistedPaths.includes(name) || isHidden(name)) continue;
+    for (const [name, handle] of await readEntries(folderHandle)) {
+      if (isIgnored(name)) continue;
       const filepath = currentPath ? `${currentPath}/${name}` : name;
 
       if (handle.kind === 'file') {
@@ -885,7 +1000,9 @@ async function getFileHandleByPath(filepath, { create = false } = {}) {
 
   const { name, parentPath } = getPartsFromPath(filepath);
 
-  let parentFolderHandle = await getFolderHandleByPath(parentPath);
+  const parentFolderHandle = await getFolderHandleByPath(parentPath, { create });
+  if (!parentFolderHandle) return null;
+
   const fileHandle = await parentFolderHandle.getFileHandle(name, { create });
 
   return fileHandle;
@@ -895,21 +1012,22 @@ async function getFileHandleByPath(filepath, { create = false } = {}) {
  * Get all folder handles inside a given folder path (NOT recursive).
  *
  * @param {string} folderpath - The absolute folder path to search in.
+ * @param {object} [options]
+ * @param {string} [options.include=listed] - Which entries to return, see
+ * `excluded`.
  * @returns {Promise<FileSystemDirectoryHandle[]>} Array of folder handles.
  */
-async function findFoldersInFolder(folderpath) {
-  // Obtain the folder handle recursively.
+async function findFoldersInFolder(folderpath, { include = 'listed' } = {}) {
+  // Obtain the folder handle recursively
   const folderHandle = await getFolderHandleByPath(folderpath);
+  if (!folderHandle) return [];
 
-  // Gather all subfolder handles.
+  // Gather all subfolder handles
   const subfolders = [];
-  for await (let handle of folderHandle.values()) {
-    if (
-      handle.kind === 'directory' &&
-      !blacklistedPaths.includes(handle.name)
-    ) {
-      subfolders.push(handle);
-    }
+  for (const [, handle] of await readEntries(folderHandle)) {
+    if (handle.kind !== 'directory') continue;
+    if (excluded(handle.name, include)) continue;
+    subfolders.push(handle);
   }
 
   return subfolders;
@@ -919,27 +1037,81 @@ async function findFoldersInFolder(folderpath) {
  * Get all file handles inside a given path (NOT recursive).
  *
  * @param {string} folderpath - The absolute folder path to search in.
+ * @param {object} [options]
+ * @param {string} [options.include=listed] - Which entries to return, see
+ * `excluded`.
  * @returns {Promise<FileSystemFileHandle[]>} Array of file handles.
  */
-async function findFilesInFolder(folderpath) {
-  // Obtain the folder handle recursively.
+async function findFilesInFolder(folderpath, { include = 'listed' } = {}) {
+  // Obtain the folder handle recursively
   const folderHandle = await getFolderHandleByPath(folderpath);
+  if (!folderHandle) return [];
 
-  // Gather all subfile handles.
+  // Gather all subfile handles
   const subfiles = [];
-  for await (let handle of folderHandle.values()) {
-    // Skip blacklisted paths and .crswap (Chrome's crash recovery swap) files.
-    const isValidFile = (
-      !blacklistedPaths.includes(handle.name)
-      && !handle.name.endsWith('.crswap')
-    );
-
-    if (handle.kind === 'file' && isValidFile) {
-      subfiles.push(handle);
-    }
+  for (const [, handle] of await readEntries(folderHandle)) {
+    if (handle.kind !== 'file') continue;
+    if (excluded(handle.name, include)) continue;
+    subfiles.push(handle);
   }
 
   return subfiles;
+}
+
+/**
+ * Move an entry with the browser's move operation, which is not offered for
+ * every kind of handle. Returns false when unavailable, so we can copy instead.
+ *
+ * @param {FileSystemHandle} handle - The entry to move.
+ * @param {FileSystemDirectoryHandle} destFolder - Its new parent.
+ * @param {string} name - The name to give it there.
+ * @returns {Promise<boolean>} False when the move is unavailable.
+ */
+async function nativeMove(handle, destFolder, name) {
+  if (typeof handle.move !== 'function') return false;
+
+  try {
+    await handle.move(destFolder, name);
+    return true;
+  } catch (err) {
+    console.log(`nativeMove unavailable for ${handle.name}:`, err.name);
+    return false;
+  }
+}
+
+/**
+ * Copy a file or a whole folder into another folder.
+ *
+ * @param {FileSystemHandle} handle - The entry to copy.
+ * @param {FileSystemDirectoryHandle} destFolder - Where the copy goes.
+ * @returns {Promise<void>}
+ */
+async function copyEntry(handle, destFolder) {
+  if (handle.kind === 'file') {
+    const file = await handle.getFile();
+    const dest = await destFolder.getFileHandle(handle.name, { create: true });
+    return writeFile(dest, await file.arrayBuffer());
+  }
+
+  const destSub = await destFolder.getDirectoryHandle(handle.name, {
+    create: true,
+  });
+  for (const [, child] of await readEntries(handle)) {
+    await copyEntry(child, destSub);
+  }
+}
+
+/**
+ * Move an entry that the app never sees into another folder, without emitting
+ * events. Falls back to a copy when the browser cannot move it directly.
+ *
+ * @param {FileSystemHandle} handle - The entry to move.
+ * @param {FileSystemDirectoryHandle} destFolder - Where it should end up.
+ * @returns {Promise<void>}
+ */
+async function relocateEntry(handle, destFolder) {
+  if (await nativeMove(handle, destFolder, handle.name)) return;
+  await copyEntry(handle, destFolder);
 }
 
 /**
@@ -978,10 +1150,6 @@ async function writeFile(handle, content) {
  * @returns {Promise<boolean>}
  */
 async function nameExistsInFolder(parentFolderHandle, nodeName) {
-  for await (let name of parentFolderHandle.keys()) {
-    if (name === nodeName) {
-      return true;
-    }
-  }
-  return false;
+  const entries = await readEntries(parentFolderHandle);
+  return entries.some(([name]) => name === nodeName);
 }

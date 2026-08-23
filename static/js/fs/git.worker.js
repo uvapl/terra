@@ -59,12 +59,6 @@ class API {
   devProxyUrl = 'http://localhost:8888';
 
   /**
-   * List of folders that should be ignored when traversing the repo contents.
-   * @type {array}
-   */
-  blacklistedFolders = ['.', '..', '.git'];
-
-  /**
    * Queue for requests to process that are sent to the GitHub API.
    * @type {Queue}
    */

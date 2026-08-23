@@ -1,4 +1,5 @@
 import { getPartsFromPath } from '../lib/helpers.js';
+import { IGNORED_PATHS } from '../constants.js';
 
 /**
  * VFS interface for the main thread. It delegates to the VFS worker module.
@@ -15,11 +16,16 @@ export default class VirtualFileSystem extends EventTarget {
     this.pending = new Map(); // id → { resolve, reject }
     this._nextId = 1;
 
-    /** Files to hide from common listings @type RegExp[] */
-    this._hidePatterns = [];
+    /**
+     * Rules for what stays out of file listings. When `tracked: false` the
+     * file is fully ignored. @type object[] */
+    this._ignoreRules = [...IGNORED_PATHS];
 
-    // Connect us to the worker.
+    // Connect us to the worker
     this.worker.addEventListener('message', (e) => this._handleMessage(e.data));
+
+    // Sent to the worker before any other message
+    this._send('setIgnoreRules', [this._ignoreRules]);
   }
 
   /**
@@ -83,30 +89,25 @@ export default class VirtualFileSystem extends EventTarget {
   setBaseFolder = (baseFolder) => this._send('setBaseFolder', [baseFolder]);
 
   /**
-   * Register a hide-pattern. Matching files/folders stay in the VFS but are
-   * filtered out of listings (file tree, downloads, shell, run sandbox).
-   * They can still be pulled via `getAllFiles(path, { includeHidden: true })`.
+   * Register a rule for entries that stay in the VFS but are filtered out of
+   * listings (file tree, downloads, shell, run sandbox).
    *
-   * @param {string} source - A RegExp source matched against a single path
-   * segment, e.g. `^\\..+\\.history$`.
+   * @param {object} rule - Matches one path segment by `name`, `suffix` or
+   * `pattern` (a RegExp source, e.g. `^\\..+\\.history$`).
+   * @param {boolean} [rule.tracked=true] - Whether the file is Terra's own, so
+   * its content is still read and its moves and deletions still raise events.
    */
-  registerHidePattern = (source) => {
-    const re = new RegExp(source);
-    if (!this._hidePatterns.some((existing) => existing.source === re.source)) {
-      this._hidePatterns.push(re);
-      // The worker prunes its recursive walks with these, so hidden files are
-      // never read. Fire-and-forget: message order guarantees later walks see it.
-      this._send('setHidePatterns', [this._hidePatterns.map((p) => p.source)]);
+  registerIgnoreRule = (rule) => {
+    const key = JSON.stringify(rule);
+    if (this._ignoreRules.some((existing) => JSON.stringify(existing) === key)) {
+      return;
     }
-  };
 
-  /**
-   * Whether a single path segment matches a registered hide pattern.
-   *
-   * @param {string} name - A file or folder name.
-   * @returns {boolean}
-   */
-  _isHidden = (name) => this._hidePatterns.some((re) => re.test(name));
+    this._ignoreRules.push(rule);
+
+    // Update the worker
+    this._send('setIgnoreRules', [this._ignoreRules]);
+  };
 
   clear = () => this._send('clear');
 
@@ -129,30 +130,26 @@ export default class VirtualFileSystem extends EventTarget {
   writeProducedFile = (path, content, temporary = false) =>
     this._send('writeProducedFile', [path, content, temporary]);
 
-  listFoldersInFolder = async (path = '') => {
-    const names = await this._send('listFoldersInFolder', [path]);
-    return names.filter((name) => !this._isHidden(name));
-  };
+  listFoldersInFolder = (path = '') =>
+    this._send('listFoldersInFolder', [path]);
 
-  listFilesInFolder = async (path = '') => {
-    const names = await this._send('listFilesInFolder', [path]);
-    return names.filter((name) => !this._isHidden(name));
-  };
-
-  getAllFiles = (path = '', { includeHidden = false } = {}) =>
-    this._send('getAllFiles', [path, includeHidden]);
+  listFilesInFolder = (path = '') => this._send('listFilesInFolder', [path]);
 
   /**
-   * List every file without reading content. Prefer this over `getAllFiles`
-   * when only paths or sizes are needed, since it does not touch file bytes.
+   * Get all files with contents.
+   *
+   * @param {string} [path] - Base folder.
+   * @returns {Promise<object[]>} Objects of `{ path, content }`.
+   */
+  getAllFiles = (path = '') => this._send('getAllFiles', [path]);
+
+  /**
+   * List every file without reading content.
    *
    * @param {string} [path] - Folder to list. Empty for the project root.
-   * @param {object} [options]
-   * @param {boolean} [options.includeHidden] - Include hide-pattern matches.
    * @returns {Promise<object[]>} Objects of `{ path, size, mtime }`.
    */
-  getFileList = (path = '', { includeHidden = false } = {}) =>
-    this._send('getFileList', [path, includeHidden]);
+  getFileList = (path = '') => this._send('getFileList', [path]);
 
   pathExists = (path) => this._send('pathExists', [path]);
 
@@ -165,20 +162,17 @@ export default class VirtualFileSystem extends EventTarget {
 
   moveFile = (src, dst) => this._send('moveFile', [src, dst]);
 
+  /**
+   * Move a folder and everything in it. Normally ignored files are
+   * moved, too.
+   *
+   * @param {string} src - The folder to move.
+   * @param {string} dst - Where it should end up.
+   * @returns {Promise<void>}
+   */
   moveFolder = (src, dst) => this._send('moveFolder', [src, dst]);
 
-  getFileTree = async (path = '') => {
-    // Recursively drop hidden nodes from the `getFileTree` result.
-    const pruneTree = (nodes) =>
-      nodes
-        .filter((node) => !this._isHidden(node.title))
-        .map((node) =>
-          node.children ? { ...node, children: pruneTree(node.children) } : node
-        );
-
-    const tree = await this._send('getFileTree', [path]);
-    return pruneTree(tree);
-  };
+  getFileTree = (path = '') => this._send('getFileTree', [path]);
 
   /**
    * List all folders in the VFS recursively, in depth-first order.
