@@ -67,6 +67,7 @@
 
 .toolbar #run-code::before {
   background-image: url('../../img/icons/play.svg');
+  margin-right: 3px;
 }
 
 /* Stop state (swapped in while a program is running). */
