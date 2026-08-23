@@ -870,12 +870,12 @@ function incrementString(str) {
   const ext = parts.length > 1 ? `.${parts.pop()}` : '';
   let name = parts.join('.');
 
-  const match = /\((\d+)\)$/.exec(name);
+  const match = /__(\d+)$/.exec(name);
   if (match) {
     const num = parseInt(match[1]) + 1;
-    return name.replace(/\((\d+)\)$/, `(${num})`);
+    return `${name.replace(/__(\d+)$/, `__${num}`)}${ext}`;
   }
-  return `${name} (1)${ext}`;
+  return `${name}__1${ext}`;
 }
 
 function isOPFS() {

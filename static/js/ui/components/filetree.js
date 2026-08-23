@@ -613,7 +613,7 @@ export default class FileTreeComponent {
 
     // NOTE: sourceNode is undefined when dragging a local filesystem entry onto
     // the tree. For security reasons `data.files` is empty during dragEnter, so
-    // duplicates cannot be detected then; such drops just get "(1)" appended.
+    // duplicates cannot be detected then; such drops just get "__1" appended.
     const sourceNode = data.otherNode;
 
     if (sourceNode && this._isCurrentContainer(sourceNode, targetNode)) {
