@@ -14,31 +14,11 @@
 
 .file-tree {
   overflow-y: auto;
+  flex-grow: 1;
 }
 
 .file-tree-container .info-msg {
   padding: var(--file-tree-padding);
-}
-
-.file-dropzone {
-  flex-grow: 1;
-  display: flex;
-}
-
-.file-dropzone.drag-over {
-  padding: var(--file-tree-padding);
-}
-
-.file-dropzone.drag-over:before {
-  content: 'Drop files or folders here to upload';
-  text-align: center;
-  border: 2px dashed var(--border-color);
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--tab-fg-color);
 }
 
 .file-tree-container .title-container {
@@ -299,15 +279,30 @@
   color: red;
 }
 
+/* The tree panel as a whole is the drop target for the root folder. */
+.file-tree-container.drop-area-indicator {
+  outline: 2px solid var(--drop-target-color);
+  outline-offset: -2px;
+}
+
+/* The root already holds the dragged name. */
+.file-tree-container.drop-area-rejected {
+  outline-color: var(--color-error);
+}
+
 .fancytree-folder.fancytree-drop-accept,
 .fancytree-folder:has(+ ul > li > .fancytree-drop-accept:not(.fancytree-folder))
 {
-  background-color: sandybrown;
+  background-color: var(--drop-target-color);
+  color: var(--color-white);
 }
 
 /* The item that is dragged under the cursor */
 .custom-drag-helper {
-  position: absolute;
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
   display: inline-block;
   background-color: var(--overlay-bg);
   border: 1px solid var(--border-color);

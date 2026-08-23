@@ -537,9 +537,10 @@ const handlers = {
    * Delete a folder recursively from the VFS.
    *
    * @param {string} path - The folder path to delete.
+   * @param {boolean} isUserInvoked - Whether the action was user-invoked.
    * @returns {Promise<boolean>} True if deleted successfully, false otherwise.
    */
-  async deleteFolder(path) {
+  async deleteFolder(path, isUserInvoked = true) {
     if (!(await handlers.pathExists(path))) {
       return false;
     }
@@ -548,19 +549,19 @@ const handlers = {
     const files = await findFilesInFolder(path, { include: 'tracked' });
     for (const file of files) {
       const filepath = `${path}/${file.name}`;
-      await handlers.deleteFile(filepath, true);
+      await handlers.deleteFile(filepath, isUserInvoked);
     }
 
     // Delete temporary binaries.
     for (const filepath of tempBinariesUnder(path)) {
-      await handlers.deleteFile(filepath, true);
+      await handlers.deleteFile(filepath, isUserInvoked);
     }
 
     // Delete all the nested folders inside the current folder.
     const folders = await findFoldersInFolder(path, { include: 'tracked' });
     for (const folder of folders) {
       const folderpath = `${path}/${folder.name}`;
-      await handlers.deleteFolder(folderpath, false);
+      await handlers.deleteFolder(folderpath, isUserInvoked);
     }
 
     // Finally, delete the folder itself from OPFS recursively.
@@ -665,7 +666,7 @@ const handlers = {
     // Folder handles have no `move` in some browsers, so the contents are
     // moved one entry at a time. Create the destination folder before moving
     // contents.
-    await handlers.createFolder(dstPath);
+    await handlers.createFolder(dstPath, false);
     const dstHandle = await getFolderHandleByPath(dstPath);
 
     // Move all files inside the folder to the new destination path. Ignored
@@ -698,8 +699,16 @@ const handlers = {
       await handlers.moveFolder(subFolderPath, newFolderPath);
     }
 
+    // Compiled binaries get a new path
+    for (const name of tempBinariesInFolder(srcPath)) {
+      const filePath = `${srcPath}/${name}`;
+      const newFilePath = dstPath ? `${dstPath}/${name}` : name;
+      tempBinaries.set(newFilePath, tempBinaries.get(filePath));
+      tempBinaries.delete(filePath);
+    }
+
     // Delete source folder recursively
-    await handlers.deleteFolder(srcPath);
+    await handlers.deleteFolder(srcPath, false);
   },
 
   /**

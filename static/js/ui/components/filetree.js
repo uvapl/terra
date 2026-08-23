@@ -5,6 +5,9 @@ import { createTooltip, destroyTooltip } from './tooltip.js';
 /** CSS class marking the active drop target during a drag. */
 const DROP_AREA_INDICATOR_CLASS = 'drop-area-indicator';
 
+/** CSS class marking a drop target that holds the dragged name already. */
+const DROP_AREA_REJECTED_CLASS = 'drop-area-rejected';
+
 /**
  * File-tree component: a FancyTree adapter.
  *
@@ -31,8 +34,14 @@ export default class FileTreeComponent {
   /** Whether the user clicked a context-menu item (vs. dismissing the menu). */
   _userClickedContextMenuItem = false;
 
+  /** Whether a drag-drop move is still being applied to the VFS. */
+  _moveInFlight = false;
+
+  /** The node currently being dragged inside the tree, or null. */
+  _dragSourceNode = null;
+
   constructor() {
-    this._setupFileDrop();
+    this._setupTreeDrop();
     this._bindToolbarButtons();
     this._setupContextMenu();
   }
@@ -247,45 +256,108 @@ export default class FileTreeComponent {
   // ─────────────────────────── Setup (one-time) ──────────────────────────
 
   /**
-   * Since FancyTree handles DnD on a node level, we need another droparea that
-   * allows dropping files/folders from the local filesystem onto the file tree.
+   * FancyTree only accepts drops on its own nodes, so we add the whole area
+   * as a drop target ourselves, both for internal drags and files dragged in
+   * from another program.
    */
-  _setupFileDrop() {
-    const $dropzone = $('#file-dropzone');
+  _setupTreeDrop() {
+    // The tree and its header both stand for the root folder.
+    const $zones = $('#file-tree, .file-tree-container .title-container');
+    const $panel = $('.file-tree-container');
 
     // dataTransfer.types is ['Files'] when dragging local filesystem entries.
-    const isLocalFileSystemDrag = (e) =>
-      e.originalEvent.dataTransfer.types.includes('Files');
+    const isUpload = (e) => e.originalEvent.dataTransfer.types.includes('Files');
 
-    $dropzone.on('dragover', (e) => {
-      if (!isLocalFileSystemDrag(e)) return;
-      // This prevents the browser from opening the file.
+    // Helper functions for finding out where a drop is.
+    const rowAt = (e) => {
+      if (!this._dragSourceNode) return null;
+      const node = this._nodeAt(e.originalEvent.clientY);
+      return $.ui.fancytree.getNode(e.target) ? null : node;
+    };
+    const isTreeDrop = (e) => this._dragSourceNode && !$.ui.fancytree.getNode(e.target);
+
+    // Custom measure to check whether a drag exits the file panel.
+    // Browser do not support this well (related target).
+    const pointerInsidePanel = (e) => {
+      const { clientX: x, clientY: y } = e.originalEvent;
+      const rect = $panel[0].getBoundingClientRect();
+      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    };
+
+    $zones.on('dragover', (e) => {
+      if (isUpload(e)) {
+        e.preventDefault();
+        this._markRootDropTarget();
+        return;
+      }
+
+      if (!isTreeDrop(e)) return;
+      const target = rowAt(e);
+      if (!this._dropAllowed(this._dragSourceNode, target)) return;
+
       e.preventDefault();
-      e.stopPropagation();
+      if (!target) this._markRootDropTarget();
     });
 
-    $dropzone.on('dragenter', (e) => {
-      if (!isLocalFileSystemDrag(e)) return;
-      $('#file-tree').addClass(DROP_AREA_INDICATOR_CLASS);
-      $dropzone.addClass('drag-over');
+    // A drop is only offered when both dragenter and dragover accept it.
+    $zones.on('dragenter', (e) => {
+      if (isUpload(e)) {
+        e.preventDefault();
+        this._markRootDropTarget();
+        return;
+      }
+
+      if (!isTreeDrop(e)) return;
+      if (this._dropAllowed(this._dragSourceNode, rowAt(e))) e.preventDefault();
+
+      const target = rowAt(e);
+      if (target) {
+        // Same indicators as a drop on the node's own title.
+        this._onDragEnter(target, { otherNode: this._dragSourceNode });
+        return;
+      }
+
+      this._clearDropIndicators();
+      if (this._isCurrentContainer(this._dragSourceNode)) return;
+
+      const duplicate = this._duplicateNode(this._dragSourceNode, null);
+      if (duplicate) {
+        this._showDuplicateTooltip(duplicate);
+        this._markRootDropTarget(true);
+        return;
+      }
+
+      this._markRootDropTarget();
     });
 
-    $dropzone.on('dragleave', (e) => {
-      if (!isLocalFileSystemDrag(e)) return;
-      $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
-      $dropzone.removeClass('drag-over');
+    // Moving between nodes also fires a dragleave on the tree, so only a drag
+    // that left the panel entirely clears the indicators.
+    $zones.on('dragleave', (e) => {
+      if (!pointerInsidePanel(e)) this._clearDropIndicators();
     });
 
-    $dropzone.on('drop', (e) => {
-      if (!isLocalFileSystemDrag(e)) return;
+    $zones.on('drop', (e) => {
+      if (isUpload(e)) {
+        e.preventDefault();
+        this._clearDropIndicators();
+        const entries = this._collectEntries(e.originalEvent.dataTransfer.items);
+        this.delegate.onFilesDropped(entries, null);
+        return;
+      }
+
+      if (!isTreeDrop(e)) return;
       e.preventDefault();
-      e.stopPropagation();
 
-      $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
-      $dropzone.removeClass('drag-over');
+      // FancyTree only ends a drag that finished on one of its nodes.
+      const target = rowAt(e);
+      const sourceNode = this._dragSourceNode;
+      this._onDragEnd();
+      this._dropInto(sourceNode, target);
+    });
 
-      const entries = this._collectEntries(e.originalEvent.dataTransfer.items);
-      this.delegate.onFilesDropped(entries, null);
+    // A drag cancelled outside the tree (escape, invalid target) ends here.
+    $(document).on('dragend', () => {
+      if (this._dragSourceNode) this._onDragEnd();
     });
   }
 
@@ -521,13 +593,14 @@ export default class FileTreeComponent {
   /** User started dragging a node. */
   _onDragStart = (node, data) => {
     this.delegate.suspendFSReload();
+    this._dragSourceNode = node;
 
-    // Set a custom drag image.
-    data.dataTransfer.setDragImage(
-      $(`<div class="custom-drag-helper">${node.title}</div>`).appendTo('body')[0],
-      -10,
-      -10,
-    );
+    // Set a custom drag image. The browser snapshots the element during this
+    // call and only takes one that is rendered on screen, so it is placed in
+    // the viewport and removed on the next tick.
+    const helper = $(`<div class="custom-drag-helper">${node.title}</div>`).appendTo('body');
+    data.dataTransfer.setDragImage(helper[0], 10, 10);
+    setTimeout(() => helper.remove());
     data.useDefaultImage = false;
 
     // Return true to enable dnd.
@@ -536,59 +609,49 @@ export default class FileTreeComponent {
 
   /** User dragged a node over another node; manage drop indicators + dup check. */
   _onDragEnter = (targetNode, data) => {
-    // Remove all existing visual drag area indicators.
-    $('.fancytree-drop-accept').removeClass('fancytree-drop-accept');
-    $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
-
-    // Add a visual drag area indicator.
-    if ((targetNode.parent.title.startsWith('root') && targetNode.data.isFile) || targetNode.title === 'root') {
-      $('#file-tree').addClass(DROP_AREA_INDICATOR_CLASS);
-    } else if (targetNode.data.isFile) {
-      $(targetNode.parent.li).addClass(DROP_AREA_INDICATOR_CLASS);
-    } else if (targetNode.data.isFolder) {
-      $(targetNode.li).addClass(DROP_AREA_INDICATOR_CLASS);
-    }
+    this._clearDropIndicators();
 
     // NOTE: sourceNode is undefined when dragging a local filesystem entry onto
     // the tree. For security reasons `data.files` is empty during dragEnter, so
     // duplicates cannot be detected then; such drops just get "(1)" appended.
     const sourceNode = data.otherNode;
 
-    if (sourceNode) {
-      // Prevent dropping when a file with the same name exists in the target.
-      const containsDuplicate = (
-        (targetNode.data.isFile && this._nodePathExists(sourceNode.title, targetNode.parent.key, [sourceNode.key]))
-        ||
-        (targetNode.data.isFolder && this._nodePathExists(sourceNode.title, targetNode.key, [sourceNode.key]))
-      );
-
-      destroyTooltip('dndDuplicate');
-
-      if (containsDuplicate) {
-        const anchor = targetNode.data.isFile
-          ? (targetNode.parent.title.startsWith('root') ? $('.file-tree-container .title')[0] : targetNode.parent.span)
-          : targetNode.span;
-
-        const msg = `There already exists a "${sourceNode.title}" file or folder`;
-        createTooltip('dndDuplicate', anchor, msg, {
-          placement: 'right',
-          theme: 'error',
-        });
-
-        return false;
-      }
+    if (sourceNode && this._isCurrentContainer(sourceNode, targetNode)) {
+      return false;
     }
 
-    return true;
+    // Prevent dropping when a file with the same name exists in the target.
+    const duplicate = sourceNode && this._duplicateNode(sourceNode, targetNode);
+    if (duplicate) {
+      this._showDuplicateTooltip(duplicate);
+      if (this._dropsIntoRoot(targetNode)) this._markRootDropTarget(true);
+      return false;
+    }
+
+    // Add a visual drag area indicator.
+    if ((targetNode.parent.title.startsWith('root') && targetNode.data.isFile) || targetNode.title === 'root') {
+      this._markRootDropTarget();
+    } else if (targetNode.data.isFile) {
+      $(targetNode.parent.li).addClass(DROP_AREA_INDICATOR_CLASS);
+    } else if (targetNode.data.isFolder) {
+      $(targetNode.li).addClass(DROP_AREA_INDICATOR_CLASS);
+    }
+
+    // Ensure that the "before" and "after" zones of directories are also
+    // accepted as drop targets for those directories. Normally these have
+    // a special meaning in FancyTree (i.e. for manual positioning).
+    return ['over'];
   };
 
   /** Drag ended: clean up indicators and resume reloads. */
   _onDragEnd = () => {
-    $(`.${DROP_AREA_INDICATOR_CLASS}`).removeClass(DROP_AREA_INDICATOR_CLASS);
+    this._dragSourceNode = null;
+    this._clearDropIndicators();
     $('.custom-drag-helper').remove();
-    destroyTooltip('dndDuplicate');
     this._sort();
-    this.delegate.resumeFSReload();
+
+    // A move still running keeps reloads suspended; it resumes them itself.
+    if (!this._moveInFlight) this.delegate.resumeFSReload();
   };
 
   /** A node (or local files) was dropped: move it visually, then report it. */
@@ -625,7 +688,7 @@ export default class FileTreeComponent {
         targetNode.setExpanded();
       }
 
-      this.delegate.onNodeMoved(srcPath, destPath, sourceNode.data.isFolder);
+      this._reportMove(sourceNode, srcPath, destPath);
     }
   };
 
@@ -762,6 +825,168 @@ export default class FileTreeComponent {
     return entries;
   }
 
+  /**
+   * Report a completed visual move to the delegate, keeping FS reloads
+   * suspended until the VFS move completed, so no event emitted mid-move
+   * rebuilds the tree against an intermediate VFS state.
+   *
+   * @param {FancytreeNode} sourceNode - The moved node.
+   * @param {string} srcPath - The path the node had.
+   * @param {string} destPath - The path the node now has.
+   */
+  _reportMove(sourceNode, srcPath, destPath) {
+    this._moveInFlight = true;
+    this.delegate.suspendFSReload();
+    Promise.resolve(this.delegate.onNodeMoved(srcPath, destPath, sourceNode.data.isFolder))
+      .finally(() => {
+        this._moveInFlight = false;
+        this.delegate.resumeFSReload();
+      });
+  }
+
+  /** Clean up all drop indicators and the duplicate-name tooltip. */
+  _clearDropIndicators() {
+    $('.fancytree-drop-accept').removeClass('fancytree-drop-accept');
+    $(`.${DROP_AREA_INDICATOR_CLASS}`)
+      .removeClass(`${DROP_AREA_INDICATOR_CLASS} ${DROP_AREA_REJECTED_CLASS}`);
+    destroyTooltip('dndDuplicate');
+  }
+
+  /**
+   * Find the tree node at a certain vertical position.
+   *
+   * @param {number} y - The pointer's viewport y coordinate.
+   * @returns {?FancytreeNode} The node whose row the pointer is on.
+   */
+  _nodeAt(y) {
+    const treeRect = $('#file-tree')[0].getBoundingClientRect();
+    if (y < treeRect.top || y > treeRect.bottom) return null;
+
+    let match = null;
+
+    this._getInstance().visit((node) => {
+      if (!node.span) return;
+
+      const rect = node.span.getBoundingClientRect();
+      if (y >= rect.top && y < rect.bottom) {
+        match = node;
+        return false;
+      }
+    });
+
+    return match;
+  }
+
+  /**
+   * Yields the containing folder that a drop would result in (you can drop
+   * on a folder, but also on its children).
+   *
+   * @param {?FancytreeNode} targetNode - The node dropped onto, null for the
+   * tree area itself.
+   * @returns {FancytreeNode} The folder node, or the tree's root node.
+   */
+  _dropParentOf(targetNode) {
+    if (!targetNode) return this._getInstance().rootNode;
+    return targetNode.data.isFolder ? targetNode : targetNode.parent;
+  }
+
+  /**
+   * @param {FancytreeNode} sourceNode - The dragged node.
+   * @param {?FancytreeNode} [targetNode] - The node dropped onto, null for the
+   * tree area itself, which means the root.
+   * @returns {boolean} True when the node already sits in the folder the drop
+   * would move it to.
+   */
+  _isCurrentContainer(sourceNode, targetNode = null) {
+    return sourceNode.parent === this._dropParentOf(targetNode);
+  }
+
+  /**
+   * @param {FancytreeNode} sourceNode - The dragged node.
+   * @param {?FancytreeNode} targetNode - The node dropped onto, null for the
+   * tree area itself.
+   * @returns {?FancytreeNode} The node holding the dragged name in the folder
+   * the drop would move it to.
+   */
+  _duplicateNode(sourceNode, targetNode) {
+    const siblings = this._dropParentOf(targetNode).children || [];
+    return siblings.find(
+      (node) => node.title === sourceNode.title && node.key !== sourceNode.key,
+    ) || null;
+  }
+
+  /**
+   * @param {?FancytreeNode} targetNode - The node dropped onto, null for the
+   * tree area itself.
+   * @returns {boolean} True when a drop on it lands in the root folder.
+   */
+  _dropsIntoRoot(targetNode) {
+    return this._dropParentOf(targetNode) === this._getInstance().rootNode;
+  }
+
+  /**
+   * Outline the tree panel as the drop target for the root folder.
+   *
+   * @param {boolean} [rejected] - Whether the root holds the name already.
+   */
+  _markRootDropTarget(rejected = false) {
+    $('.file-tree-container').addClass(
+      rejected
+        ? `${DROP_AREA_INDICATOR_CLASS} ${DROP_AREA_REJECTED_CLASS}`
+        : DROP_AREA_INDICATOR_CLASS,
+    );
+  }
+
+  /**
+   * Point out the node whose name blocks the drop.
+   *
+   * @param {FancytreeNode} duplicate - The node already holding the name.
+   */
+  _showDuplicateTooltip(duplicate) {
+    createTooltip(
+      'dndDuplicate',
+      duplicate.span,
+      `There already exists a "${duplicate.title}" file or folder`,
+      { placement: 'right', theme: 'error' },
+    );
+  }
+
+  /**
+   * @param {FancytreeNode} sourceNode - The dragged node.
+   * @param {?FancytreeNode} targetNode - The node dropped onto, null for the
+   * tree area itself.
+   * @returns {boolean} True when the drop moves the node somewhere else and the
+   * name is free there.
+   */
+  _dropAllowed(sourceNode, targetNode) {
+    return (
+      !this._isCurrentContainer(sourceNode, targetNode) &&
+      !this._duplicateNode(sourceNode, targetNode)
+    );
+  }
+
+  /**
+   * Move a dragged node into the folder a drop target stands for.
+   *
+   * @param {FancytreeNode} sourceNode - The dragged node.
+   * @param {?FancytreeNode} targetNode - The node dropped onto, null for the
+   * tree area itself.
+   */
+  _dropInto(sourceNode, targetNode) {
+    if (!this._dropAllowed(sourceNode, targetNode)) return;
+
+    const parent = this._dropParentOf(targetNode);
+    const parentKey = parent === this._getInstance().rootNode ? null : parent.key;
+
+    const srcPath = sourceNode.key;
+    const destPath = parentKey ? `${parentKey}/${sourceNode.title}` : sourceNode.title;
+
+    sourceNode.moveTo(parent, 'child');
+    if (parentKey) parent.setExpanded();
+    this._sort();
+    this._reportMove(sourceNode, srcPath, destPath);
+  }
+
   /** Sort folders before files, then alphabetically. */
   _sort() {
     this._getInstance().rootNode.sortChildren((a, b) => {
@@ -784,12 +1009,13 @@ export default class FileTreeComponent {
    * not support async.
    *
    * @param {string} name - The file name.
-   * @param {string} parentPath - The folder path to check.
+   * @param {?string} parentPath - The folder path to check, null for the root.
    * @param {string[]} [ignorePaths] - Node keys to ignore.
    * @returns {boolean} True if a matching node exists.
    */
   _nodePathExists(name, parentPath, ignorePaths = []) {
-    const parentNode = this._getInstance().getNodeByKey(parentPath);
+    const instance = this._getInstance();
+    const parentNode = parentPath ? instance.getNodeByKey(parentPath) : instance.rootNode;
     if (!parentNode) return false;
 
     const childNodes = parentNode.children || [];

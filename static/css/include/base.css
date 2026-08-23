@@ -68,6 +68,8 @@
 :root {
   --color-white: #fff;
   --color-black: #000;
+  /* Highlight on a drop target, matching the toolbar's leading blue. */
+  --drop-target-color: #3b6fd4;
   --font-size: 16px;
   --navbar-padding: 15px;
   --editor-tab-font-size: 12px;
