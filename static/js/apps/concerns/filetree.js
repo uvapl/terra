@@ -86,7 +86,13 @@ export function useFileTree(app) {
     async onNodeMoved(srcPath, destPath, isFolder) {
       // perform the move in the file system
       const move = isFolder ? this.vfs.moveFolder : this.vfs.moveFile;
-      await move(srcPath, destPath);
+      const result = await move(srcPath, destPath);
+
+      // move failed in FS
+      if (result === null) {
+        await this.refreshFileTree();
+        return;
+      }
 
       // work the move recursively into the filetree and collect any changed paths
       const pairs = this.fileTree.applyRelocatedKeys(srcPath, destPath, isFolder);
@@ -114,10 +120,12 @@ export function useFileTree(app) {
       const path = parentPath ? `${parentPath}/${name}` : name;
 
       if (isFolder) {
-        await this.vfs.createFolder(path);
+        if (!(await this.vfs.createFolder(path))) return;
         await this.refreshFileTree();
       } else {
         const fileName = await this.vfs.createFile(path, "");
+        // creation in FS might fail
+        if (!fileName) return;
         const key = parentPath ? `${parentPath}/${fileName}` : fileName;
         await this.refreshFileTree();
         this.openFile(key);

@@ -294,8 +294,8 @@ const handlers = {
     // A real file overwrites a binary with the same name.
     tempBinaries.delete(parentPath ? `${parentPath}/${name}` : name);
 
-    while (await handlers.pathExists(`${parentPath}/${name}`)) {
-      name = incrementString(name);
+    if (await handlers.pathExists(`${parentPath}/${name}`)) {
+      return { error: 'FileExists' };
     }
 
     // Create an empty file and add content if provided.
@@ -512,9 +512,8 @@ const handlers = {
       ? await getFolderHandleByPath(parentPath, { create: true })
       : await getRootFolderHandle();
 
-    // Ensure a unique folder name.
-    while (await nameExistsInFolder(parentFolderHandle, name)) {
-      name = incrementString(name);
+    if (await nameExistsInFolder(parentFolderHandle, name)) {
+      return { error: 'FileExists' };
     }
 
     // Actually create the folder.
@@ -602,14 +601,12 @@ const handlers = {
       return false;
     }
 
-    // Choose a free name first, so a move cannot overwrite anything
-    const { name, parentPath } = getPartsFromPath(dest);
-    const fullPath = (n) => (parentPath ? `${parentPath}/${n}` : n);
-    let destName = name;
-    while (await handlers.pathExists(fullPath(destName))) {
-      destName = incrementString(destName);
+    if (await handlers.pathExists(dest)) {
+      return { error: 'FileExists' };
     }
-    const destPath = fullPath(destName);
+
+    const { name: destName, parentPath } = getPartsFromPath(dest);
+    const destPath = dest;
 
     try {
       const srcHandle = await getFileHandleByPath(src);
@@ -651,17 +648,9 @@ const handlers = {
    * @returns {Promise}
    */
   async moveFolder(srcPath, dstPath) {
-    const { name, parentPath } = getPartsFromPath(dstPath);
-    const dstParentHandle = await getFolderHandleByPath(parentPath, {
-      create: true,
-    });
-
-    // Choose a free name first, so a move cannot overwrite anything
-    let dstName = name;
-    while (await nameExistsInFolder(dstParentHandle, dstName)) {
-      dstName = incrementString(dstName);
+    if (await handlers.pathExists(dstPath)) {
+      return { error: 'FileExists' };
     }
-    dstPath = parentPath ? `${parentPath}/${dstName}` : dstName;
 
     // Folder handles have no `move` in some browsers, so the contents are
     // moved one entry at a time. Create the destination folder before moving
@@ -863,19 +852,6 @@ function tempBinariesInFolder(folderpath) {
   return tempBinariesUnder(folderpath)
     .map((path) => path.slice(prefix.length))
     .filter((name) => !name.includes('/'));
-}
-
-function incrementString(str) {
-  const parts = str.split('.');
-  const ext = parts.length > 1 ? `.${parts.pop()}` : '';
-  let name = parts.join('.');
-
-  const match = /__(\d+)$/.exec(name);
-  if (match) {
-    const num = parseInt(match[1]) + 1;
-    return `${name.replace(/__(\d+)$/, `__${num}`)}${ext}`;
-  }
-  return `${name}__1${ext}`;
 }
 
 function isOPFS() {

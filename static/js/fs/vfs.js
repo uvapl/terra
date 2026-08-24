@@ -1,5 +1,6 @@
 import { getPartsFromPath } from '../lib/helpers.js';
 import { IGNORED_PATHS } from '../constants.js';
+import { createModal } from '../ui/components/modal.js';
 
 /**
  * VFS interface for the main thread. It delegates to the VFS worker module.
@@ -119,7 +120,7 @@ export default class VirtualFileSystem extends EventTarget {
     this._send('updateFile', [path, content, isUserInvoked]);
 
   createFile = (path, content = '', isUserInvoked = true) =>
-    this._send('createFile', [path, content, isUserInvoked]);
+    _withCollisionAlert(this._send('createFile', [path, content, isUserInvoked]), path);
 
   deleteFile = (path, isUserInvoked = true) =>
     this._send('deleteFile', [path, isUserInvoked]);
@@ -156,11 +157,11 @@ export default class VirtualFileSystem extends EventTarget {
   isEmpty = () => this._send('isEmpty');
 
   createFolder = (path, isUserInvoked = true) =>
-    this._send('createFolder', [path, isUserInvoked]);
+    _withCollisionAlert(this._send('createFolder', [path, isUserInvoked]), path);
 
   deleteFolder = (path) => this._send('deleteFolder', [path]);
 
-  moveFile = (src, dst) => this._send('moveFile', [src, dst]);
+  moveFile = (src, dst) => _withCollisionAlert(this._send('moveFile', [src, dst]), dst);
 
   /**
    * Move a folder and everything in it. Normally ignored files are
@@ -170,7 +171,7 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {string} dst - Where it should end up.
    * @returns {Promise<void>}
    */
-  moveFolder = (src, dst) => this._send('moveFolder', [src, dst]);
+  moveFolder = (src, dst) => _withCollisionAlert(this._send('moveFolder', [src, dst]), dst);
 
   getFileTree = (path = '') => this._send('getFileTree', [path]);
 
@@ -272,4 +273,25 @@ function _makeError(errorName) {
     if (m) return new ErrorClass();
   }
   return new Error(errorName);
+}
+
+/**
+ * Catch a failed file operation to show an alert.
+ *
+ * @param {Promise} promise - The pending `_send` call.
+ * @param {string} path - The path that was already taken, for the message.
+ * @returns {Promise<*>} Whatever `promise` resolves to, or null on collision.
+ */
+async function _withCollisionAlert(promise, path) {
+  try {
+    return await promise;
+  } catch (err) {
+    if (!(err instanceof FileExistsError)) throw err;
+    createModal({
+      title: 'Name already exists',
+      body: `<p>A file or folder named <strong>${path}</strong> already exists.</p>`,
+      confirmLabel: 'OK',
+    });
+    return null;
+  }
 }
