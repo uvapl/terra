@@ -173,6 +173,86 @@ export default class VirtualFileSystem extends EventTarget {
    */
   moveFolder = (src, dst) => _withCollisionAlert(this._send('moveFolder', [src, dst]), dst);
 
+  /**
+   * Import dropped filesystem entries (files/folders, e.g. from
+   * dragging local files onto the tree) into a folder. Refuses all
+   * if any top-level name is already taken.
+   *
+   * @param {FileSystemEntry[]} entries - Top-level dropped entries.
+   * @param {string} [destParentPath] - Folder to import into ('' for root).
+   * @returns {Promise<boolean>} True if the import happened, false if refused.
+   */
+  importEntries = async (entries, destParentPath) => {
+    const parentPath = destParentPath || '';
+    const names = entries.map((entry) => entry.name);
+    if (!(await this._checkNamesAvailable(parentPath, names))) return false;
+
+    for (const entry of entries) {
+      await this._importEntry(entry, '', parentPath);
+    }
+    return true;
+  };
+
+  /**
+   * Check that none of the given names already exist in a folder.
+   *
+   * @param {string} parentPath - The folder to check in ('' for the root).
+   * @param {string[]} names - The names to check.
+   * @returns {Promise<boolean>} True if all names are free. False shows a
+   * modal listing the ones already taken.
+   */
+  _checkNamesAvailable = async (parentPath, names) => {
+    const conflicts = [];
+    for (const name of names) {
+      const path = parentPath ? `${parentPath}/${name}` : name;
+      if (await this.pathExists(path)) conflicts.push(name);
+    }
+
+    if (conflicts.length === 0) return true;
+
+    createModal({
+      title: 'Cannot import',
+      body: `<p>Nothing was imported. Already exists:</p><ul>${conflicts.map((n) => `<li>${n}</li>`).join('')}</ul>`,
+      confirmLabel: 'OK',
+    });
+    return false;
+  };
+
+  /**
+   * Recursively create a file or folder in the VFS from a FileSystemEntry.
+   *
+   * @param {FileSystemEntry} item - The file or folder entry.
+   * @param {string} [path] - Path of the entry relative to the drop target.
+   * @param {string} [targetPath] - Path of the folder it was dropped onto.
+   * @returns {Promise<void>}
+   */
+  _importEntry = (item, path = '', targetPath = '') => {
+    return new Promise((resolve) => {
+      if (item.isFile) {
+        item.file((file) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const buffer = e.target.result;
+            const destPath = [targetPath, path, file.name].filter((s) => s).join('/');
+            this.createFile(destPath, buffer).then(() => resolve());
+          };
+          reader.readAsArrayBuffer(file);
+        });
+      } else if (item.isDirectory) {
+        const dirReader = item.createReader();
+        dirReader.readEntries(async (entries) => {
+          for (const entry of entries) {
+            const subpath = path ? `${path}/${item.name}` : item.name;
+            await this._importEntry(entry, subpath, targetPath);
+          }
+          resolve();
+        });
+      } else {
+        resolve();
+      }
+    });
+  };
+
   getFileTree = (path = '') => this._send('getFileTree', [path]);
 
   /**

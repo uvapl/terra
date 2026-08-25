@@ -146,11 +146,12 @@ export function useFileTree(app) {
       await this.refreshFileTree();
     },
 
-    /** Local filesystem entries were dropped onto the tree. */
+    /**
+     * Local filesystem entries were dropped onto the tree. Refuses the whole
+     * drop if any top-level dragged-in name is already taken.
+     */
     async onFilesDropped(entries, destParentKey) {
-      for (const entry of entries) {
-        await importEntry(this.vfs, entry, "", destParentKey);
-      }
+      if (!(await this.vfs.importEntries(entries, destParentKey))) return;
       await this.refreshFileTree();
     },
 
@@ -184,41 +185,4 @@ export function useFileTree(app) {
   app.vfs.addEventListener("folderCreated", rebuildOnChange);
   app.vfs.addEventListener("fileDeleted", rebuildOnChange);
   app.vfs.addEventListener("fileSystemChanged", rebuildOnChange);
-}
-
-/**
- * Create a file or folder in the VFS from a FileSystemEntry (e.g. dragged from
- * the local filesystem). Recurses into directories.
- *
- * @param {VirtualFileSystem} vfs - The VFS to write into.
- * @param {FileSystemEntry} item - The file or folder entry.
- * @param {string} [path] - Path of the entry relative to the drop target.
- * @param {string} [targetNodePath] - Path of the node it was dropped onto.
- * @returns {Promise<void>}
- */
-function importEntry(vfs, item, path = "", targetNodePath = null) {
-  return new Promise((resolve) => {
-    if (item.isFile) {
-      item.file((file) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const buffer = e.target.result;
-          const destPath = [targetNodePath, path, file.name].filter((s) => s).join("/");
-          vfs.createFile(destPath, buffer).then(() => resolve());
-        };
-        reader.readAsArrayBuffer(file);
-      });
-    } else if (item.isDirectory) {
-      const dirReader = item.createReader();
-      dirReader.readEntries(async (entries) => {
-        for (const entry of entries) {
-          const subpath = path ? `${path}/${item.name}` : item.name;
-          await importEntry(vfs, entry, subpath, targetNodePath);
-        }
-        resolve();
-      });
-    } else {
-      resolve();
-    }
-  });
 }
