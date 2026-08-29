@@ -1,8 +1,20 @@
 /**
  * Handles the mechanics of the lab configuration: reading the lab URL from the
  * query params, resolving it to a GitHub org/repo/branch/subdir, fetching and
- * parsing the lab's .cs50.yml and persisting/restoring the config through
+ * parsing the lab's YAML config and persisting/restoring the config through
  * local storage.
+ *
+ * The config lives in the lab directory as `lab.yml`, or as `.cs50.yml` /
+ * `.cs50.yaml` for labs written against the cs50 tooling. One schema covers
+ * all three, spelled either way:
+ *
+ *   lab:                        lab50:
+ *     windows: [editor, ...]      window: [editor, ...]
+ *     files:                      files:
+ *       - main.py                   - !include main.py
+ *     buttons:                    buttons:
+ *       doctest: |                  doctest: |
+ *         ...                         ...
  *
  * Labs are identified by a GitHub URL such as
  *
@@ -29,8 +41,17 @@ import {
 } from '../lib/local-storage-manager.js';
 
 /**
+ * The config filenames that are looked for in the lab directory, in the order
+ * they are tried.
+ */
+const CONFIG_FILENAMES = ['lab.yml', '.cs50.yml', '.cs50.yaml'];
+
+/** Human-readable form of CONFIG_FILENAMES, for error messages. */
+const CONFIG_FILENAMES_TEXT = CONFIG_FILENAMES.join(' or ');
+
+/**
  * YAML schema that understands the custom !include/!exclude tags used in the
- * `files` list of a .cs50.yml. Entries are constructed as
+ * `files` list of a cs50 config. Entries are constructed as
  * `{ file, include }` objects. The !require tag (used by check50/submit50
  * configs that share the file) is accepted as well so such files at least
  * parse and produce a clear "not a lab" error instead of a YAML error.
@@ -117,7 +138,7 @@ export function parseGitHubUrl(labUrl) {
  * The branch list from the GitHub API is authoritative: the longest branch
  * name that prefixes the remainder wins. When the API is unreachable (or
  * rate-limited), fall back to a single raw.githubusercontent.com probe:
- * raw URLs are simply `{branch}/{path}` concatenated, so the .cs50.yml is
+ * raw URLs are simply `{branch}/{path}` concatenated, so the config is
  * served at the same URL no matter where the split lies. The whole remainder
  * is then treated as the branch, which yields identical raw URLs; only the
  * branch/subdir labels differ, and the lab slug is split-agnostic. The probe
@@ -160,7 +181,7 @@ export async function resolveBranch(org, repo, rest) {
     return { branch: rest, subdir: '', yamlText };
   }
 
-  throw new Error(`Could not find a lab (.cs50.yml) at ${org}/${repo}/${rest}`);
+  throw new Error(`Could not find a lab (${CONFIG_FILENAMES_TEXT}) at ${org}/${repo}/${rest}`);
 }
 
 /**
@@ -199,15 +220,15 @@ function makeRawUrl(org, repo, branch, subdir, filename) {
 }
 
 /**
- * Fetch the lab's YAML config from the given directory, accepting both the
- * `.cs50.yml` and `.cs50.yaml` spellings.
+ * Fetch the lab's YAML config from the given directory, trying each of the
+ * accepted config filenames in turn.
  *
  * @async
- * @returns {Promise<string|null>} The YAML text, or null when neither file
- * exists.
+ * @returns {Promise<string|null>} The YAML text, or null when none of the
+ * files exist.
  */
 async function fetchYamlText(org, repo, branch, subdir) {
-  for (const filename of ['.cs50.yml', '.cs50.yaml']) {
+  for (const filename of CONFIG_FILENAMES) {
     const response = await fetch(makeRawUrl(org, repo, branch, subdir, filename));
     if (response.ok) return response.text();
   }
@@ -216,8 +237,8 @@ async function fetchYamlText(org, repo, branch, subdir) {
 }
 
 /**
- * Fetch the lab's .cs50.yml (or .cs50.yaml) and parse it into a normalized
- * lab config object.
+ * Fetch the lab's YAML config and parse it into a normalized lab config
+ * object.
  *
  * Two kinds of lab URLs are supported:
  *
@@ -228,14 +249,14 @@ async function fetchYamlText(org, repo, branch, subdir) {
  *   statically deployed (e.g. `https://org.github.io/repo/lab/`); the config
  *   and README are fetched straight from it, no URL mangling involved.
  *
- * Only literal `!include` entries are supported in the `files` list; glob
- * patterns and `!exclude` entries are parsed but ignored.
+ * Only literal filenames are supported in the `files` list; glob patterns and
+ * `!exclude` entries are parsed but ignored.
  *
  * @async
  * @param {string} labUrl - The URL identifying the lab.
  * @returns {Promise<object>} The normalized lab config: `{ labUrl, baseUrl,
- * linkBaseUrl, name, files, window, cmd }`. `baseUrl` is where the lab files
- * live, `linkBaseUrl` is where relative README links should point.
+ * linkBaseUrl, name, files, window, buttons, cmd }`. `baseUrl` is where the
+ * lab files live, `linkBaseUrl` is where relative README links should point.
  */
 export async function fetchConfig(labUrl) {
   const parsed = parseGitHubUrl(labUrl);
@@ -244,16 +265,23 @@ export async function fetchConfig(labUrl) {
     : await resolveDirectLab(labUrl);
 
   const doc = jsyaml.load(lab.yamlText, { schema: LAB_YAML_SCHEMA });
-  if (!isObject(doc) || typeof doc.lab50 === 'undefined') {
-    throw new Error('The .cs50.yml file is not a lab50 configuration');
+  const root = isObject(doc) ? doc.lab ?? doc.lab50 : undefined;
+  if (typeof root === 'undefined') {
+    throw new Error(`The ${CONFIG_FILENAMES_TEXT} file is not a lab configuration`);
   }
 
-  // The minimal form `lab50: true` has no files/window/cmd keys.
-  const lab50 = isObject(doc.lab50) ? doc.lab50 : {};
+  // The minimal form `lab: true` has no files/window/buttons/cmd keys.
+  const settings = isObject(root) ? root : {};
 
-  const files = (Array.isArray(lab50.files) ? lab50.files : [])
+  // A file is either a plain filename or an `!include`/`!exclude` tagged entry
+  // constructed into `{ file, include }`. Bring the plain form into that same
+  // shape so one filter handles both.
+  const files = (Array.isArray(settings.files) ? settings.files : [])
+    .map((entry) => (typeof entry === 'string' ? { file: entry, include: true } : entry))
     .filter((entry) => isObject(entry) && entry.include && !/[*?[\]]/.test(entry.file))
     .map((entry) => entry.file);
+
+  const window = settings.window ?? settings.windows;
 
   return {
     labUrl,
@@ -262,8 +290,9 @@ export async function fetchConfig(labUrl) {
     name: lab.name,
     slug: lab.slug,
     files,
-    window: Array.isArray(lab50.window) ? lab50.window : ['editor', 'readme', 'terminal'],
-    cmd: lab50.cmd || null,
+    window: Array.isArray(window) ? window : ['editor', 'readme', 'terminal'],
+    buttons: isObject(settings.buttons) ? settings.buttons : {},
+    cmd: settings.cmd || null,
   };
 }
 
@@ -282,7 +311,7 @@ async function resolveGitHubLab(labUrl, { org, repo, rest }) {
   if (text === null) {
     text = await fetchYamlText(org, repo, branch, subdir);
     if (text === null) {
-      throw new Error(`No .cs50.yml found at ${org}/${repo}/${branch}/${subdir}`);
+      throw new Error(`No ${CONFIG_FILENAMES_TEXT} found at ${org}/${repo}/${branch}/${subdir}`);
     }
   }
 
@@ -314,7 +343,7 @@ async function resolveDirectLab(labUrl) {
   const baseUrl = labUrl.endsWith('/') ? labUrl : `${labUrl}/`;
 
   let yamlText = null;
-  for (const filename of ['.cs50.yml', '.cs50.yaml']) {
+  for (const filename of CONFIG_FILENAMES) {
     const response = await fetch(baseUrl + filename);
     if (response.ok) {
       yamlText = await response.text();
@@ -323,7 +352,7 @@ async function resolveDirectLab(labUrl) {
   }
 
   if (yamlText === null) {
-    throw new Error(`No .cs50.yml found at ${baseUrl}`);
+    throw new Error(`No ${CONFIG_FILENAMES_TEXT} found at ${baseUrl}`);
   }
 
   const { hostname, pathname } = new URL(baseUrl);

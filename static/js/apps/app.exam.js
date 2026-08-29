@@ -17,7 +17,6 @@ import {
   getFileExtension,
   getRandNumBetween,
   seconds,
-  isObject,
 } from '../lib/helpers.js';
 import ExamController from '../ui/controllers/exam.js';
 import examCommandConfig from '../commands/config.exam.js';
@@ -127,7 +126,7 @@ export default class ExamApp extends App {
       return message;
     });
 
-    this.addToolbarButtonsFromConfig();
+    this.addToolbarButtons(this.config.buttons);
   }
 
   /**
@@ -222,33 +221,6 @@ export default class ExamApp extends App {
       notifyError('Could not connect to server');
       throw err;
     }
-  }
-
-  /**
-   * Render the config buttons declared in the app's buttons config into the
-   * toolbar.
-   */
-  addToolbarButtonsFromConfig() {
-    if (!isObject(this.config.buttons)) return;
-
-    Object.keys(this.config.buttons).forEach((name, index) => {
-      const id = name.replace(/\s/g, '-').toLowerCase();
-      const selector = `#${id}`;
-
-      let cmd = this.config.buttons[name];
-      if (!Array.isArray(cmd)) {
-        cmd = cmd.split('\n');
-      }
-
-      this.commands.register([{
-        name: `config-${id}`,
-        button: { id, label: name, class: `config-btn ${id}-btn`, position: 300 + index * 10 },
-        isAvailable: ({ app }) => app.canRunActiveTab(),
-        exec: ({ app }) => app.runSnippet(selector, cmd),
-      }]);
-
-      this.view.surfaces.renderButton(`config-${id}`, $('#toolbar'));
-    });
   }
 
   /**

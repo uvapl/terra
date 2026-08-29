@@ -25,7 +25,7 @@ export default class LabLayout extends Layout {
       componentState: { path: filename },
     }, { fontSize }));
 
-    // A lab without files (e.g. the minimal `lab50: true` form) still needs
+    // A lab without files (e.g. the minimal `lab: true` form) still needs
     // at least one tab in the editor stack.
     if (content.length === 0) {
       content.push(createTabConfig({ isClosable: false }, { fontSize }));

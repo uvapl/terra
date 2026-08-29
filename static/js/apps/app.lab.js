@@ -93,6 +93,8 @@ export default class LabApp extends App {
     this.view.setPageTitle(this.config);
 
     loadReadme(this.config, $('#readme'));
+
+    this.addToolbarButtons(this.config.buttons);
   }
 
   /**

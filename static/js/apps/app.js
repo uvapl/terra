@@ -1,4 +1,4 @@
-import { getFileExtension, isImageExtension, seconds } from '../lib/helpers.js'
+import { getFileExtension, isImageExtension, isObject, seconds } from '../lib/helpers.js'
 import { createScheduler } from '../lib/scheduler.js';
 import { FileExistsError, FileNotFoundError, FileTooLargeError } from '../fs/vfs.js';
 import BaseApp from './app.base.js';
@@ -719,6 +719,40 @@ export default class App extends BaseApp {
     const files = await this.getRunFiles(proglang);
 
     this.langWorkerClient.runSnippet(proglang, selector, filename, cmd, files);
+  }
+
+  /**
+   * Render a set of config-declared buttons into the toolbar, each running its
+   * own snippet in the language worker. The snippet is a list of lines, or a
+   * single string that is split on newlines; `<filename>` inside it is replaced
+   * by the active tab's module name when it runs.
+   *
+   * Called after the layout is set up, so the toolbar these are appended to
+   * already exists.
+   *
+   * @param {object} buttons - Map of button label to its snippet.
+   */
+  addToolbarButtons(buttons) {
+    if (!isObject(buttons)) return;
+
+    Object.keys(buttons).forEach((name, index) => {
+      const id = name.replace(/\s/g, '-').toLowerCase();
+      const selector = `#${id}`;
+
+      let cmd = buttons[name];
+      if (!Array.isArray(cmd)) {
+        cmd = cmd.split('\n');
+      }
+
+      this.commands.register([{
+        name: `config-${id}`,
+        button: { id, label: name, class: `config-btn ${id}-btn`, position: 300 + index * 10 },
+        isAvailable: ({ app }) => app.canRunActiveTab(),
+        exec: ({ app }) => app.runSnippet(selector, cmd),
+      }]);
+
+      this.view.surfaces.renderButton(`config-${id}`, $('#toolbar'));
+    });
   }
 
   /**
