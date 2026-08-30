@@ -252,6 +252,73 @@ export default class EditorTab extends FileTab {
   }
 
   /**
+   * Add content to the end of the file, separated from what is already there
+   * by a blank line, and focus the editor. When the snippet carries a
+   * placeholder body its `...` is selected, so the user can type the body
+   * straight over it; otherwise the caret goes to the snippet's first line,
+   * which at least shows where it landed. Inserting (rather than replacing the
+   * whole value) keeps the undo history intact, so the addition can be undone.
+   *
+   * @param {string} content - The content to append.
+   */
+  appendContent = (content) => {
+    if (!this.editor || typeof content !== 'string') return;
+
+    const text = content.replace(/\s+$/, '');
+    const doc = this.editor.session.getDocument();
+    const lastRow = doc.getLength() - 1;
+    const end = { row: lastRow, column: doc.getLine(lastRow).length };
+
+    const isEmpty = doc.getValue().trim() === '';
+    const separator = isEmpty ? '' : '\n\n';
+    doc.insert(end, separator + text + '\n');
+
+    const startRow = isEmpty ? 0 : end.row + 2;
+    this.editor.scrollToLine(startRow, false, true);
+
+    const placeholder = findPlaceholder(text);
+    if (placeholder) {
+      // Anchor first, then move the cursor: that spans the selection over the
+      // placeholder instead of extending whatever was selected before.
+      const row = startRow + placeholder.row;
+      const selection = this.editor.getSelection();
+      selection.setSelectionAnchor(row, placeholder.column);
+      selection.moveCursorTo(row, placeholder.column + PLACEHOLDER.length);
+      this.editor.renderer.scrollCursorIntoView();
+    } else {
+      this.editor.moveCursorTo(startRow, 0);
+      this.editor.clearSelection();
+    }
+
+    this.focus();
+  }
+
+  /**
+   * Find the line matching the given text and bring it into view, putting the
+   * caret at its start. Leading and trailing whitespace is ignored on both
+   * sides of the comparison.
+   *
+   * @param {string} line - The line to look for.
+   * @returns {boolean} Whether such a line was found.
+   */
+  revealLine = (line) => {
+    if (!this.editor || typeof line !== 'string') return false;
+
+    const target = line.trim();
+    const row = this.editor.session.getDocument().getAllLines()
+      .findIndex((text) => text.trim() === target);
+
+    if (row === -1) return false;
+
+    this.editor.moveCursorTo(row, 0);
+    this.editor.clearSelection();
+    this.editor.scrollToLine(row, true, true);
+    this.focus();
+
+    return true;
+  }
+
+  /**
    * Reload the editor with new content while keeping the caret where the user
    * left it. Optionally reset the undo history (used after an external/VFS
    * reload so the reload itself is not undoable).
@@ -624,4 +691,28 @@ export default class EditorTab extends FileTab {
     });
 
   }
+}
+
+/** The stand-in for a body the user still has to write. */
+const PLACEHOLDER = '...';
+
+/**
+ * Locate the placeholder in a snippet: the first line that is nothing but a
+ * bare `...`, or a `return ...`. Requiring the whole line to match keeps an
+ * ellipsis that is part of a string or a comment (`'loud...'`) out of it.
+ *
+ * @param {string} text - The snippet to search.
+ * @returns {?object} An `{ row, column }` position, or null when the snippet
+ * has no placeholder.
+ */
+function findPlaceholder(text) {
+  const lines = text.split('\n');
+
+  for (let row = 0; row < lines.length; row++) {
+    if (/^\s*(return\s+)?\.\.\.\s*$/.test(lines[row])) {
+      return { row, column: lines[row].indexOf(PLACEHOLDER) };
+    }
+  }
+
+  return null;
 }

@@ -6,6 +6,29 @@ import { triggerPluginEvent, triggerPluginEventFor } from '../lib/plugin-manager
 import { MAX_FILE_SIZE } from '../constants.js';
 
 /**
+ * The toolbar buttons the app puts there itself, keyed by the name a config
+ * uses to address them. Giving such a name an empty value in the `buttons`
+ * config removes the button.
+ */
+const BUILTIN_BUTTONS = {
+  run: { command: 'runTab', id: 'run-code' },
+};
+
+/**
+ * Whether a configured button holds no command, which is how a config asks for
+ * a button to be removed instead of added.
+ *
+ * @param {*} cmd - The value the config gave the button.
+ * @returns {boolean} True when the value is empty.
+ */
+function isEmptyCommand(cmd) {
+  if (cmd === null || typeof cmd === 'undefined') return true;
+  if (Array.isArray(cmd)) return cmd.length === 0;
+
+  return typeof cmd === 'string' && cmd.trim() === '';
+}
+
+/**
  * Base class that is extended for each of the apps.
  *
  * Composition and wiring live in BaseApp; this class holds the handlers
@@ -727,6 +750,13 @@ export default class App extends BaseApp {
    * single string that is split on newlines; `<filename>` inside it is replaced
    * by the active tab's module name when it runs.
    *
+   * A button named after one of the app's own (see BUILTIN_BUTTONS) and given
+   * an empty snippet is removed instead, so a config can drop the run button
+   * for a lab where running the file makes no sense:
+   *
+   *   buttons:
+   *     run:
+   *
    * Called after the layout is set up, so the toolbar these are appended to
    * already exists.
    *
@@ -740,6 +770,11 @@ export default class App extends BaseApp {
       const selector = `#${id}`;
 
       let cmd = buttons[name];
+      if (isEmptyCommand(cmd)) {
+        this.removeToolbarButton(name);
+        return;
+      }
+
       if (!Array.isArray(cmd)) {
         cmd = cmd.split('\n');
       }
@@ -753,6 +788,21 @@ export default class App extends BaseApp {
 
       this.view.surfaces.renderButton(`config-${id}`, $('#toolbar'));
     });
+  }
+
+  /**
+   * Drop one of the app's own toolbar buttons, along with the command behind
+   * it, so any keyboard shortcut for it stops working as well. Names that are
+   * not one of those buttons are ignored.
+   *
+   * @param {string} name - The name the config uses for the button.
+   */
+  removeToolbarButton(name) {
+    const button = BUILTIN_BUTTONS[name.trim().toLowerCase()];
+    if (!button) return;
+
+    this.commands.removeCommand(button.command);
+    $(`#${button.id}`).remove();
   }
 
   /**

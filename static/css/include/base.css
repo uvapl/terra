@@ -206,8 +206,10 @@ body {
    so the surrounding chrome reads as distinct from the work area.
    (The IDE navbar does the same; see ide/navbar.css.) */
 
-/* The file tree is a card floating on the panel colour. */
-.file-tree-container {
+/* The file tree (IDE) and the readme sidebar (lab) are cards floating on the
+   panel colour. */
+.file-tree-container,
+.readme-container {
   border-radius: 0.25rem;
   margin: 0 0.5rem 0.5rem 0.5rem;
   background-color: var(--surface-bg);

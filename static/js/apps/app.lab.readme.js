@@ -27,6 +27,8 @@ import {
   getLocalStorageItem,
 } from '../lib/local-storage-manager.js';
 import { DEFAULT_README } from './app.lab.config.js';
+import { seconds } from '../lib/helpers.js';
+import Terra from '../terra.js';
 
 const SPOILER_REGEX = /\{%\s*spoiler(?:\s+"([^"]*)")?\s*%\}([\s\S]*?)\{%\s*endspoiler\s*%\}/g;
 const NEXT_REGEX = /\{%\s*next(?:\s+"([^"]*)")?\s*%\}/;
@@ -108,6 +110,7 @@ export function renderReadme(text, config, $container) {
   const $sections = pages.map((page) => {
     const $section = $('<section class="readme-page hidden-page"></section>').html(page.html);
     resolveRelativeUrls($section, config);
+    addCopyLinks($section);
     $container.append($section);
     return $section;
   });
@@ -142,6 +145,54 @@ export function renderReadme(text, config, $container) {
   });
 
   placeNextButton();
+}
+
+/**
+ * Put a "copy to code editor" link under every fenced code block that names a
+ * language. Those are the snippets meant to end up in the file; plain fences
+ * and indented blocks hold examples and diagrams, which have no business in
+ * the editor.
+ *
+ * The block and its link are wrapped together so a single frame encloses both,
+ * with the link sitting on its own line inside that frame.
+ *
+ * @param {jQuery} $section - The rendered README section.
+ */
+function addCopyLinks($section) {
+  $section.find('pre > code[class*="language-"]').each((_, code) => {
+    const $link = $('<a href="#" class="copy-to-editor">Copy to code editor \u2192</a>');
+    const label = $link.text();
+
+    // The snippet's first line (its `def` line) identifies it well enough to
+    // recognise a copy that is already in the file.
+    const firstLine = code.textContent.trim().split('\n')[0];
+
+    // The code lands in another pane, so report back here as well.
+    const flash = (text, state) => {
+      $link.addClass(state).text(text);
+      setTimeout(() => $link.removeClass(state).text(label), seconds(1.5));
+    };
+
+    $link.on('click', (event) => {
+      event.preventDefault();
+
+      const editorComponent = Terra.app?.view?.getActiveEditor();
+      if (!editorComponent) return;
+
+      // Already in the file: scroll to that copy rather than adding a second.
+      if (editorComponent.revealLine(firstLine)) {
+        flash("Can't copy twice! Here it is \u2192", 'blocked');
+        return;
+      }
+
+      editorComponent.appendContent(code.textContent);
+      flash('Copied \u2192', 'copied');
+    });
+
+    const $pre = $(code).parent();
+    $pre.wrap('<div class="code-snippet"></div>');
+    $pre.after($link);
+  });
 }
 
 /**

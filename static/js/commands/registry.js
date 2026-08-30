@@ -68,6 +68,17 @@ export default class CommandRegistry {
   }
 
   /**
+   * Take a command out of the registry. Its surfaces stop responding: the
+   * toolbar skips it on the next build and dispatching the name is a no-op, so
+   * a keyboard shortcut already bound to it does nothing.
+   *
+   * @param {string} name
+   */
+  removeCommand(name) {
+    this._commands.delete(name);
+  }
+
+  /**
    * Add a number of commands to the registry.
    *
    * @param {object[]} list

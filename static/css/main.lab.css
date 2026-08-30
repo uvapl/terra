@@ -19,6 +19,12 @@
   --readme-min-width: 320px;
 }
 
+/* No background. */
+.navbar {
+  background-image: none;
+  color: var(--fg);
+}
+
 .layout-container {
   width: calc(100% - var(--readme-width)) !important;
 }

@@ -7,8 +7,6 @@
   width: var(--readme-width);
   max-width: var(--readme-width);
   overflow-y: auto;
-  border-right: 1px solid var(--border-color);
-  background-color: var(--color-white);
 }
 
 .readme-content {
@@ -61,6 +59,48 @@
 .readme-content td {
   border: 1px solid var(--border-color);
   padding: 4px 10px;
+}
+
+/* A language-tagged code block and its "copy to code editor" link, framed
+ * together. The frame sits on the wrapper so it encloses both; the link keeps
+ * the sidebar's own colour, which sets it apart from the tinted code above
+ * it. */
+
+.readme-content .code-snippet {
+  margin: 1em 0;
+  border: 1px solid #ddd;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+.readme-content .code-snippet pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.readme-content .copy-to-editor {
+  display: block;
+  padding: 5px 10px;
+  text-align: right;
+  font-size: 13px;
+  color: #7194aa;
+  background-color: var(--surface-bg);
+  border-top: 1px solid #ddd;
+  text-decoration: none;
+}
+
+.readme-content .copy-to-editor:hover {
+  color: #2c6a92;
+  text-decoration: underline;
+}
+
+.readme-content .copy-to-editor.copied {
+  color: #4a9c50;
+}
+
+.readme-content .copy-to-editor.blocked {
+  color: #b5651d;
 }
 
 /* Spoilers ({% spoiler %}) */
@@ -137,7 +177,7 @@
   left: 50%;
   transform: translate(-50%, -50%);
   padding: 0 16px;
-  background-color: var(--color-white);
+  background-color: var(--surface-bg);
   color: #999;
   font-size: 18px;
   line-height: 1;
@@ -201,8 +241,6 @@
 /* ========================================================================== */
 
 .dark-mode .readme-container {
-  background-color: var(--surface-bg);
-  border-right-color: var(--line-color);
   color: var(--fg);
 }
 
@@ -218,6 +256,27 @@
 .dark-mode .readme-content code {
   background-color: var(--panel-bg);
   border-color: var(--line-color);
+}
+
+.dark-mode .readme-content .code-snippet {
+  border-color: var(--line-color);
+}
+
+.dark-mode .readme-content .copy-to-editor {
+  color: #7d9db1;
+  border-top-color: var(--line-color);
+}
+
+.dark-mode .readme-content .copy-to-editor:hover {
+  color: #9fc7e2;
+}
+
+.dark-mode .readme-content .copy-to-editor.copied {
+  color: #79bd7e;
+}
+
+.dark-mode .readme-content .copy-to-editor.blocked {
+  color: #d69b5c;
 }
 
 .dark-mode .readme-content blockquote {
@@ -236,7 +295,6 @@
 }
 
 .dark-mode .readme-page + .readme-page:before {
-  background-color: var(--surface-bg);
   color: var(--fg-muted);
 }
 
