@@ -9,6 +9,7 @@
  * all three, spelled either way:
  *
  *   lab:                        lab50:
+ *     readme: index.md            readme: index.md
  *     windows: [editor, ...]      window: [editor, ...]
  *     files:                      files:
  *       - main.py                   - !include main.py
@@ -48,6 +49,9 @@ const CONFIG_FILENAMES = ['lab.yml', '.cs50.yml', '.cs50.yaml'];
 
 /** Human-readable form of CONFIG_FILENAMES, for error messages. */
 const CONFIG_FILENAMES_TEXT = CONFIG_FILENAMES.join(' or ');
+
+/** The instructions file a lab uses when it does not name one itself. */
+export const DEFAULT_README = 'README.md';
 
 /**
  * YAML schema that understands the custom !include/!exclude tags used in the
@@ -255,8 +259,9 @@ async function fetchYamlText(org, repo, branch, subdir) {
  * @async
  * @param {string} labUrl - The URL identifying the lab.
  * @returns {Promise<object>} The normalized lab config: `{ labUrl, baseUrl,
- * linkBaseUrl, name, files, window, buttons, cmd }`. `baseUrl` is where the
- * lab files live, `linkBaseUrl` is where relative README links should point.
+ * linkBaseUrl, name, files, readme, window, buttons, cmd }`. `baseUrl` is
+ * where the lab files live, `linkBaseUrl` is where relative README links
+ * should point.
  */
 export async function fetchConfig(labUrl) {
   const parsed = parseGitHubUrl(labUrl);
@@ -270,7 +275,7 @@ export async function fetchConfig(labUrl) {
     throw new Error(`The ${CONFIG_FILENAMES_TEXT} file is not a lab configuration`);
   }
 
-  // The minimal form `lab: true` has no files/window/buttons/cmd keys.
+  // The minimal form `lab: true` has no files/readme/window/buttons/cmd keys.
   const settings = isObject(root) ? root : {};
 
   // A file is either a plain filename or an `!include`/`!exclude` tagged entry
@@ -290,6 +295,7 @@ export async function fetchConfig(labUrl) {
     name: lab.name,
     slug: lab.slug,
     files,
+    readme: settings.readme || DEFAULT_README,
     window: Array.isArray(window) ? window : ['editor', 'readme', 'terminal'],
     buttons: isObject(settings.buttons) ? settings.buttons : {},
     cmd: settings.cmd || null,

@@ -1,5 +1,6 @@
 /**
- * Fetches a lab's README.md and renders it as HTML into the readme sidebar.
+ * Fetches a lab's instructions file and renders it as HTML into the readme
+ * sidebar. Which file that is comes from the lab config's `readme` key.
  *
  * Besides regular markdown, the CS50 lab directives are supported:
  *
@@ -15,8 +16,8 @@
  * `Cross-Origin-Embedder-Policy: require-corp` (required by the WASM
  * language workers) and YouTube's embed pages do not satisfy that policy.
  *
- * The rendered HTML is sanitized with DOMPurify since the README comes from
- * an arbitrary user-supplied GitHub URL.
+ * The rendered HTML is sanitized with DOMPurify since the instructions come
+ * from an arbitrary user-supplied GitHub URL.
  */
 
 import { marked } from '../vendor/marked-12.0.2.min.js';
@@ -25,6 +26,7 @@ import {
   setLocalStorageItem,
   getLocalStorageItem,
 } from '../lib/local-storage-manager.js';
+import { DEFAULT_README } from './app.lab.config.js';
 
 const SPOILER_REGEX = /\{%\s*spoiler(?:\s+"([^"]*)")?\s*%\}([\s\S]*?)\{%\s*endspoiler\s*%\}/g;
 const NEXT_REGEX = /\{%\s*next(?:\s+"([^"]*)")?\s*%\}/;
@@ -37,25 +39,28 @@ const FRONT_MATTER_REGEX = /^---\n[\s\S]*?\n---\n/;
 const KRAMDOWN_ATTR_REGEX = /\{:[^}\n]*\}/g;
 
 /**
- * Fetch the lab's README.md and render it into the given container. The
- * README text is cached in (lab-specific) local storage so it remains
- * available when GitHub is unreachable.
+ * Fetch the lab's instructions file and render it into the given container.
+ * The text is cached in (lab-specific) local storage so it remains available
+ * when GitHub is unreachable.
  *
  * @async
  * @param {object} config - The lab config object.
- * @param {jQuery} $container - The element to render the README into.
+ * @param {jQuery} $container - The element to render the instructions into.
  */
 export async function loadReadme(config, $container) {
+  // A config restored from local storage need not carry a readme filename.
+  const filename = config.readme || DEFAULT_README;
+
   let text = null;
 
   try {
-    const response = await fetch(config.baseUrl + 'README.md');
+    const response = await fetch(config.baseUrl + filename);
     if (response.ok) {
       text = await response.text();
       setLocalStorageItem('readme', text);
     }
   } catch (err) {
-    console.warn('Failed to fetch README.md:', err);
+    console.warn(`Failed to fetch ${filename}:`, err);
   }
 
   if (text === null) {
@@ -63,7 +68,7 @@ export async function loadReadme(config, $container) {
   }
 
   if (text === null) {
-    $container.html('<p class="error">Could not load the lab instructions (README.md).</p>');
+    $container.html(`<p class="error">Could not load the lab instructions (${filename}).</p>`);
     return;
   }
 
