@@ -18,11 +18,6 @@ export default class CourseController extends BaseController {
 
   // ── Layout API ──
 
-  /** @returns {object<string, string>} The hidden (never-shown) files. */
-  get hiddenFiles() {
-    return this.layout.hiddenFiles;
-  }
-
   setPageTitle(config, pageName) {
     this.layout.setPageTitle(config, pageName);
   }

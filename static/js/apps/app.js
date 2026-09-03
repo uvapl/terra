@@ -470,18 +470,13 @@ export default class App extends BaseApp {
       /**
        * The worker is requesting the content of a single project file.
        *
-       * Exam hidden files live only in memory and are never in the VFS, so they
-       * are checked first. Throws FileNotFoundError / FileTooLargeError, which
-       * the client turns into a status for the worker.
+       * Throws FileNotFoundError / FileTooLargeError, which the client turns
+       * into a status for the worker.
        *
        * @param {string} path - The (VFS-absolute) file to read.
        * @returns {Promise<string|ArrayBuffer>} The file content.
        */
-      onReadFile: (path) => {
-        const hidden = this._hiddenFileMap?.get(path);
-        if (hidden !== undefined) return Promise.resolve(hidden);
-        return this.vfs.readFile(path, MAX_FILE_SIZE);
-      },
+      onReadFile: (path) => this.vfs.readFile(path, MAX_FILE_SIZE),
 
       /**
        * A custom config button's command has finished executing.
@@ -828,40 +823,22 @@ export default class App extends BaseApp {
   }
 
   /**
-   * Get the hidden files that should be passed to the worker, but are not
-   * displayed as visual tabs inside the UI for the user.
-   *
-   * @returns {array} List of (hidden) files.
-   */
-  getHiddenFiles() {
-    return [];
-  }
-
-  /**
    * Build the file payload for a run.
    *
    * Languages whose worker reads files on demand get a list without content,
    * so a large project costs nothing to start; the worker pulls what it opens
    * back through `onReadFile`. Everything else still gets full content up front.
    *
-   * Either way the hidden files are included, and their content is kept in
-   * `_hiddenFileMap` because they exist only in memory, never in the VFS.
+   * Course-supplied files that the student never sees are ordinary (read-only)
+   * VFS files, so they need nothing special here.
    *
    * @param {string} proglang - The language about to run.
    * @returns {Promise<object[]>} Objects with `path`, and `content` when eager.
    */
   async getRunFiles(proglang) {
-    const hidden = this.getHiddenFiles();
-    this._hiddenFileMap = new Map(hidden.map((f) => [f.path, f.content]));
-
-    if (!this.langWorkerClient.usesLazyFiles(proglang)) {
-      return (await this.vfs.getAllFiles()).concat(hidden);
-    }
-
-    const files = await this.vfs.getFileList();
-    return files.concat(
-      hidden.map(({ path, content }) => ({ path, size: content.length }))
-    );
+    return this.langWorkerClient.usesLazyFiles(proglang)
+      ? this.vfs.getFileList()
+      : this.vfs.getAllFiles();
   }
 
   /**

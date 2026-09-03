@@ -22,6 +22,13 @@ export default class VirtualFileSystem extends EventTarget {
      * file is fully ignored. @type object[] */
     this._ignoreRules = [...IGNORED_PATHS];
 
+    /**
+     * Paths that may be read and run but never written. Course-supplied files
+     * live here: they are real files so everything that reads the file system
+     * finds them, but nothing may overwrite what the course handed out.
+     * @type Set<string> */
+    this._readOnlyPaths = new Set();
+
     // Connect us to the worker
     this.worker.addEventListener('message', (e) => this._handleMessage(e.data));
 
@@ -110,26 +117,74 @@ export default class VirtualFileSystem extends EventTarget {
     this._send('setIgnoreRules', [this._ignoreRules]);
   };
 
+  /**
+   * Mark paths as read-only, replacing any previous set. Every write goes
+   * through this class — the language worker's own output arrives here as a
+   * `writeProducedFile` call — so guarding here covers the whole system.
+   *
+   * @param {string[]} paths - The paths to protect.
+   */
+  setReadOnlyPaths = (paths) => {
+    this._readOnlyPaths = new Set(paths);
+  };
+
+  /**
+   * Throw when a path is read-only. Deliberately loud rather than a silent
+   * skip: nothing in the app legitimately writes to one, so hitting this is a
+   * bug (or a course file and a produced file sharing a name), and swallowing
+   * it would leave whoever wrote the file believing it landed.
+   *
+   * @param {string} path - The path about to be written.
+   */
+  _assertWritable = (path) => {
+    if (this._readOnlyPaths.has(path)) {
+      throw new Error(`Cannot write to '${path}': it is read-only.`);
+    }
+  };
+
+  /**
+   * Throw when a folder holds a read-only path, so a folder operation cannot
+   * take one out from under the guard above.
+   *
+   * @param {string} path - The folder about to be moved or deleted.
+   */
+  _assertFolderWritable = (path) => {
+    const prefix = path.endsWith('/') ? path : `${path}/`;
+    for (const readOnly of this._readOnlyPaths) {
+      if (readOnly.startsWith(prefix)) {
+        throw new Error(`Cannot modify folder '${path}': it holds the read-only file '${readOnly}'.`);
+      }
+    }
+  };
+
   clear = () => this._send('clear');
 
   readFile = (path, maxSize = null) => this._send('readFile', [path, maxSize]);
 
   getFileURL = (path) => this._send('getFileURL', [path]);
 
-  updateFile = (path, content, isUserInvoked = true) =>
-    this._send('updateFile', [path, content, isUserInvoked]);
+  updateFile = (path, content, isUserInvoked = true) => {
+    this._assertWritable(path);
+    return this._send('updateFile', [path, content, isUserInvoked]);
+  };
 
-  createFile = (path, content = '', isUserInvoked = true) =>
-    _withCollisionAlert(this._send('createFile', [path, content, isUserInvoked]), path);
+  createFile = (path, content = '', isUserInvoked = true) => {
+    this._assertWritable(path);
+    return _withCollisionAlert(this._send('createFile', [path, content, isUserInvoked]), path);
+  };
 
-  deleteFile = (path, isUserInvoked = true) =>
-    this._send('deleteFile', [path, isUserInvoked]);
+  deleteFile = (path, isUserInvoked = true) => {
+    this._assertWritable(path);
+    return this._send('deleteFile', [path, isUserInvoked]);
+  };
 
   isTempBinary = (path) =>
     this._send('isTempBinary', [path]);
 
-  writeProducedFile = (path, content, temporary = false) =>
-    this._send('writeProducedFile', [path, content, temporary]);
+  writeProducedFile = (path, content, temporary = false) => {
+    this._assertWritable(path);
+    return this._send('writeProducedFile', [path, content, temporary]);
+  };
 
   listFoldersInFolder = (path = '') =>
     this._send('listFoldersInFolder', [path]);
@@ -159,9 +214,16 @@ export default class VirtualFileSystem extends EventTarget {
   createFolder = (path, isUserInvoked = true) =>
     _withCollisionAlert(this._send('createFolder', [path, isUserInvoked]), path);
 
-  deleteFolder = (path) => this._send('deleteFolder', [path]);
+  deleteFolder = (path) => {
+    this._assertFolderWritable(path);
+    return this._send('deleteFolder', [path]);
+  };
 
-  moveFile = (src, dst) => _withCollisionAlert(this._send('moveFile', [src, dst]), dst);
+  moveFile = (src, dst) => {
+    this._assertWritable(src);
+    this._assertWritable(dst);
+    return _withCollisionAlert(this._send('moveFile', [src, dst]), dst);
+  };
 
   /**
    * Move a folder and everything in it. Normally ignored files are
@@ -171,7 +233,10 @@ export default class VirtualFileSystem extends EventTarget {
    * @param {string} dst - Where it should end up.
    * @returns {Promise<void>}
    */
-  moveFolder = (src, dst) => _withCollisionAlert(this._send('moveFolder', [src, dst]), dst);
+  moveFolder = (src, dst) => {
+    this._assertFolderWritable(src);
+    return _withCollisionAlert(this._send('moveFolder', [src, dst]), dst);
+  };
 
   /**
    * Import dropped filesystem entries (files/folders, e.g. from

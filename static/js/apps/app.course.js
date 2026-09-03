@@ -188,6 +188,22 @@ export default class CourseApp extends App {
       })
     );
 
+    // Files the course supplies but the student never edits: helper modules,
+    // Karel worlds, fixtures. They are ordinary VFS files, so everything that
+    // reads the file system finds them — the run payload, a Karel world
+    // preview, the world-name autocomplete. They get no tab because the tab
+    // list below is built from the visible files alone, and they are marked
+    // read-only so nothing can overwrite what the course handed out. Written
+    // unconditionally: the course's copy always wins over whatever is in this
+    // browser.
+    const hidden = isObject(config.hidden_tabs) ? config.hidden_tabs : {};
+    await Promise.all(
+      Object.entries(hidden).map(([filename, content]) =>
+        this.vfs.updateFile(filename, content, false)
+      )
+    );
+    this.vfs.setReadOnlyPaths(Object.keys(hidden));
+
     // The lab's own order first, so the language is taken from the file the
     // lab leads with, then anything else the course-site sent.
     const filenames = files.concat(
@@ -207,7 +223,6 @@ export default class CourseApp extends App {
       delegate: this,
       commandRegistry: this.commands,
       files: filenames,
-      hiddenFiles: config.hidden_tabs,
       autocomplete: config.autocomplete,
 
       // Instructions already take the horizontal room, so a session showing
@@ -662,23 +677,5 @@ export default class CourseApp extends App {
       this.editorContentChanged = true;
       this.runAutoSave(this.config.postback, this.config.code);
     }, 300);
-  }
-
-  /**
-   * Get the hidden files defined in the config's `hidden_tabs` property.
-   *
-   * @returns {array<object<string,string>>} List of (hidden) file objects.
-   */
-  getHiddenFiles() {
-    const hiddenFileKeys = Object.keys(this.view.hiddenFiles);
-    if (hiddenFileKeys.length > 0) {
-      return hiddenFileKeys.map((filename) => ({
-        path: filename,
-        name: filename,
-        content: this.view.hiddenFiles[filename],
-      }));
-    }
-
-    return [];
   }
 }

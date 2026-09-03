@@ -156,13 +156,6 @@ export default class Layout extends GoldenLayout {
   outputStack = null;
 
   /**
-   * Reference to all hidden files which will *never* be shown in the UI, but
-   * will be sent to the workers and written to worker's filesystem.
-   * @type {object<string, string>}
-   */
-  hiddenFiles = {};
-
-  /**
    * Reference to the current active tab instance in the layout.
    * @type {BaseTab}
    */
@@ -230,10 +223,6 @@ export default class Layout extends GoldenLayout {
     this._orientation = orientation;
     this.theme = options.theme || 'light';
     this.fontSize = options.fontSize || BASE_FONT_SIZE;
-
-    if (isObject(options.hiddenFiles)) {
-      this.hiddenFiles = options.hiddenFiles;
-    }
 
     // 'layoutReady' is ours, not GoldenLayout's: v2 emits 'initialised' from
     // init(), which runs *before* loadLayout() has built the tree, so it is too
