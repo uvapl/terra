@@ -1,39 +1,44 @@
-import { formatDate, isObject } from '../../lib/helpers.js';
+import { formatDate } from '../../lib/helpers.js';
 import { createModal } from '../components/modal.js';
 import Layout from './layout.js';
 import { createTabConfig } from './tab-config.js';
 
-export default class ExamLayout extends Layout {
+/**
+ * Layout for a session on a piece of coursework, on both the exam and the lab
+ * page. The submit and lock visuals below only come into play on a session
+ * connected to a course-site.
+ */
+export default class CourseLayout extends Layout {
   tabsClosable = false;
 
   /**
-   * Create the layout.
+   * Create the layout. When the session has a README, it is rendered in a
+   * fixed sidebar next to the layout container and is not part of the
+   * GoldenLayout structure.
    *
-   * @param {array} content - List of content objects.
-   * @param {number} fontSize - The default font-size to be used.
-   * @param {object} options - Additional options object.
+   * @param {object} options - Controller-supplied options.
+   * @param {array<string>} options.files - Filenames to open as tabs.
+   * @param {number} options.fontSize - The default font-size to be used.
    */
   constructor(options = {}) {
-    const { tabs, fontSize } = options;
+    const { files, fontSize } = options;
 
-    // Create the config for each tab.
-    const content = Object.keys(tabs).map((filename) => createTabConfig({
+    // The file contents are not embedded: every source the session has is
+    // written to the VFS before the layout is built, and each editor loads
+    // its file from there when it is shown.
+    const content = files.map((filename) => createTabConfig({
       title: filename,
       isClosable: false,
-      componentState: {
-        value: tabs[filename],
-        path: filename,
-      },
+      componentState: { path: filename },
     }, { fontSize }));
 
+    // A lab without files (e.g. the minimal `lab: true` form) still needs
+    // at least one tab in the editor stack.
+    if (content.length === 0) {
+      content.push(createTabConfig({ isClosable: false }, { fontSize }));
+    }
+
     const defaultLayoutConfig = {
-      settings: {
-        reorderEnabled: false,
-      },
-      header: {
-        popout: false,
-        maximise: false,
-      },
       root: {
         content: [
           { content },
@@ -63,18 +68,27 @@ export default class ExamLayout extends Layout {
   }
 
   /**
-   * Render the course and exam name in the page title.
+   * Render the name of the coursework in the page title, prefixed by the
+   * course name when the course-site supplied one.
    *
-   * @param {string} courseName - The name of the course.
-   * @param {string} examName - The name of the exam.
+   * @param {object} config - The resolved config.
+   * @param {string} [pageName] - The page's own name, used as the suffix of
+   * the browser tab title.
    */
-  setPageTitle(courseName, examName) {
-    if (!courseName || !examName) return;
+  setPageTitle(config, pageName) {
+    const name = config.exam_name || config.name;
+    if (!name) return;
 
-    $('.page-title').html(`
-      <span class="course-name">${courseName}</span>
-      <span class="exam-name">${examName}</span>
-    `);
+    if (config.course_name) {
+      $('.page-title').html(`
+        <span class="course-name">${config.course_name}</span>
+        <span class="coursework-name">${name}</span>
+      `);
+    } else {
+      $('.page-title').text(name);
+    }
+
+    document.title = pageName ? `${name} - ${pageName}` : name;
   }
 
   /**
@@ -90,7 +104,7 @@ export default class ExamLayout extends Layout {
   }
 
   /**
-   * Show all lock visuals, which gets triggered once the exam is over.
+   * Show all lock visuals, which gets triggered once submission is closed.
    *
    * @param {object} options - Additional options object.
    * @param {Date} [options.prevAutoSaveTime] - Time of the last successful save.
@@ -131,8 +145,10 @@ export default class ExamLayout extends Layout {
    *
    * @param {object} options - Additional options object.
    * @param {Date} [options.prevAutoSaveTime] - Time of the last successful save.
+   * @param {boolean} [options.isLab] - Whether this session is a lab, which
+   * has no invigilated desk to sign off at.
    */
-  showSubmitExamModal({ prevAutoSaveTime } = {}) {
+  showSubmitModal({ prevAutoSaveTime, isLab } = {}) {
     let lastSaveText = '';
     if (prevAutoSaveTime instanceof Date) {
       lastSaveText += `<br/>🛅 Previous successful submit was at <span class="last-save">${formatDate(prevAutoSaveTime)}</span>.<br/>`;
@@ -141,7 +157,7 @@ export default class ExamLayout extends Layout {
     const dialog = createModal({
       title: "You're done!",
       body: '<div class="spinner"></div>',
-      confirmLabel: 'Return to exam',
+      confirmLabel: isLab ? 'Return to lab' : 'Return to exam',
       attrs: { id: 'submit-exam-model' },
       onConfirm: () => this.cancelSubmitPendingMessage(),
     });
@@ -159,22 +175,27 @@ export default class ExamLayout extends Layout {
           🛄 Trying to submit your final changes to the server.<br/>
           ${lastSaveText}
         </p>
-        <p>You can still return to the exam if you would like to make more changes to your code.</p>
+        <p>You can still return to your code if you would like to make more changes.</p>
       `;
     }, 1300);
   }
 
   /**
-   * Render the success message in the submit exam modal, if it is open.
+   * Render the success message in the submit modal, if it is open.
    *
    * @param {object} options - Additional options object.
    * @param {string} [options.evalLink] - URL of the course evaluation form.
+   * @param {boolean} [options.isLab] - Whether this session is a lab.
    */
-  setSubmitModalSuccess({ evalLink } = {}) {
+  setSubmitModalSuccess({ evalLink, isLab } = {}) {
     const dialog = document.getElementById('submit-exam-model');
     if (!dialog) return;
 
     this.cancelSubmitPendingMessage();
+
+    const signOff = isLab
+      ? ''
+      : '<br/><br/>🛂 Make sure that you sign off at the desk before leaving';
 
     const evaluationFormLink = evalLink
       ? `<br/><br/>🙏 <a href="${evalLink}" target="_blank">Fill in the evaluation form for the course</a>`
@@ -182,16 +203,15 @@ export default class ExamLayout extends Layout {
 
     dialog.querySelector('.modal-body').innerHTML = `
       <p>
-        ✅ Your files have been submitted successfully<br/><br/>
-        🛂 Make sure that you sign off at the desk before leaving
+        ✅ Your files have been submitted successfully${signOff}
         ${evaluationFormLink}
       </p>
-      <p>You can still return to the exam if you would like to make more changes to your code.</p>
+      <p>You can still return to your code if you would like to make more changes.</p>
     `;
   }
 
   /**
-   * Cancel the pending "trying to submit" message in the submit exam modal.
+   * Cancel the pending "trying to submit" message in the submit modal.
    */
   cancelSubmitPendingMessage() {
     clearTimeout(this.submitPendingMsgTimeoutId);

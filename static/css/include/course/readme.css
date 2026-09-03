@@ -1,12 +1,38 @@
 /* ==========================================================================
- *  Lab README sidebar styling.
+ *  README sidebar styling.
+ *
+ *  Only a session with a lab behind it has instructions to show. The app marks
+ *  that with `has-readme` on the body, before the layout measures itself, so
+ *  the layout container is already the right width on the first paint.
  * ========================================================================== */
 
+:root {
+  --readme-width: 40%;
+  --readme-min-width: 320px;
+}
+
 .readme-container {
+  display: none;
+}
+
+.has-readme .readme-container {
+  display: block;
   min-width: var(--readme-min-width);
   width: var(--readme-width);
   max-width: var(--readme-width);
   overflow-y: auto;
+}
+
+/* Leave room beside the layout for the sidebar. */
+.has-readme .layout-container {
+  width: calc(100% - var(--readme-width)) !important;
+}
+
+/* With no sidebar beside it, the work area lines up with where that sidebar
+   would have started, rather than butting against the window. */
+body:not(.has-readme) .layout-container {
+  margin-left: var(--chrome-gap);
+  width: calc(100% - var(--chrome-gap));
 }
 
 .readme-content {

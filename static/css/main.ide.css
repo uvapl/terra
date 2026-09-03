@@ -51,15 +51,6 @@
   opacity: 1;
 }
 
-.lm_goldenlayout,
-.lm_goldenlayout > div {
-  max-width: 100%;
-}
-
-.layout-outer-container {
-  overflow: hidden;
-}
-
 .lm_header .lm_controls > * {
   float: none;
 }

@@ -2,7 +2,7 @@
 
 | Directory         | Contents                                                                |
 | ----------------- | ----------------------------------------------------------------------- |
-| `apps/`           | Entry point for each variant (IDE, lab, embed, exam)                    |
+| `apps/`           | Entry point for each variant (IDE, embed, and the exam and lab pages)   |
 | `apps/concerns/`  | App-level mixins wired in by the IDE app (filetree, storage, git, LFS)  |
 | `commands/`       | Command registry and per-variant command configs for menus and toolbars |
 | `fs/`             | Filesystem implementations: virtual FS, git FS, LFS                     |
@@ -13,3 +13,9 @@
 | `ui/controllers/` | Per-variant view controllers that wire the layout to the app            |
 | `ui/layouts/`     | GoldenLayout configuration and tab management per variant               |
 | `vendor/`         | Third-party libraries                                                   |
+
+The exam and lab pages run the same app (`apps/app.course.js`), because they are
+the same thing with two independent halves: a connection to a course-site, and
+a lab to work on. The exam page always has the connection and may be handed a
+lab by its course-site; the lab page always has a lab and never connects. Each
+page says which it is in its `main.*.js`.

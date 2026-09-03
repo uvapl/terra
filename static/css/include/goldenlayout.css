@@ -11,6 +11,9 @@
 .lm_goldenlayout,
 .lm_goldenlayout > div {
   min-width: 100% !important;
+  /* Pins the width rather than letting min-width overflow a layout container
+     that a sidebar (file tree, README) has narrowed. */
+  max-width: 100%;
   height: 100% !important;
 }
 

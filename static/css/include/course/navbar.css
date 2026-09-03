@@ -1,11 +1,11 @@
+/* The navbar of the exam and lab pages; the IDE has its own in ../ide/navbar.css. */
 .navbar {
   position: relative;
   padding: var(--navbar-padding);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-image: linear-gradient(180deg, rgba(132, 250, 176, 0.99) 95%, rgba(143, 211, 244, 0.99) 100%);
-  color: #006b4b;
+  color: var(--fg);
 }
 
 .navbar-left {
@@ -48,13 +48,8 @@
   font-size: 28px;
 }
 
-.exam-name {
+.coursework-name {
   font-size: 20px;
-}
-
-/* hide 80-th column indicator */
-.ace_print-margin {
-  display: none !important;
 }
 
 /* ========================================================================== */
@@ -65,7 +60,7 @@
     font-size: 24px;
   }
 
-  .exam-name {
+  .coursework-name {
     font-size: 16px;
   }
 }

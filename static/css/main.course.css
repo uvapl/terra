@@ -1,16 +1,26 @@
+/* The exam and lab pages: one app, so one stylesheet. */
+
 @import 'include/base.css';
 @import 'include/form.css';
 @import 'include/toolbar.css';
 @import 'include/spinner.css';
 @import 'include/button.css';
 @import 'include/modal.css';
-@import 'include/navbar.css';
+@import 'include/course/navbar.css';
 @import 'include/settings-dropdown.css';
 @import 'include/goldenlayout.css';
 @import 'include/term.css';
 @import 'include/editor.css';
+@import 'include/canvas.css';
 @import 'include/ide/image-component.css';
+@import 'include/course/readme.css';
 
+/* The terminal is alone in its stack, so its tab strip says nothing. */
 .terminal-component-container .lm_tabs {
   display: none;
+}
+
+/* Hide the 80-th column indicator. The IDE deliberately keeps its own. */
+.ace_print-margin {
+  display: none !important;
 }

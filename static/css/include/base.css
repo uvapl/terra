@@ -75,6 +75,9 @@
   --editor-tab-font-size: 12px;
   --modal-padding: 20px;
   --border-radius: 4px;
+  /* The inset the chrome cards (file tree, README) sit at, which the work
+     area lines up with when there is no card beside it. */
+  --chrome-gap: 0.5rem;
 }
 
 /* Derived names. Declared on `body` so they resolve against the active
@@ -211,7 +214,7 @@ body {
 .file-tree-container,
 .readme-container {
   border-radius: 0.25rem;
-  margin: 0 0.5rem 0.5rem 0.5rem;
+  margin: 0 var(--chrome-gap) var(--chrome-gap) var(--chrome-gap);
   background-color: var(--surface-bg);
 }
 

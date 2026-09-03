@@ -1,8 +1,8 @@
 /**
- * Handles the mechanics of the lab configuration: reading the lab URL from the
- * query params, resolving it to a GitHub org/repo/branch/subdir, fetching and
- * parsing the lab's YAML config and persisting/restoring the config through
- * local storage.
+ * Where a lab comes from: reading the lab URL from the page URL, resolving it
+ * to a GitHub org/repo/branch/subdir or to a statically deployed directory, and
+ * fetching and parsing the lab's YAML config. Persisting the resolved config is
+ * app.course.config.js's job.
  *
  * The config lives in the lab directory as `lab.yml`, or as `.cs50.yml` /
  * `.cs50.yaml` for labs written against the cs50 tooling. One schema covers
@@ -34,12 +34,6 @@ import {
   parseQueryParams,
   slugify,
 } from '../lib/helpers.js';
-import {
-  isDefaultLocalStoragePrefix,
-  setLocalStorageItem,
-  getLocalStorageItem,
-  updateLocalStoragePrefix,
-} from '../lib/local-storage-manager.js';
 
 /**
  * The config filenames that are looked for in the lab directory, in the order
@@ -81,7 +75,7 @@ const LAB_YAML_SCHEMA = jsyaml.DEFAULT_SCHEMA.extend([
  * @param {object} config - The config object to validate.
  * @returns {boolean} True when the given object is a valid lab config object.
  */
-export function isValidConfig(config) {
+export function isValidLabConfig(config) {
   return isObject(config)
     && ['labUrl', 'baseUrl', 'slug'].every((key) => typeof config[key] === 'string')
     && Array.isArray(config.files);
@@ -263,7 +257,7 @@ async function fetchYamlText(org, repo, branch, subdir) {
  * where the lab files live, `linkBaseUrl` is where relative README links
  * should point.
  */
-export async function fetchConfig(labUrl) {
+export async function fetchLabConfig(labUrl) {
   const parsed = parseGitHubUrl(labUrl);
   const lab = parsed
     ? await resolveGitHubLab(labUrl, parsed)
@@ -371,59 +365,4 @@ async function resolveDirectLab(labUrl) {
     slug: slugify(`${hostname}/${path}`),
     yamlText,
   };
-}
-
-/**
- * Get the slug that identifies a lab, used for the lab-specific local
- * storage prefix and VFS folder. The slug is derived from the lab's resolved
- * location rather than the URL as typed, so equivalent URL forms share their
- * storage. Prefixed with `lab-` so lab storage can never collide with exam
- * storage on the same origin.
- *
- * @param {object} config - The lab config object.
- * @returns {string} The lab slug.
- */
-export function labSlug(config) {
-  return `lab-${config.slug}`;
-}
-
-/**
- * Point local storage at the lab-specific prefix derived from the config
- * and remember that prefix for subsequent visits.
- *
- * @param {object} config - The lab config object.
- */
-export function selectConfigStorage(config) {
-  const storageKey = labSlug(config);
-  setLocalStorageItem('last-used-lab', storageKey);
-  updateLocalStoragePrefix(storageKey);
-}
-
-/**
- * Persist the given config in local storage.
- *
- * @param {object} config - The config object to store.
- */
-export function saveConfig(config) {
-  setLocalStorageItem('config', JSON.stringify(config));
-}
-
-/**
- * Load the most recently used lab config from local storage, restoring the
- * lab-specific local storage prefix if needed.
- *
- * @returns {object|null} The stored config object, or null when absent.
- */
-export function loadStoredConfig() {
-  // This should only update the local storage prefix if it's
-  // not the default prefix.
-  if (isDefaultLocalStoragePrefix()) {
-    const storageKey = getLocalStorageItem('last-used-lab');
-
-    if (storageKey) {
-      updateLocalStoragePrefix(storageKey);
-    }
-  }
-
-  return JSON.parse(getLocalStorageItem('config'));
 }

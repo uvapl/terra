@@ -26,7 +26,7 @@ import {
   setLocalStorageItem,
   getLocalStorageItem,
 } from '../lib/local-storage-manager.js';
-import { DEFAULT_README } from './app.lab.config.js';
+import { DEFAULT_README } from './lab-source.js';
 import { seconds } from '../lib/helpers.js';
 import Terra from '../terra.js';
 

@@ -14,8 +14,8 @@ const LAYOUT_CONFIG_VERSION = 5;
 
 /**
  * BaseController is the app's single interface to the UI layer. Each app variant
- * has its own subclass (IDEController, ExamController, LabController,
- * EmbedController); this base holds the behaviour they share.
+ * has its own subclass (IDEController, CourseController, EmbedController); this
+ * base holds the behaviour they share.
  *
  * The controller owns the layout's lifecycle and persistence: the app
  * constructs a variant controller with itself as the single `delegate`, the
