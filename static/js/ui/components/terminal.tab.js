@@ -21,6 +21,13 @@ export default class TerminalTab extends BaseTab {
   terminalInstance = null;
 
   /**
+   * Whether the tab has been visible at least once, so the one-off resize
+   * trigger in onShow does not repeat on every tab switch.
+   * @type {boolean}
+   */
+  didShow = false;
+
+  /**
    * Identifies who currently owns keyboard input on the terminal. One of
    * `null` (nobody — keystrokes are dropped, the default e.g. in the exam),
    * `'shell'` (the shell plugin's input loop) or `'program'` (a running
@@ -68,6 +75,7 @@ export default class TerminalTab extends BaseTab {
 
   init = () => {
     this.bindContainerEvents();
+    this.createTerminal();
   }
 
   /**
@@ -87,6 +95,11 @@ export default class TerminalTab extends BaseTab {
    */
   write = (msg) => {
     this.lastWriteNotTerminated = !(typeof msg === 'string' && msg.endsWith("\n"));
+
+    if (!this.terminalInstance) {
+      console.warn('Dropped terminal write: no terminal instance');
+      return;
+    }
 
     try {
       this.terminalInstance.write(msg);
@@ -164,18 +177,9 @@ export default class TerminalTab extends BaseTab {
   }
 
   /**
-   * Callback when the editor is opened for the first time or it is already open
-   * and becomes active (i.e. the user clicks on the tab in the UI).
+   * Create and configure the xterm instance.
    */
-  onShow = () => {
-    // Add custom class for styling purposes.
-    this.getParentComponentElement().classList.add('component-container', 'terminal-component-container');
-
-    if (this.terminalInstance) {
-      this.fitAddon.fit();
-      return;
-    }
-
+  createTerminal = () => {
     const fontFamily = "12px/normal 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Source Code Pro', 'source-code-pro', monospace";
     const fontSize = this.container.getState().fontSize || BASE_FONT_SIZE;
 
@@ -193,24 +197,40 @@ export default class TerminalTab extends BaseTab {
     this.terminalInstance.open(this.container.element);
     // show cursor immediately
     this.terminalInstance.write('\x1b[?25h');
-    this.fitAddon.fit();
 
-    // A single, persistent input pipeline: every keystroke and paste is routed
-    // to whoever currently owns input (see acquireInput/releaseInput). When
-    // there is no owner the events are dropped, which is the default behaviour
-    // for environments without a shell (e.g. the exam).
+    this.bindTerminalInput();
+    this.setFontSize(fontSize);
+  }
+
+  /**
+   * Catch whatever is typed into the terminal and route it to the
+   * currently running program or a shell.
+   */
+  bindTerminalInput = () => {
     this.terminalInstance.onKey((e) => {
       if (this.inputHandler) this.inputHandler(e);
     });
     this.terminalInstance.textarea.addEventListener('paste', this._handlePaste);
+  }
 
-    // Trigger a single resize after the terminal has rendered to make sure it
-    // fits the whole parent width and doesn't leave any gaps near the edges.
-    setTimeout(() => {
-      $(window).trigger('resize');
-    }, 0);
+  /**
+   * Editor is opened for the first time, or focused.
+   */
+  onShow = () => {
+    // add custom class for styling purposes
+    this.getParentComponentElement().classList.add('component-container', 'terminal-component-container');
 
-    this.setFontSize(fontSize);
+    if (!this.didShow) {
+      this.didShow = true;
+
+      // trigger a resize after the terminal has
+      // rendered to make sure it spans the parent
+      setTimeout(() => {
+        $(window).trigger('resize');
+      }, 0);
+    }
+
+    this.fitAddon.fit();
   }
 
   /**
