@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Terra browser check</title>
+
+  <!--
+    A standalone diagnostic page. It is deliberately self-contained: no imports,
+    no modules, no stylesheet of its own, nothing from static/js. The failures it
+    exists to diagnose are exactly the ones that stop the editor from loading its
+    own code, so this page must not depend on any of it.
+
+    Nothing in the app links here. Hand the address to a student whose editor
+    will not start, and ask them to send back the copied result.
+  -->
+
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      background: #fff;
+      color: #111;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+    main { max-width: 46em; margin: 0 auto; padding: 2.5em 1.5em 4em; }
+    h1 { font-size: 1.5em; margin: 0 0 .3em; }
+    h2 { font-size: 1.05em; margin: 2em 0 .6em; }
+    p.intro { color: #444; margin: 0 0 1.5em; }
+    .summary {
+      padding: .9em 1.1em;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      background: #f6f6f6;
+      font-weight: 600;
+      margin-bottom: 1.5em;
+    }
+    .summary.pass { background: #eaf7ee; border-color: #b6e0c2; }
+    .summary.fail { background: #fdecea; border-color: #f3bdb7; }
+    ul.checks { list-style: none; margin: 0; padding: 0; }
+    ul.checks li {
+      display: grid;
+      grid-template-columns: 5.5em 1fr;
+      gap: .2em .8em;
+      padding: .7em 0;
+      border-top: 1px solid #eee;
+    }
+    .badge {
+      font-size: .75em;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      padding: .15em 0;
+      color: #777;
+    }
+    .badge.pass { color: #1a7f37; }
+    .badge.fail { color: #b42318; }
+    .badge.warn { color: #96690a; }
+    .name { font-weight: 600; }
+    .detail, .hint { grid-column: 2; font-size: .9em; color: #555; }
+    .detail { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+    .hint { color: #b42318; }
+    button {
+      font: inherit;
+      padding: .5em 1em;
+      border: 1px solid #bbb;
+      border-radius: 5px;
+      background: #f4f4f4;
+      cursor: pointer;
+    }
+    button:hover { background: #ebebeb; }
+    input[type=url] {
+      font: inherit;
+      padding: .45em .6em;
+      border: 1px solid #bbb;
+      border-radius: 5px;
+      width: min(100%, 28em);
+    }
+    .optional { margin-top: 2.5em; padding-top: 1.5em; border-top: 1px solid #eee; }
+    .optional p { color: #444; font-size: .95em; }
+    textarea {
+      width: 100%;
+      min-height: 12em;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .85em;
+      margin-top: .8em;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <h1>Terra browser check</h1>
+    <p class="intro">
+      This page tests whether this browser, on this network, can run the Terra
+      editor. It downloads the same files the editor needs and reports which
+      step fails. Nothing is submitted anywhere.
+    </p>
+
+    <div class="summary" id="summary">Running checks…</div>
+
+    <ul class="checks" id="checks"></ul>
+
+    <p style="margin-top: 2em;">
+      <button id="copy">Copy result</button>
+      <button id="rerun">Run again</button>
+    </p>
+
+    <div class="optional">
+      <h2>Optional: test the exam address</h2>
+      <p>
+        The editor also saves your work to the course website, which is a
+        different address. Paste the address of the exam page here to test
+        whether it can be reached.
+      </p>
+      <p>
+        <input type="url" id="origin-input" placeholder="https://example.com/exam.html?..." />
+        <button id="origin-test">Test</button>
+      </p>
+      <ul class="checks" id="origin-checks"></ul>
+    </div>
+
+    <textarea id="report" readonly hidden></textarea>
+  </main>
+
+  <script>
+  (function () {
+    'use strict';
+
+    // How long any single check may take before it counts as a failure. A
+    // filtering proxy often stalls a request rather than refusing it, and an
+    // unbounded wait would look exactly like the problem being diagnosed.
+    var TIMEOUT_MS = 20000;
+
+    // The app's own base, derived from where this page is served. This page
+    // lives next to index.html/exam.html, so its own directory is the app root.
+    var BASE = location.href.replace(/[^/]*$/, '');
+
+    var KAREL_WORKER = 'static/plugins/karel/runner/karel.worker.js';
+
+    // The one check whose failure is not about this computer or its network.
+    var HEADERS_CHECK = 'Page headers';
+
+    // Every same-origin file the editor downloads after the page itself has
+    // loaded. `range` marks the ones that are tens of megabytes: those are
+    // asked for a single byte, never the whole file.
+    var ASSETS = [
+      { path: 'static/js/apps/app.js', label: 'Editor code' },
+      { path: 'static/js/fs/vfs.worker.js', label: 'File system' },
+      { path: KAREL_WORKER, label: 'Karel runtime' },
+      { path: 'static/plugins/karel/worlds/test.w', label: 'Karel world file' },
+      { path: 'static/js/platforms/py.worker.js', label: 'Python runtime' },
+      { path: 'static/wasm/py/pyodide-lock.json', label: 'Python packages' },
+      { path: 'static/wasm/c_cpp/sysroot.tar', label: 'C header files', range: true },
+      { path: 'static/wasm/c_cpp/clang', label: 'C compiler (31 MB)', range: true }
+    ];
+
+    var BLOCK_HINT = 'Something on the network stopped this download. The usual '
+      + 'causes are a web filter built into your router, antivirus software that '
+      + 'inspects web traffic, or a proxy.';
+
+    var results = [];
+    var $checks = document.getElementById('checks');
+    var $summary = document.getElementById('summary');
+
+    /**
+     * Render one result row and remember it for the copied report.
+     */
+    function report(list, name, status, detail, hint) {
+      results.push({ name: name, status: status, detail: detail || '', hint: hint || '' });
+
+      var li = document.createElement('li');
+      var badge = document.createElement('span');
+      badge.className = 'badge ' + status;
+      badge.textContent = status;
+      var label = document.createElement('span');
+      label.className = 'name';
+      label.textContent = name;
+      li.appendChild(badge);
+      li.appendChild(label);
+
+      if (detail) {
+        var d = document.createElement('span');
+        d.className = 'detail';
+        d.textContent = detail;
+        li.appendChild(d);
+      }
+      if (hint) {
+        var h = document.createElement('span');
+        h.className = 'hint';
+        h.textContent = hint;
+        li.appendChild(h);
+      }
+      list.appendChild(li);
+    }
+
+    /** Reject after TIMEOUT_MS so a stalled request cannot hang the page. */
+    function withTimeout(promise, what) {
+      return new Promise(function (resolve, reject) {
+        var timer = setTimeout(function () {
+          reject(new Error(what + ' took longer than ' + (TIMEOUT_MS / 1000) + ' seconds'));
+        }, TIMEOUT_MS);
+        promise.then(function (value) {
+          clearTimeout(timer);
+          resolve(value);
+        }, function (err) {
+          clearTimeout(timer);
+          reject(err);
+        });
+      });
+    }
+
+    // ─────────────────────────── The checks ───────────────────────────
+
+    /**
+     * The page must be served over HTTPS with the two cross-origin headers, or
+     * the browser refuses the shared memory the editor uses to deliver keyboard
+     * input to a running program.
+     */
+    function checkPageHeaders() {
+      var secure = window.isSecureContext;
+      var isolated = window.crossOriginIsolated === true;
+      var shared = false;
+      try {
+        new SharedArrayBuffer(1024);
+        shared = true;
+      } catch (err) { /* not available */ }
+
+      var detail = 'secure context: ' + secure
+        + ', crossOriginIsolated: ' + isolated
+        + ', SharedArrayBuffer: ' + shared;
+
+      if (secure && isolated && shared) {
+        report($checks, HEADERS_CHECK, 'pass', detail);
+      } else {
+        report($checks, HEADERS_CHECK, 'fail', detail,
+          'The server is not sending the two headers the editor needs. That is a '
+          + 'setup problem on the site itself: it fails the same way for everyone, '
+          + 'and there is nothing to change on your own computer. Report it to the '
+          + 'course. Much more rarely, software that inspects web traffic strips '
+          + 'the headers on the way through, so it is worth asking whether others '
+          + 'can use the site normally.');
+      }
+    }
+
+    /**
+     * The editor runs every program in a module worker. This checks the browser
+     * supports one at all, using a worker built in memory so no network is
+     * involved.
+     */
+    function checkModuleWorkerSupport() {
+      return new Promise(function (resolve) {
+        var url;
+        var worker;
+        function done(status, detail, hint) {
+          if (url) URL.revokeObjectURL(url);
+          if (worker) worker.terminate();
+          report($checks, 'Module workers', status, detail, hint);
+          resolve();
+        }
+
+        try {
+          var blob = new Blob(['self.postMessage("ok");'], { type: 'text/javascript' });
+          url = URL.createObjectURL(blob);
+          worker = new Worker(url, { type: 'module' });
+        } catch (err) {
+          done('fail', String(err && err.message || err),
+            'This browser cannot start a module worker. Update it, or use a '
+            + 'recent version of Chrome, Edge, Firefox or Safari.');
+          return;
+        }
+
+        var timer = setTimeout(function () {
+          done('fail', 'no response within 10 seconds',
+            'This browser did not start a module worker. Update it, or use a '
+            + 'recent version of Chrome, Edge, Firefox or Safari.');
+        }, 10000);
+
+        worker.onmessage = function () {
+          clearTimeout(timer);
+          done('pass', 'supported');
+        };
+        worker.onerror = function (event) {
+          clearTimeout(timer);
+          done('fail', String(event.message || 'worker error'),
+            'This browser cannot start a module worker. Update it, or use a '
+            + 'recent version of Chrome, Edge, Firefox or Safari.');
+        };
+      });
+    }
+
+    /**
+     * Download one file the editor needs and report the status and how long it
+     * took. A response that is suddenly HTML is the signature of a filter that
+     * replaced the file with a block page.
+     */
+    function checkAsset(asset) {
+      var started = Date.now();
+      var options = { cache: 'no-store' };
+      if (asset.range) options.headers = { Range: 'bytes=0-0' };
+
+      return withTimeout(fetch(BASE + asset.path, options), asset.label).then(function (res) {
+        var ms = Date.now() - started;
+        var type = res.headers.get('content-type') || 'unknown';
+        var detail = asset.path + ' → ' + res.status + ' ' + type + ' (' + ms + ' ms)';
+
+        if (!res.ok && res.status !== 206) {
+          report($checks, asset.label, 'fail', detail,
+            res.status === 404
+              ? 'The server does not have this file. Report this to the course.'
+              : BLOCK_HINT);
+          return;
+        }
+        if (/text\/html/.test(type)) {
+          report($checks, asset.label, 'fail', detail,
+            'The server returned a web page where program code was expected. '
+            + 'That is what a filter looks like when it replaces a download '
+            + 'with a block page. ' + BLOCK_HINT);
+          return;
+        }
+        if (ms > 8000) {
+          report($checks, asset.label, 'warn', detail,
+            'This download worked but was very slow, which can make the editor '
+            + 'time out. A scanning proxy or a slow connection is the usual cause.');
+          return;
+        }
+        report($checks, asset.label, 'pass', detail);
+      }, function (err) {
+        report($checks, asset.label, 'fail',
+          asset.path + ' → ' + String(err && err.message || err), BLOCK_HINT);
+      });
+    }
+
+    /**
+     * The end-to-end test: start the real Karel worker the editor starts, and
+     * wait for the same "ready" message the editor waits for. The handshake is
+     * repeated here rather than imported, so this page stays standalone.
+     */
+    function checkKarelWorker() {
+      return new Promise(function (resolve) {
+        var worker;
+        var settled = false;
+        var started = Date.now();
+
+        function done(status, detail, hint) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          if (worker) worker.terminate();
+          report($checks, 'Starting Karel', status, detail, hint);
+          resolve();
+        }
+
+        var timer = setTimeout(function () {
+          done('fail', 'no ready message within ' + (TIMEOUT_MS / 1000) + ' seconds',
+            'The Karel runtime never finished starting. This is what a student '
+            + 'sees as a Run button that does nothing. ' + BLOCK_HINT);
+        }, TIMEOUT_MS);
+
+        try {
+          worker = new Worker(BASE + KAREL_WORKER, { type: 'module' });
+        } catch (err) {
+          done('fail', String(err && err.message || err), BLOCK_HINT);
+          return;
+        }
+
+        worker.onerror = function (event) {
+          done('fail', String(event.message || 'the worker script failed to load'),
+            'The browser could not start the Karel runtime. ' + BLOCK_HINT);
+        };
+
+        // Same handshake as the editor: hand the worker one end of a message
+        // channel, then wait for it to announce itself on that channel.
+        var channel = new MessageChannel();
+        channel.port1.onmessage = function (event) {
+          if (event.data && event.data.id === 'ready') {
+            done('pass', 'ready in ' + (Date.now() - started) + ' ms');
+          }
+        };
+        worker.postMessage({ id: 'constructor', data: { port: channel.port2 } }, [channel.port2]);
+      });
+    }
+
+    /**
+     * Optional: can this browser reach the course website the editor saves to?
+     * Sent without CORS, so a successful request tells us the address is
+     * reachable; nothing is read from the response and nothing is submitted.
+     */
+    function checkOrigin(rawUrl) {
+      var $originChecks = document.getElementById('origin-checks');
+      $originChecks.innerHTML = '';
+
+      var origin;
+      try {
+        origin = new URL(rawUrl).origin;
+      } catch (err) {
+        report($originChecks, 'Exam address', 'fail', String(rawUrl),
+          'That is not a complete web address. Copy the whole address from the '
+          + 'browser bar, including the https:// at the front.');
+        return;
+      }
+
+      var started = Date.now();
+      withTimeout(fetch(origin, { mode: 'no-cors', cache: 'no-store' }), origin)
+        .then(function () {
+          report($originChecks, 'Exam address', 'pass',
+            origin + ' reachable (' + (Date.now() - started) + ' ms)');
+        }, function (err) {
+          report($originChecks, 'Exam address', 'fail',
+            origin + ' → ' + String(err && err.message || err),
+            'Your work is saved to this address while you work, so this must be '
+            + 'reachable for an exam. ' + BLOCK_HINT);
+        });
+    }
+
+    // ───────────────────────────── Runner ─────────────────────────────
+
+    function runAll() {
+      results = [];
+      $checks.innerHTML = '';
+
+      // Opened from disk rather than from the site. Every check would fail for
+      // reasons that have nothing to do with this computer: the browser refuses
+      // fetch() and new Worker() on file:// URLs whatever is on the disk. Say so
+      // instead of reporting a wall of failures with the wrong explanation.
+      if (location.protocol !== 'http:' && location.protocol !== 'https:') {
+        $summary.className = 'summary fail';
+        $summary.textContent = 'This page has to be opened from the website itself, '
+          + 'not from a copy saved on your computer. Nothing has been tested.';
+        report($checks, 'How this page was opened', 'fail', location.href,
+          'Browsers do not allow a page opened from a file to download anything, '
+          + 'so every check below would fail no matter how well your computer and '
+          + 'network work. Go to the address of the editor and put '
+          + '"browsercheck.html" at the end of it instead.');
+        return;
+      }
+
+      $summary.className = 'summary';
+      $summary.textContent = 'Running checks…';
+
+      checkPageHeaders();
+
+      var chain = checkModuleWorkerSupport();
+      ASSETS.forEach(function (asset) {
+        chain = chain.then(function () { return checkAsset(asset); });
+      });
+
+      chain.then(checkKarelWorker).then(function () {
+        var failed = results.filter(function (r) { return r.status === 'fail'; });
+        var warned = results.filter(function (r) { return r.status === 'warn'; });
+
+        if (failed.length === 0 && warned.length === 0) {
+          $summary.className = 'summary pass';
+          $summary.textContent = 'All checks passed. This browser can run Terra on this network.';
+        } else if (failed.length === 0) {
+          $summary.className = 'summary';
+          $summary.textContent = 'Everything works, but some downloads were slow. '
+            + 'Terra may be unreliable on this connection.';
+        } else if (failed.length === 1 && failed[0].name === HEADERS_CHECK) {
+          // Everything reachable, only the headers wrong: nothing on this
+          // computer is at fault, so do not send the student looking.
+          $summary.className = 'summary fail';
+          $summary.textContent = 'This site is missing two headers the editor needs. '
+            + 'Your browser and your network are fine — this is a setup problem on the '
+            + 'server, so report it to the course.';
+        } else {
+          $summary.className = 'summary fail';
+          $summary.textContent = failed.length + ' of ' + results.length
+            + ' checks failed. See below, and send the copied result when you ask for help.';
+        }
+      });
+    }
+
+    function buildReport() {
+      var lines = [
+        'Terra browser check',
+        'when:    ' + new Date().toISOString(),
+        'page:    ' + location.href,
+        'browser: ' + navigator.userAgent,
+        ''
+      ];
+      results.forEach(function (r) {
+        lines.push(r.status.toUpperCase() + '  ' + r.name);
+        if (r.detail) lines.push('      ' + r.detail);
+        if (r.hint) lines.push('      ! ' + r.hint);
+      });
+      return lines.join('\n');
+    }
+
+    document.getElementById('rerun').addEventListener('click', runAll);
+
+    document.getElementById('copy').addEventListener('click', function () {
+      var text = buildReport();
+      var $report = document.getElementById('report');
+      var button = this;
+
+      function fallback() {
+        // Clipboard access can be refused; showing the text is always possible.
+        $report.value = text;
+        $report.hidden = false;
+        $report.select();
+        button.textContent = 'Select the text above and copy it';
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          button.textContent = 'Copied';
+          setTimeout(function () { button.textContent = 'Copy result'; }, 3000);
+        }, fallback);
+      } else {
+        fallback();
+      }
+    });
+
+    document.getElementById('origin-test').addEventListener('click', function () {
+      checkOrigin(document.getElementById('origin-input').value.trim());
+    });
+
+    runAll();
+  }());
+  </script>
+</body>
+
+</html>

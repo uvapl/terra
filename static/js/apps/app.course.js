@@ -187,6 +187,7 @@ export default class CourseApp extends App {
     // Download the lab files the server did not supply. Files the student
     // already has (and may have edited) are never overwritten, which is what
     // makes a standalone lab persistent across visits.
+    const failedDownloads = [];
     await Promise.all(
       files.map(async (filename) => {
         if (await this.vfs.pathExists(filename)) return;
@@ -200,12 +201,24 @@ export default class CourseApp extends App {
             content = await response.text();
           }
         } catch (err) {
+          // The download was blocked or the network is down. Creating an empty
+          // file here would look like an assignment that ships blank files, so
+          // record it and leave the file absent instead.
           console.error(`Failed to download lab file ${filename}:`, err);
+          failedDownloads.push(filename);
+          return;
         }
 
         await this.vfs.createFile(filename, content);
       })
     );
+
+    if (failedDownloads.length > 0) {
+      notifyError(
+        `Could not download: ${failedDownloads.join(', ')}. `
+        + 'Check your network connection and reload the page.'
+      );
+    }
 
     // put all hidden tabs from the config into the VFS as read-only
     const hidden = isObject(config.hidden_tabs) ? config.hidden_tabs : {};
