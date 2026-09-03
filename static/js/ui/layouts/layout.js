@@ -192,6 +192,7 @@ export default class Layout extends GoldenLayout {
    * resolves persisted state and passes it in here.
    * @param {?object} [options.restoredConfig] - The stored GoldenLayout config to
    * restore, or null/undefined to start from the (merged) default.
+   * @param {boolean} [options.terminal] - Needs a terminal. Defaults to true.
    * @param {string} [options.theme] - The persisted theme to apply on render.
    */
   constructor(additionalLayoutConfig, options = {}) {
@@ -213,6 +214,17 @@ export default class Layout extends GoldenLayout {
       // base owns the editor/output skeleton (variants no longer hand-roll it).
       const base = JSON.parse(JSON.stringify(DEFAULT_LAYOUT_CONFIG));
       base.root.type = orientation === 'vertical' ? 'column' : 'row';
+
+      // create a fixed canvas in case the layout does not use a terminal
+      if (options.terminal === false) {
+        base.root.content[1].content = [
+          createTabConfig(
+            { kind: 'canvas', title: 'Canvas', isClosable: true },
+            { fontSize: options.fontSize || BASE_FONT_SIZE },
+          ),
+        ];
+      }
+
       this._layoutConfig = mergeObjects(base, additionalLayoutConfig);
     }
 

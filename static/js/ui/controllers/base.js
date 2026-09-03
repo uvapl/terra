@@ -5,6 +5,7 @@ import {
 } from '../../lib/local-storage-manager.js';
 import { BASE_FONT_SIZE, DEMO_FONT_SIZE } from '../../constants.js';
 import CommandSurfaces from '../../commands/surfaces.js';
+import { componentTypeOf } from '../layouts/tab-config.js';
 
 /**
  * Current version of the default layout config. Bump it when a breaking change
@@ -68,9 +69,21 @@ export default class BaseController {
     // Resolve persisted state up front so the layout can receive it as plain
     // constructor parameters (it never reads storage itself). An explicit
     // restoredConfig (e.g. a plugin loading a custom layout) is used verbatim.
-    const restoredConfig = layoutOptions.restoredConfig !== undefined
+    let restoredConfig = layoutOptions.restoredConfig !== undefined
       ? layoutOptions.restoredConfig
       : this.resolveRestoredConfig(layoutOptions.forceDefaultLayout);
+
+    // A stored layout from a session with a different output surface cannot be
+    // reused (a lab whose content switched between Karel-only and Python): it
+    // would restore a terminal the session has no use for, or drop the canvas
+    // that carries the toolbar. Fall back to the default.
+    if (
+      restoredConfig &&
+      layoutOptions.terminal !== undefined &&
+      this._configHasTerminal(restoredConfig) !== layoutOptions.terminal
+    ) {
+      restoredConfig = null;
+    }
 
     this.layout = this.buildLayout({
       ...layoutOptions,
@@ -110,6 +123,22 @@ export default class BaseController {
    */
   buildLayout(options) {
     throw new Error('buildLayout() not implemented');
+  }
+
+  /**
+   * Whether a (stored) layout config contains a terminal component.
+   *
+   * @param {object} config - A GoldenLayout config.
+   * @returns {boolean}
+   */
+  _configHasTerminal(config) {
+    const walk = (item) => {
+      if (!item) return false;
+      if (componentTypeOf(item) === 'terminal') return true;
+      return (item.content || []).some(walk);
+    };
+
+    return walk(config?.root);
   }
 
   /**

@@ -58,13 +58,19 @@ export default class CourseLayout extends Layout {
   initCustomContent() {
     const settingsMenuHtml = this.getSettingsMenuHtml();
 
-    // The run and clear buttons are built into the static `#toolbar` by the
-    // controller's buildToolbar pass; only the settings dropdown and the
-    // data-driven config buttons are placed here.
-    $('.terminal-component-container').find('.lm_controls').append(settingsMenuHtml);
+    const $outputStack = this.getOutputStackElement();
 
-    const $header = $('.terminal-component-container').find('.lm_header');
-    $header.append(`<div class="toolbar" id="toolbar"></div>`);
+    $outputStack.find('.lm_controls').append(settingsMenuHtml);
+    $outputStack.find('.lm_header').append(`<div class="toolbar" id="toolbar"></div>`);
+  }
+
+  /**
+   * The output stack's element, which holds the page's toolbar and controls.
+   *
+   * @returns {jQuery} The stack element, empty when there is no output stack.
+   */
+  getOutputStackElement() {
+    return $(this._firstOutputStack()?.element);
   }
 
   /**
@@ -117,7 +123,7 @@ export default class CourseLayout extends Layout {
     // rendered at least once.
     setTimeout(() => {
       // Disable the controls and remove their 'click' event listeners.
-      $('.terminal-component-container .button').prop('disabled', true).off('click');
+      this.getOutputStackElement().find('.button').prop('disabled', true).off('click');
 
       // Lock the drag handler between the editor and terminal.
       $('.lm_splitter').addClass('locked');

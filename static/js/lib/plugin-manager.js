@@ -245,6 +245,7 @@ export class TerraPlugin {
 
   // EVENT LISTENERS THAT CAN BE IMPLEMENTED FOR EACH PLUGIN.
   // ========================================================
+  // onAppInit() // before the layout is built; register languages/surfaces here
   // onLayoutLoaded()
   // onEditorTextChanged(editorComponent)
   // onEditorFocus(editorComponent)

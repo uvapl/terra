@@ -353,16 +353,24 @@ export default class App extends BaseApp {
   }
 
   /**
-   * Bring the surface paired with an editor to the front, opening it on demand;
-   * for an unlinked editor, fall back to the terminal — but only once a canvas
-   * exists, so a project that never uses one is left untouched. Activating an
-   * already-frontmost tab (or one the user dragged into its own stack) is a
-   * no-op, so a custom arrangement is preserved.
+   * Whether a proglang needs a canvas to show its output, rather than writing
+   * to the terminal.
+   *
+   * @param {string} proglang - The programming language (= file extension).
+   * @returns {boolean}
+   */
+  needsCanvas(proglang) {
+    return this._surfaces[proglang] === 'canvas';
+  }
+
+  /**
+   * Brings the output panel paired with an editor to the front.
+   * May add a new canvas tab if needed.
    *
    * @param {EditorTab} editorComponent - The newly active editor.
    */
   _showSurface(editorComponent) {
-    if (this._surfaces[editorComponent?.proglang] === 'canvas') {
+    if (this.needsCanvas(editorComponent?.proglang)) {
       this.view.addCanvasTab({ title: 'Canvas' });
     } else if (this.view.canvas) {
       this.term?.setActive();
@@ -370,18 +378,19 @@ export default class App extends BaseApp {
   }
 
   /**
-   * Close the canvas once it has no linked editor left to serve. Counting the
-   * survivors (rather than the editor being closed) makes this independent of
-   * teardown ordering.
+   * Close the canvas once it has no linked editor left to serve.
    *
-   * @param {EditorTab} [closingEditor] - An editor being destroyed, excluded
-   *   from the survivor count.
+   * @param {EditorTab} [closingEditor] - editor being destroyed
    */
   _pruneSurfaces(closingEditor = null) {
+    // if no canvas, we'll leave the terminal that must be there
     if (!this.view.canvas) return;
 
+    // if no terminal, we'll leave the canvas that must be there
+    if (!this.term) return;
+
     const stillLinked = this.view.getEditorComponents().some(
-      (component) => component !== closingEditor && this._surfaces[component.proglang] === 'canvas'
+      (component) => component !== closingEditor && this.needsCanvas(component.proglang)
     );
     if (!stillLinked) this.view.closeCanvas();
   }
@@ -423,7 +432,7 @@ export default class App extends BaseApp {
        */
       onReady: (hasPendingCommand) => {
         if (hasPendingCommand) {
-          this.term.clearCurrentLine();
+          this.term?.clearCurrentLine();
         }
         if (!hasPendingCommand) {
           // The runtime finished loading: re-pull availability so the run and
@@ -465,7 +474,7 @@ export default class App extends BaseApp {
       /**
        * The worker is requesting a line of standard input from the terminal.
        */
-      onRequestStdin: () => this.term.waitForInput(),
+      onRequestStdin: () => this.term ? this.term.waitForInput() : Promise.resolve('\n'),
 
       /**
        * The worker is requesting the content of a single project file.
@@ -630,13 +639,13 @@ export default class App extends BaseApp {
     if (this.langWorkerClient.isRunningCode) {
       throw new Error('a program is already running');
     }
-    if (options.clearTerm) this.term.clear();
+    if (options.clearTerm) this.term?.clear();
     this._refocusEditorOnRunEnd = !options.fromShell;
 
     // Notify plugins that a run is starting (e.g. the shell, to yield the
     // terminal and start program output on a fresh line).
     triggerPluginEvent('onRunStart');
-    this.term.focus();
+    this.term?.focus();
 
     await this.writeEditorsNow();
     const files = await this.getRunFiles(getFileExtension(filepath));
@@ -672,7 +681,7 @@ export default class App extends BaseApp {
 
     this._refocusEditorOnRunEnd = false;
     triggerPluginEvent('onRunStart');
-    this.term.focus();
+    this.term?.focus();
 
     await this.writeEditorsNow();
     const files = await this.getRunFiles(proglang);
@@ -701,7 +710,7 @@ export default class App extends BaseApp {
 
     this._refocusEditorOnRunEnd = false;
     triggerPluginEvent('onRunStart');
-    this.term.focus();
+    this.term?.focus();
 
     const binary = await this.vfs.readFile(path);
     await this.writeEditorsNow();
@@ -729,7 +738,7 @@ export default class App extends BaseApp {
     const $button = $(selector);
     if ($button.prop('disabled')) return;
 
-    this.term.clear();
+    this.term?.clear();
 
     const filename = this.view.getActiveEditor().getFilename();
     const proglang = getFileExtension(filename);

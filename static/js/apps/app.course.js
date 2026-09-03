@@ -20,6 +20,7 @@ import {
 import { loadReadme } from './app.course.readme.js';
 import {
   formatDate,
+  getFileExtension,
   getRandNumBetween,
   isObject,
   seconds,
@@ -145,6 +146,24 @@ export default class CourseApp extends App {
     return this.page.connected ? slugify(this.config.configUrl) : this.config.slug;
   }
 
+  /**
+   * Whether a session showing these files needs a terminal. It goes without one
+   * only when it has a file that draws on a canvas and no file that a
+   * terminal-writing language can run: a Karel-only exam shows the canvas alone,
+   * while a session mixing Karel and Python keeps its terminal and opens the
+   * canvas next to it (see _showSurface).
+   *
+   * @param {string[]} filenames - The files the session opens.
+   * @returns {boolean} Whether the session needs a terminal.
+   */
+  needsTerminalFor(filenames) {
+    const proglangs = filenames.map(getFileExtension);
+
+    return !proglangs.some((proglang) => this.needsCanvas(proglang))
+      || proglangs.some((proglang) =>
+        this.langWorkerClient.supports(proglang) && !this.needsCanvas(proglang));
+  }
+
   async setupLayout() {
     const config = this.config;
 
@@ -188,14 +207,7 @@ export default class CourseApp extends App {
       })
     );
 
-    // Files the course supplies but the student never edits: helper modules,
-    // Karel worlds, fixtures. They are ordinary VFS files, so everything that
-    // reads the file system finds them — the run payload, a Karel world
-    // preview, the world-name autocomplete. They get no tab because the tab
-    // list below is built from the visible files alone, and they are marked
-    // read-only so nothing can overwrite what the course handed out. Written
-    // unconditionally: the course's copy always wins over whatever is in this
-    // browser.
+    // put all hidden tabs from the config into the VFS as read-only
     const hidden = isObject(config.hidden_tabs) ? config.hidden_tabs : {};
     await Promise.all(
       Object.entries(hidden).map(([filename, content]) =>
@@ -210,19 +222,26 @@ export default class CourseApp extends App {
       Object.keys(tabs).filter((filename) => !files.includes(filename))
     );
 
-    // The README sits beside the layout container rather than inside it, so
-    // the class that makes room for it has to be set before the layout
-    // measures itself.
+    // enable css flag for readme panel
     if (this.hasLabContent()) {
       $('body').addClass('has-readme');
     }
 
-    this.commands.register(courseCommandConfig.commands);
+    // check whether terminal is needed
+    const terminal = this.needsTerminalFor(filenames);
+
+    // register terminal commands
+    this.commands.register(
+      terminal
+        ? courseCommandConfig.commands
+        : courseCommandConfig.commands.filter((cmd) => cmd.name !== 'clearTerminal')
+    );
 
     this.view = new CourseController({
       delegate: this,
       commandRegistry: this.commands,
       files: filenames,
+      terminal,
       autocomplete: config.autocomplete,
 
       // Instructions already take the horizontal room, so a session showing

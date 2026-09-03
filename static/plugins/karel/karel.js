@@ -150,10 +150,8 @@ export default class KarelPlugin extends TerraPlugin {
   _traceMarkerIds = [];
   _traceFrames = null;
 
-  onLayoutLoaded = () => {
-    // Join the run pipeline. Idempotent, so re-firing on a layout reset is fine.
+  onAppInit = () => {
     Terra.app.registerLangWorker('karel', 'static/plugins/karel/runner/karel.worker.js', this.name);
-
     Terra.app.registerSurface('karel', 'canvas');
     Terra.app.registerSurface('w', 'canvas');
   }

@@ -15,12 +15,13 @@
 @import 'include/ide/image-component.css';
 @import 'include/course/readme.css';
 
-/* The terminal is alone in its stack, so its tab strip says nothing. */
-.terminal-component-container .lm_tabs {
+/* Hide the tab strip above the output stack. */
+.terminal-component-container .lm_tabs,
+.canvas-component-container .lm_tabs {
   display: none;
 }
 
-/* Hide the 80-th column indicator. The IDE deliberately keeps its own. */
+/* Hide the 80-th column indicator. The IDE keeps its own. */
 .ace_print-margin {
   display: none !important;
 }

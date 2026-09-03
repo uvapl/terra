@@ -13,6 +13,16 @@
   overflow: hidden;
 }
 
+/* If shown above the output stack, make it a bit like a tab bar. */
+.lm_header .toolbar {
+  align-self: stretch;
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.lm_header .toolbar .button {
+  height: 100%;
+}
+
 /* Compact, icon-led buttons that read as one cohesive toolbar. */
 .toolbar .button {
   display: inline-flex;

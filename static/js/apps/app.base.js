@@ -3,6 +3,7 @@ import LangWorkerClient from '../platforms/lang-worker-client.js';
 import VirtualFileSystem from '../fs/vfs.js';
 import CommandRegistry from '../commands/registry.js';
 import { checkEnvironment } from '../lib/environment.js';
+import { triggerPluginEvent } from '../lib/plugin-manager.js';
 
 /**
  * Composition + wiring layer shared by every app.
@@ -127,6 +128,10 @@ export default class BaseApp {
   async init() {
     // Nothing can run without shared memory.
     if (!checkEnvironment()) return;
+
+    // Lets plugins add their languages and output surfaces to the app before the
+    // layout is built.
+    triggerPluginEvent('onAppInit');
 
     // Await the setupLayout because some apps might need to do async work.
     await this.setupLayout();
