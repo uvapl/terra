@@ -54,13 +54,40 @@ class API extends BaseAPI {
       const pyVersion = this.pyodide.runPython("sys.version.split(' ')[0]");
       console.log(`Started Python v${pyVersion}`);
 
-      // Packages (numpy, pandas, matplotlib, pytest, checkpy, ...) are no longer
-      // bundled into the filesystem up-front. They are self-hosted next to
-      // pyodide-lock.json and loaded on demand via loadPackagesFromImports()
-      // whenever the user's code imports them (see the run() method).
+      // Load Terra's own Python helper modules.
+      await this.loadTerraModules();
 
       this.readyCallback();
     });
+  }
+
+  /**
+   * Write Terra's bundled Python helper modules into the virtual filesystem and
+   * put them on sys.path, so user code and button configs can import them.
+   */
+  async loadTerraModules() {
+    const modules = ['terra_doctest'];
+    const dir = '/terra_lib';
+
+    try {
+      this.pyodide.FS.mkdir(dir);
+    } catch (err) {
+      // Directory already exists; ignore.
+    }
+
+    for (const name of modules) {
+      try {
+        const url = new URL(`../../wasm/py/terra/${name}.py`, import.meta.url);
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const source = await res.text();
+        this.pyodide.FS.writeFile(`${dir}/${name}.py`, source, { encoding: 'utf8' });
+      } catch (err) {
+        console.warn(`Failed to load Terra Python module "${name}":`, err);
+      }
+    }
+
+    this.pyodide.runPython(`import sys; sys.path.append(${JSON.stringify(dir)})`);
   }
 
   stdinHandler = () => {
