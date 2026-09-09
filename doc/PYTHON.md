@@ -173,6 +173,9 @@ ruby dev-server/serve.rb   # http://localhost:8000
 Then open the IDE and check:
 
 - The console logs `Started Python v3.x.y` with the expected version.
+- `print('café — €5 ✓')` shows the accented and non-ASCII characters intact
+  (raw stdout arrives one byte at a time and is reassembled by a streaming
+  `TextDecoder` in [`py.worker.js`](../static/js/platforms/py.worker.js)).
 - Running `print('hello')` works, and a `NameError` (e.g. `print(x)`) shows a
   clean traceback (Terra trims Pyodide's internal frames in
   [`formatErrorMsg`](../static/js/platforms/py.worker.js); if the traceback

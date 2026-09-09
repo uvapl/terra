@@ -35,10 +35,15 @@ class API extends BaseAPI {
       this.pyodide = pyodide;
 
       // By default, pyodide uses batch mode, which only flushes data when a
-      // newline character is received. We override the options by using raw
-      // mode, which gets triggered on every character the stdout receives.
+      // newline character is received. We override the options to use raw
+      // mode, which gets triggered on every byte the stdout receives. That's
+      // why we feed each byte into a streaming TextDecoder.
+      const stdoutDecoder = new TextDecoder('utf-8');
       this.pyodide.setStdout({
-        raw: (charCode) => this.hostWrite(String.fromCharCode(charCode)),
+        raw: (byte) => {
+          const text = stdoutDecoder.decode(new Uint8Array([byte]), { stream: true });
+          if (text) this.hostWrite(text);
+        },
         isatty: true
       });
 
