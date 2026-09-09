@@ -28,6 +28,18 @@ export default class TerminalTab extends BaseTab {
   didShow = false;
 
   /**
+   * Re-fits the xterm grid when the container box changes size.
+   * @type {?ResizeObserver}
+   */
+  resizeObserver = null;
+
+  /**
+   * Pending requestAnimationFrame handle for scheduleFit().
+   * @type {number}
+   */
+  _fitFrame = 0;
+
+  /**
    * Identifies who currently owns keyboard input on the terminal. One of
    * `null` (nobody — keystrokes are dropped, the default e.g. in the exam),
    * `'shell'` (the shell plugin's input loop) or `'program'` (a running
@@ -200,6 +212,66 @@ export default class TerminalTab extends BaseTab {
 
     this.bindTerminalInput();
     this.setFontSize(fontSize);
+
+    // Size the grid to the pane, now and on every later resize.
+    this.observeContainerSize();
+    this.scheduleFit();
+  }
+
+  /**
+   * Watch the actual container box for size changes. GoldenLayout's 'resize'/
+   * 'show' events can fire before the pane has its final size.
+   */
+  observeContainerSize = () => {
+    if (typeof ResizeObserver === 'undefined') return;
+
+    this.resizeObserver = new ResizeObserver(() => this.scheduleFit());
+    this.resizeObserver.observe(this.container.element);
+  }
+
+  /**
+   * Schedule fits on the next frame so we prevent short-sequence bursts. xterm is
+   * opened before it (or the pane) has a size, so retry until fit() can measure.
+   *
+   * @param {number} [retries] - Remaining frames to retry before giving up.
+   */
+  scheduleFit = (retries = 10) => {
+    if (!this.terminalInstance) return;
+
+    cancelAnimationFrame(this._fitFrame);
+    this._fitFrame = requestAnimationFrame(() => {
+      if (!this.fit() && retries > 0) this.scheduleFit(retries - 1);
+    });
+  }
+
+  /**
+   * Fit the grid to the container.
+   *
+   * @returns {boolean} Whether the terminal could be measured and was fitted.
+   */
+  fit = () => {
+    if (!this.terminalInstance) return false;
+
+    let proposed;
+    try {
+      proposed = this.fitAddon.proposeDimensions();
+    } catch (e) {
+      proposed = null;
+    }
+
+    if (!proposed
+        || !Number.isFinite(proposed.cols) || proposed.cols <= 0
+        || !Number.isFinite(proposed.rows) || proposed.rows <= 0) {
+      return false;
+    }
+
+    // Follow new output only if the user hadn't scrolled up.
+    const buffer = this.terminalInstance.buffer.active;
+    const wasAtBottom = buffer.viewportY >= buffer.baseY;
+
+    this.fitAddon.fit();
+    if (wasAtBottom) this.terminalInstance.scrollToBottom();
+    return true;
   }
 
   /**
@@ -230,13 +302,16 @@ export default class TerminalTab extends BaseTab {
       }, 0);
     }
 
-    this.fitAddon.fit();
+    this.scheduleFit();
   }
 
   /**
    * Callback when the container is destroyed.
    */
   onContainerDestroy = () => {
+    this.resizeObserver?.disconnect();
+    cancelAnimationFrame(this._fitFrame);
+
     if (this.terminalInstance && typeof this.terminalInstance.destroy === 'function') {
       this.terminalInstance.destroy();
     }
@@ -248,7 +323,7 @@ export default class TerminalTab extends BaseTab {
    * Callback when the container is resized.
    */
   onContainerResize = () => {
-    this.fitAddon.fit();
+    this.scheduleFit();
   }
 
   /**
@@ -278,7 +353,7 @@ export default class TerminalTab extends BaseTab {
   setFontSize = (fontSize) => {
     this.container.extendState({ fontSize });
     this.terminalInstance.options.fontSize = fontSize;
-    this.fitAddon.fit();
+    this.scheduleFit();
   };
 
   /**
