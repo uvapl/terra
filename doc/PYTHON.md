@@ -43,6 +43,35 @@ Because `pyodide-lock.json` is pruned to only the packages we actually ship,
 importing something we don't bundle raises a normal `ModuleNotFoundError`
 instead of a confusing network error.
 
+## Terra's bundled Python modules
+
+Python files in [`static/wasm/py/terra/`](../static/wasm/py/terra/) are Terra's
+own helper modules. At worker startup `loadTerraModules()` in
+[`py.worker.js`](../static/js/platforms/py.worker.js) fetches each one from the
+same origin, writes it into `/terra_lib` in the virtual filesystem and puts
+that directory on `sys.path`, so any user code or button config can
+`import` it. They are fetched, not part of `python_stdlib.zip`, so
+`update.py` never touches them.
+
+### `terra_doctest`
+
+Checks the examples in a module's docstrings and prints a short coloured
+summary — one `✓`/`✗` line per function with an `ok/total` count, then the
+first example to fix (the call, what it should give, what the code gave) —
+instead of `doctest.testmod`'s long per-example output. The wording avoids
+testing jargon ("examples", not "doctests" or "test cases"). Meant for the
+exam/lab "doctest" button:
+
+```yaml
+buttons:
+  doctest: |
+    import terra_doctest
+    terra_doctest.run("<filename>")
+```
+
+`<filename>` is replaced with the active tab's module name. `run` also accepts
+an already-imported module object.
+
 ## Updating Pyodide
 
 Everything is driven by one script and one version file.
