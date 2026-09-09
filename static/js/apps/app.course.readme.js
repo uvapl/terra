@@ -170,7 +170,7 @@ function addCopyLinks($section) {
     // The code lands in another pane, so report back here as well.
     const flash = (text, state) => {
       $link.addClass(state).text(text);
-      setTimeout(() => $link.removeClass(state).text(label), seconds(1.5));
+      setTimeout(() => $link.removeClass(state).text(label), seconds(2.5));
     };
 
     $link.on('click', (event) => {
@@ -181,7 +181,7 @@ function addCopyLinks($section) {
 
       // Already in the file: scroll to that copy rather than adding a second.
       if (editorComponent.revealLine(firstLine)) {
-        flash("Can't copy twice! Here it is \u2192", 'blocked');
+        flash("You already have this one! Here it is \u2192", 'blocked');
         return;
       }
 
