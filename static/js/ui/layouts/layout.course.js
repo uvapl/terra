@@ -62,6 +62,39 @@ export default class CourseLayout extends Layout {
 
     $outputStack.find('.lm_controls').append(settingsMenuHtml);
     $outputStack.find('.lm_header').append(`<div class="toolbar" id="toolbar"></div>`);
+
+    $('#lab-reset-menu-item')
+      .off('click.labreset')
+      .on('click.labreset', () => this.showResetLabModal());
+  }
+
+  /**
+   * The "Reset lab progress" entry in the settings menu. Only shows when
+   * the session has a README.
+   *
+   * @returns {string}
+   */
+  getExtraSettingsMenuItems() {
+    return '<li id="lab-reset-menu-item">Reset lab progress…</li>';
+  }
+
+  /**
+   * Ask for confirmation, then reset this lab's stored progress and settings.
+   * The files the student wrote are kept.
+   */
+  showResetLabModal() {
+    createModal({
+      title: 'Reset lab progress',
+      body: `
+        <p>This clears the reading progress in the instructions and any
+        settings for this lab, such as theme, font size and panel layout.</p>
+        <p>Your files are not touched.</p>
+      `,
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Reset',
+      danger: true,
+      onConfirm: () => this.delegate.resetLabProgress(),
+    });
   }
 
   /**

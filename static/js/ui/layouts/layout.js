@@ -751,9 +751,20 @@ export default class Layout extends GoldenLayout {
               <li data-val="30">30</li>
             </ul>
           </li>
+          ${this.getExtraSettingsMenuItems()}
         </ul>
       </div>
     `;
+  }
+
+  /**
+   * Extra `<li>` entries appended to the settings menu, for a variant to
+   * override. The base adds none.
+   *
+   * @returns {string}
+   */
+  getExtraSettingsMenuItems() {
+    return '';
   }
 
   /**

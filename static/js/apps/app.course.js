@@ -32,6 +32,7 @@ import {
   setLocalStorageItem,
   getLocalStorageItem,
   removeLocalStorageItem,
+  clearLocalStorage,
 } from '../lib/local-storage-manager.js';
 import { notify, notifyError } from '../ui/components/notifications.js';
 
@@ -276,6 +277,17 @@ export default class CourseApp extends App {
     }
 
     this.addToolbarButtons(this.config.buttons);
+  }
+
+  /**
+   * Clear this lab's stored progress and settings, then reload.
+   * File tabs are left alone.
+   */
+  resetLabProgress() {
+    // Removes every local storage key for this lab
+    // except the resolved `config`.
+    clearLocalStorage(['config']);
+    window.location.reload();
   }
 
   // ── Configuration ──

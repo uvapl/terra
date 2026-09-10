@@ -37,4 +37,8 @@ export default class CourseController extends BaseController {
   setSubmitModalSuccess(options) {
     this.layout.setSubmitModalSuccess(options);
   }
+
+  resetLabProgress() {
+    this.delegate.resetLabProgress();
+  }
 }

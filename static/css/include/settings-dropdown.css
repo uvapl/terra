@@ -33,12 +33,21 @@
   cursor: pointer;
 }
 
+/* Override GoldenLayout's `.lm_controls` styles */
+.settings-menu {
+  opacity: 1;
+}
+
 .settings-dropdown {
   position: absolute;
-  background: var(--color-white);
+  background: var(--overlay-bg);
   display: none;
   right: 0;
   border: 1px solid var(--border-color);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .settings-dropdown li.has-dropdown {
@@ -68,13 +77,23 @@
   position: relative;
   padding: 6px 10px;
   white-space: nowrap;
+  text-align: left;
   color: var(--tab-fg-color);
 }
 
 .settings-dropdown li:hover {
-  background-color: var(--tab-menu--tab-bg-color);
-  color: var(--color-black);
+  background-color: var(--muted-bg);
+  color: var(--fg-strong);
   cursor: pointer;
+}
+
+/* Lab-only item: hidden unless the session has a README sidebar. */
+#lab-reset-menu-item {
+  border-top: 1px solid var(--separator-color);
+}
+
+body:not(.has-readme) #lab-reset-menu-item {
+  display: none;
 }
 
 .settings-dropdown li:hover:before {
@@ -82,7 +101,7 @@
 }
 
 .settings-dropdown li.active {
-  color: var(--color-black);
+  color: var(--fg-strong);
   font-weight: bold;
 }
 

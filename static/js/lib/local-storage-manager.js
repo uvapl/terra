@@ -62,6 +62,21 @@ export function removeLocalStorageItem(key) {
 }
 
 /**
+ * Remove every local storage key under the current prefix, except the ones
+ * named in `exceptKeys`.
+ *
+ * @param {string[]} [exceptKeys] - Keys (without prefix) to keep.
+ */
+export function clearLocalStorage(exceptKeys = []) {
+  const prefix = `${localStoragePrefix}-`;
+  const keep = new Set(exceptKeys.map((key) => `${prefix}${key}`));
+
+  Object.keys(localStorage)
+    .filter((key) => key.startsWith(prefix) && !keep.has(key))
+    .forEach((key) => localStorage.removeItem(key));
+}
+
+/**
  * Set the local storage prefix's additional key.
  *
  * @param {string} additionalKey
