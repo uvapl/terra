@@ -47,6 +47,17 @@ class API extends BaseAPI {
         isatty: true
       });
 
+      // stderr is raw-decoded the same way, and goes to the same place as
+      // stdout so the two stay in order on the terminal.
+      const stderrDecoder = new TextDecoder('utf-8');
+      this.pyodide.setStderr({
+        raw: (byte) => {
+          const text = stderrDecoder.decode(new Uint8Array([byte]), { stream: true });
+          if (text) this.hostWrite(text);
+        },
+        isatty: true
+      });
+
       // Import some basic modules.
       this.pyodide.runPython('import io, sys');
 
@@ -59,8 +70,15 @@ class API extends BaseAPI {
       const pyVersion = this.pyodide.runPython("sys.version.split(' ')[0]");
       console.log(`Started Python v${pyVersion}`);
 
+      // Keep mypy's cache out of the project tree.
+      this.pyodide.runPython(
+        "import os; os.environ['MYPY_CACHE_DIR'] = '/tmp/terra-mypy-cache'");
+
       // Load Terra's own Python helper modules.
       await this.loadTerraModules();
+
+      // Import the runner before user files can join sys.path and shadow it.
+      this.pyodide.runPython('import terra_run');
 
       this.readyCallback();
     });
@@ -71,7 +89,7 @@ class API extends BaseAPI {
    * put them on sys.path, so user code and button configs can import them.
    */
   async loadTerraModules() {
-    const modules = ['terra_doctest'];
+    const modules = ['terra_doctest', 'terra_run'];
     const dir = '/terra_lib';
 
     try {
@@ -179,21 +197,8 @@ class API extends BaseAPI {
     // deleting the folder itself, going bottom-up direction.
     const parentFolderPaths = this.getParentFolderPaths(files);
 
-    // Delete the parent folders if they are empty and exist, bottom-up.
     for (const folderpath of parentFolderPaths) {
-      if (this.directoryExists(folderpath)) {
-        // Delete all files in the folder.
-        const subFolderFilePaths = this.pyodide.FS.readdir(folderpath);
-        for (const file of subFolderFilePaths) {
-          const filepath = `${folderpath}/${file}`;
-          if (this.fileExists(filepath)) {
-            this.pyodide.FS.unlink(filepath);
-          }
-        }
-
-        // Delete the folder itself.
-        this.pyodide.FS.rmdir(folderpath);
-      }
+      this.removeTree(folderpath);
     }
 
     // Finally, delete all the files inside the home directory.
@@ -203,6 +208,30 @@ class API extends BaseAPI {
         this.pyodide.FS.unlink(filepath);
       }
     }
+  }
+
+  /**
+   * Delete a folder and everything below it.
+   *
+   * @param {string} folderpath - The folder to remove.
+   */
+  removeTree(folderpath) {
+    if (!this.directoryExists(folderpath)) return;
+
+    for (const name of this.pyodide.FS.readdir(folderpath)) {
+      if (name === '.' || name === '..') continue;
+
+      const path = `${folderpath}/${name}`;
+      if (this.fileExists(path)) {
+        this.pyodide.FS.unlink(path);
+      } else {
+        // A run can leave folders behind that were not part of the input,
+        // e.g. __pycache__; rmdir only accepts an empty folder.
+        this.removeTree(path);
+      }
+    }
+
+    this.pyodide.FS.rmdir(folderpath);
   }
 
   /**
@@ -352,7 +381,7 @@ class API extends BaseAPI {
   }
 
   /**
-   * Run the user's code and print the output to the terminal.
+   * Run the active tab and print the output to the terminal.
    *
    * @param {object} data - The data object coming from the worker.
    * @param {string} data.activeTabPath - The active tab's absolute file path.
@@ -360,16 +389,43 @@ class API extends BaseAPI {
    * containing the filename and content of the corresponding editor tab.
    */
   async runUserCode({ activeTabPath, vfsFiles }) {
-    const activeTab = vfsFiles.find((file) => file.path === activeTabPath);
+    const hasParent = activeTabPath.includes('/');
+    const { name, parentPath } = getPartsFromPath(activeTabPath);
+    const filename = hasParent ? name : activeTabPath;
 
-    // Resolve the filename up front (cheap string work) and write the command
-    // prompt to the terminal *before* the heavier filesystem work below, so the
-    // "$ python3 <file>" line shows up immediately and any pause happens after
-    // it rather than before it.
-    const hasParent = activeTab.path.includes('/');
-    const { name, parentPath } = getPartsFromPath(activeTab.path);
-    const filename = hasParent ? name : activeTab.path;
-    this.hostWriteCmd(`python3 ${filename}`);
+    // Running a file runs it from its own folder, as there is no other
+    // working directory to speak of.
+    return this._runProgram({
+      spec: { mode: 'script', target: activeTabPath, args: [], argv0: filename },
+      cwd: hasParent ? parentPath : '',
+      vfsFiles,
+      cmdline: `python3 ${filename}`,
+    });
+  }
+
+  /**
+   * Run a command line the user typed in the shell.
+   *
+   * @param {object} data - The data object coming from the worker.
+   * @param {object} data.spec - What to run, see terra_run.main().
+   * @param {string} data.cwd - The working directory, relative to the home
+   * directory.
+   * @param {array} data.vfsFiles - List of all file objects from the VFS.
+   * @param {string} data.cmdline - The command as typed, for the echo.
+   */
+  async runCommand({ spec, cwd, vfsFiles, cmdline }) {
+    return this._runProgram({ spec, cwd, vfsFiles, cmdline });
+  }
+
+  /**
+   * Run one program and hand back whatever it changed on disk.
+   *
+   * @param {object} options - spec, cwd, vfsFiles and cmdline, see runCommand().
+   */
+  async _runProgram({ spec, cwd, vfsFiles, cmdline }) {
+    // Echo before the filesystem work below, so the command line shows up
+    // immediately and any pause happens after it rather than before it.
+    this.hostWriteCmd(cmdline);
 
     // Keep track of original file modification times.
     let baseline = new Map();
@@ -380,36 +436,107 @@ class API extends BaseAPI {
 
       baseline = this.writeFilesToVirtualFS(vfsFiles);
 
-      if (hasParent) {
-        // Change directory to the folder of the active file.
-        this.pyodide.FS.chdir(parentPath);
+      if (cwd) {
+        this.pyodide.FS.chdir(cwd);
       }
 
-      const error = await this.run(activeTab.content, activeTabPath);
+      await this._preloadPackages(spec, vfsFiles, cwd);
+
+      const error = this._exec(spec);
       if (error) {
         this.hostWrite(error);
       }
     } finally {
-      // Ensure that we always operate from the home directory, because the cwd
-      // might have changed during execution.
-      this.pyodide.FS.chdir(HOME_DIR);
+      try {
+        // Ensure that we always operate from the home directory, because the
+        // cwd might have changed during execution.
+        this.pyodide.FS.chdir(HOME_DIR);
 
-      const newFiles = this.checkForNewFiles(vfsFiles, baseline);
-      const deletedPaths = this.checkForDeletedFiles(vfsFiles);
+        const newFiles = this.checkForNewFiles(vfsFiles, baseline);
+        const deletedPaths = this.checkForDeletedFiles(vfsFiles);
 
-      this.deleteFilesFromVirtualFS(vfsFiles);
+        this.deleteFilesFromVirtualFS(vfsFiles);
 
-      if (newFiles.length > 0) {
-        this.newOrModifiedFilesCallback(newFiles);
-      }
+        if (newFiles.length > 0) {
+          this.newOrModifiedFilesCallback(newFiles);
+        }
 
-      if (deletedPaths.length > 0) {
-        this.deletedFilesCallback(deletedPaths);
+        if (deletedPaths.length > 0) {
+          this.deletedFilesCallback(deletedPaths);
+        }
+      } catch (err) {
+        // The run itself is done, so a failure here must not keep the app
+        // waiting for the callbacks below.
+        console.error('Failed to clean up after the run:', err);
       }
 
       this.runUserCodeCallback();
       this.restartCallback();
     }
+  }
+
+  /**
+   * Load the wheels the program is going to need.
+   *
+   * @param {object} spec - What is about to run, see terra_run.main().
+   * @param {array} vfsFiles - List of all file objects from the VFS.
+   * @param {string} cwd - The working directory, relative to the home directory.
+   */
+  async _preloadPackages(spec, vfsFiles, cwd) {
+    const sources = [];
+
+    if (spec.mode === 'module') {
+      // The module itself is only named, never imported in code we can scan.
+      sources.push(`import ${spec.target.split('.')[0]}`);
+    }
+
+    // A tool imports the files it is pointed at, so their imports count too.
+    // Only a script target is already a project path; arguments are the
+    // program's own business and relative to where it runs.
+    const paths = spec.args
+      .filter((arg) => arg.endsWith('.py'))
+      .map((arg) => (cwd ? `${cwd}/${arg}` : arg));
+
+    if (spec.mode === 'script') {
+      paths.push(spec.target);
+    }
+
+    for (const path of paths) {
+      const file = vfsFiles.find((f) => f.path === path);
+      if (file) sources.push(file.content);
+    }
+
+    for (const source of sources) {
+      try {
+        await this.pyodide.loadPackagesFromImports(source, {
+          messageCallback: () => {},
+          checkIntegrity: true,
+        });
+      } catch (err) {
+        console.warn('Failed to load packages from imports:', err);
+      }
+    }
+  }
+
+  /**
+   * Execute a spec through Terra's runner module.
+   *
+   * @param {object} spec - What to run, see terra_run.main().
+   * @returns {?string} The error message to print, or null.
+   */
+  _exec(spec) {
+    // A script is named by its path in the project, which lives under the
+    // home directory here.
+    const payload = spec.mode === 'script'
+      ? { ...spec, target: `${HOME_DIR}/${spec.target}` }
+      : spec;
+
+    // JSON both ways: a JS object would arrive in Python as a proxy that has
+    // to be destroyed by hand.
+    const result = this.pyodide.pyimport('terra_run').main(JSON.stringify(payload));
+    const { status, error } = JSON.parse(result);
+    this.lastStatus = status;
+    return error;
   }
 
   /**
@@ -637,6 +764,10 @@ const onAnyMessage = async event => {
 
     case 'runUserCode':
       api.runUserCode(event.data.data);
+      break;
+
+    case 'runCommand':
+      api.runCommand(event.data.data);
       break;
   }
 };

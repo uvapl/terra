@@ -1,7 +1,6 @@
 import { TerraPlugin } from '../../js/lib/plugin-manager.js';
 import Terra from '../../js/terra.js';
 import { FileNotFoundError, FileTooLargeError } from '../../js/fs/vfs.js';
-import { getFileExtension } from '../../js/lib/helpers.js';
 
 /**
  * Error type for shell command failures. The message is printed to the
@@ -23,9 +22,9 @@ const MAKE = 'make';
  * redirection.
  *
  * Programs are launched through the app, during which the shell yields terminal
- * input and waits for the run to end. Three things count as a program: an
- * interpreter matching the script's language (`python3 hello.py`), `make`, and
- * a path to a binary an earlier `make` produced (`./hello alice`).
+ * input and waits for the run to end. Three things count as a program: a
+ * command a language registered (`python3 hello.py`, `mypy hello.py`), `make`,
+ * and a path to a binary an earlier `make` produced (`./hello alice`).
  *
  * The shell keeps its own current working directory, fully separate from the
  * editor/file tree. Paths are VFS-relative; the shell root ('') is the same
@@ -293,9 +292,13 @@ export default class ShellPlugin extends TerraPlugin {
    * @returns {boolean}
    */
   isProgram = (name) => (
-    name === MAKE
-    || this.isPath(name)
-    || !!Terra.app.langWorkerClient.getLangForCommand(name)
+    // A builtin is never shadowed by a command a language registered.
+    !this.builtins[name]
+    && (
+      name === MAKE
+      || this.isPath(name)
+      || Terra.app.langWorkerClient.hasShellCommand(name)
+    )
   );
 
   /**
@@ -307,7 +310,7 @@ export default class ShellPlugin extends TerraPlugin {
   isPath = (name) => name.includes('/');
 
   /**
-   * Run a program: make, a binary, or a script through its interpreter.
+   * Run a program: make, a binary, or a registered command.
    *
    * @param {string[]} argv - The tokenized command, e.g. ['./hello', 'alice'].
    */
@@ -316,7 +319,7 @@ export default class ShellPlugin extends TerraPlugin {
 
     if (name === MAKE) return this.make(argv);
     if (this.isPath(name)) return this.exec(argv);
-    return this.interpret(argv);
+    return this.launchCommand(argv);
   }
 
   /**
@@ -390,30 +393,30 @@ export default class ShellPlugin extends TerraPlugin {
   }
 
   /**
-   * Run a script in its interpreter.
+   * Run a command a language registered, e.g. `python3 hello.py` or
+   * `mypy hello.py`. The language turns the command line into something its
+   * worker runs; the shell only supplies where it runs.
    *
    * @param {string[]} argv - The tokenized command.
    */
-  interpret = async (argv) => {
-    const [name, script, ...rest] = argv;
-    const proglang = Terra.app.langWorkerClient.getLangForCommand(name);
+  launchCommand = async (argv) => {
+    const { proglang, parse } = Terra.app.langWorkerClient.getShellCommand(argv[0]);
 
-    if (!script) {
-      throw new ShellError(`usage: ${name} <file.${proglang}>`);
-    }
-    if (rest.length > 0) {
-      throw new ShellError(`${name}: arguments are not supported`);
-    }
-
-    const path = this.resolvePath(script);
-    if (!(await this.isFile(path))) {
-      throw new ShellError(`${name}: can't open file '${script}': No such file or directory`);
-    }
-    if (getFileExtension(path) !== proglang) {
-      throw new ShellError(`${name}: can't run '${script}': not a .${proglang} file`);
+    let spec;
+    try {
+      spec = await parse(argv, {
+        cwd: this.cwd,
+        resolvePath: this.resolvePath,
+        isFile: this.isFile,
+      });
+    } catch (err) {
+      throw new ShellError(err.message);
     }
 
-    return this.launch(() => Terra.app.runFile(path, { fromShell: true }));
+    return this.launch(() => Terra.app.runCommand(proglang, spec, argv.join(' '), {
+      cwd: this.cwd,
+      fromShell: true,
+    }));
   }
 
   /**

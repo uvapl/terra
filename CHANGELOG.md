@@ -42,9 +42,18 @@ Python and C runtimes were updated.
   `hello` is not a path, as in a real shell. `make` does not read a makefile: it
   compiles with the same clang flags the Run button uses.
 - An interpreter now has to match the file it is given. `python3 hello.c` used
-  to compile and run a C program; it is now an error. Interpreter names are
-  registered per language rather than hardcoded in the shell, so a plugin
-  language can name its own.
+  to compile and run a C program; it is now an error.
+- Commands are registered per language rather than hardcoded in the shell, so a
+  plugin language can name its own. Python registers `python`, `python3`,
+  `mypy`, `pytest`, `pycodestyle` and `terra_doctest`.
+- Scripts take command-line arguments (`python bla.py alice`), and any module
+  can be run with `-m`, so `python -m doctest -v bla.py` works. `sys.exit()`
+  ends a program rather than showing a traceback. A command runs in the shell's
+  working directory.
+- `mypy bla.py` type-checks a file. The wheel was already bundled but nothing
+  could invoke it.
+- `terra_doctest bla.py` checks a file's examples with the same readable output
+  as the exam/lab button, which until now was the only way to reach it.
 - Terminal internals moved into their own module as part of this work.
 
 ### Edit history

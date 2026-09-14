@@ -664,6 +664,42 @@ export default class App extends BaseApp {
   }
 
   /**
+   * Run a command line, e.g. one the shell parsed. Returns a Promise that
+   * resolves when the run ends (normally or aborted).
+   *
+   * @async
+   * @param {string} proglang - The language whose worker runs the command.
+   * @param {object} spec - What to run, interpreted by that worker only.
+   * @param {string} cmdline - The command as typed, for the echo.
+   * @param {object} [options]
+   * @param {string} [options.cwd] - Working directory, relative to the root.
+   * @param {boolean} [options.clearTerm] - Clear the terminal before running.
+   * @param {boolean} [options.fromShell] - The user typed this command.
+   * @returns {Promise<void>} Resolves when the run has ended.
+   */
+  async runCommand(proglang, spec, cmdline, options = {}) {
+    if (!this.langWorkerClient.supports(proglang)) {
+      throw new Error(`cannot run '${cmdline}': unsupported language`);
+    }
+    if (this.langWorkerClient.isRunningCode) {
+      throw new Error('a program is already running');
+    }
+    if (options.clearTerm) this.term?.clear();
+    this._refocusEditorOnRunEnd = !options.fromShell;
+
+    triggerPluginEvent('onRunStart');
+    this.term?.focus();
+
+    await this.writeEditorsNow();
+    const files = await this.getRunFiles(proglang);
+
+    const runEnded = new Promise(resolve => { this._runEndResolver = resolve; });
+    await this.langWorkerClient.runCommand(
+      proglang, spec, options.cwd || '', files, cmdline, !options.fromShell);
+    return runEnded;
+  }
+
+  /**
    * Compile a source file without running it.
    *
    * @async

@@ -1,6 +1,6 @@
 """Check the examples in a module's docstrings and print a short, readable
 summary instead of doctest's verbose output. Meant for the exam/lab "doctest"
-button.
+button and the shell command of the same name.
 
 Button config:
 
@@ -12,6 +12,10 @@ Button config:
     import <filename>
     import terra_doctest
     terra_doctest.run("<filename>")
+
+From the shell, where the file is named as a file:
+
+    terra_doctest bla.py
 """
 
 import doctest
@@ -187,3 +191,21 @@ def run(module):
         print(_labelled("the example", call))
         print(_labelled("should give", want, _green))
         print(_labelled("your code gave", got, _red))
+
+
+def _main(argv):
+    """Check each file named on the command line."""
+    if not argv:
+        print("usage: terra_doctest <file.py> ...")
+        return
+
+    for index, name in enumerate(argv):
+        if index:
+            print()
+
+        # A student names the file, while run() works in modules.
+        run(name[:-3] if name.endswith(".py") else name)
+
+
+if __name__ == "__main__":
+    _main(sys.argv[1:])

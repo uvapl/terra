@@ -2,6 +2,7 @@ import { getFileExtension } from '../lib/helpers.js'
 import LangWorkerClient from '../platforms/lang-worker-client.js';
 import VirtualFileSystem from '../fs/vfs.js';
 import CommandRegistry from '../commands/registry.js';
+import { pythonShellCommands } from '../platforms/py.commands.js';
 import { checkEnvironment } from '../lib/environment.js';
 import { triggerPluginEvent } from '../lib/plugin-manager.js';
 
@@ -128,6 +129,10 @@ export default class BaseApp {
   async init() {
     // Nothing can run without shared memory.
     if (!checkEnvironment()) return;
+
+    // Python is built in, so it registers its own shell commands here rather
+    // than from a plugin.
+    this.langWorkerClient.registerShellCommands('py', pythonShellCommands);
 
     // Lets plugins add their languages and output surfaces to the app before the
     // layout is built.

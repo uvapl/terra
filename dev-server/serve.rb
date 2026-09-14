@@ -6,7 +6,7 @@ class Server < WEBrick::HTTPServer
   # otherwise cached very aggressively and keep running stale code across
   # reloads. Large static binaries (e.g. the Pyodide/WASM assets) are left
   # cacheable so they are not re-downloaded on every reload.
-  NO_STORE_EXTENSIONS = %w[.js .css .html].freeze
+  NO_STORE_EXTENSIONS = %w[.js .css .html .py].freeze
 
   def service(req, res)
     super

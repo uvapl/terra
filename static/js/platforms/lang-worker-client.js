@@ -13,15 +13,22 @@ import { hasSharedMemory } from '../lib/environment.js';
  * more via registerLang(). The owner lets a worker's custom messages be routed
  * back to just that plugin instead of every plugin.
  *
- * `commands` names the interpreters that directly run a script in this
- * language from the shell.
- *
- * @type {Object<string, { path: string, owner: ?string, lazyFiles: boolean, commands: string[] }>}
+ * @type {Object<string, { path: string, owner: ?string, lazyFiles: boolean }>}
  */
 const workers = {
-  c: { path: 'static/js/platforms/clang.worker.js', owner: null, lazyFiles: true, commands: [] },
-  py: { path: 'static/js/platforms/py.worker.js', owner: null, lazyFiles: false, commands: ['python', 'python3'] },
+  c: { path: 'static/js/platforms/clang.worker.js', owner: null, lazyFiles: true },
+  py: { path: 'static/js/platforms/py.worker.js', owner: null, lazyFiles: false },
 };
+
+/**
+ * The commands a shell can run, contributed by the languages that back them
+ * (e.g. 'python3' and 'mypy' by py). Keyed by command name rather than by
+ * language, so registering does not depend on the language's worker being
+ * registered first and a name taken twice is caught on the spot.
+ *
+ * @type {Map<string, { proglang: string, parse: function }>}
+ */
+const shellCommands = new Map();
 
 
 /**
@@ -134,27 +141,61 @@ export default class LangWorkerClient {
    * @param {object} [options]
    * @param {boolean} [options.lazyFiles] - Whether the worker reads project
    *   files on demand instead of being handed their content up front.
-   * @param {string[]} [options.commands] - Interpreter names that launch this
-   *   language from the shell, e.g. `['python', 'python3']`.
+   * @param {object} [options.shellCommands] - Shell commands this language
+   *   backs, see registerShellCommands().
    */
-  registerLang(proglang, workerPath, owner = null, { lazyFiles = false, commands = [] } = {}) {
-    workers[proglang] = { path: workerPath, owner, lazyFiles, commands };
+  registerLang(proglang, workerPath, owner = null, { lazyFiles = false, shellCommands } = {}) {
+    workers[proglang] = { path: workerPath, owner, lazyFiles };
+
+    if (shellCommands) {
+      this.registerShellCommands(proglang, shellCommands);
+    }
   }
 
   /**
-   * The language an interpreter command runs, e.g. 'py' for 'python3'. The
-   * shell uses this to tell an interpreter launch from a builtin, and to
-   * reject a file the interpreter cannot run.
+   * Declare the commands a shell can run in this language. A command is
+   * `{ parse }`, where parse(argv, ctx) returns the spec its worker runs, or
+   * throws an error whose message the shell prints.
+   *
+   * @param {string} proglang - The language whose worker runs these commands.
+   * @param {Object<string, { parse: function }>} commands - Keyed by the name
+   *   typed at the prompt, e.g. `python3`.
+   */
+  registerShellCommands(proglang, commands) {
+    for (const [name, command] of Object.entries(commands)) {
+      const existing = shellCommands.get(name);
+
+      // Plugins load in whichever order their imports settle, so refusing the
+      // second registration keeps the outcome the same every time.
+      if (existing) {
+        console.warn(
+          `Command "${name}" is already registered by ${existing.proglang}, ignoring ${proglang}`
+        );
+        continue;
+      }
+
+      shellCommands.set(name, { proglang, parse: command.parse });
+    }
+  }
+
+  /**
+   * Whether a command is one a language registered.
    *
    * @param {string} command - The first word of a command line.
-   * @returns {?string} The programming language, or null when the command is
-   * not an interpreter.
+   * @returns {boolean}
    */
-  getLangForCommand(command) {
-    const match = Object.entries(workers).find(
-      ([, worker]) => worker.commands?.includes(command)
-    );
-    return match ? match[0] : null;
+  hasShellCommand(command) {
+    return shellCommands.has(command);
+  }
+
+  /**
+   * Look up a registered shell command.
+   *
+   * @param {string} command - The first word of a command line.
+   * @returns {?{ proglang: string, parse: function }}
+   */
+  getShellCommand(command) {
+    return shellCommands.get(command) || null;
   }
 
   /**
@@ -330,6 +371,36 @@ export default class LangWorkerClient {
         runAsConfig,
         // Tells the worker whether `vfsFiles` entries carry content or are
         // name-only entries that can later be lazy-loaded.
+        lazyFiles: this.usesLazyFiles(proglang),
+        echoCmd,
+      },
+    });
+  }
+
+  /**
+   * Run a command line in a language's worker.
+   *
+   * @param {string} proglang - The programming language.
+   * @param {object} spec - What to run. Opaque here; only that language's
+   *   worker interprets it.
+   * @param {string} cwd - The working directory, relative to the project root.
+   * @param {object[]} files - The run file payload, see App.getRunFiles().
+   * @param {string} cmdline - The command as typed, for the echo.
+   * @param {boolean} [echoCmd] - Whether the worker should echo the command.
+   */
+  async runCommand(proglang, spec, cwd, files, cmdline, echoCmd = true) {
+    this._runQueued = true;
+    await this.load(proglang);
+    this._runQueued = false;
+    this.isRunningCode = true;
+    this.handlers.onRunStarted();
+    this.port.postMessage({
+      id: 'runCommand',
+      data: {
+        spec,
+        cwd,
+        cmdline,
+        vfsFiles: files,
         lazyFiles: this.usesLazyFiles(proglang),
         echoCmd,
       },

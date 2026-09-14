@@ -72,6 +72,63 @@ buttons:
 `<filename>` is replaced with the active tab's module name. `run` also accepts
 an already-imported module object.
 
+In the shell it is a command, naming the file rather than the module, and
+taking more than one:
+
+```
+terra_doctest bla.py
+```
+
+### `terra_run`
+
+Runs one command line. The worker hands it a spec — a script or a module, the
+arguments, and what `sys.argv[0]` should be — and gets back an exit status and,
+when something went wrong, the text to print.
+
+It exists to make the shell's Python behave like the real thing. `sys.exit()`
+ends a program instead of showing a traceback, so `python -m doctest bla.py`
+reporting failures is not itself an error. Tracebacks are formatted here rather
+than in JavaScript, dropping the frames of `terra_run` and `runpy` so a student
+only sees their own code.
+
+A script is compiled under the path the user typed, which is what puts
+`bla.py` (rather than `/home/pyodide/bla.py`) in `sys.argv[0]`, `__file__` and
+tracebacks. A module runs through `runpy.run_module` with `alter_sys=False`,
+which keeps `sys.argv[0]` under Terra's control at the price of leaving
+`sys.modules["__main__"]` alone — code that pickles classes defined in a
+module run with `-m`, or that introspects `__main__`, behaves differently from
+CPython there.
+
+## Running commands from the shell
+
+The shell plugin knows no Python. Each language contributes the commands it
+backs through `registerShellCommands()` on the language worker client, and the
+shell asks that client when a command is typed; Python's are declared in
+[`py.commands.js`](../static/js/platforms/py.commands.js), which is also the
+only place that turns a Python command line into a spec.
+
+| Command | What it runs |
+| --- | --- |
+| `python bla.py one two` | The script, with arguments in `sys.argv`. |
+| `python -m doctest -v bla.py` | Any module, as `python -m` does. |
+| `mypy bla.py` | Shorthand for `python -m mypy`. |
+| `pytest`, `pycodestyle` | Same, for the other bundled checkers. |
+| `terra_doctest bla.py` | The friendly example checker, see above. |
+
+Arguments after the command are passed through untouched. There is no glob
+expansion, so `mypy *.py` reaches mypy as the literal `*.py`. `python` with no
+arguments, `-c` and other options are refused. Everything the shell can catch
+cheaply — an unknown option, a missing file, a file that is not `.py` — is
+reported at the prompt without starting Python.
+
+A command runs in the shell's working directory, so `cd src` then
+`python main.py` behaves like it does in a terminal. The Run button has no
+working directory of its own and keeps running a file from its own folder.
+
+mypy is a 6.6 MB wheel with 217 shared objects, and the Python worker is
+replaced after every run, so each `mypy` invocation pays a few seconds of
+loading. Its cache is pointed at `/tmp` so it never lands in the project.
+
 ## Updating Pyodide
 
 Everything is driven by one script and one version file.
@@ -184,3 +241,5 @@ Then open the IDE and check:
 - `import numpy`, `import pandas`, a matplotlib `Agg` plot, `import pytest`,
   `import mypy`, `import checkpy`, `import pycodestyle` all import — and in the
   network tab the wheels come from `static/wasm/py/wheels/`, never a CDN.
+- In the shell, `python -m doctest -v bla.py` reports the examples and
+  `mypy bla.py` reports type errors, both without a traceback.
