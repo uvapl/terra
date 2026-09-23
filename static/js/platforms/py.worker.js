@@ -430,6 +430,10 @@ class API extends BaseAPI {
     // Keep track of original file modification times.
     let baseline = new Map();
 
+    // Anything that stops the run before python reports a status of its own
+    // counts as a failure.
+    let exitCode = 1;
+
     try {
       // Ensure that we always operate from the home directory as a fresh start.
       this.pyodide.FS.chdir(HOME_DIR);
@@ -442,7 +446,8 @@ class API extends BaseAPI {
 
       await this._preloadPackages(spec, vfsFiles, cwd);
 
-      const error = this._exec(spec);
+      const { status, error } = this._exec(spec);
+      exitCode = status;
       if (error) {
         this.hostWrite(error);
       }
@@ -470,7 +475,7 @@ class API extends BaseAPI {
         console.error('Failed to clean up after the run:', err);
       }
 
-      this.runUserCodeCallback();
+      this.runUserCodeCallback(exitCode);
       this.restartCallback();
     }
   }
@@ -522,7 +527,8 @@ class API extends BaseAPI {
    * Execute a spec through Terra's runner module.
    *
    * @param {object} spec - What to run, see terra_run.main().
-   * @returns {?string} The error message to print, or null.
+   * @returns {{ status: number, error: ?string }} The exit status, and the
+   * message to print when the program failed.
    */
   _exec(spec) {
     // A script is named by its path in the project, which lives under the
@@ -534,9 +540,7 @@ class API extends BaseAPI {
     // JSON both ways: a JS object would arrive in Python as a proxy that has
     // to be destroyed by hand.
     const result = this.pyodide.pyimport('terra_run').main(JSON.stringify(payload));
-    const { status, error } = JSON.parse(result);
-    this.lastStatus = status;
-    return error;
+    return JSON.parse(result);
   }
 
   /**
@@ -744,8 +748,8 @@ const onAnyMessage = async event => {
           });
         },
 
-        runUserCodeCallback() {
-          port.postMessage({ id: 'runUserCodeCallback' });
+        runUserCodeCallback(exitCode = 0) {
+          port.postMessage({ id: 'runUserCodeCallback', exitCode });
         },
 
         runSnippetCallback(selector) {

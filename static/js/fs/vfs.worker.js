@@ -83,6 +83,38 @@ function excluded(name, include) {
 const tempBinaries = new Map();
 
 /**
+ * When each file was last written through this worker.
+ *
+ * Writing through an OPFS sync access handle leaves the file's `lastModified`
+ * untouched, so a caller comparing timestamps (`make`) would never see a
+ * change. This map records the writes we do ourselves; a file we have not
+ * written this session falls back on its own metadata.
+ *
+ * @type {Map<string, number>}
+ */
+const writeTimes = new Map();
+
+/**
+ * Note that a path was just written.
+ *
+ * @param {string} path - The absolute file path.
+ */
+function recordWrite(path) {
+  writeTimes.set(path, Date.now());
+}
+
+/**
+ * When a file was last written, as far as this worker can tell.
+ *
+ * @param {string} path - The absolute file path.
+ * @param {number} lastModified - What the file's own metadata reports.
+ * @returns {number} A timestamp.
+ */
+function modifiedAt(path, lastModified) {
+  return Math.max(lastModified, writeTimes.get(path) || 0);
+}
+
+/**
  * For polling or external changes in the FS.
  */
 let watchRootFolderInterval;
@@ -159,6 +191,7 @@ const handlers = {
     _vfsBaseFolder = baseFolderName;
 
     tempBinaries.clear();
+    writeTimes.clear();
 
     console.log(`base folder set: ${baseFolderName} in ${handle}`);
 
@@ -192,6 +225,7 @@ const handlers = {
   async clear() {
     // In-memory tempfiles can always be cleared.
     tempBinaries.clear();
+    writeTimes.clear();
 
     // We only allow clearing when a private browser file system
     // (origin private) is connected and not when the real file
@@ -303,6 +337,7 @@ const handlers = {
     if (content) {
       writeFile(handle, content);
     }
+    recordWrite(parentPath ? `${parentPath}/${name}` : name);
 
     if (isUserInvoked) {
       const filepath = parentPath ? `${parentPath}/${name}` : name;
@@ -333,6 +368,7 @@ const handlers = {
     const handle = await getFileHandleByPath(path, { create: true });
 
     await writeFile(handle, content);
+    recordWrite(path);
 
     if (isUserInvoked) {
       // A freshly created file must post `fileCreated` so the file tree learns
@@ -352,6 +388,8 @@ const handlers = {
    * @returns {Promise<boolean>} Resolves to true if deleted successfully, false otherwise.
    */
   async deleteFile(path, isUserInvoked = true) {
+    writeTimes.delete(path);
+
     // Either delete from the binaries store...
     if (tempBinaries.delete(path)) {
       if (isUserInvoked) {
@@ -475,7 +513,8 @@ const handlers = {
 
   /**
    * Lists every file in the VFS without reading any content. `size` and `mtime`
-   * come from file metadata.
+   * come from file metadata. Build artifacts are listed alongside stored files,
+   * so a caller comparing timestamps (`make`) sees them.
    *
    * @returns {Promise<object[]>} List of objects, each containing the filepath,
    * byte size and last-modified timestamp of the corresponding file.
@@ -483,14 +522,27 @@ const handlers = {
   async getFileList(path) {
     const entries = [];
 
+    const prefix = path ? `${path}/` : '';
+
     await walkFiles(path, async (filepath, handle) => {
       const file = await handle.getFile();
       entries.push({
         path: filepath,
         size: file.size,
-        mtime: file.lastModified,
+        mtime: modifiedAt(`${prefix}${filepath}`, file.lastModified),
       });
     });
+
+    // walkFiles reports paths relative to `path`, so strip the prefix these
+    // carry to match.
+    for (const filepath of tempBinariesUnder(path)) {
+      const temp = tempBinaries.get(filepath);
+      entries.push({
+        path: filepath.slice(prefix.length),
+        size: temp.content.byteLength,
+        mtime: temp.mtime,
+      });
+    }
 
     return entries;
   },
@@ -586,6 +638,10 @@ const handlers = {
    */
   async moveFile(src, dest) {
     console.log(`moveFile: ${src} -> ${dest}`);
+
+    const written = writeTimes.get(src);
+    writeTimes.delete(src);
+    if (written) writeTimes.set(dest, written);
 
     // A temp binary is just tagged with its new filename
     const temp = tempBinaries.get(src);

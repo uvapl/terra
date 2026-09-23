@@ -1,6 +1,7 @@
 import { TerraPlugin } from '../../js/lib/plugin-manager.js';
 import Terra from '../../js/terra.js';
 import { FileNotFoundError, FileTooLargeError } from '../../js/fs/vfs.js';
+import { parseMakefile } from './makefile.js';
 
 /**
  * Error type for shell command failures. The message is printed to the
@@ -9,22 +10,36 @@ import { FileNotFoundError, FileTooLargeError } from '../../js/fs/vfs.js';
 class ShellError extends Error {}
 
 /**
- * The command that compiles a C source into a binary.
+ * The command that builds targets from a makefile.
  */
 const MAKE = 'make';
+
+/**
+ * The makefile names `make` looks for, in the order it tries them.
+ */
+const MAKEFILE_NAMES = ['Makefile', 'makefile'];
+
+/**
+ * Reports a command that failed without a status of its own, the way a shell
+ * numbers a command it could not carry out.
+ */
+const SHELL_ERROR_STATUS = 2;
 
 /**
  * An interactive shell that lives on top of the existing terminal.
  *
  * It owns terminal input (via term.acquireInput) whenever no program is
  * running and provides a small set of builtins (ls, cat, head, echo, pwd, cd,
- * mkdir, touch) operating on the VFS, plus builtin-to-builtin pipes and output
- * redirection.
+ * mkdir, touch, rm) operating on the VFS, plus builtin-to-builtin pipes and
+ * output redirection.
  *
  * Programs are launched through the app, during which the shell yields terminal
  * input and waits for the run to end. Three things count as a program: a
- * command a language registered (`python3 hello.py`, `mypy hello.py`), `make`,
- * and a path to a binary an earlier `make` produced (`./hello alice`).
+ * command a language registered (`python3 hello.py`, `clang -o hello hello.c`),
+ * `make`, and a path to a binary an earlier build produced (`./hello alice`).
+ *
+ * `make` reads the makefile in its working directory and runs each recipe line
+ * through the shell itself, so a recipe can use anything the user can type.
  *
  * The shell keeps its own current working directory, fully separate from the
  * editor/file tree. Paths are VFS-relative; the shell root ('') is the same
@@ -258,8 +273,11 @@ export default class ShellPlugin extends TerraPlugin {
    * Parse and execute a single command line.
    *
    * @param {string} line - The trimmed command line.
+   * @param {boolean} [nested] - True when make is already holding the
+   * terminal, so a program must not take it over again.
+   * @returns {Promise<number>} The exit status.
    */
-  run = async (line) => {
+  run = async (line, nested = false) => {
     const { stages, redirect } = this.parse(line);
 
     if (stages.some((cmd) => this.isProgram(cmd[0]))) {
@@ -269,7 +287,7 @@ export default class ShellPlugin extends TerraPlugin {
       if (redirect) {
         throw new ShellError('redirection is not supported for programs');
       }
-      return this.runProgram(stages[0]);
+      return this.runProgram(stages[0], nested);
     }
 
     // Builtin pipeline: feed each stage's stdout into the next stage's stdin.
@@ -282,6 +300,23 @@ export default class ShellPlugin extends TerraPlugin {
       await this.writeRedirect(redirect, stdin);
     } else {
       this.writeOut(stdin);
+    }
+
+    return 0;
+  }
+
+  /**
+   * Run one line on behalf of make, reporting rather than raising a failure.
+   *
+   * @param {string} line - The command line from a recipe.
+   * @returns {Promise<number>} The exit status.
+   */
+  runLine = async (line) => {
+    try {
+      return await this.run(line, true);
+    } catch (err) {
+      this.writeError(err instanceof ShellError ? err.message : `error: ${err.message}`);
+      return SHELL_ERROR_STATUS;
     }
   }
 
@@ -313,13 +348,19 @@ export default class ShellPlugin extends TerraPlugin {
    * Run a program: make, a binary, or a registered command.
    *
    * @param {string[]} argv - The tokenized command, e.g. ['./hello', 'alice'].
+   * @param {boolean} [nested] - True when make already holds the terminal.
+   * @returns {Promise<number>} The exit status.
    */
-  runProgram = async (argv) => {
+  runProgram = async (argv, nested = false) => {
     const [name] = argv;
 
-    if (name === MAKE) return this.make(argv);
-    if (this.isPath(name)) return this.exec(argv);
-    return this.launchCommand(argv);
+    const start = () => {
+      if (name === MAKE) return this.make(argv);
+      if (this.isPath(name)) return this.exec(argv);
+      return this.launchCommand(argv);
+    };
+
+    return nested ? start() : this.launch(start);
   }
 
   /**
@@ -327,47 +368,187 @@ export default class ShellPlugin extends TerraPlugin {
    * afterwards. Raised errors are printed.
    *
    * @param {function} start - Starts the run. Awaited.
+   * @returns {Promise<number>} The exit status the run reported, or a failure
+   * status when it raised instead.
    */
   launch = async (start) => {
     this.term.releaseInput('shell');
     try {
-      await start();
+      return await start();
     } catch (err) {
       this.writeError(err.message);
+      return SHELL_ERROR_STATUS;
     } finally {
       this.term.acquireInput('shell', { onKey: this.handleKey, onPaste: this.handlePaste });
     }
   }
 
   /**
-   * Compile a C source into a binary: `make hello` builds hello.c into hello.
-   * This does not read a makefile!
+   * Build targets from the makefile in the current directory.
    *
    * @param {string[]} argv - The tokenized command.
+   * @returns {Promise<number>} The exit status.
    */
   make = async (argv) => {
-    const [, target, ...rest] = argv;
+    const goals = argv.slice(1);
+    const { rules, first } = await this.readMakefile();
 
-    if (!target) {
-      throw new ShellError(`${MAKE}: *** No targets specified and no makefile found.  Stop.`);
-    }
-    if (rest.length > 0) {
-      throw new ShellError(`${MAKE}: only one target at a time is supported`);
-    }
-
-    const noRule = `${MAKE}: *** No rule to make target '${target}'.  Stop.`;
-
-    // `make hello.c` is a common mistake
-    if (target.endsWith('.c')) {
-      throw new ShellError(`${noRule}\nDid you mean \`${MAKE} ${target.replace(/\.c$/, '')}\`?`);
+    if (goals.length === 0) {
+      if (first === null) {
+        throw new ShellError(`${MAKE}: *** No targets specified and no makefile found.  Stop.`);
+      }
+      goals.push(first);
     }
 
-    const source = `${this.resolvePath(target)}.c`;
-    if (!(await this.isFile(source))) {
-      throw new ShellError(noRule);
+    for (const goal of goals) {
+      // `make hello.c` is a common mistake, and a source file is otherwise
+      // simply up to date, which says nothing useful.
+      if (!rules.has(goal) && goal.endsWith('.c')) {
+        throw new ShellError(
+          `${MAKE}: *** No rule to make target '${goal}'.  Stop.` +
+          `\nDid you mean \`${MAKE} ${goal.replace(/\.c$/, '')}\`?`);
+      }
+
+      if (!(await this.makeTarget(goal, rules, null, []))) {
+        this.writeOut(`${MAKE}: '${goal}' is up to date.`);
+      }
     }
 
-    return this.launch(() => Terra.app.compileFile(source));
+    return 0;
+  }
+
+  /**
+   * Read the makefile in the current directory. Its absence is not an error:
+   * make falls back on the implicit rule, so `make hello` keeps working in a
+   * folder that has only sources.
+   *
+   * @returns {Promise<{ rules: Map, first: ?string }>} See parseMakefile().
+   */
+  readMakefile = async () => {
+    for (const name of MAKEFILE_NAMES) {
+      if (!(await this.isFile(this.resolvePath(name)))) continue;
+
+      const text = await Terra.app.vfs.readFile(this.resolvePath(name));
+      try {
+        return parseMakefile(text, name);
+      } catch (err) {
+        throw new ShellError(err.message);
+      }
+    }
+
+    return { rules: new Map(), first: null };
+  }
+
+  /**
+   * The rule make applies when the makefile has none for a target: build
+   * `hello` from `hello.c`. This is what `make hello` did before makefiles
+   * were read at all.
+   *
+   * @param {string} name - The target.
+   * @returns {Promise<?object>} A rule, or null when there is no source.
+   */
+  implicitRule = async (name) => {
+    const source = `${name}.c`;
+    if (!(await this.isFile(this.resolvePath(source)))) return null;
+
+    return {
+      deps: [source],
+      recipe: [{ text: `clang -o ${name} ${source}`, echo: true, ignoreErrors: false }],
+    };
+  }
+
+  /**
+   * Bring one target up to date, building its prerequisites first.
+   *
+   * @param {string} name - The target to build.
+   * @param {Map} rules - The rules from the makefile.
+   * @param {?string} parent - The target that needs this one, for the error.
+   * @param {string[]} stack - The targets being built further up, to catch a
+   * rule that depends on itself.
+   * @throws {ShellError} When there is no rule, or a recipe fails.
+   * @returns {Promise<boolean>} True when a recipe ran.
+   */
+  makeTarget = async (name, rules, parent, stack) => {
+    if (stack.includes(name)) {
+      this.writeOut(`${MAKE}: Circular ${parent} <- ${name} dependency dropped.`);
+      return false;
+    }
+
+    const rule = rules.get(name) || await this.implicitRule(name);
+
+    if (!rule) {
+      // A prerequisite with no rule is a source file, and is up to date by
+      // virtue of existing.
+      if (await this.isFile(this.resolvePath(name))) return false;
+
+      const needed = parent ? `, needed by '${parent}'` : '';
+      throw new ShellError(`${MAKE}: *** No rule to make target '${name}'${needed}.  Stop.`);
+    }
+
+    let rebuilt = false;
+    for (const dep of rule.deps) {
+      if (await this.makeTarget(dep, rules, name, [...stack, name])) {
+        rebuilt = true;
+      }
+    }
+
+    if (!rebuilt && await this.isUpToDate(name, rule.deps)) {
+      return false;
+    }
+
+    await this.runRecipe(name, rule.recipe);
+    return true;
+  }
+
+  /**
+   * Whether a target is newer than everything it is built from.
+   *
+   * @param {string} name - The target.
+   * @param {string[]} deps - Its prerequisites.
+   * @returns {Promise<boolean>}
+   */
+  isUpToDate = async (name, deps) => {
+    const targetTime = await this.fileMtime(name);
+    if (targetTime === null) return false;
+
+    for (const dep of deps) {
+      const depTime = await this.fileMtime(dep);
+      if (depTime === null || depTime > targetTime) return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * When a file was last written, for make's comparison. Build artifacts are
+   * listed alongside stored files, so an object file counts too.
+   *
+   * @param {string} name - A path as the makefile writes it.
+   * @returns {Promise<?number>} The timestamp, or null when there is no file.
+   */
+  fileMtime = async (name) => {
+    const { parent, name: filename } = this.splitPath(this.resolvePath(name));
+    const files = await Terra.app.vfs.getFileList(parent);
+    const entry = files.find((file) => file.path === filename);
+    return entry ? entry.mtime : null;
+  }
+
+  /**
+   * Run every command of a recipe, printing each one first.
+   *
+   * @param {string} target - The target being built, for the error.
+   * @param {object[]} recipe - See parseMakefile().
+   * @throws {ShellError} When a command fails.
+   */
+  runRecipe = async (target, recipe) => {
+    for (const command of recipe) {
+      if (command.echo) this.writeOut(command.text);
+
+      const status = await this.runLine(command.text);
+      if (status !== 0 && !command.ignoreErrors) {
+        throw new ShellError(`${MAKE}: *** [${target}] Error ${status}`);
+      }
+    }
   }
 
   /**
@@ -375,6 +556,7 @@ export default class ShellPlugin extends TerraPlugin {
    * argv[0] is the command as typed
    *
    * @param {string[]} argv - The tokenized command.
+   * @returns {Promise<number>} The program's exit status.
    */
   exec = async (argv) => {
     const [cmd, ...args] = argv;
@@ -389,7 +571,7 @@ export default class ShellPlugin extends TerraPlugin {
       throw new ShellError(`${cmd}: Permission denied`);
     }
 
-    return this.launch(() => Terra.app.execBinary(path, args, cmd));
+    return Terra.app.execBinary(path, args, cmd);
   }
 
   /**
@@ -398,6 +580,7 @@ export default class ShellPlugin extends TerraPlugin {
    * worker runs; the shell only supplies where it runs.
    *
    * @param {string[]} argv - The tokenized command.
+   * @returns {Promise<number>} The program's exit status.
    */
   launchCommand = async (argv) => {
     const { proglang, parse } = Terra.app.langWorkerClient.getShellCommand(argv[0]);
@@ -413,10 +596,10 @@ export default class ShellPlugin extends TerraPlugin {
       throw new ShellError(err.message);
     }
 
-    return this.launch(() => Terra.app.runCommand(proglang, spec, argv.join(' '), {
+    return Terra.app.runCommand(proglang, spec, argv.join(' '), {
       cwd: this.cwd,
       fromShell: true,
-    }));
+    });
   }
 
   /**
@@ -520,9 +703,45 @@ export default class ShellPlugin extends TerraPlugin {
 
       for (const arg of args) {
         const path = this.resolvePath(arg);
-        if (!(await Terra.app.vfs.pathExists(path))) {
+        if (await Terra.app.vfs.pathExists(path)) {
+          // Rewrite the file so only its modification time changes, which is
+          // what make looks at.
+          await Terra.app.vfs.updateFile(path, await Terra.app.vfs.readFile(path));
+        } else {
           await Terra.app.vfs.createFile(path, '');
         }
+      }
+      return '';
+    },
+
+    rm: async (args) => {
+      let recursive = false;
+      let force = false;
+      const paths = [];
+
+      for (const arg of args) {
+        if (arg === '-r' || arg === '-rf' || arg === '-fr') recursive = true;
+        if (arg === '-f' || arg === '-rf' || arg === '-fr') force = true;
+        if (!arg.startsWith('-')) paths.push(arg);
+      }
+
+      if (paths.length === 0 && !force) throw new ShellError('rm: missing operand');
+
+      for (const arg of paths) {
+        const path = this.resolvePath(arg);
+
+        if (await this.isFolder(path)) {
+          if (!recursive) throw new ShellError(`rm: ${arg}: is a directory`);
+          await Terra.app.vfs.deleteFolder(path);
+          continue;
+        }
+
+        if (!(await Terra.app.vfs.pathExists(path))) {
+          if (force) continue;
+          throw new ShellError(`rm: ${arg}: No such file or directory`);
+        }
+
+        await Terra.app.vfs.deleteFile(path);
       }
       return '';
     },

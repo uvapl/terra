@@ -643,9 +643,6 @@ class App {
     try {
       this.exports._start();
     } catch (exn) {
-      /* Do NOT write the stacktrace, as this is not useful for students. */
-      let writeStack = false;
-
       if (exn instanceof ProcExit) {
         if (exn.code === RAF_PROC_EXIT_CODE) {
           console.log('Allowing rAF after exit.');
@@ -657,16 +654,16 @@ class App {
         if (exn.code == 0) {
           return false;
         }
-        writeStack = false;
+
+        // A process that exits with a status has said whatever it had to say
+        // on its own stderr, the way clang prints its diagnostics. Restating
+        // the status only gets in the way, and the caller has it anyway.
+        throw exn;
       }
 
-      // Write error message.
-      let msg = `\x1b[91mError: ${describeRuntimeError(exn)}`;
-      if (writeStack) {
-        msg = msg + `\n${exn.stack}`;
-      }
-      msg += '\x1b[0m\n';
-      this.memfs.hostWrite(msg);
+      // Write the error message, but never the stack trace: it says nothing
+      // a student can act on.
+      this.memfs.hostWrite(`\x1b[91mError: ${describeRuntimeError(exn)}\x1b[0m\n`);
 
       // Propagate error.
       throw exn;
@@ -946,7 +943,16 @@ class API extends BaseAPI {
     ]);
   }
 
-  async link(objs, wasm) {
+  /**
+   * Link object files into a wasm binary.
+   *
+   * @param {string[]} objs - The object files to link.
+   * @param {string} wasm - The output path.
+   * @param {string[]} [libs] - Extra `-l` flags, e.g. the ones a clang command
+   * line asked for. They come after the always-linked libraries, so a library
+   * the user names can satisfy those too.
+   */
+  async link(objs, wasm, libs = []) {
     const stackSize = 1024 * 1024;
     const libdir = 'lib/wasm32-wasi';
     const crt1 = `${libdir}/crt1.o`;
@@ -957,7 +963,7 @@ class API extends BaseAPI {
       lld, 'wasm-ld', '--no-threads',
       '--export-dynamic',
       '-z', `stack-size=${stackSize}`,
-      `-L${libdir}`, crt1, ...objs, ...this.ldflags,
+      `-L${libdir}`, crt1, ...objs, ...this.ldflags, ...libs,
       '-o', wasm,
     ]);
   }
@@ -986,9 +992,6 @@ class API extends BaseAPI {
   async buildTarget({ srcFiles, srcFilenames, vfsFilePaths, target, lazyFiles }) {
     const wasm = `${target}.wasm`;
     const objectFiles = [];
-
-    this.hostWriteCmd(`make ${target}`);
-    this.hostWrite(makeCmdPlaceholder(srcFilenames, target) + '\n');
 
     // Check if the user misspelled some paths in srcFilenames.
     const incorrectFiles = srcFilenames
@@ -1067,6 +1070,10 @@ class API extends BaseAPI {
       ? runAsConfig.compileTarget
       : activeTabPath.replace(/\.c$/, '');
 
+    // The Run button and the run-as modal have no command line of their own,
+    // so show the compile they come down to. The shell echoes its own lines.
+    this.hostWriteCmd(makeCmdPlaceholder(srcFilenames, target));
+
     // prep
     this.memfs.startRun(lazyFiles ? vfsFilePaths : []);
 
@@ -1096,11 +1103,18 @@ class API extends BaseAPI {
   async execute(cmd, binary, args) {
     this.hostWriteCmd([cmd, ...args].join(' '));
 
+    let exitCode = 0;
     try {
       const module = await WebAssembly.compile(binary);
       return await this.run([module, cmd, ...args]);
+    } catch (err) {
+      // App.run() has already written the diagnostic; only the status is
+      // needed here, and rethrowing would only become an unhandled rejection
+      // in the worker's message handler.
+      exitCode = err instanceof ProcExit ? err.code : 1;
+      return null;
     } finally {
-      this.runUserCodeCallback();
+      this.runUserCodeCallback(exitCode);
     }
   }
 
@@ -1115,7 +1129,7 @@ class API extends BaseAPI {
     // start the build
     const { target, binary } = await this.build(data);
     if (!binary) {
-      this.runUserCodeCallback();
+      this.runUserCodeCallback(1);
       return;
     }
 
@@ -1128,20 +1142,152 @@ class API extends BaseAPI {
   }
 
   /**
-   * Compile the user's code without running it. Backs the shell's `make`.
+   * Read an input file the command names, either from the payload or on
+   * demand through the file channel.
    *
-   * @param {object} data - See build().
+   * @param {string} path - The (VFS-relative) file path.
+   * @param {object[]} vfsFiles - Every file in the VFS, stubs when lazy.
+   * @param {boolean} lazyFiles - Whether `vfsFiles` entries are stubs.
+   * @returns {?(string|Uint8Array)} The content, or null when unreadable.
    */
-  async compileUserCode(data) {
+  loadInput(path, vfsFiles, lazyFiles) {
+    if (lazyFiles) {
+      return this.readProjectFile(path);
+    }
+
+    const file = vfsFiles.find((entry) => entry.path === path);
+    return file ? file.content : null;
+  }
+
+  /**
+   * Compile one source into one object file inside memfs.
+   *
+   * @param {string} input - The source path.
+   * @param {string} obj - The object path to write.
+   * @param {object[]} vfsFiles - See loadInput().
+   * @param {boolean} lazyFiles - See loadInput().
+   * @throws {Error} When the source cannot be read or clang reports an error.
+   */
+  async compileInput(input, obj, vfsFiles, lazyFiles) {
+    const content = this.loadInput(input, vfsFiles, lazyFiles);
+    if (content === null) {
+      this.hostWriteError(`clang: error: cannot read '${input}'\n`);
+      throw new Error(`cannot read ${input}`);
+    }
+
+    this.memfs.ensureDirs(input);
+    this.memfs.ensureDirs(obj);
+
+    // compile() adds the source to memfs itself; keep the wrapper off it.
+    this.memfs.markRead(input);
+    await this.compile({ input, content, obj });
+  }
+
+  /**
+   * Take a file out of memfs to hand back to the host. Both object files and
+   * linked binaries go back as build artifacts, so a later command in the same
+   * shell session (the next recipe line of a makefile, say) can read them
+   * again: memfs itself is wiped at the start of every run.
+   *
+   * @param {string} memfsPath - Where the file sits in memfs.
+   * @param {string} path - Where it belongs in the VFS.
+   * @returns {object} A file entry for newOrModifiedFilesCallback().
+   */
+  producedFile(memfsPath, path) {
+    // getFileContents hands back a view onto memfs's own heap, which the next
+    // build overwrites, so take a copy before it leaves this method.
+    return { path, content: this.memfs.getFileContents(memfsPath).slice(), temporary: true };
+  }
+
+  /**
+   * Run a clang command line: either compile sources into object files, or
+   * compile and link them into a binary.
+   *
+   * @param {object} data - The data object coming from the main thread.
+   * @param {object} data.spec - What to build, see parseClang() in
+   * c.commands.js. Its paths are already resolved against the shell's cwd.
+   * @param {string} data.cmdline - The command as typed, for the echo.
+   * @param {array} data.vfsFiles - Every file in the VFS. When `lazyFiles` is
+   * set these carry no content and are read on demand.
+   * @param {boolean} data.lazyFiles - Whether `vfsFiles` entries are stubs.
+   */
+  async runCommand({ spec, cmdline, vfsFiles, lazyFiles }) {
     await this.ready;
 
-    await this.build(data);
+    this.hostWriteCmd(cmdline);
+    this.memfs.startRun(lazyFiles ? vfsFiles.map((file) => file.path) : []);
 
-    // Run-end both cleans up the terminal and releases whoever is waiting. A
-    // build reports nothing else: its diagnostics have already been written,
-    // and killing the worker mid-build still settles the caller through the
-    // run-end the client synthesises.
-    this.runUserCodeCallback();
+    let exitCode = 0;
+    try {
+      const produced = spec.mode === 'compile'
+        ? await this.compileOnly(spec, vfsFiles, lazyFiles)
+        : await this.compileAndLink(spec, vfsFiles, lazyFiles);
+
+      this.newOrModifiedFilesCallback(produced);
+    } catch {
+      // clang and wasm-ld have already written their own diagnostics.
+      exitCode = 1;
+    } finally {
+      this.runUserCodeCallback(exitCode);
+    }
+  }
+
+  /**
+   * Compile each source into its own object file, as `clang -c` does.
+   *
+   * @param {object} spec - With a `jobs` list of `{ input, output }`.
+   * @param {object[]} vfsFiles - See loadInput().
+   * @param {boolean} lazyFiles - See loadInput().
+   * @returns {Promise<object[]>} The object files produced.
+   */
+  async compileOnly({ jobs }, vfsFiles, lazyFiles) {
+    const produced = [];
+
+    for (const { input, output } of jobs) {
+      await this.compileInput(input, output, vfsFiles, lazyFiles);
+      produced.push(this.producedFile(output, output));
+    }
+
+    return produced;
+  }
+
+  /**
+   * Compile any sources and link everything into one binary.
+   *
+   * Objects compiled along the way stay inside memfs, the way a real clang
+   * leaves no `.o` behind when it is asked for a program.
+   *
+   * @param {object} spec - With `inputs`, `output` and `libs`.
+   * @param {object[]} vfsFiles - See loadInput().
+   * @param {boolean} lazyFiles - See loadInput().
+   * @returns {Promise<object[]>} The binary produced.
+   */
+  async compileAndLink({ inputs, output, libs }, vfsFiles, lazyFiles) {
+    const objectFiles = [];
+
+    for (const input of inputs) {
+      if (input.endsWith('.o')) {
+        const content = this.loadInput(input, vfsFiles, lazyFiles);
+        if (content === null) {
+          this.hostWriteError(`clang: error: cannot read '${input}'\n`);
+          throw new Error(`cannot read ${input}`);
+        }
+        this.memfs.ensureDirs(input);
+        this.memfs.addFile(input, content);
+        this.memfs.markRead(input);
+        objectFiles.push(input);
+        continue;
+      }
+
+      const obj = `${input.replace(/\.c$/, '')}.o`;
+      await this.compileInput(input, obj, vfsFiles, lazyFiles);
+      objectFiles.push(obj);
+    }
+
+    const wasm = `${output}.wasm`;
+    await this.link(objectFiles, wasm, libs);
+
+    return [this.producedFile(wasm, output)];
   }
 
   /**
@@ -1238,8 +1384,8 @@ const onAnyMessage = async event => {
           port.postMessage({ id: 'ready' });
         },
 
-        runUserCodeCallback() {
-          port.postMessage({ id: 'runUserCodeCallback' });
+        runUserCodeCallback(exitCode = 0) {
+          port.postMessage({ id: 'runUserCodeCallback', exitCode });
         },
 
         newOrModifiedFilesCallback(newOrModifiedFiles) {
@@ -1262,8 +1408,8 @@ const onAnyMessage = async event => {
       currentApp = await api.runUserCode(event.data.data);
       break;
 
-    case 'compileUserCode':
-      await api.compileUserCode(event.data.data);
+    case 'runCommand':
+      await api.runCommand(event.data.data);
       break;
 
     case 'runBinary':

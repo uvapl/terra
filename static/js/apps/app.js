@@ -510,7 +510,7 @@ export default class App extends BaseApp {
        * button and clean up the terminal. Safe on normal completion too: there
        * is nothing pending to dispose and the cursor is already hidden.
        */
-      onRunEnded: () => {
+      onRunEnded: (exitCode = 0) => {
         // If the run finished before the stop-button delay elapsed, cancel it
         // so the button never flips — avoiding a flash for very short runs.
         if (this._runButtonTimer) {
@@ -535,7 +535,7 @@ export default class App extends BaseApp {
         if (this._runEndResolver) {
           const resolve = this._runEndResolver;
           this._runEndResolver = null;
-          resolve();
+          resolve(exitCode);
         }
 
         // Notify plugins that the run has ended, after the terminal cleanup
@@ -675,7 +675,7 @@ export default class App extends BaseApp {
    * @param {string} [options.cwd] - Working directory, relative to the root.
    * @param {boolean} [options.clearTerm] - Clear the terminal before running.
    * @param {boolean} [options.fromShell] - The user typed this command.
-   * @returns {Promise<void>} Resolves when the run has ended.
+   * @returns {Promise<number>} The command's exit status, once it has ended.
    */
   async runCommand(proglang, spec, cmdline, options = {}) {
     if (!this.langWorkerClient.supports(proglang)) {
@@ -700,41 +700,13 @@ export default class App extends BaseApp {
   }
 
   /**
-   * Compile a source file without running it.
-   *
-   * @async
-   * @param {string} filepath - The source file to compile.
-   * @returns {Promise<void>} Resolves when the build has ended.
-   */
-  async compileFile(filepath) {
-    const proglang = getFileExtension(filepath);
-    if (proglang !== 'c') {
-      throw new Error(`cannot compile '${filepath}': not a C file`);
-    }
-    if (this.langWorkerClient.isRunningCode) {
-      throw new Error('a program is already running');
-    }
-
-    this._refocusEditorOnRunEnd = false;
-    triggerPluginEvent('onRunStart');
-    this.term?.focus();
-
-    await this.writeEditorsNow();
-    const files = await this.getRunFiles(proglang);
-
-    const compileEnded = new Promise(resolve => { this._runEndResolver = resolve; });
-    await this.langWorkerClient.compileFile(proglang, filepath, files, false);
-    return compileEnded;
-  }
-
-  /**
    * Run a previously generated binary by path.
    *
    * @async
    * @param {string} path - The (VFS-absolute) path of the binary.
    * @param {string[]} args - The command-line arguments.
    * @param {string} [cmd] - The command as the user typed it, used as argv[0].
-   * @returns {Promise<void>} Resolves when the run has ended.
+   * @returns {Promise<number>} The program's exit status, once it has ended.
    */
   async execBinary(path, args = [], cmd = path) {
     if (!(await this.vfs.isTempBinary(path))) {

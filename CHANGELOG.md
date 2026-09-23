@@ -32,15 +32,31 @@ Python and C runtimes were updated.
 ### Shell
 
 - New opt-in shell plugin running on top of the terminal. It provides builtins
-  (`ls`, `cat`, `head`, `echo`, `pwd`, `cd`, `mkdir`, `touch`) operating on the
-  virtual file system, pipes between builtins, and output redirection.
+  (`ls`, `cat`, `head`, `echo`, `pwd`, `cd`, `mkdir`, `touch`, `rm`) operating
+  on the virtual file system, pipes between builtins, and output redirection.
 - The shell keeps its own working directory, separate from the editor and file
   tree, and launches programs through the app, yielding terminal input while a
   program runs.
-- `make hello` compiles `hello.c` into `hello`, and `./hello alice bob` runs it
-  with command-line arguments. Both take relative and absolute paths; a bare
-  `hello` is not a path, as in a real shell. `make` does not read a makefile: it
-  compiles with the same clang flags the Run button uses.
+- `clang -c -o hello.o hello.c` compiles a source into an object file, and
+  `clang -o hello hello.o -lm` links one or more objects into a program.
+  `./hello alice bob` then runs it with command-line arguments. Paths may be
+  relative or absolute; a bare `hello` is not a path, as in a real shell.
+  Object files and programs are kept in memory and shown in the file tree, so
+  one command can build on what the previous one produced.
+- Only `-c`, `-o` and `-l` are read from a clang command line. The compiler
+  runs `clang -cc1` and `wasm-ld` directly with a fixed set of flags, so the
+  warning, standard and debug flags a makefile passes have no effect: a program
+  that compiles here is not guaranteed to compile under a real `-Werror`.
+- `make` reads the `Makefile` in its working directory: a target, its
+  prerequisites and tab-indented recipe lines, with the first target as the
+  default goal. A recipe line runs through the shell itself, so it can use any
+  command, and `@` and `-` prefixes work. A target is rebuilt only when it is
+  missing or older than something it is built from, and a failing line stops
+  the build. Variables, automatic variables and pattern rules are not read.
+- Without a makefile, or for a target the makefile has no rule for, `make`
+  falls back on building `hello` from `hello.c`, as it did before.
+- A program that exits with a status no longer has that status restated in the
+  terminal, and the status is now what decides whether `make` carries on.
 - An interpreter now has to match the file it is given. `python3 hello.c` used
   to compile and run a C program; it is now an error.
 - Commands are registered per language rather than hardcoded in the shell, so a

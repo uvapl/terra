@@ -30,6 +30,14 @@ const workers = {
  */
 const shellCommands = new Map();
 
+/**
+ * Reports a program that was killed rather than allowed to finish, the way a
+ * shell numbers a process terminated by a signal.
+ *
+ * @type {number}
+ */
+const ABORTED_EXIT_CODE = 130;
+
 
 /**
  * Main-thread client that manages language workers and provides a
@@ -285,9 +293,10 @@ export default class LangWorkerClient {
     const wasRunning = this.isRunningCode;
     this._destroyWorker();
 
-    // Only when we abort a still-running program:
+    // Only when we abort a still-running program. An aborted program never
+    // succeeded, so it reports the status a shell gives a killed process.
     if (wasRunning) {
-      this.handlers.onRunEnded();
+      this.handlers.onRunEnded(ABORTED_EXIT_CODE);
     }
   }
 
@@ -408,31 +417,6 @@ export default class LangWorkerClient {
   }
 
   /**
-   * Compile a file without running it. Only the C worker implements this.
-   *
-   * @param {string} proglang - The programming language.
-   * @param {string} filepath - The source file.
-   * @param {object[]} files - The run file payload, see App.getRunFiles().
-   * @param {boolean} [echoCmd] - Whether the worker should echo the command.
-   */
-  async compileFile(proglang, filepath, files, echoCmd = true) {
-    this._runQueued = true;
-    await this.load(proglang);
-    this._runQueued = false;
-    this.isRunningCode = true;
-    this.handlers.onRunStarted();
-    this.port.postMessage({
-      id: 'compileUserCode',
-      data: {
-        activeTabPath: filepath,
-        vfsFiles: files,
-        lazyFiles: this.usesLazyFiles(proglang),
-        echoCmd,
-      },
-    });
-  }
-
-  /**
    * Run a binary that was built earlier, with command-line arguments.
    *
    * @param {string} cmd - The command as the user typed it, used as argv[0].
@@ -497,7 +481,7 @@ export default class LangWorkerClient {
     this._createWorker();
 
     if (wasRunning) {
-      this.handlers.onRunEnded();
+      this.handlers.onRunEnded(ABORTED_EXIT_CODE);
     }
   }
 
@@ -614,7 +598,7 @@ export default class LangWorkerClient {
         // will be triggered after excecuting the user's code.
         this.isRunningCode = false;
         this._clearFileCache();
-        this.handlers.onRunEnded();
+        this.handlers.onRunEnded(event.data.exitCode ?? 0);
         break;
 
       case 'newOrModifiedFilesCallback':

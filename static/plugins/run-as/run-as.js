@@ -40,8 +40,7 @@ export default class RunAsPlugin extends TerraPlugin {
     const target = modalEl.querySelector('#compile-target-input').value.replace(/^\.\//, '').trim() || defaultTarget;
 
     modalEl.querySelector('.code-block').innerHTML = `
-      <div class="line cmd">make ${target}</div>
-      <div class="line">clang -ggdb3 -O0 -std=c11 -Wall -Werror -o ${target} ${srcFiles} -lcs50 -lm</div>
+      <div class="line cmd">clang -o ${target} ${srcFiles}</div>
       <div class="line cmd">./${target} ${args}</div>
     `;
   }
