@@ -34,8 +34,12 @@
 }
 
 /* Override GoldenLayout's `.lm_controls` styles */
-.settings-menu {
+.settings-menu,
+.lm_header .lm_controls > .settings-menu {
   opacity: 1;
+  float: none;
+  width: 24px;
+  height: 24px;
 }
 
 .settings-dropdown {

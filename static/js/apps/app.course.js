@@ -280,6 +280,14 @@ export default class CourseApp extends App {
   }
 
   /**
+   * Discard the stored panel layout, then reload. The files stay as they are.
+   */
+  resetLayout() {
+    removeLocalStorageItem('layout');
+    window.location.reload();
+  }
+
+  /**
    * Clear this lab's stored progress and settings, then reload.
    * File tabs are left alone.
    */

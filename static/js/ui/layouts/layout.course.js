@@ -66,16 +66,23 @@ export default class CourseLayout extends Layout {
     $('#lab-reset-menu-item')
       .off('click.labreset')
       .on('click.labreset', () => this.showResetLabModal());
+
+    $('#layout-reset-menu-item')
+      .off('click.layoutreset')
+      .on('click.layoutreset', () => this.delegate.resetLayout());
   }
 
   /**
-   * The "Reset lab progress" entry in the settings menu. Only shows when
-   * the session has a README.
+   * The "Reset layout" and "Reset lab progress" entries in the settings menu.
+   * The latter only shows when the session has a README.
    *
    * @returns {string}
    */
   getExtraSettingsMenuItems() {
-    return '<li id="lab-reset-menu-item">Reset lab progress…</li>';
+    return `
+      <li id="layout-reset-menu-item">Reset layout</li>
+      <li id="lab-reset-menu-item">Reset lab progress…</li>
+    `;
   }
 
   /**
