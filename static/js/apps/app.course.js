@@ -609,6 +609,10 @@ export default class CourseApp extends App {
    * verification purposes.
    */
   async runAutoSave(url, uuid) {
+    // A locked session has nothing left to send, and its stored files may be
+    // all that is there.
+    if (this.config.locked === true) return;
+
     // Explicitly use a try-catch to make sure this auto-save never stops.
     try {
       // Save the editor content.

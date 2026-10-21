@@ -45,7 +45,9 @@ const SCHEMES = {
  * Validate whether the given object is a config as served by a course-site.
  *
  * A config has to name at least one source for its content: `tabs` for the
- * files themselves, or `lab_url` for a lab to take them from.
+ * files themselves, or `lab_url` for a lab to take them from. A locked config
+ * is exempt, because the course-site leaves both out and the session shows
+ * whatever is stored locally.
  *
  * @param {object} config - The config object to validate.
  * @returns {boolean} True when the given object is a valid config object.
@@ -53,7 +55,7 @@ const SCHEMES = {
 export function isValidServerConfig(config) {
   return isObject(config)
     && typeof config.postback === 'string'
-    && (isObject(config.tabs) || typeof config.lab_url === 'string');
+    && (config.locked === true || isObject(config.tabs) || typeof config.lab_url === 'string');
 }
 
 /**
