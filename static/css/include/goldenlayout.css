@@ -17,6 +17,24 @@
   height: 100% !important;
 }
 
+/*
+ * GoldenLayout uses float for row children. When the row is a fraction of a
+ * pixel narrower than the children the last one is invisibly wrapped.
+ * That can be caused by offsetWidth rounding, or stale sizes during
+ * a window resize. We override with flex without wrapping to slightly clip
+ * the overflow.
+ */
+.lm_row {
+  display: flex;
+  flex-wrap: nowrap;
+}
+
+.lm_row > .lm_item,
+.lm_row > .lm_splitter {
+  float: none;
+  flex: none;
+}
+
 .lm_header .lm_tab {
   font-size: inherit;
   font-family: inherit;
